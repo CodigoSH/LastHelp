@@ -1,0 +1,19 @@
+{
+  "name": "lasthelp",
+  "version": "0.1.0",
+  "module": "web/src/main.ts",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "bun web/build.ts",
+    "typecheck": "tsc --noEmit",
+    "i18n:sync": "bun run scripts/i18n-sync.ts",
+    "i18n:audit": "bun run scripts/i18n-audit.ts",
+    "i18n:scan": "bun run scripts/i18n-scan.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
+}

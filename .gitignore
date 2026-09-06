@@ -1,0 +1,89 @@
+# Claude Code
+.claude/
+
+# Go binaries and build artifacts
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+vendor/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE specialized files
+.vscode/
+.idea/
+.agent/
+
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# Web dependencies and build folders
+node_modules/
+web/node_modules/
+web/dist/
+.bun/
+.bun-build/
+
+# OS specialized files
+.DS_Store
+Thumbs.db
+*.icloud
+
+# Logs and coverage
+*.log
+*.out
+*.prof
+coverage/
+
+# Temporary files
+tmp/
+.temp/
+
+# Root binary
+/lasthelp
+/LastHelp
+*.old
+*.tar.gz
+*.tsbuildinfo
+
+# Agent/Coding assistant files
+AGENTS.md
+CLAUDE.md
+cursor_rules/
+.cursorrules
+.github/copilot-instructions.md
+
+# Temporary development notes
+/*_FIXED.md
+/*_STATUS.md
+/*_COMPLETE.md
+/*_DONE.md
+CHECKLIST_*.md
+DEBUG_*.md
+IMPLEMENTATION_*.md
+IMPROVEMENTS_*.md
+TEST_*.md
+ANALYSIS_*.md
+REFACTOR_*.md
+BUILD_*.md
+AUDIT_*.md
+AUDIT.md
+audit.md
+PLAN_*.md
+ROADMAP_*.md

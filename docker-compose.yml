@@ -1,0 +1,21 @@
+services:
+  lasthelp:
+    image: lasthelp:latest
+    build: .
+    container_name: lasthelp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - lasthelp-data:/data
+    environment:
+      # Every knob this binary reads is listed in .env.example.
+      LASTHELP_PORT: "8080"
+      LASTHELP_DB_FILE: "/data/lasthelp.db"
+      # Turn this on only when a reverse proxy really is in front. With it on
+      # and no proxy there, the caller chooses the address we attribute their
+      # requests to, and the rate limits stop meaning anything.
+      LASTHELP_TRUST_PROXY: "false"
+
+volumes:
+  lasthelp-data:

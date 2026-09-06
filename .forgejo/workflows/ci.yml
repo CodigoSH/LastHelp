@@ -1,0 +1,108 @@
+# Runs on every push to main. It checks what exists today; steps are added as
+# the things they check come to exist, never before — a workflow that invokes a
+# script nobody wrote fails every run until somebody deletes the step, which
+# teaches people to delete steps.
+#
+# The release workflow is not here yet, and that is deliberate: there is nothing
+# to release, no signing key and no artefact script. It arrives with the first
+# release, not before it.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # Without this there is no `tsc`: it is a devDependency and nothing else
+      # here installs one. `bun run build` is not affected — the build script
+      # uses only Bun's own APIs — so the failure looks like a missing toolchain
+      # rather than a missing install.
+      - name: install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l ./cmd ./internal)
+          if [ -n "$unformatted" ]; then
+            echo "these files are not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go mod tidy is clean
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum
+
+      - name: go vet
+        run: go vet ./...
+
+      # -count=1 is not optional: the architecture rules read the repository
+      # from disk, which the test cache does not track. A cached pass here means
+      # nothing.
+      - name: architecture rules
+        run: go test -count=1 ./internal/arch/
+
+      - name: frontend build
+        run: bun run build
+
+      - name: typecheck
+        run: bun run typecheck
+
+      - name: backend build
+        run: make backend
+
+      # Building is not running. This starts the binary the job just built and
+      # asks it a question, which is the difference between "it compiles" and
+      # "it works".
+      - name: smoke test
+        run: |
+          LASTHELP_PORT=8099 ./bin/lasthelp &
+          pid=$!
+          for _ in $(seq 1 40); do
+            curl -sf http://127.0.0.1:8099/healthz >/dev/null && break
+            sleep 0.25
+          done
+          curl -sf http://127.0.0.1:8099/healthz | tee /dev/stderr | grep -q '"status":"ok"'
+          curl -sf http://127.0.0.1:8099/ | grep -q '<title>LastHelp</title>'
+          LASTHELP_PORT=8099 ./bin/healthcheck
+          kill $pid
+
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The Go build embeds internal/web/dist, which is build output and is not
+      # in the repository. Without this step every package that imports the web
+      # server fails to build, and the failure names go:embed rather than the
+      # missing build.
+      - name: build the frontend the tests need
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: go test
+        run: go test -count=1 -race -covermode=atomic ./...
