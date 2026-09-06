@@ -2,6 +2,7 @@
 package web
 
 import (
+	"database/sql"
 	"embed"
 	"io/fs"
 	"log/slog"
@@ -23,18 +24,19 @@ var content embed.FS
 // that grows here is usually something that belongs in core.
 type Server struct {
 	cfg    config.Config
+	db     *sql.DB
 	mux    *http.ServeMux
 	assets fs.FS
 }
 
 // New wires the routes and returns a server ready to be handed to net/http.
-func New(cfg config.Config) (*Server, error) {
+func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	assets, err := fs.Sub(content, "dist")
 	if err != nil {
 		return nil, err
 	}
 
-	s := &Server{cfg: cfg, mux: http.NewServeMux(), assets: assets}
+	s := &Server{cfg: cfg, db: db, mux: http.NewServeMux(), assets: assets}
 	s.routes()
 	return s, nil
 }

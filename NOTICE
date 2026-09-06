@@ -17,12 +17,29 @@ limitations under the License.
 
 THIRD-PARTY COMPONENTS
 
-1. Go modules compiled into the released binaries and Docker images
+1. Go modules compiled into the released binaries and container images
 
-   None yet. This file is kept accurate by an architecture test that fails the
-   build when a redistributed module is missing from it.
+   This list is kept honest by an architecture test: adding a module to go.mod
+   without adding it here fails the build. `go version -m lasthelp` prints the
+   same inventory out of a binary you already have.
 
-2. Build-time only
+   SQLite driver, pure Go — no cgo, which is why the binary is a single static
+   file:
 
-   TypeScript (Apache-2.0) and bun's bundler are used to build the frontend.
-   Neither is redistributed in the binary.
+     modernc.org/sqlite                  BSD 3-Clause
+     modernc.org/libc                    BSD 3-Clause
+     modernc.org/mathutil                BSD 3-Clause
+     modernc.org/memory                  BSD 3-Clause
+     github.com/dustin/go-humanize       MIT
+     github.com/google/uuid              BSD 3-Clause
+     github.com/mattn/go-isatty          MIT
+     github.com/ncruces/go-strftime      MIT
+     github.com/remyoudompheng/bigfft    BSD 3-Clause
+     golang.org/x/sys                    BSD 3-Clause
+
+   Everything else this binary does uses the Go standard library.
+
+2. Build-time only, not redistributed
+
+   TypeScript (Apache-2.0) and bun's bundler build the frontend. Neither ends
+   up in the binary.
