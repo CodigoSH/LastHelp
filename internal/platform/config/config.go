@@ -32,6 +32,13 @@ type Config struct {
 	// the one *our* proxy appended, which is this many places from the right of
 	// X-Forwarded-For — never the leftmost, which the caller writes.
 	TrustProxyHops int
+
+	// Offline stops every outbound connection this binary can make. It exists
+	// so the claim in SECURITY.md — that the only connections are the forge and
+	// the notification channel the operator configured — is something an
+	// operator can verify rather than take on trust: turn this on, and if
+	// anything still reaches the network, the document is wrong.
+	Offline bool
 }
 
 // Load reads the environment. It never fails: every value has a working
@@ -44,6 +51,7 @@ func Load() Config {
 		LogJSON:        strings.EqualFold(str("LASTHELP_LOG_FORMAT", "text"), "json"),
 		TrustProxy:     boolean("LASTHELP_TRUST_PROXY", false),
 		TrustProxyHops: hops(),
+		Offline:        boolean("LASTHELP_OFFLINE", false),
 	}
 }
 
