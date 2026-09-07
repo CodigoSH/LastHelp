@@ -222,3 +222,109 @@ func TestDeliveriesAreForgottenEventually(t *testing.T) {
 		t.Errorf("%d deliveries survived the purge", left)
 	}
 }
+
+// TestTheReporterIsToldAndThenForgotten.
+//
+// SECURITY.md says the reporter's address is deleted when the item closes, and
+// says of that sentence that it is a test rather than a promise. It was not:
+// the code existed and nothing exercised it, which is how a document ends up
+// describing a behaviour nobody has ever seen run.
+func TestTheReporterIsToldAndThenForgotten(t *testing.T) {
+	b, _, _ := setup(t, org.ForgeNone)
+
+	var told []string
+	b.Tell = func(_ context.Context, sealed []byte, title, reason, _ string) error {
+		told = append(told, string(sealed)+"|"+title+"|"+reason)
+		return nil
+	}
+
+	// Somebody who asked to be notified. The address arrives already sealed —
+	// the domain never sees it in the clear — so for this test the "sealed"
+	// bytes stand in for whatever the box produced.
+	it, _, err := b.Items.Create(item.New{
+		RepoID: 1, Kind: item.Bug, Title: "crash on import",
+		EmailSealed: []byte("sealed:somebody@example.com"),
+	}, item.Published, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Something that is not the end: they are told, and the address stays,
+	// because there is more to tell them about.
+	if err := b.Items.SetStatus(it.ID, item.StatusConfirmed, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.RequestTellReporter(it.ID, "changed status", epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Run(context.Background(), epoch, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(told) != 1 {
+		t.Fatalf("the reporter was told %d times, want 1", len(told))
+	}
+	sealed, err := b.Items.SealedEmail(it.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sealed) == 0 {
+		t.Fatal("the address was forgotten while the item is still open, so nothing can tell " +
+			"them about the next change")
+	}
+
+	// And now the end.
+	if err := b.Items.SetStatus(it.ID, item.StatusClosed, epoch.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.RequestTellReporter(it.ID, "was closed", epoch.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Run(context.Background(), epoch.Add(time.Hour), 10); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(told) != 2 {
+		t.Fatalf("the reporter was told %d times in total, want 2 — they should hear about "+
+			"the closure before being forgotten", len(told))
+	}
+
+	sealed, err = b.Items.SealedEmail(it.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sealed) != 0 {
+		t.Errorf("the address survived the item closing: %q\n\n"+
+			"It was collected for one purpose and that purpose is over. SECURITY.md says it "+
+			"is deleted, and a document describing a behaviour nobody exercises is a document "+
+			"that is right until the day it is not.", sealed)
+	}
+}
+
+// TestNobodyWhoLeftNoAddressIsChased.
+//
+// The common case, and the one that must cost nothing: no address, no relay,
+// nothing to do, and no error either.
+func TestNobodyWhoLeftNoAddressIsChased(t *testing.T) {
+	b, _, it := setup(t, org.ForgeNone)
+
+	called := 0
+	b.Tell = func(context.Context, []byte, string, string, string) error {
+		called++
+		return nil
+	}
+
+	if err := b.RequestTellReporter(it.ID, "is now public", epoch); err != nil {
+		t.Fatal(err)
+	}
+	done, err := b.Run(context.Background(), epoch, 10)
+	if err != nil {
+		t.Fatalf("telling nobody failed: %v", err)
+	}
+	if done != 1 {
+		t.Errorf("the job did not finish; a reporter who left no address must not be a stuck job")
+	}
+	if called != 0 {
+		t.Errorf("something was sent to nobody %d times", called)
+	}
+}

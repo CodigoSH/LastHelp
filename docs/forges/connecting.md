@@ -19,6 +19,10 @@ one reach:
 | GitLab | A group access token, or a project one | `api` |
 | Gitea / Forgejo | An access token in your settings | `write:issue` |
 
+On Gitea and Forgejo a write scope also grants the matching read routes, so
+`write:issue` alone covers both creating an issue and reading one back — and a
+scope is required even for a public repository.
+
 A GitHub fine-grained token cannot span two organisations. That is why an
 organisation here is one connection: two of them are two connections whether or
 not anybody wanted a second level.

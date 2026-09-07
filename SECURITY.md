@@ -63,8 +63,9 @@ assumptions apply, and keeping them apart is most of the design:
   the field is not even offered unless a mail relay is configured, because
   collecting an address nothing can use is collecting personal data for nothing.
   It is encrypted with the same key as the forge credentials, is never returned
-  by any endpoint, and is deleted when the item closes. That last part is a
-  test, not a sentence.
+  by any endpoint, and is deleted when the item closes — after they have been
+  told about the closure, not before. That last part is
+  `TestTheReporterIsToldAndThenForgotten`, not a sentence.
 
 - **The feed asks for nothing.** Following a board over Atom stores nothing
   about you: no address, no account, no subscription. It is the notification
