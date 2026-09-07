@@ -8,12 +8,52 @@
  */
 import type { ItemDetail, ItemSummary, OrganizationSummary, RepositorySummary } from "../api";
 import { escapeAttr, escapeHTML } from "../escape";
+import { choiceField, exampleFor, field, wizard } from "./wizard";
 
 /** Everything a template needs to say something. */
 export interface Text {
   t(key: string, params?: Record<string, string | number>): string;
   date(value: number): string;
   number(value: number): string;
+}
+
+/**
+ * The first screen anybody sees, signed in or not.
+ *
+ * It used to be one grey sentence — "nothing has been set up here yet" — on an
+ * otherwise blank page. Nothing said what this is, and an operator who had just
+ * installed it read that, correctly, as an unfinished product. A page that
+ * admits it is empty before it says what it is has the order backwards.
+ *
+ * So: what this is, then what there is. An administrator looking at an empty
+ * one is offered the way out; a visitor is told plainly, without being sent to
+ * a form that would refuse them.
+ */
+export function landing(orgs: OrganizationSummary[], isAdmin: boolean, text: Text): string {
+  const hero = `<section class="hero">
+    <h1>LastHelp</h1>
+    <p class="lead">${escapeHTML(text.t("app.tagline"))}</p>
+    ${
+      orgs.length === 0 && isAdmin
+        ? `<div class="hero-actions">
+             <a class="button primary" href="/panel/new">${escapeHTML(text.t("landing.configure"))}</a>
+           </div>`
+        : ""
+    }
+    <ul class="hero-points">
+      <li><span>${escapeHTML(text.t("landing.pointNoAccount"))}</span></li>
+      <li><span>${escapeHTML(text.t("landing.pointVotes"))}</span></li>
+      <li><span>${escapeHTML(text.t("landing.pointForge"))}</span></li>
+    </ul>
+  </section>`;
+
+  if (orgs.length === 0) {
+    return `${hero}<p class="empty">${escapeHTML(
+      text.t(isAdmin ? "landing.emptyOperator" : "portal.empty"),
+    )}</p>`;
+  }
+
+  return `${hero}${organizationList(orgs, text)}`;
 }
 
 export function organizationList(orgs: OrganizationSummary[], text: Text): string {
@@ -59,18 +99,7 @@ export function repositoryList(
  * offer no way to set anything up: the only path was curl. A screen that names
  * a problem it cannot help with reads as broken rather than as empty.
  */
-export function panelHome(
-  orgs: OrganizationSummary[],
-  text: Text,
-): string {
-  const forges = [
-    ["none", text.t("panel.forgeNone")],
-    ["github", "GitHub"],
-    ["gitlab", "GitLab"],
-    ["gitea", "Gitea"],
-    ["forgejo", "Forgejo"],
-  ];
-
+export function panelHome(orgs: OrganizationSummary[], text: Text): string {
   const list =
     orgs.length === 0
       ? `<p class="empty">${escapeHTML(text.t("panel.firstStep"))}</p>`
@@ -86,33 +115,22 @@ export function panelHome(
   return `
     <h1>${escapeHTML(text.t("nav.panel"))}</h1>
     ${list}
-
-    <h2>${escapeHTML(text.t("panel.newOrganization"))}</h2>
-    <form class="new-org">
-      <label for="org-name">${escapeHTML(text.t("panel.name"))}</label>
-      <input id="org-name" name="name" required />
-
-      <label for="org-slug">${escapeHTML(text.t("panel.address"))}</label>
-      <input id="org-slug" name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" />
-      <p class="hint">${escapeHTML(text.t("panel.addressHelp"))}</p>
-
-      <label for="org-forge">${escapeHTML(text.t("panel.forge"))}</label>
-      <select id="org-forge" name="forge">
-        ${forges.map(([value, label]) => `<option value="${escapeAttr(value ?? "")}">${escapeHTML(label ?? "")}</option>`).join("")}
-      </select>
-
-      <div class="forge-fields" hidden>
-        <label for="org-url">${escapeHTML(text.t("panel.forgeURL"))}</label>
-        <input id="org-url" name="base_url" placeholder="https://git.example.com" />
-
-        <label for="org-owner">${escapeHTML(text.t("panel.forgeOwner"))}</label>
-        <input id="org-owner" name="forge_owner" />
-      </div>
-
-      <p class="form-error" role="alert" hidden></p>
-      <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button>
-    </form>`;
+    <p class="head-actions">
+      <a class="button primary" href="/panel/new">${escapeHTML(text.t("panel.newOrganization"))}</a>
+    </p>`;
 }
+
+/** The forge choices, in the order somebody is likely to recognise them. */
+export function forgeOptions(text: Text): [string, string][] {
+  return [
+    ["none", text.t("panel.forgeNone")],
+    ["github", "GitHub"],
+    ["gitlab", "GitLab"],
+    ["gitea", "Gitea"],
+    ["forgejo", "Forgejo"],
+  ];
+}
+
 
 /**
  * The update panel.
@@ -599,4 +617,291 @@ export function queueView(items: ItemSummary[], bodies: Map<string, string>, tex
       </li>`,
     )
     .join("")}</ul>`;
+}
+
+/* ------------------------------------------------------------------ wizards
+ *
+ * Every one of these used to be a form dumped on a page with no order, no
+ * examples and no sense of how far along you were. The operator's words: he did
+ * not know what went in each box, because the boxes asked for formats and
+ * showed none.
+ *
+ * The field helpers live in wizard.ts and carry a real example each.
+ */
+
+function accountFields(text: Text): string {
+  return (
+    field({
+      id: "email",
+      name: "email",
+      label: text.t("auth.email"),
+      type: "email",
+      required: true,
+      autocomplete: "username",
+      example: "you@example.com",
+    }, text) +
+    field({
+      id: "password",
+      name: "password",
+      label: text.t("auth.password"),
+      type: "password",
+      required: true,
+      autocomplete: "new-password",
+      hint: text.t("auth.passwordHelp"),
+    }, text)
+  );
+}
+
+function organizationFields(text: Text, forge: string): string {
+  const example = exampleFor(forge === "none" ? "forgejo" : forge);
+  return (
+    field({
+      id: "org-name",
+      name: "name",
+      label: text.t("panel.name"),
+      hint: text.t("panel.nameHelp"),
+      example: "CodigoSH",
+      required: true,
+    }, text) +
+    field({
+      id: "org-slug",
+      name: "slug",
+      label: text.t("panel.address"),
+      hint: text.t("panel.addressHelp"),
+      example: "codigosh",
+      required: true,
+      pattern: "[a-z0-9]+(-[a-z0-9]+)*",
+    }, text) +
+    choiceField({
+      id: "org-forge",
+      name: "forge",
+      label: text.t("panel.forge"),
+      options: forgeOptions(text),
+      selected: forge,
+      hint: text.t("panel.forgeHelp"),
+    }) +
+    `<div class="forge-fields"${forge === "none" ? " hidden" : ""}>
+      ${field({
+        id: "org-url",
+        name: "base_url",
+        label: text.t("panel.forgeURL"),
+        hint: text.t("panel.forgeURLHelp"),
+        example: example.url,
+      }, text)}
+      ${field({
+        id: "org-owner",
+        name: "forge_owner",
+        label: text.t("panel.forgeOwner"),
+        hint: text.t("panel.forgeOwnerHelp"),
+        example: example.owner,
+      }, text)}
+    </div>`
+  );
+}
+
+function repositoryFields(text: Text, forge: string, hasForge: boolean): string {
+  const example = exampleFor(forge);
+  return (
+    field({
+      id: "repo-name",
+      name: "name",
+      label: text.t("panel.name"),
+      hint: text.t("panel.nameHelp"),
+      example: example.repo,
+      required: true,
+    }, text) +
+    field({
+      id: "repo-slug",
+      name: "slug",
+      label: text.t("panel.address"),
+      hint: text.t("panel.addressHelp"),
+      example: example.repo.toLowerCase(),
+      required: true,
+      pattern: "[a-z0-9]+(-[a-z0-9]+)*",
+    }, text) +
+    (hasForge
+      ? field({
+          id: "repo-forge",
+          name: "forge_repo",
+          label: text.t("panel.forgeRepo"),
+          hint: text.t("panel.forgeRepoHelp"),
+          example: example.repo,
+        }, text)
+      : "")
+  );
+}
+
+/** What a board takes. Both on by default: a board that accepts nothing is
+ *  refused by the server, and defaulting to off makes that the common mistake. */
+function acceptsFields(text: Text): string {
+  return `<div class="field">
+    <label>${escapeHTML(text.t("repo.accepts"))}</label>
+    <p class="choices">
+      <label class="choice"><input type="checkbox" name="accepts_bugs" checked /> ${escapeHTML(text.t("kind.bug"))}</label>
+      <label class="choice"><input type="checkbox" name="accepts_ideas" checked /> ${escapeHTML(text.t("kind.idea"))}</label>
+    </p>
+    <p class="hint">${escapeHTML(text.t("repo.acceptsHelp"))}</p>
+  </div>`;
+}
+
+/** The first run: account, organisation, board. */
+export function setupWizard(step: number, text: Text, forge = "none"): string {
+  const names = [
+    text.t("setup.stepAccount"),
+    text.t("setup.stepOrganization"),
+    text.t("setup.stepBoard"),
+  ];
+
+  if (step === 1) {
+    return wizard(
+      {
+        step: 1,
+        names,
+        title: text.t("auth.setupTitle"),
+        lead: text.t("auth.setupHelp"),
+        body: accountFields(text),
+        submit: text.t("wizard.continue"),
+        formClass: "setup-account",
+      },
+      text,
+    );
+  }
+
+  if (step === 2) {
+    return wizard(
+      {
+        step: 2,
+        names,
+        title: text.t("setup.orgTitle"),
+        lead: text.t("setup.orgLead"),
+        body: organizationFields(text, forge),
+        submit: text.t("wizard.continue"),
+        formClass: "setup-organization",
+      },
+      text,
+    );
+  }
+
+  return wizard(
+    {
+      step: 3,
+      names,
+      title: text.t("setup.boardTitle"),
+      lead: text.t("setup.boardLead"),
+      body: repositoryFields(text, forge, forge !== "none") + acceptsFields(text),
+      submit: text.t("wizard.finish"),
+      formClass: "setup-repository",
+    },
+    text,
+  );
+}
+
+/** Adding an organisation on its own, once the instance is running. */
+export function organizationWizard(step: number, text: Text, forge = "none"): string {
+  const names = [text.t("org.stepIdentity"), text.t("org.stepForge")];
+
+  if (step === 1) {
+    return wizard(
+      {
+        step: 1,
+        names,
+        title: text.t("panel.newOrganization"),
+        lead: text.t("setup.orgLead"),
+        body: organizationFields(text, forge),
+        submit: text.t("wizard.continue"),
+        back: { href: "/panel", label: text.t("nav.back") },
+        formClass: "setup-organization",
+      },
+      text,
+    );
+  }
+
+  const example = exampleFor(forge);
+  return wizard(
+    {
+      step: 2,
+      names,
+      title: text.t("panel.connection"),
+      lead: forge === "none" ? text.t("org.noForgeLead") : text.t("org.forgeLead"),
+      body:
+        forge === "none"
+          ? ""
+          : field({
+              id: "org-token",
+              name: "token",
+              label: text.t("panel.token"),
+              hint: text.t("panel.tokenHelp") + " " + text.t("org.tokenWhere", { where: example.where, scope: example.scope }),
+              type: "password",
+              example: "glpat-… / ghp_… / " + example.scope,
+            }, text),
+      submit: text.t("wizard.finish"),
+      back: { href: "/panel", label: text.t("nav.back") },
+      formClass: "setup-token",
+    },
+    text,
+  );
+}
+
+/** Adding a board to an organisation that already exists. */
+export function repositoryWizard(
+  org: OrganizationSummary & { forge?: string },
+  step: number,
+  text: Text,
+): string {
+  const names = [text.t("org.stepIdentity"), text.t("repo.stepAccepts")];
+  const forge = org.forge ?? "none";
+
+  if (step === 1) {
+    return wizard(
+      {
+        step: 1,
+        names,
+        title: text.t("panel.newRepository"),
+        lead: text.t("setup.boardLead"),
+        body: repositoryFields(text, forge, forge !== "none"),
+        submit: text.t("wizard.continue"),
+        back: { href: `/panel/${escapeAttr(org.slug)}`, label: text.t("nav.back") },
+        formClass: "setup-repository-identity",
+      },
+      text,
+    );
+  }
+
+  return wizard(
+    {
+      step: 2,
+      names,
+      title: text.t("repo.stepAccepts"),
+      lead: text.t("repo.acceptsLead"),
+      body: acceptsFields(text),
+      submit: text.t("wizard.finish"),
+      back: { href: `/panel/${escapeAttr(org.slug)}`, label: text.t("nav.back") },
+      formClass: "setup-repository-accepts",
+    },
+    text,
+  );
+}
+
+/** The end of the first run, which has to say where the thing now lives. */
+export function wizardDone(
+  orgSlug: string,
+  repoSlug: string,
+  hasForge: boolean,
+  text: Text,
+): string {
+  const address = `/${orgSlug}/${repoSlug}`;
+  return `<section class="wizard">
+    <header class="wizard-head">
+      <p class="step-count">${escapeHTML(text.t("setup.doneStep"))}</p>
+      <h1>${escapeHTML(text.t("setup.doneTitle"))}</h1>
+      <p class="lead">${escapeHTML(text.t("setup.doneLead"))}</p>
+    </header>
+    <div class="wizard-card">
+      <p><a class="button primary" href="${escapeAttr(address)}">${escapeHTML(text.t("setup.doneOpen"))}</a></p>
+      ${hasForge ? `<p class="hint">${escapeHTML(text.t("setup.doneWebhook"))}</p>` : ""}
+    </div>
+    <div class="wizard-actions">
+      <a class="link" href="/panel/${escapeAttr(orgSlug)}">${escapeHTML(text.t("nav.panel"))}</a>
+    </div>
+  </section>`;
 }

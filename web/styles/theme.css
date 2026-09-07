@@ -447,3 +447,230 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .triage-note { font-size: 0.875rem; color: var(--text-muted); }
 
 .exports { font-size: 0.875rem; margin-block: 0.5rem 0; }
+
+/* ---------------------------------------------------------------- landing
+ *
+ * A fresh instance used to open on one grey sentence: "nothing is set up yet".
+ * Nothing said what this is, who it is for, or what to do next, and the
+ * operator who asked for this read it — correctly — as an unfinished product.
+ * The first screen has to introduce the thing before it admits it is empty.
+ */
+.hero {
+  padding: clamp(2.5rem, 8vw, 5rem) 0 clamp(2rem, 5vw, 3rem);
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5.5vw, 3.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.75rem;
+}
+
+.hero .lead {
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  max-width: 34rem;
+  margin: 0 auto;
+  color: var(--text-muted);
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1.75rem;
+}
+
+/* Three short lines under the hero. Not a feature grid: the whole product is
+   one journey, and a wall of cards would promise a suite it is not. */
+.hero-points {
+  display: grid;
+  /* Three, or one. Two columns leave an orphan on the second row, which
+     reads as a layout that ran out rather than as three points. */
+  grid-template-columns: 1fr;
+  gap: 1rem 2rem;
+  max-width: 52rem;
+  margin: clamp(2rem, 5vw, 3.5rem) auto 0;
+  padding: 0;
+  list-style: none;
+  text-align: start;
+}
+
+.hero-points li {
+  border-inline-start: 2px solid rgba(var(--accent-rgb), 0.35);
+  padding-inline-start: 0.9rem;
+}
+
+.hero-points strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.hero-points span {
+  color: var(--text-muted);
+  font-size: 0.925rem;
+}
+
+@media (min-width: 52rem) {
+  .hero-points {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------- wizard */
+
+.wizard {
+  max-width: 34rem;
+  margin: clamp(1.5rem, 4vw, 3rem) auto;
+}
+
+/* The dots. A list, so a screen reader hears "step 2 of 3" from the markup and
+   not from the shape. */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.75rem;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.steps li::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+.steps li:last-child::after {
+  display: none;
+}
+
+.steps .dot {
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+  border-radius: 50%;
+  background: var(--border);
+  flex: none;
+  transition: background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.steps .done .dot {
+  background: rgba(var(--accent-rgb), 0.55);
+}
+
+.steps .done::after {
+  background: rgba(var(--accent-rgb), 0.35);
+}
+
+.steps .now .dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.18);
+}
+
+.step-name {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.steps .now .step-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Only the current step keeps its label on a narrow screen: five words in a row
+   wrap into a paragraph and stop reading as a progress bar. */
+@media (max-width: 34rem) {
+  .steps li:not(.now) .step-name {
+    display: none;
+  }
+}
+
+.step-count {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  margin: 0 0 0.35rem;
+  letter-spacing: 0.02em;
+}
+
+.wizard-head h1 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  letter-spacing: -0.01em;
+}
+
+.wizard-head .lead {
+  color: var(--text-muted);
+  margin: 0 0 1.75rem;
+}
+
+.wizard-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 4px);
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.wizard-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+
+.wizard-actions .spacer {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------- fields */
+
+.field {
+  margin-bottom: 1.25rem;
+}
+
+.field:last-of-type {
+  margin-bottom: 0;
+}
+
+.field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.field .hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* An example is worth more than a paragraph of prose about the format, and it
+   is the thing the operator asked for: a field that shows what goes in it. */
+.field .example {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  color: var(--text);
+  background: rgba(127, 127, 127, 0.14);
+  border-radius: 5px;
+  padding: 0.1rem 0.35rem;
+  /* A URL or an account name is latin inside an Arabic sentence: without the
+     isolate the punctuation around it is placed by the paragraph. */
+  unicode-bidi: isolate;
+}
+
+.field input,
+.field select,
+.field textarea {
+  inline-size: 100%;
+  margin: 0;
+}

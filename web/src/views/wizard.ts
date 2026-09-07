@@ -1,0 +1,196 @@
+/**
+ * The step wizard, and the fields that go inside it.
+ *
+ * Pure functions like the rest of the templates: they take their text as a
+ * parameter rather than importing the i18n singleton, which is what keeps them
+ * testable without a browser.
+ *
+ * This exists because the panel used to be a wall of inputs with no order and
+ * no examples. The operator who asked for it put it plainly: he did not know
+ * what went in each box, because the boxes asked for formats and showed none.
+ */
+import { escapeAttr, escapeHTML } from "../escape";
+import type { Text } from "./templates";
+
+/**
+ * Real examples, per forge.
+ *
+ * Deliberately not translated. A URL, an account name and a repository name are
+ * machine values: translating them would invent accounts that do not exist, and
+ * the point of an example is that the reader can recognise the shape.
+ *
+ * They are also real. `git.codigosh.com/CodigoSH/LastHelp` is this project;
+ * showing `example.com/my-org/my-repo` teaches nothing about what a forge owner
+ * actually looks like.
+ */
+export interface ForgeExample {
+  url: string;
+  owner: string;
+  repo: string;
+  /** The narrowest scope that works, which is what the docs tell people to make. */
+  scope: string;
+  /** Where the token is created, in that forge's own words. */
+  where: string;
+}
+
+export const forgeExamples: Record<string, ForgeExample> = {
+  github: {
+    url: "https://github.com",
+    owner: "immich-app",
+    repo: "immich",
+    scope: "repo",
+    where: "Settings → Developer settings → Personal access tokens",
+  },
+  gitlab: {
+    url: "https://gitlab.com",
+    owner: "gitlab-org",
+    repo: "gitlab",
+    scope: "api",
+    where: "Preferences → Access tokens",
+  },
+  gitea: {
+    url: "https://gitea.com",
+    owner: "gitea",
+    repo: "gitea",
+    scope: "write:issue",
+    where: "Settings → Applications → Access tokens",
+  },
+  forgejo: {
+    url: "https://git.codigosh.com",
+    owner: "CodigoSH",
+    repo: "LastHelp",
+    scope: "write:issue",
+    where: "Settings → Applications → Access tokens",
+  },
+};
+
+/** The example for a forge, falling back to Forgejo's shape for an unknown one. */
+export function exampleFor(forge: string): ForgeExample {
+  return forgeExamples[forge] ?? forgeExamples.forgejo!;
+}
+
+export interface FieldSpec {
+  id: string;
+  name: string;
+  label: string;
+  /** What goes in the box, in one sentence. Optional: obvious fields need none. */
+  hint?: string;
+  /** A real value of the right shape. Shown as the placeholder and beside it. */
+  example?: string;
+  type?: string;
+  required?: boolean;
+  value?: string;
+  pattern?: string;
+  autocomplete?: string;
+}
+
+/**
+ * One labelled field.
+ *
+ * The example goes in the hint line as well as in the placeholder. A
+ * placeholder alone disappears at the first keystroke — exactly when somebody
+ * is checking the shape of what they are typing — and it is grey-on-grey for
+ * anybody who needs contrast. Showing it twice at rest was worse: the same word
+ * in the box and again underneath reads as two different things.
+ */
+export function field(spec: FieldSpec, text?: Text): string {
+  const attrs = [
+    `id="${escapeAttr(spec.id)}"`,
+    `name="${escapeAttr(spec.name)}"`,
+    `type="${escapeAttr(spec.type ?? "text")}"`,
+    spec.required ? "required" : "",
+    spec.value !== undefined ? `value="${escapeAttr(spec.value)}"` : "",
+    spec.pattern ? `pattern="${escapeAttr(spec.pattern)}"` : "",
+    spec.example ? `placeholder="${escapeAttr(spec.example)}"` : "",
+    spec.autocomplete ? `autocomplete="${escapeAttr(spec.autocomplete)}"` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const example =
+    spec.example && text
+      ? ` ${escapeHTML(text.t("wizard.example"))} <code class="example">${escapeHTML(spec.example)}</code>`
+      : "";
+
+  return `<div class="field">
+    <label for="${escapeAttr(spec.id)}">${escapeHTML(spec.label)}</label>
+    <input ${attrs} />
+    ${spec.hint || example ? `<p class="hint">${escapeHTML(spec.hint ?? "")}${example}</p>` : ""}
+  </div>`;
+}
+
+/** A labelled <select>, with the same shape as a field so a form reads evenly. */
+export function choiceField(
+  spec: Omit<FieldSpec, "example"> & { options: [string, string][]; selected?: string },
+): string {
+  return `<div class="field">
+    <label for="${escapeAttr(spec.id)}">${escapeHTML(spec.label)}</label>
+    <select id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}">
+      ${spec.options
+        .map(
+          ([value, label]) =>
+            `<option value="${escapeAttr(value)}"${value === spec.selected ? " selected" : ""}>${escapeHTML(label)}</option>`,
+        )
+        .join("")}
+    </select>
+    ${spec.hint ? `<p class="hint">${escapeHTML(spec.hint)}</p>` : ""}
+  </div>`;
+}
+
+export interface WizardSpec {
+  /** 1-based. */
+  step: number;
+  /** The name of each step, in order. Its length is how many there are. */
+  names: string[];
+  title: string;
+  lead?: string;
+  /** The markup inside the card — fields, usually. */
+  body: string;
+  /** The label on the button that submits. */
+  submit: string;
+  /** Shown as a plain link beside the button, if this step can be left. */
+  back?: { href: string; label: string };
+  /** Extra class on the form, so main.ts can find it. */
+  formClass: string;
+}
+
+/**
+ * The whole step: dots, heading, card, actions.
+ *
+ * The dots are an ordered list with aria-current on the one you are on, so the
+ * progress is in the markup and not only in the shape — a screen reader gets
+ * "step 2 of 3" without being able to see a row of circles.
+ */
+export function wizard(spec: WizardSpec, text: Text): string {
+  const total = spec.names.length;
+  const dots = spec.names
+    .map((name, index) => {
+      const n = index + 1;
+      const state = n < spec.step ? "done" : n === spec.step ? "now" : "";
+      return `<li class="step ${state}"${n === spec.step ? ' aria-current="step"' : ""}>
+        <span class="dot" aria-hidden="true"></span>
+        <span class="step-name">${escapeHTML(name)}</span>
+      </li>`;
+    })
+    .join("");
+
+  return `<section class="wizard">
+    <ol class="steps" aria-label="${escapeAttr(text.t("wizard.progress", { step: spec.step, total }))}">
+      ${dots}
+    </ol>
+    <header class="wizard-head">
+      <p class="step-count">${escapeHTML(text.t("wizard.progress", { step: spec.step, total }))}</p>
+      <h1>${escapeHTML(spec.title)}</h1>
+      ${spec.lead ? `<p class="lead">${escapeHTML(spec.lead)}</p>` : ""}
+    </header>
+    <form class="${escapeAttr(spec.formClass)}">
+      <div class="wizard-card">${spec.body}</div>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="wizard-actions">
+        <button class="button primary" type="submit">${escapeHTML(spec.submit)}</button>
+        <span class="spacer"></span>
+        ${spec.back ? `<a class="link" href="${escapeAttr(spec.back.href)}">${escapeHTML(spec.back.label)}</a>` : ""}
+      </div>
+    </form>
+  </section>`;
+}

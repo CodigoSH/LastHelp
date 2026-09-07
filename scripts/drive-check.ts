@@ -109,18 +109,31 @@ async function main() {
   // 3. Sign in through the form, as a person would.
   await evaluate(`history.pushState({}, "", "/sign-in"); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(400);
-  const setupVisible = await evaluate(`return !!document.querySelector("form.auth")`);
-  check("the setup form is on screen", setupVisible === true);
+  // A fresh instance opens the wizard rather than a bare login: the first
+  // screen has to carry its own progress, or nobody knows how many more there
+  // are. The dots are read from the markup, not from the shape.
+  const firstStep = await evaluate(`
+    const form = document.querySelector("form.setup-account");
+    return {
+      there: !!form,
+      dots: document.querySelectorAll(".steps li").length,
+      current: document.querySelector('.steps [aria-current="step"] .step-name')?.textContent?.trim(),
+    };`);
+  check(
+    "the first run opens on step one of a wizard",
+    firstStep.there === true && firstStep.dots === 3,
+    `${firstStep.dots} steps, on "${firstStep.current}"`,
+  );
 
   await evaluate(`
-    const f = document.querySelector("form.auth");
+    const f = document.querySelector("form.setup-account");
     f.querySelector('[name=email]').value = "k4wit0@codigosh.com";
     f.querySelector('[name=password]').value = "una contraseña larga de verdad";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   `);
-  await sleep(800);
+  await sleep(900);
   const signedIn = await evaluate(`return location.pathname`);
-  check("signing in lands on the panel", signedIn === "/panel", String(signedIn));
+  check("the account carries on into the wizard", signedIn === "/setup/organization", String(signedIn));
 
   // 4. The first minute of a real operator: an empty instance, and whether it
   //    can be got started from the screen at all.
@@ -140,8 +153,24 @@ async function main() {
     navAfterSignIn.join(" · "),
   );
 
+  // Every field that asks for a format has to show one. This is the check for
+  // the complaint that started the redesign: the operator could not tell what
+  // went in each box, because the boxes asked and showed nothing.
+  const examples = await evaluate(`
+    return [...document.querySelectorAll(".field")].map(f => ({
+      label: f.querySelector("label")?.textContent?.trim(),
+      example: f.querySelector(".example")?.textContent?.trim() ?? null,
+      placeholder: f.querySelector("input")?.placeholder ?? null,
+    }));`);
+  const textFields = examples.filter((f: any) => f.placeholder !== null);
+  check(
+    "every field on the step shows an example",
+    textFields.length > 0 && textFields.every((f: any) => f.example && f.placeholder),
+    textFields.map((f: any) => `${f.label}=${f.example}`).join(" · "),
+  );
+
   const started = await evaluate(`
-    const form = document.querySelector("form.new-org");
+    const form = document.querySelector("form.setup-organization");
     if (!form) return "no way to add an organisation";
     form.querySelector('[name=name]').value = "CodigoSH";
     form.querySelector('[name=slug]').value = "codigosh";
@@ -149,18 +178,31 @@ async function main() {
     await new Promise(r => setTimeout(r, 900));
     return location.pathname;
   `);
-  check("an empty instance can be started from the screen", started === "/panel/codigosh", String(started));
+  check("an empty instance can be started from the screen", started === "/setup/board", String(started));
 
   const boards = await evaluate(`
-    const form = document.querySelector("form.new-repo");
+    const form = document.querySelector("form.setup-repository");
     if (!form) return "no way to add a board";
     form.querySelector('[name=name]').value = "Lastboard";
     form.querySelector('[name=slug]').value = "lastboard";
     form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await new Promise(r => setTimeout(r, 900));
-    return [...document.querySelectorAll(".cards .card-title")].map(e => e.textContent.trim());
+    return location.pathname;
   `);
-  check("a board can be added from the screen", JSON.stringify(boards) === '["Lastboard"]', JSON.stringify(boards));
+  check("a board can be added from the screen", boards === "/setup/done", String(boards));
+
+  // The last screen has to say where the thing now lives. A wizard that ends on
+  // a blank panel leaves somebody wondering whether it worked.
+  const ending = await evaluate(`
+    return {
+      open: document.querySelector(".wizard-card a.button")?.getAttribute("href"),
+      words: document.querySelector(".wizard-head h1")?.textContent?.trim(),
+    };`);
+  check(
+    "the wizard ends by pointing at the board it made",
+    ending.open === "/codigosh/lastboard",
+    `${ending.words} → ${ending.open}`,
+  );
 
   // 5. Report something through the form, with no account.
   await evaluate(`history.pushState({}, "", "/codigosh/lastboard/new"); dispatchEvent(new PopStateEvent("popstate"));`);
@@ -288,6 +330,9 @@ async function main() {
   // the lowest specificity there is, so any class rule with a display of its own
   // beats it — and the element sits in the layout wearing a correct `hidden`.
   // Reading the attribute would say everything is fine.
+  // The forge fields live in the organisation wizard now, not on the panel.
+  await evaluate(`history.pushState({}, "", "/panel/new"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(600);
   const reallyHidden = await evaluate(`
     const fields = document.querySelector(".forge-fields");
     if (!fields) return "there are no forge fields";

@@ -113,7 +113,20 @@ async function render(): Promise<void> {
   try {
     if (path === "/") return await showOrganizations();
     if (path === "/sign-in") return await showSignIn();
+    if (path === "/setup/organization") return showSetupStep(2);
+    if (path === "/setup/board") return showSetupStep(3);
+    if (path === "/setup/done") return showSetupDone();
     if (path === "/panel") return await showPanel();
+    // Before the generic /panel/{org}: "new" is a screen, not an organisation
+    // anybody would be able to open.
+    if (path === "/panel/new") return showOrganizationWizard(1);
+    if (path === "/panel/new/connection") return showOrganizationWizard(2);
+    if (parts[0] === "panel" && parts[2] === "new" && parts[1]) {
+      return await showRepositoryWizard(parts[1], 1);
+    }
+    if (parts[0] === "panel" && parts[2] === "accepts" && parts[1]) {
+      return await showRepositoryWizard(parts[1], 2);
+    }
     if (parts[0] === "panel" && parts[1] && parts.length === 2) {
       return await showPanelOrganization(parts[1]);
     }
@@ -137,9 +150,11 @@ async function render(): Promise<void> {
 
 async function showOrganizations(): Promise<void> {
   const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
-  show(`<h1>${escapeHTML(i18n.t("app.name"))}</h1>
-        <p class="lead">${escapeHTML(i18n.t("app.tagline"))}</p>
-        ${views.organizationList(organizations ?? [], text)}`);
+  // Who is looking decides what an empty instance says. An administrator gets
+  // the way out of it; a visitor gets told plainly, rather than being sent to a
+  // form that would refuse them.
+  if (!me) me = await api.get<Me>("/api/me").catch(() => null);
+  show(views.landing(organizations ?? [], me?.admin === true, text));
 }
 
 async function showRepositories(orgSlug: string): Promise<void> {
@@ -515,11 +530,213 @@ function wireTriage(publicID: string): void {
   });
 }
 
+/**
+ * What the wizard is carrying between steps.
+ *
+ * In memory on purpose: a half-finished organisation is not something to leave
+ * in a database, and a reload landing on step three of a form whose first two
+ * steps no longer exist is worse than starting again.
+ */
+const draft: { forge: string; orgSlug: string; repoSlug: string } = {
+  forge: "none",
+  orgSlug: "",
+  repoSlug: "",
+};
+
+/** The error line under a wizard card, which every step has one of. */
+function showFormError(err: unknown): void {
+  const line = root?.querySelector<HTMLParagraphElement>(".form-error");
+  if (!line) return;
+  line.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+  line.hidden = false;
+}
+
+/**
+ * The forge fields appear only when there is a forge, and their examples change
+ * with it: an owner on GitHub and an owner on a self-hosted Forgejo look
+ * nothing alike, and a single generic example teaches neither.
+ */
+function wireForgeChoice(rerender: (forge: string) => void): void {
+  const select = root?.querySelector<HTMLSelectElement>("#org-forge");
+  select?.addEventListener("change", () => {
+    draft.forge = select.value;
+    rerender(select.value);
+  });
+}
+
+function showSetupStep(step: 2 | 3): void {
+  show(views.setupWizard(step, text, draft.forge));
+
+  if (step === 2) {
+    wireForgeChoice((forge) => showSetupStep2(forge));
+    root?.querySelector<HTMLFormElement>("form.setup-organization")?.addEventListener(
+      "submit",
+      async (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget as HTMLFormElement);
+        draft.forge = String(data.get("forge") ?? "none");
+        draft.orgSlug = String(data.get("slug") ?? "");
+        try {
+          await api.post("/api/organizations", {
+            name: String(data.get("name") ?? ""),
+            slug: draft.orgSlug,
+            forge: draft.forge,
+            base_url: String(data.get("base_url") ?? ""),
+            forge_owner: String(data.get("forge_owner") ?? ""),
+          });
+          go("/setup/board");
+        } catch (err) {
+          showFormError(err);
+        }
+      },
+    );
+    return;
+  }
+
+  root?.querySelector<HTMLFormElement>("form.setup-repository")?.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget as HTMLFormElement);
+      draft.repoSlug = String(data.get("slug") ?? "");
+      try {
+        await api.post(`/api/orgs/${encodeURIComponent(draft.orgSlug)}/repositories`, {
+          name: String(data.get("name") ?? ""),
+          slug: draft.repoSlug,
+          forge_repo: String(data.get("forge_repo") ?? ""),
+          accepts_bugs: data.get("accepts_bugs") !== null,
+          accepts_ideas: data.get("accepts_ideas") !== null,
+        });
+        go("/setup/done");
+      } catch (err) {
+        showFormError(err);
+      }
+    },
+  );
+}
+
+/** Re-render step two in place when the forge changes, keeping what was typed. */
+function showSetupStep2(forge: string): void {
+  const kept = new FormData(root?.querySelector<HTMLFormElement>("form.setup-organization") ?? undefined);
+  draft.forge = forge;
+  showSetupStep(2);
+  const form = root?.querySelector<HTMLFormElement>("form.setup-organization");
+  for (const [name, value] of kept.entries()) {
+    const input = form?.querySelector<HTMLInputElement>(`[name="${name}"]`);
+    if (input && input.type !== "checkbox" && name !== "forge") input.value = String(value);
+  }
+}
+
+function showSetupDone(): void {
+  show(views.wizardDone(draft.orgSlug, draft.repoSlug, draft.forge !== "none", text));
+}
+
+function showOrganizationWizard(step: 1 | 2): void {
+  show(views.organizationWizard(step, text, draft.forge));
+
+  if (step === 1) {
+    wireForgeChoice((forge) => {
+      draft.forge = forge;
+      showOrganizationWizard(1);
+    });
+  }
+
+  root?.querySelector<HTMLFormElement>("form.setup-organization")?.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget as HTMLFormElement);
+      draft.forge = String(data.get("forge") ?? "none");
+      draft.orgSlug = String(data.get("slug") ?? "");
+      try {
+        await api.post("/api/organizations", {
+          name: String(data.get("name") ?? ""),
+          slug: draft.orgSlug,
+          forge: draft.forge,
+          base_url: String(data.get("base_url") ?? ""),
+          forge_owner: String(data.get("forge_owner") ?? ""),
+        });
+        go(draft.forge === "none" ? `/panel/${draft.orgSlug}` : "/panel/new/connection");
+      } catch (err) {
+        showFormError(err);
+      }
+    },
+  );
+
+  root?.querySelector<HTMLFormElement>("form.setup-token")?.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget as HTMLFormElement);
+      const token = String(data.get("token") ?? "");
+      try {
+        if (token) {
+          await api.post(`/api/orgs/${encodeURIComponent(draft.orgSlug)}/credentials`, { token });
+        }
+        go(`/panel/${draft.orgSlug}`);
+      } catch (err) {
+        showFormError(err);
+      }
+    },
+  );
+}
+
+async function showRepositoryWizard(orgSlug: string, step: 1 | 2): Promise<void> {
+  const body = await api.get<{
+    organization: OrganizationSummary & { forge?: string };
+  }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
+  draft.orgSlug = orgSlug;
+  show(views.repositoryWizard(body.organization, step, text));
+
+  root?.querySelector<HTMLFormElement>("form.setup-repository-identity")?.addEventListener(
+    "submit",
+    (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget as HTMLFormElement);
+      draft.repoSlug = String(data.get("slug") ?? "");
+      pendingRepository = {
+        name: String(data.get("name") ?? ""),
+        slug: draft.repoSlug,
+        forge_repo: String(data.get("forge_repo") ?? ""),
+      };
+      go(`/panel/${orgSlug}/accepts`);
+    },
+  );
+
+  root?.querySelector<HTMLFormElement>("form.setup-repository-accepts")?.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget as HTMLFormElement);
+      try {
+        await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/repositories`, {
+          ...pendingRepository,
+          accepts_bugs: data.get("accepts_bugs") !== null,
+          accepts_ideas: data.get("accepts_ideas") !== null,
+        });
+        go(`/panel/${orgSlug}`);
+      } catch (err) {
+        showFormError(err);
+      }
+    },
+  );
+}
+
+let pendingRepository: { name: string; slug: string; forge_repo: string } = {
+  name: "",
+  slug: "",
+  forge_repo: "",
+};
+
 async function showSignIn(): Promise<void> {
   const status = await api.get<Status>("/api/status");
-  show(views.signInForm(status.needs_setup, text));
+  if (status.needs_setup) {
+    show(views.setupWizard(1, text));
+  } else {
+    show(views.signInForm(false, text));
+  }
 
-  const form = root?.querySelector<HTMLFormElement>("form.auth");
+  const form = root?.querySelector<HTMLFormElement>("form.auth, form.setup-account");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
 
   form?.addEventListener("submit", async (event) => {
@@ -532,7 +749,9 @@ async function showSignIn(): Promise<void> {
     try {
       await api.post(status.needs_setup ? "/api/setup" : "/api/session", payload);
       me = await api.get<Me>("/api/me");
-      go("/panel");
+      // A fresh instance goes on to the rest of the wizard rather than dropping
+      // somebody on an empty panel with a form and no order.
+      go(status.needs_setup ? "/setup/organization" : "/panel");
     } catch (err) {
       if (errorLine) {
         errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
