@@ -209,7 +209,7 @@ func TestACollaboratorCannotReachTheCredentials(t *testing.T) {
 	team.connected(t, "forgejo", "s")
 
 	helper := team.anonymous()
-	makeCollaborator(t, team, helper, "helper@example.com")
+	makeCollaborator(t, team, helper, "helper")
 
 	resp := helper.do(http.MethodPost, "/api/orgs/codigosh/credentials",
 		map[string]string{"token": "mine-now", "webhook_secret": "s"})
@@ -269,7 +269,7 @@ func TestOnlyTheAdministratorSeesUpdates(t *testing.T) {
 	team.createRepo("codigosh", "lastboard")
 
 	helper := team.anonymous()
-	makeCollaborator(t, team, helper, "helper@example.com")
+	makeCollaborator(t, team, helper, "helper")
 
 	resp := helper.do(http.MethodGet, "/api/update", nil)
 	_ = resp.Body.Close()

@@ -26,6 +26,13 @@ const VoterSigningKey = "voter_signing_key"
 // the other, and they have very different lifetimes.
 const FormSigningKey = "form_signing_key"
 
+// InstanceName is what this installation calls itself: the title in the tab,
+// the name in the header, the word a reporter sees before anything else.
+//
+// Empty means "LastHelp", which is what an operator who never set it expects to
+// see rather than a blank where a name should be.
+const InstanceName = "instance_name"
+
 type Store struct {
 	DB database.Execer
 }

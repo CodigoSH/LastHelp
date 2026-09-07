@@ -31,8 +31,8 @@ func TestCreateAndAuthenticate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created.Email != "person@example.com" {
-		t.Errorf("email stored as %q; addresses are normalised so nobody signs up twice with capitals", created.Email)
+	if created.Username != "person@example.com" {
+		t.Errorf("email stored as %q; addresses are normalised so nobody signs up twice with capitals", created.Username)
 	}
 
 	got, err := s.Authenticate("person@example.com", "a good long passphrase")
@@ -125,8 +125,8 @@ func TestTheSameAddressCannotBeTakenTwice(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err := s.Create("DUP@example.com", "another passphrase entirely", "", false, epoch)
-	if !errors.Is(err, ErrEmailTaken) {
-		t.Errorf("got %v, want ErrEmailTaken — and note the capitals: normalisation is what makes this collide", err)
+	if !errors.Is(err, ErrNameTaken) {
+		t.Errorf("got %v, want ErrNameTaken — and note the capitals: normalisation is what makes this collide", err)
 	}
 }
 

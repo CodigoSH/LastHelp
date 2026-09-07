@@ -208,6 +208,18 @@ func (s *Server) routes() {
 	private("POST /api/orgs/{org}/credentials", s.handleSetCredentials)
 	private("POST /api/orgs/{org}/repos/{repo}/channel", s.handleSetNotifyChannel)
 
+	private("POST /api/me/password", s.handleChangePassword)
+	private("POST /api/me/profile", s.handleChangeProfile)
+
+	private("GET /api/people", s.handleListPeople)
+	private("POST /api/people", s.handleCreatePerson)
+	private("POST /api/people/{id}/grants", s.handleGrant)
+
+	private("GET /api/backup", s.handleBackup)
+
+	private("GET /api/instance", s.handleGetInstance)
+	private("POST /api/instance", s.handleSetInstance)
+
 	private("GET /api/update", s.handleUpdateStatus)
 	private("POST /api/update", s.handleUpdatePerform)
 

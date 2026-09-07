@@ -1,5 +1,7 @@
 package database
 
+import "database/sql"
+
 // migrations is the whole history of this schema, append-only.
 //
 // Nothing here is ever renumbered, reworded into a different meaning, or
@@ -53,7 +55,7 @@ var migrations = []migration{
 			// somebody porting a query will trip over it.
 			`CREATE TABLE app_user (
 				id               INTEGER PRIMARY KEY,
-				email            TEXT    NOT NULL UNIQUE,
+				username         TEXT    NOT NULL UNIQUE,
 				password_hash    TEXT    NOT NULL,
 				display_name     TEXT    NOT NULL DEFAULT '',
 				is_administrator INTEGER NOT NULL DEFAULT 0,
@@ -266,4 +268,27 @@ var migrations = []migration{
 			`CREATE INDEX organization_by_hook ON organization (hook_id)`,
 		},
 	},
+	{
+		version: 3,
+		name:    "accounts are named by a username, not an address",
+		// An address was never what this column held: it identified the account
+		// and nothing was ever sent to it. Asking somebody setting up their own
+		// server for an email address they will never receive anything at is
+		// asking for information to store and not use.
+		//
+		// RENAME COLUMN rather than a rebuild, and skipped when the column is
+		// already called username — which is every database created by the
+		// CREATE above, and this migration runs on those too.
+		fn: renameEmailToUsername,
+	},
+}
+
+// renameEmailToUsername is a no-op on any database that already has the column.
+func renameEmailToUsername(tx *sql.Tx) error {
+	has, err := hasColumn(tx, "app_user", "username")
+	if err != nil || has {
+		return err
+	}
+	_, err = tx.Exec(`ALTER TABLE app_user RENAME COLUMN email TO username`)
+	return err
 }

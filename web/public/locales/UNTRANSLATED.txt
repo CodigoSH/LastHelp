@@ -1,0 +1,52 @@
+# Keys waiting for translation.
+#
+# The screens they belong to are still being designed, and translating a
+# sentence that is about to be rewritten is work done twice. They wait here
+# rather than being quietly missing: this file is in the repository, it shows up
+# in every diff, and an architecture rule refuses to let it keep a key that is
+# already translated everywhere or one that no longer exists.
+#
+# Nothing here ships. The list has to be empty before a release.
+about.commit
+about.lead
+about.schema
+about.version
+appearance.lead
+auth.username
+auth.usernameHelp
+backups.download
+backups.help
+backups.lead
+error.password_wrong
+error.username_required
+error.username_taken
+panel.mailTo
+people.add
+people.addHelp
+people.administrator
+people.grants
+people.lead
+profile.change
+profile.current
+profile.lead
+profile.name
+profile.nameHelp
+profile.new
+profile.password
+profile.passwordHelp
+repo.lead
+setup.doneNext
+setup.instanceLead
+setup.instanceName
+setup.instanceNameHelp
+setup.instanceTitle
+setup.stepInstance
+shell.about
+shell.appearance
+shell.backups
+shell.groupAccount
+shell.groupSystem
+shell.groupWork
+shell.people
+shell.profile
+wizard.back

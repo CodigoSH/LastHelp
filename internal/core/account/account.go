@@ -25,8 +25,8 @@ import (
 // a login bug.
 var ErrNotFound = errors.New("account not found")
 
-// ErrEmailTaken is returned when the address already has an account.
-var ErrEmailTaken = errors.New("that email address already has an account")
+// ErrNameTaken is returned when the username already has an account.
+var ErrNameTaken = errors.New("that username already has an account")
 
 // Store reads and writes accounts. It takes an Execer rather than a handle, so
 // a caller can pass a transaction and make this part of a larger unit of work.
@@ -37,7 +37,7 @@ type Store struct {
 // User is an account as stored.
 type User struct {
 	ID              int64
-	Email           string
+	Username        string
 	DisplayName     string
 	IsAdministrator bool
 	Disabled        bool
@@ -48,10 +48,10 @@ type User struct {
 // now is a parameter rather than a call to the clock: the domain does not read
 // the wall clock, which is what lets a test place an account in the past
 // without sleeping.
-func (s Store) Create(email, plainPassword, displayName string, administrator bool, now time.Time) (User, error) {
-	email = normaliseEmail(email)
-	if email == "" {
-		return User{}, errors.New("an account needs an email address")
+func (s Store) Create(username, plainPassword, displayName string, administrator bool, now time.Time) (User, error) {
+	username = normaliseUsername(username)
+	if username == "" {
+		return User{}, errors.New("an account needs a username")
 	}
 
 	hash, err := password.Hash(plainPassword)
@@ -60,12 +60,12 @@ func (s Store) Create(email, plainPassword, displayName string, administrator bo
 	}
 
 	res, err := s.DB.Exec(`INSERT INTO app_user
-		(email, password_hash, display_name, is_administrator, created_at)
+		(username, password_hash, display_name, is_administrator, created_at)
 		VALUES (?, ?, ?, ?, ?)`,
-		email, hash, displayName, administrator, now.Unix())
+		username, hash, displayName, administrator, now.Unix())
 	if err != nil {
 		if isUniqueViolation(err) {
-			return User{}, ErrEmailTaken
+			return User{}, ErrNameTaken
 		}
 		return User{}, fmt.Errorf("creating the account: %w", err)
 	}
@@ -75,7 +75,7 @@ func (s Store) Create(email, plainPassword, displayName string, administrator bo
 		return User{}, fmt.Errorf("creating the account: %w", err)
 	}
 	return User{
-		ID: id, Email: email, DisplayName: displayName, IsAdministrator: administrator,
+		ID: id, Username: username, DisplayName: displayName, IsAdministrator: administrator,
 	}, nil
 }
 
@@ -84,16 +84,16 @@ func (s Store) Create(email, plainPassword, displayName string, administrator bo
 // A missing account and a wrong password come back as the same error, and both
 // paths do the same work: answering faster for an address that does not exist
 // is how an attacker enumerates who has an account here.
-func (s Store) Authenticate(email, plainPassword string) (User, error) {
-	email = normaliseEmail(email)
+func (s Store) Authenticate(username, plainPassword string) (User, error) {
+	username = normaliseUsername(username)
 
 	var (
 		u          User
 		storedHash string
 	)
-	err := s.DB.QueryRow(`SELECT id, email, display_name, is_administrator, disabled, password_hash
-		FROM app_user WHERE email = ?`, email).
-		Scan(&u.ID, &u.Email, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &storedHash)
+	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled, password_hash
+		FROM app_user WHERE username = ?`, username).
+		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &storedHash)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -121,9 +121,9 @@ func (s Store) Authenticate(email, plainPassword string) (User, error) {
 // leak from.
 func (s Store) ByID(userID int64) (User, error) {
 	var u User
-	err := s.DB.QueryRow(`SELECT id, email, display_name, is_administrator, disabled
+	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled
 		FROM app_user WHERE id = ?`, userID).
-		Scan(&u.ID, &u.Email, &u.DisplayName, &u.IsAdministrator, &u.Disabled)
+		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -221,8 +221,10 @@ func (s Store) Count() (int, error) {
 	return n, nil
 }
 
-func normaliseEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
+// normaliseUsername lowercases and trims, so nobody signs up twice as "Ana"
+// and "ana" and then wonders which one they are.
+func normaliseUsername(username string) string {
+	return strings.ToLower(strings.TrimSpace(username))
 }
 
 func isUniqueViolation(err error) bool {
@@ -253,3 +255,85 @@ var decoy = sync.OnceValue(func() string {
 	}
 	return hash
 })
+
+// List reads every account, with the memberships that say what each one may do.
+//
+// Ordered by name so the screen is stable: a list that reorders itself between
+// visits is one where somebody clicks the wrong row.
+func (s Store) List() ([]User, error) {
+	rows, err := s.DB.Query(`SELECT id, username, display_name, is_administrator, disabled
+		FROM app_user ORDER BY username`)
+	if err != nil {
+		return nil, fmt.Errorf("listing accounts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+// Memberships reads what one account has been granted.
+func (s Store) Memberships(userID int64) ([]authz.Membership, error) {
+	actor, err := s.Actor(userID)
+	if err != nil {
+		return nil, err
+	}
+	return actor.Memberships, nil
+}
+
+// SetPassword replaces a password, and only after the old one is proved.
+//
+// Proving it is the point: a session left open on a shared machine is the
+// ordinary way an account is taken, and a change that asked for nothing would
+// hand it over permanently.
+func (s Store) SetPassword(userID int64, currentPassword, newPassword string) error {
+	var storedHash string
+	err := s.DB.QueryRow(`SELECT password_hash FROM app_user WHERE id = ?`, userID).Scan(&storedHash)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("looking up the account: %w", err)
+	}
+
+	if err := password.Verify(currentPassword, storedHash); err != nil {
+		return ErrNotFound
+	}
+
+	hash, err := password.Hash(newPassword)
+	if err != nil {
+		return fmt.Errorf("hashing the password: %w", err)
+	}
+	if _, err := s.DB.Exec(`UPDATE app_user SET password_hash = ? WHERE id = ?`, hash, userID); err != nil {
+		return fmt.Errorf("storing the password: %w", err)
+	}
+	return nil
+}
+
+// SetDisplayName changes the name shown beside a reply.
+func (s Store) SetDisplayName(userID int64, name string) error {
+	if _, err := s.DB.Exec(`UPDATE app_user SET display_name = ? WHERE id = ?`,
+		strings.TrimSpace(name), userID); err != nil {
+		return fmt.Errorf("storing the display name: %w", err)
+	}
+	return nil
+}
+
+// SetDisabled turns an account off without deleting what it wrote.
+//
+// Deleting would take the replies with it — the ON DELETE CASCADE is there for
+// a reason — and a thread that loses half a conversation because somebody left
+// the team is worse than a row marked disabled.
+func (s Store) SetDisabled(userID int64, disabled bool) error {
+	if _, err := s.DB.Exec(`UPDATE app_user SET disabled = ? WHERE id = ?`, disabled, userID); err != nil {
+		return fmt.Errorf("storing the account state: %w", err)
+	}
+	return nil
+}

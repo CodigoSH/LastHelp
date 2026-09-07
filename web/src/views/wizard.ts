@@ -179,7 +179,6 @@ export function wizard(spec: WizardSpec, text: Text): string {
       ${dots}
     </ol>
     <header class="wizard-head">
-      <p class="step-count">${escapeHTML(text.t("wizard.progress", { step: spec.step, total }))}</p>
       <h1>${escapeHTML(spec.title)}</h1>
       ${spec.lead ? `<p class="lead">${escapeHTML(spec.lead)}</p>` : ""}
     </header>
@@ -187,9 +186,9 @@ export function wizard(spec: WizardSpec, text: Text): string {
       <div class="wizard-card">${spec.body}</div>
       <p class="form-error" role="alert" hidden></p>
       <div class="wizard-actions">
-        <button class="button primary" type="submit">${escapeHTML(spec.submit)}</button>
+        ${spec.back ? `<a class="button ghost" href="${escapeAttr(spec.back.href)}">${escapeHTML(spec.back.label)}</a>` : ""}
         <span class="spacer"></span>
-        ${spec.back ? `<a class="link" href="${escapeAttr(spec.back.href)}">${escapeHTML(spec.back.label)}</a>` : ""}
+        <button class="button primary" type="submit">${escapeHTML(spec.submit)}</button>
       </div>
     </form>
   </section>`;

@@ -67,7 +67,7 @@ export interface Status {
 
 export interface Me {
   id: number;
-  email?: string;
+  username?: string;
   admin: boolean;
   memberships: Array<{ scope: string; id: number; org_id: number; role: string }>;
 }

@@ -168,7 +168,7 @@ func TestACollaboratorCannotTouchTheRepositoryNextDoor(t *testing.T) {
 
 	// Somebody who triages only lastboard.
 	accounts := account.Store{DB: team.db()}
-	helper, err := accounts.Create("helper@example.com", "a good long passphrase", "Helper", false, team.now())
+	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestACollaboratorCannotTouchTheRepositoryNextDoor(t *testing.T) {
 
 	helperClient := team.anonymous()
 	resp := helperClient.do(http.MethodPost, "/api/session", map[string]string{
-		"email": "helper@example.com", "password": "a good long passphrase",
+		"username": "helper", "password": "a good long passphrase",
 	})
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -225,7 +225,7 @@ func TestAnOwnerOfOneOrganizationHasNothingInAnother(t *testing.T) {
 	team.createRepo("jellyfin", "server")
 
 	accounts := account.Store{DB: team.db()}
-	outsider, err := accounts.Create("owner@other.example", "a good long passphrase", "Other", false, team.now())
+	outsider, err := accounts.Create("otherowner", "a good long passphrase", "Other", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,7 +239,7 @@ func TestAnOwnerOfOneOrganizationHasNothingInAnother(t *testing.T) {
 
 	client := team.anonymous()
 	resp := client.do(http.MethodPost, "/api/session", map[string]string{
-		"email": "owner@other.example", "password": "a good long passphrase",
+		"username": "otherowner", "password": "a good long passphrase",
 	})
 	_ = resp.Body.Close()
 
@@ -484,11 +484,11 @@ func TestTheRoadmapNeverShowsWhatNobodyHasRead(t *testing.T) {
 
 // makeCollaborator gives an account triage rights on codigosh/lastboard and
 // signs the given client in as them.
-func makeCollaborator(t *testing.T, team, client *instance, email string) {
+func makeCollaborator(t *testing.T, team, client *instance, username string) {
 	t.Helper()
 
 	accounts := account.Store{DB: team.db()}
-	user, err := accounts.Create(email, "a good long passphrase", "Helper", false, team.now())
+	user, err := accounts.Create(username, "a good long passphrase", "Helper", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +501,7 @@ func makeCollaborator(t *testing.T, team, client *instance, email string) {
 	}
 
 	resp := client.do(http.MethodPost, "/api/session",
-		map[string]string{"email": email, "password": "a good long passphrase"})
+		map[string]string{"username": username, "password": "a good long passphrase"})
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("the collaborator could not sign in: %d", resp.StatusCode)

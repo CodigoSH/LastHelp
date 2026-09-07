@@ -209,11 +209,11 @@ func TestAGenuineSubmissionStillGetsThrough(t *testing.T) {
 	public.tick.advance(12 * time.Second)
 
 	resp := public.do(http.MethodPost, boardAPI+"/items", map[string]any{
-		"kind":  "bug",
-		"title": "crashes when I import a folder of photos",
-		"body":  "It closes with no message. Log here: https://paste.example.com/abc",
-		"email": "someone@example.com",
-		"token": token,
+		"kind":     "bug",
+		"title":    "crashes when I import a folder of photos",
+		"body":     "It closes with no message. Log here: https://paste.example.com/abc",
+		"username": "someone",
+		"token":    token,
 	})
 	body := decode(t, resp)
 	if resp.StatusCode != http.StatusCreated {

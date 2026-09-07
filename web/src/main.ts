@@ -33,6 +33,15 @@ const nav = document.getElementById("nav");
 
 let me: Me | null = null;
 
+/**
+ * What this installation calls itself.
+ *
+ * Read once when a panel page is drawn and kept: it is on every screen, and
+ * asking the server for it on each navigation would be a request for a string
+ * that changes about once in the life of an install.
+ */
+let instanceName = "";
+
 // --- routing ---------------------------------------------------------------
 
 /** Navigate without a reload, so the language and the scroll survive. */
@@ -110,6 +119,11 @@ async function showInShell(content: string, path: string): Promise<void> {
     .get<{ organizations: OrganizationSummary[] }>("/api/orgs")
     .catch(() => ({ organizations: [] as OrganizationSummary[] }));
 
+  if (!instanceName) {
+    const instance = await api.get<{ name: string }>("/api/instance").catch(() => null);
+    instanceName = instance?.name ?? "";
+  }
+
   const orgs: views.SideOrganization[] = organizations ?? [];
   const inside = orgs.find((o) => path.startsWith(`/panel/${o.slug}`) || path.startsWith(`/${o.slug}/`));
   if (inside) {
@@ -124,11 +138,10 @@ async function showInShell(content: string, path: string): Promise<void> {
       {
         path,
         organizations: orgs,
-        who: me?.email ?? "",
+        who: me?.username ?? "",
         isAdmin: me?.admin === true,
-        theme: currentTheme(),
-        languages: availableLocales.map((l) => ({ code: l.code, name: l.name })),
-        language: i18n.current,
+        mayAddOrganization: me?.admin === true,
+        instance: instanceName || i18n.t("app.name"),
         content,
       },
       text,
@@ -140,20 +153,121 @@ async function showInShell(content: string, path: string): Promise<void> {
 
 /** The controls that live in the shell rather than in any one screen. */
 function wireShell(): void {
-  root?.querySelectorAll<HTMLButtonElement>("[data-theme-choice]").forEach((button) => {
-    button.addEventListener("click", () => {
-      applyTheme((button.dataset.themeChoice ?? "system") as Theme);
-      void render();
-    });
-  });
-  root?.querySelector<HTMLSelectElement>(".side .lang")?.addEventListener("change", (e) => {
-    void i18n.setLanguage((e.target as HTMLSelectElement).value).then(() => void render());
-  });
   root?.querySelector<HTMLButtonElement>(".side [data-signout]")?.addEventListener("click", async () => {
     await api.del("/api/session").catch(() => undefined);
     me = null;
+    instanceName = "";
     go("/");
   });
+}
+
+/** Signed in, or sent to the door. Every panel screen starts here. */
+async function requirePanel(): Promise<boolean> {
+  me = await api.get<Me>("/api/me").catch(() => null);
+  if (!me) {
+    go("/sign-in");
+    return false;
+  }
+  return true;
+}
+
+async function showProfile(): Promise<void> {
+  if (!(await requirePanel())) return;
+  await showInShell(views.profileScreen(me?.username ?? "", "", text), "/panel/account");
+
+  root?.querySelector<HTMLFormElement>("form.profile-name")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    try {
+      await api.post("/api/me/profile", { display_name: String(data.get("display_name") ?? "") });
+      await render();
+    } catch (err) {
+      showFormError(err);
+    }
+  });
+
+  root?.querySelector<HTMLFormElement>("form.profile-password")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    const next = String(data.get("new") ?? "");
+    if (next !== String(data.get("again") ?? "")) {
+      showFormError(new ApiError(400, "error.password_mismatch"));
+      return;
+    }
+    try {
+      await api.post("/api/me/password", { current: String(data.get("current") ?? ""), new: next });
+      await render();
+    } catch (err) {
+      showFormError(err);
+    }
+  });
+}
+
+async function showAppearance(): Promise<void> {
+  if (!(await requirePanel())) return;
+  await showInShell(
+    views.appearanceScreen(
+      availableLocales.map((l) => ({ code: l.code, name: l.name })),
+      i18n.current,
+      currentTheme(),
+      text,
+    ),
+    "/panel/appearance",
+  );
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-theme-choice]").forEach((button) =>
+    button.addEventListener("click", () => {
+      applyTheme((button.dataset.themeChoice ?? "system") as Theme);
+      void render();
+    }),
+  );
+  root?.querySelector<HTMLSelectElement>("#appearance-language")?.addEventListener("change", (e) => {
+    void i18n.setLanguage((e.target as HTMLSelectElement).value).then(() => void render());
+  });
+}
+
+async function showPeople(): Promise<void> {
+  if (!(await requirePanel())) return;
+  const body = await api
+    .get<{ people: Parameters<typeof views.peopleScreen>[0] }>("/api/people")
+    .catch(() => null);
+  if (!body) {
+    await showInShell(`<p class="empty">${escapeHTML(i18n.t("error.forbidden"))}</p>`, "/panel/people");
+    return;
+  }
+
+  await showInShell(views.peopleScreen(body.people ?? [], text), "/panel/people");
+
+  root?.querySelector<HTMLFormElement>("form.new-person")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget as HTMLFormElement);
+    try {
+      await api.post("/api/people", {
+        username: String(data.get("username") ?? ""),
+        display_name: String(data.get("display_name") ?? ""),
+        password: String(data.get("password") ?? ""),
+      });
+      await render();
+    } catch (err) {
+      showFormError(err);
+    }
+  });
+}
+
+async function showBackups(): Promise<void> {
+  if (!(await requirePanel())) return;
+  await showInShell(views.backupScreen(text), "/panel/backups");
+}
+
+async function showAbout(): Promise<void> {
+  if (!(await requirePanel())) return;
+  const status = await api
+    .get<{ current: string; commit?: string; schema?: number }>("/api/update")
+    .catch(() => ({ current: "" }));
+  await showInShell(
+    views.aboutScreen(status, instanceName || i18n.t("app.name"), text),
+    "/panel/about",
+  );
 }
 
 function fail(err: unknown): void {
@@ -176,11 +290,15 @@ async function render(): Promise<void> {
     if (path === "/sign-in") return await showSignIn();
     if (path === "/setup") return showSetupStep(1);
     if (path === "/setup/account") return showSetupStep(2);
-    if (path === "/setup/organization") return showSetupStep(3);
-    if (path === "/setup/board") return showSetupStep(4);
+    if (path === "/setup/instance") return showSetupStep(3);
     if (path === "/setup/done") return showSetupDone();
     if (path === "/panel") return await showPanel();
     if (path === "/panel/updates") return await showUpdates();
+    if (path === "/panel/account") return await showProfile();
+    if (path === "/panel/appearance") return await showAppearance();
+    if (path === "/panel/people") return await showPeople();
+    if (path === "/panel/backups") return await showBackups();
+    if (path === "/panel/about") return await showAbout();
     // Before the generic /panel/{org}: "new" is a screen, not an organisation
     // anybody would be able to open.
     if (path === "/panel/new") return await showOrganizationWizard(1);
@@ -213,6 +331,13 @@ async function render(): Promise<void> {
 }
 
 async function showOrganizations(): Promise<void> {
+  // A brand new installation opens on the wizard, not on a landing that hides
+  // it behind "sign in". Whoever reaches an unclaimed instance first is the
+  // person who is going to set it up, and asking them to find the door is how
+  // the first minute goes wrong.
+  const status = await api.get<Status>("/api/status").catch(() => null);
+  if (status?.needs_setup) return go("/setup");
+
   const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
   // Who is looking decides what an empty instance says. An administrator gets
   // the way out of it; a visitor gets told plainly, rather than being sent to a
@@ -628,9 +753,9 @@ function wireForgeChoice(rerender: (forge: string) => void): void {
   });
 }
 
-function showSetupStep(step: 1 | 2 | 3 | 4): void {
+function showSetupStep(step: 1 | 2 | 3): void {
   show(
-    views.setupWizard(step, text, draft.forge, {
+    views.setupWizard(step, text, {
       languages: availableLocales.map((l) => ({ code: l.code, name: l.name })),
       language: i18n.current,
       theme: currentTheme(),
@@ -671,9 +796,9 @@ function showSetupStep(step: 1 | 2 | 3 | 4): void {
           return;
         }
         try {
-          await api.post("/api/setup", { email: String(data.get("email") ?? ""), password });
+          await api.post("/api/setup", { username: String(data.get("username") ?? ""), password });
           me = await api.get<Me>("/api/me");
-          go("/setup/organization");
+          go("/setup/instance");
         } catch (err) {
           showFormError(err);
         }
@@ -682,46 +807,13 @@ function showSetupStep(step: 1 | 2 | 3 | 4): void {
     return;
   }
 
-  if (step === 3) {
-    wireForgeChoice((forge) => showSetupStep2(forge));
-    root?.querySelector<HTMLFormElement>("form.setup-organization")?.addEventListener(
-      "submit",
-      async (event) => {
-        event.preventDefault();
-        const data = new FormData(event.currentTarget as HTMLFormElement);
-        draft.forge = String(data.get("forge") ?? "none");
-        draft.orgSlug = String(data.get("slug") ?? "");
-        try {
-          await api.post("/api/organizations", {
-            name: String(data.get("name") ?? ""),
-            slug: draft.orgSlug,
-            forge: draft.forge,
-            base_url: String(data.get("base_url") ?? ""),
-            forge_owner: String(data.get("forge_owner") ?? ""),
-          });
-          go("/setup/board");
-        } catch (err) {
-          showFormError(err);
-        }
-      },
-    );
-    return;
-  }
-
-  root?.querySelector<HTMLFormElement>("form.setup-repository")?.addEventListener(
+  root?.querySelector<HTMLFormElement>("form.setup-instance")?.addEventListener(
     "submit",
     async (event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget as HTMLFormElement);
-      draft.repoSlug = String(data.get("slug") ?? "");
       try {
-        await api.post(`/api/orgs/${encodeURIComponent(draft.orgSlug)}/repositories`, {
-          name: String(data.get("name") ?? ""),
-          slug: draft.repoSlug,
-          forge_repo: String(data.get("forge_repo") ?? ""),
-          accepts_bugs: data.get("accepts_bugs") !== null,
-          accepts_ideas: data.get("accepts_ideas") !== null,
-        });
+        await api.post("/api/instance", { name: String(data.get("name") ?? "") });
         go("/setup/done");
       } catch (err) {
         showFormError(err);
@@ -730,20 +822,8 @@ function showSetupStep(step: 1 | 2 | 3 | 4): void {
   );
 }
 
-/** Re-render step two in place when the forge changes, keeping what was typed. */
-function showSetupStep2(forge: string): void {
-  const kept = new FormData(root?.querySelector<HTMLFormElement>("form.setup-organization") ?? undefined);
-  draft.forge = forge;
-  showSetupStep(2);
-  const form = root?.querySelector<HTMLFormElement>("form.setup-organization");
-  for (const [name, value] of kept.entries()) {
-    const input = form?.querySelector<HTMLInputElement>(`[name="${name}"]`);
-    if (input && input.type !== "checkbox" && name !== "forge") input.value = String(value);
-  }
-}
-
 function showSetupDone(): void {
-  show(views.wizardDone(draft.orgSlug, draft.repoSlug, draft.forge !== "none", text));
+  show(views.setupDone(text));
 }
 
 async function showOrganizationWizard(step: 1 | 2): Promise<void> {

@@ -21,8 +21,12 @@ const credentialsBodyLimit = 4 << 10 // 4 KiB
 // actually strong, and argon2id does not care what characters are in it.
 const minPasswordLength = 10
 
+// minUsernameLength keeps a stray keystroke from becoming an account nobody
+// can guess the name of again.
+const minUsernameLength = 2
+
 type credentials struct {
-	Email       string `json:"email"`
+	Username    string `json:"username"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
 }
@@ -63,9 +67,9 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.accounts().Create(in.Email, in.Password, in.DisplayName, true, s.now())
+	user, err := s.accounts().Create(in.Username, in.Password, in.DisplayName, true, s.now())
 	if err != nil {
-		if errors.Is(err, account.ErrEmailTaken) {
+		if errors.Is(err, account.ErrNameTaken) {
 			writeError(w, http.StatusConflict, "error.email_taken")
 			return
 		}
@@ -76,7 +80,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("instance claimed", "user", user.ID)
 	s.startSession(w, r, user.ID)
-	writeJSON(w, http.StatusCreated, map[string]any{"id": user.ID, "email": user.Email})
+	writeJSON(w, http.StatusCreated, map[string]any{"id": user.ID, "username": user.Username})
 }
 
 // handleSignIn exchanges an email and password for a session.
@@ -86,7 +90,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.accounts().Authenticate(in.Email, in.Password)
+	user, err := s.accounts().Authenticate(in.Username, in.Password)
 	if err != nil {
 		if errors.Is(err, account.ErrNotFound) {
 			// One answer for a wrong password and an address with no account.
@@ -99,7 +103,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.startSession(w, r, user.ID)
-	writeJSON(w, http.StatusOK, map[string]any{"id": user.ID, "email": user.Email})
+	writeJSON(w, http.StatusOK, map[string]any{"id": user.ID, "username": user.Username})
 }
 
 // handleSignOut ends the session, in the database and not only in the browser.
@@ -156,7 +160,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		"memberships": memberships,
 	}
 	if user, err := s.accounts().ByID(actor.UserID); err == nil {
-		body["email"] = user.Email
+		body["username"] = user.Username
 	}
 	writeJSON(w, http.StatusOK, body)
 }
@@ -187,8 +191,11 @@ func readCredentials(w http.ResponseWriter, r *http.Request) (credentials, bool)
 		writeError(w, http.StatusBadRequest, "error.bad_request")
 		return credentials{}, false
 	}
-	if strings.TrimSpace(in.Email) == "" || !strings.Contains(in.Email, "@") {
-		writeError(w, http.StatusBadRequest, "error.email_required")
+	// A username, not an address: nothing is ever sent to it, and asking
+	// somebody setting up their own server for an email they will never receive
+	// anything at is asking for information to store and not use.
+	if len(strings.TrimSpace(in.Username)) < minUsernameLength {
+		writeError(w, http.StatusBadRequest, "error.username_required")
 		return credentials{}, false
 	}
 	if len(in.Password) < minPasswordLength {

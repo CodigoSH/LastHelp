@@ -92,7 +92,7 @@ func TestTheExportCarriesNobodyElsesSecrets(t *testing.T) {
 
 	sent := decode(t, public.do(http.MethodPost, base+"/items", map[string]any{
 		"kind": "bug", "title": "a bug", "body": "it broke",
-		"email": "somebody@example.com", "token": form["token"],
+		"username": "somebody", "token": form["token"],
 	}))
 	followToken, _ := sent["follow_token"].(string)
 	if followToken == "" {

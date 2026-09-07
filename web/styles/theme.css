@@ -576,6 +576,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   border-radius: 2px;
 }
 
+/* The last step has no line after it, so with an equal share of the row it left
+   a gap and the whole bar read as narrower than the card underneath it. It
+   takes only the width of its own label instead, which ends the bar exactly
+   where the card ends. */
+.steps li:last-child {
+  flex: 0 0 auto;
+}
+
 .steps li:last-child::after {
   display: none;
 }
@@ -646,11 +654,24 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   padding: clamp(1.25rem, 3vw, 1.75rem);
 }
 
+/* The way forward on the end the eye leaves from, and the way back on the other
+   one. A single button on the left reads as the only thing you can do. */
 .wizard-actions {
   display: flex;
   gap: 0.75rem;
   align-items: center;
   margin-top: 1.5rem;
+}
+
+.button.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.button.ghost:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 .wizard-actions .spacer {
@@ -890,4 +911,74 @@ body.admin-view > main {
   background: rgba(var(--accent-rgb), 0.16);
   color: var(--accent-alt);
   font-weight: 600;
+}
+
+/* --------------------------------------------------------- panel sections */
+
+.people {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 2rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.person {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.person-name {
+  font-weight: 600;
+}
+
+.person-role {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.facts {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.4rem;
+  max-inline-size: 34rem;
+}
+
+.facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.facts code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  unicode-bidi: isolate;
+}
+
+.admin-main h2 {
+  margin-block-start: 2.25rem;
+  font-size: 1.15rem;
+}
+
+/* The wizard card is reused for the settings forms, so it needs to stop being
+   as wide as the reading column when it holds two fields. */
+.admin-main .wizard-card {
+  max-inline-size: 34rem;
+}
+
+.admin-main .wizard-actions {
+  max-inline-size: 34rem;
 }

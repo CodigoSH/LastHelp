@@ -149,7 +149,7 @@ func (i *instance) csrf() string {
 func (i *instance) claim() {
 	i.t.Helper()
 	resp := i.do(http.MethodPost, "/api/setup", map[string]string{
-		"email": "owner@example.com", "password": "a good long passphrase", "display_name": "Owner",
+		"username": "owner", "password": "a good long passphrase", "display_name": "Owner",
 	})
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
@@ -198,7 +198,7 @@ func TestSetupCanOnlyHappenOnce(t *testing.T) {
 	i.claim()
 
 	resp := i.do(http.MethodPost, "/api/setup", map[string]string{
-		"email": "someone@example.com", "password": "another long passphrase",
+		"username": "someone", "password": "another long passphrase",
 	})
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusForbidden {
@@ -264,7 +264,7 @@ func TestSigningInAndOut(t *testing.T) {
 	}
 
 	resp = i.do(http.MethodPost, "/api/session", map[string]string{
-		"email": "owner@example.com", "password": "a good long passphrase",
+		"username": "owner", "password": "a good long passphrase",
 	})
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -277,10 +277,10 @@ func TestAWrongPasswordAndAnUnknownAddressAnswerTheSame(t *testing.T) {
 	i.claim()
 
 	wrong := i.do(http.MethodPost, "/api/session", map[string]string{
-		"email": "owner@example.com", "password": "not the passphrase",
+		"username": "owner", "password": "not the passphrase",
 	})
 	unknown := i.do(http.MethodPost, "/api/session", map[string]string{
-		"email": "nobody@example.com", "password": "not the passphrase",
+		"username": "nobody", "password": "not the passphrase",
 	})
 
 	wrongBody := decode(t, wrong)
@@ -345,7 +345,7 @@ func TestTheSessionCookieIsNotReadableByScripts(t *testing.T) {
 	i.claim()
 
 	resp := i.do(http.MethodPost, "/api/session", map[string]string{
-		"email": "owner@example.com", "password": "a good long passphrase",
+		"username": "owner", "password": "a good long passphrase",
 	})
 	defer func() { _ = resp.Body.Close() }()
 
@@ -368,7 +368,7 @@ func TestTheSessionCookieIsNotReadableByScripts(t *testing.T) {
 func TestAShortPasswordIsRefused(t *testing.T) {
 	i := newInstance(t)
 	resp := i.do(http.MethodPost, "/api/setup", map[string]string{
-		"email": "owner@example.com", "password": "short",
+		"username": "owner", "password": "short",
 	})
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusBadRequest {

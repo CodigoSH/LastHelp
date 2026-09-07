@@ -193,7 +193,7 @@ export function panelOrganization(
           .map(
             (r) =>
               `<a href="/api/orgs/${escapeAttr(org.slug)}/repos/${escapeAttr(r.slug)}/export"
-                  download>${escapeHTML(text.t("panel.export", { board: r.name }))}</a>`,
+                  download>${escapeHTML(text.t("panel.export", { repository: r.name }))}</a>`,
           )
           .join(" · ")}</p>`;
 
@@ -271,7 +271,7 @@ export function connectionForms(
            </div>
 
            <div class="channel-mail" hidden>
-             <label for="chan-to">${escapeHTML(text.t("auth.email"))}</label>
+             <label for="chan-to">${escapeHTML(text.t("panel.mailTo"))}</label>
              <input id="chan-to" name="to" type="email" />
            </div>
 
@@ -582,7 +582,7 @@ export function signInForm(text: Text): string {
     </header>
     <form class="auth">
       <div class="wizard-card">
-        ${field({ id: "auth-email", name: "email", label: text.t("auth.email"), type: "email", required: true, autocomplete: "username" }, text)}
+        ${field({ id: "auth-username", name: "username", label: text.t("auth.username"), required: true, autocomplete: "username" }, text)}
         ${field({ id: "auth-password", name: "password", label: text.t("auth.password"), type: "password", required: true, autocomplete: "current-password" }, text)}
       </div>
       <p class="form-error" role="alert" hidden></p>
@@ -628,13 +628,13 @@ export function queueView(items: ItemSummary[], bodies: Map<string, string>, tex
 function accountFields(text: Text): string {
   return (
     field({
-      id: "email",
-      name: "email",
-      label: text.t("auth.email"),
-      type: "email",
+      id: "username",
+      name: "username",
+      label: text.t("auth.username"),
       required: true,
       autocomplete: "username",
-      example: "you@example.com",
+      hint: text.t("auth.usernameHelp"),
+      example: "k4wit0",
     }, text) +
     field({
       id: "password",
@@ -789,17 +789,22 @@ function acceptsFields(text: Text): string {
 }
 
 /**
- * The first run: language, administrator, organisation, board.
+ * The first run, and it configures the installation — not the work.
  *
- * Language and look come first because everything after them is read in
- * whatever they choose, and because the account created in step two is the
- * administrator — there is no sign-up afterwards and no password reset, so the
- * step that makes it deserves not to be the first thing somebody sees.
+ * Language and look first, because everything after them is read in whatever
+ * they choose. Then the administrator: there is no sign-up afterwards and no
+ * password reset, so the account this step makes is the only way back in. Then
+ * what this installation calls itself.
+ *
+ * Organisations and repositories deliberately are not here. They are the daily
+ * work rather than the installation, they are created and deleted for years
+ * after this screen is gone, and putting the first one in a wizard implies the
+ * shape of everything that follows has to be decided before you have seen the
+ * product.
  */
 export function setupWizard(
   step: number,
   text: Text,
-  forge = "none",
   prefs: { languages: { code: string; name: string }[]; language: string; theme: string } = {
     languages: [],
     language: "en",
@@ -809,8 +814,7 @@ export function setupWizard(
   const names = [
     text.t("setup.stepLanguage"),
     text.t("setup.stepAccount"),
-    text.t("setup.stepOrganization"),
-    text.t("setup.stepBoard"),
+    text.t("setup.stepInstance"),
   ];
 
   if (step === 1) {
@@ -837,22 +841,8 @@ export function setupWizard(
         lead: text.t("auth.setupHelp"),
         body: accountFields(text),
         submit: text.t("wizard.continue"),
+        back: { href: "/setup", label: text.t("wizard.back") },
         formClass: "setup-account",
-      },
-      text,
-    );
-  }
-
-  if (step === 3) {
-    return wizard(
-      {
-        step: 3,
-        names,
-        title: text.t("setup.orgTitle"),
-        lead: text.t("setup.orgLead"),
-        body: organizationFields(text, forge),
-        submit: text.t("wizard.continue"),
-        formClass: "setup-organization",
       },
       text,
     );
@@ -860,13 +850,23 @@ export function setupWizard(
 
   return wizard(
     {
-      step: 4,
+      step: 3,
       names,
-      title: text.t("setup.boardTitle"),
-      lead: text.t("setup.boardLead"),
-      body: repositoryFields(text, forge, forge !== "none") + acceptsFields(text),
+      title: text.t("setup.instanceTitle"),
+      lead: text.t("setup.instanceLead"),
+      body: field(
+        {
+          id: "instance-name",
+          name: "name",
+          label: text.t("setup.instanceName"),
+          hint: text.t("setup.instanceNameHelp"),
+          example: "CodigoSH",
+        },
+        text,
+      ),
       submit: text.t("wizard.finish"),
-      formClass: "setup-repository",
+      back: { href: "/setup/account", label: text.t("wizard.back") },
+      formClass: "setup-instance",
     },
     text,
   );
@@ -933,7 +933,7 @@ export function repositoryWizard(
         step: 1,
         names,
         title: text.t("panel.newRepository"),
-        lead: text.t("setup.boardLead"),
+        lead: text.t("repo.lead"),
         body: repositoryFields(text, forge, forge !== "none"),
         submit: text.t("wizard.continue"),
         back: { href: `/panel/${escapeAttr(org.slug)}`, label: text.t("nav.back") },
@@ -958,26 +958,25 @@ export function repositoryWizard(
   );
 }
 
-/** The end of the first run, which has to say where the thing now lives. */
-export function wizardDone(
-  orgSlug: string,
-  repoSlug: string,
-  hasForge: boolean,
-  text: Text,
-): string {
-  const address = `/${orgSlug}/${repoSlug}`;
+/**
+ * The end of the first run.
+ *
+ * It hands over rather than congratulating: the installation is configured and
+ * the next thing is an organisation, which is work rather than setup. A last
+ * screen that only says "done" leaves somebody looking for the next door.
+ */
+export function setupDone(text: Text): string {
   return `<section class="wizard">
     <header class="wizard-head">
-      <p class="step-count">${escapeHTML(text.t("setup.doneStep"))}</p>
       <h1>${escapeHTML(text.t("setup.doneTitle"))}</h1>
       <p class="lead">${escapeHTML(text.t("setup.doneLead"))}</p>
     </header>
     <div class="wizard-card">
-      <p><a class="button primary" href="${escapeAttr(address)}">${escapeHTML(text.t("setup.doneOpen"))}</a></p>
-      ${hasForge ? `<p class="hint">${escapeHTML(text.t("setup.doneWebhook"))}</p>` : ""}
+      <p class="hint">${escapeHTML(text.t("setup.doneNext"))}</p>
     </div>
     <div class="wizard-actions">
-      <a class="link" href="/panel/${escapeAttr(orgSlug)}">${escapeHTML(text.t("nav.panel"))}</a>
+      <span class="spacer"></span>
+      <a class="button primary" href="/panel/new">${escapeHTML(text.t("panel.newOrganization"))}</a>
     </div>
   </section>`;
 }
@@ -997,19 +996,22 @@ export interface ShellSpec {
   /** Shown at the foot, so it is obvious which account is acting. */
   who: string;
   isAdmin: boolean;
-  theme: "system" | "light" | "dark";
-  languages: { code: string; name: string }[];
-  language: string;
+  /** True for anybody who may create an organisation. */
+  mayAddOrganization: boolean;
+  instance: string;
   content: string;
 }
 
 /**
- * The administration, with its options down one side.
+ * The administration, grouped.
  *
- * The panel used to be a page with a list and a button, so the answer to "what
- * can I do here?" was whatever that screen happened to show. Everything an
- * account can reach is in the sidebar, and the current page is marked with
- * aria-current rather than only with a colour and a bar.
+ * One flat list answers "where do I click" and nothing else. Grouped, it also
+ * answers "what kind of thing is this" — the daily work, your own account, and
+ * the server — which is the difference between a menu and an inventory.
+ *
+ * What each account sees is what it may do. The groups are built from the
+ * permissions rather than rendered and then hidden, because an item you can see
+ * and cannot use is worse than one that was never there.
  */
 export function adminShell(spec: ShellSpec, text: Text): string {
   const item = (href: string, label: string, extra = ""): string => {
@@ -1017,50 +1019,205 @@ export function adminShell(spec: ShellSpec, text: Text): string {
     return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${escapeHTML(label)}</a>`;
   };
 
+  const group = (label: string, items: string): string =>
+    items.trim() === ""
+      ? ""
+      : `<p class="side-label">${escapeHTML(label)}</p>${items}`;
+
   const orgs = spec.organizations
     .map((org) => {
-      const inside = spec.path.startsWith(`/panel/${org.slug}`) || spec.path.startsWith(`/${org.slug}/`);
-      const boards =
+      const inside =
+        spec.path.startsWith(`/panel/${org.slug}`) || spec.path.startsWith(`/${org.slug}/`);
+      const repos =
         inside && org.repos?.length
           ? org.repos
-              .map((r) => item(`/${org.slug}/${r.slug}/queue`, r.name, "sub"))
+              .map(
+                (r) =>
+                  item(`/${org.slug}/${r.slug}/queue`, r.name, "sub") ,
+              )
               .join("")
           : "";
-      return item(`/panel/${org.slug}`, org.name) + boards;
+      return item(`/panel/${org.slug}`, org.name) + repos;
     })
     .join("");
 
-  const themeButton = (value: string, label: string) =>
-    `<button type="button" data-theme-choice="${escapeAttr(value)}" aria-pressed="${spec.theme === value}">${escapeHTML(label)}</button>`;
-
   return `<div class="admin">
     <aside class="side">
-      <a class="brand" href="/">${escapeHTML(text.t("app.name"))}</a>
+      <a class="brand" href="/">${escapeHTML(spec.instance)}</a>
       <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
-        ${item("/panel", text.t("shell.overview"))}
-        ${spec.isAdmin ? item("/panel/updates", text.t("shell.updates")) : ""}
-        <p class="side-label">${escapeHTML(text.t("shell.organizations"))}</p>
-        ${orgs}
-        ${item("/panel/new", text.t("panel.newOrganization"), "add")}
+        ${group(
+          text.t("shell.groupWork"),
+          item("/panel", text.t("shell.overview")) +
+            orgs +
+            (spec.mayAddOrganization
+              ? item("/panel/new", text.t("panel.newOrganization"), "add")
+              : ""),
+        )}
+        ${group(
+          text.t("shell.groupAccount"),
+          item("/panel/account", text.t("shell.profile")) +
+            item("/panel/appearance", text.t("shell.appearance")),
+        )}
+        ${group(
+          text.t("shell.groupSystem"),
+          spec.isAdmin
+            ? item("/panel/people", text.t("shell.people")) +
+                item("/panel/backups", text.t("shell.backups")) +
+                item("/panel/updates", text.t("shell.updates")) +
+                item("/panel/about", text.t("shell.about"))
+            : "",
+        )}
       </nav>
       <div class="side-foot">
         <p class="who">${escapeHTML(spec.who)}</p>
-        <div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
-          ${themeButton("system", text.t("shell.themeSystem"))}
-          ${themeButton("light", text.t("shell.themeLight"))}
-          ${themeButton("dark", text.t("shell.themeDark"))}
-        </div>
-        <select class="lang" aria-label="${escapeAttr(text.t("shell.language"))}">
-          ${spec.languages
-            .map(
-              (l) =>
-                `<option value="${escapeAttr(l.code)}"${l.code === spec.language ? " selected" : ""}>${escapeHTML(l.name)}</option>`,
-            )
-            .join("")}
-        </select>
         <button class="link" data-signout>${escapeHTML(text.t("nav.signOut"))}</button>
       </div>
     </aside>
     <main class="admin-main">${spec.content}</main>
   </div>`;
+}
+
+/** Your own account: the name beside your replies, and your password. */
+export function profileScreen(who: string, displayName: string, text: Text): string {
+  return `<h1>${escapeHTML(text.t("shell.profile"))}</h1>
+    <p class="lead">${escapeHTML(text.t("profile.lead", { username: who }))}</p>
+
+    <h2>${escapeHTML(text.t("profile.name"))}</h2>
+    <form class="profile-name">
+      <div class="wizard-card">
+        ${field({ id: "display-name", name: "display_name", label: text.t("profile.name"), hint: text.t("profile.nameHelp"), value: displayName, example: "k4wit0" }, text)}
+      </div>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="wizard-actions"><span class="spacer"></span>
+        <button class="button primary" type="submit">${escapeHTML(text.t("panel.saved"))}</button></div>
+    </form>
+
+    <h2>${escapeHTML(text.t("profile.password"))}</h2>
+    <form class="profile-password">
+      <div class="wizard-card">
+        ${field({ id: "current-password", name: "current", label: text.t("profile.current"), type: "password", required: true, autocomplete: "current-password" }, text)}
+        ${field({ id: "new-password", name: "new", label: text.t("profile.new"), type: "password", required: true, autocomplete: "new-password", hint: text.t("auth.passwordHelp") }, text)}
+        ${field({ id: "new-password-again", name: "again", label: text.t("auth.passwordAgain"), type: "password", required: true, autocomplete: "new-password" }, text)}
+      </div>
+      <p class="hint">${escapeHTML(text.t("profile.passwordHelp"))}</p>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="wizard-actions"><span class="spacer"></span>
+        <button class="button primary" type="submit">${escapeHTML(text.t("profile.change"))}</button></div>
+    </form>`;
+}
+
+/** Language and look, which belong to the reader rather than to the server. */
+export function appearanceScreen(
+  languages: { code: string; name: string }[],
+  language: string,
+  theme: string,
+  text: Text,
+): string {
+  return `<h1>${escapeHTML(text.t("shell.appearance"))}</h1>
+    <p class="lead">${escapeHTML(text.t("appearance.lead"))}</p>
+    <div class="wizard-card">
+      ${choiceField({
+        id: "appearance-language",
+        name: "language",
+        label: text.t("shell.language"),
+        options: languages.map((l) => [l.code, l.name] as [string, string]),
+        selected: language,
+      })}
+      <div class="field">
+        <label>${escapeHTML(text.t("shell.theme"))}</label>
+        <div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
+          ${(["system", "light", "dark"] as const)
+            .map(
+              (value) =>
+                `<button type="button" data-theme-choice="${value}" aria-pressed="${theme === value}">${escapeHTML(
+                  text.t(
+                    value === "system"
+                      ? "shell.themeSystem"
+                      : value === "light"
+                        ? "shell.themeLight"
+                        : "shell.themeDark",
+                  ),
+                )}</button>`,
+            )
+            .join("")}
+        </div>
+      </div>
+    </div>`;
+}
+
+/** Who may act here, and what each of them may do. */
+export function peopleScreen(
+  people: {
+    id: number;
+    username: string;
+    name: string;
+    admin: boolean;
+    disabled: boolean;
+    grants: { scope: string; id: number; role: string }[];
+  }[],
+  text: Text,
+): string {
+  const rows = people
+    .map(
+      (p) => `<li class="person">
+        <span class="person-name">${escapeHTML(p.username)}</span>
+        <span class="person-role">${escapeHTML(
+          p.admin ? text.t("people.administrator") : text.t("people.grants", { count: p.grants.length }),
+        )}</span>
+      </li>`,
+    )
+    .join("");
+
+  return `<h1>${escapeHTML(text.t("shell.people"))}</h1>
+    <p class="lead">${escapeHTML(text.t("people.lead"))}</p>
+    <ul class="people">${rows}</ul>
+
+    <h2>${escapeHTML(text.t("people.add"))}</h2>
+    <form class="new-person">
+      <div class="wizard-card">
+        ${field({ id: "person-username", name: "username", label: text.t("auth.username"), required: true, example: "ana" }, text)}
+        ${field({ id: "person-name", name: "display_name", label: text.t("profile.name"), hint: text.t("profile.nameHelp"), example: "Ana" }, text)}
+        ${field({ id: "person-password", name: "password", label: text.t("auth.password"), type: "password", required: true, hint: text.t("auth.passwordHelp") }, text)}
+      </div>
+      <p class="hint">${escapeHTML(text.t("people.addHelp"))}</p>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="wizard-actions"><span class="spacer"></span>
+        <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button></div>
+    </form>`;
+}
+
+/**
+ * Backups, which are a file you keep somewhere else.
+ *
+ * The snapshot is taken with VACUUM INTO rather than by copying the file: a
+ * SQLite database copied while it is being written restores into something
+ * missing whatever was in flight, and looks exactly like a backup until the day
+ * it is needed.
+ */
+export function backupScreen(text: Text): string {
+  return `<h1>${escapeHTML(text.t("shell.backups"))}</h1>
+    <p class="lead">${escapeHTML(text.t("backups.lead"))}</p>
+    <div class="wizard-card">
+      <p class="hint">${escapeHTML(text.t("backups.help"))}</p>
+      <p><a class="button primary" href="/api/backup" download>${escapeHTML(text.t("backups.download"))}</a></p>
+    </div>`;
+}
+
+/** What is running, and where it came from. */
+export function aboutScreen(
+  version: { current: string; commit?: string; schema?: number },
+  instance: string,
+  text: Text,
+): string {
+  const row = (label: string, value: string) =>
+    `<li><span>${escapeHTML(label)}</span><code>${escapeHTML(value)}</code></li>`;
+
+  return `<h1>${escapeHTML(text.t("shell.about"))}</h1>
+    <ul class="facts">
+      ${row(text.t("setup.instanceName"), instance)}
+      ${row(text.t("about.version"), version.current)}
+      ${version.commit ? row(text.t("about.commit"), version.commit) : ""}
+      ${version.schema !== undefined ? row(text.t("about.schema"), String(version.schema)) : ""}
+    </ul>
+    <p class="hint">${escapeHTML(text.t("about.lead"))}</p>`;
 }

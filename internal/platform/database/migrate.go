@@ -12,6 +12,10 @@ type migration struct {
 	version int
 	name    string
 	stmts   []string
+	// fn is for the migrations a list of statements cannot express — the ones
+	// that have to look at the database before deciding what to do. It runs
+	// inside the same transaction as stmts and after them.
+	fn func(*sql.Tx) error
 }
 
 // LatestSchema is the highest schema version this binary knows.
@@ -76,6 +80,12 @@ func apply(db *sql.DB, m migration) error {
 		}
 	}
 
+	if m.fn != nil {
+		if err := m.fn(tx); err != nil {
+			return err
+		}
+	}
+
 	// PRAGMA does not take a bound parameter, and the value is an int from this
 	// file rather than anything a user typed.
 	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", m.version)); err != nil {
@@ -104,25 +114,30 @@ func userVersion(db *sql.DB) (int, error) {
 //     enough to still need it, and those are exactly the ones nobody is
 //     watching.
 func addColumn(tx *sql.Tx, table, column, definition string) error {
+	has, err := hasColumn(tx, table, column)
+	if err != nil || has {
+		return err
+	}
+	_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition))
+	return err
+}
+
+// hasColumn answers what every idempotent migration has to ask first.
+func hasColumn(tx *sql.Tx, table, column string) (bool, error) {
 	rows, err := tx.Query("SELECT name FROM pragma_table_info(?)", table)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
-			return err
+			return false, err
 		}
 		if name == column {
-			return nil
+			return true, nil
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-
-	_, err = tx.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, definition))
-	return err
+	return false, rows.Err()
 }

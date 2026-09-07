@@ -44,6 +44,34 @@ type Scope struct {
 	OrgID int64 // set for ScopeRepository; the organisation the repository is in
 }
 
+// RoleFrom turns what arrived on the wire into a role, or refuses.
+//
+// It lives here because this package is the only one allowed to know how a role
+// is spelled: a handler that compared strings itself would be a second copy of
+// the rules, and the two drift the first time one is updated.
+func RoleFrom(value string) (Role, bool) {
+	switch Role(value) {
+	case RoleOwner:
+		return RoleOwner, true
+	case RoleCollaborator:
+		return RoleCollaborator, true
+	default:
+		return "", false
+	}
+}
+
+// ScopeFrom turns a scope kind and an identifier into a scope, or refuses.
+func ScopeFrom(kind string, id, orgID int64) (Scope, bool) {
+	switch ScopeKind(kind) {
+	case ScopeOrganization:
+		return Organization(id), true
+	case ScopeRepository:
+		return Repository(id, orgID), true
+	default:
+		return Scope{}, false
+	}
+}
+
 func Organization(id int64) Scope { return Scope{Kind: ScopeOrganization, ID: id} }
 
 func Repository(id, orgID int64) Scope {

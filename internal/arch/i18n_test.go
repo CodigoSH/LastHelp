@@ -2,6 +2,7 @@ package arch
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -97,6 +98,7 @@ func TestTheTwoListsOfLanguagesAgree(t *testing.T) {
 // reads that language.
 func TestEveryCatalogueHasEveryKey(t *testing.T) {
 	all := catalogues(t)
+	pending := untranslated(t)
 	master, ok := all["en"]
 	if !ok {
 		t.Fatal("there is no en.json; English is the table every other one falls back to")
@@ -108,12 +110,15 @@ func TestEveryCatalogueHasEveryKey(t *testing.T) {
 		}
 		var missing []string
 		for key := range master {
-			if strings.TrimSpace(table[key]) == "" {
+			if strings.TrimSpace(table[key]) == "" && !pending[key] {
 				missing = append(missing, key)
 			}
 		}
 		if len(missing) > 0 {
-			t.Errorf("%s is missing %d key(s): %v", code, len(missing), sorted(missing))
+			t.Errorf("%s is missing %d key(s): %v\n\n"+
+				"Translate them, or — while the screen they belong to is still\n"+
+				"changing — list them in %s and translate them before release.",
+				code, len(missing), sorted(missing), untranslatedFile)
 		}
 
 		var extra []string
@@ -144,6 +149,12 @@ func TestPlaceholdersSurviveTranslation(t *testing.T) {
 			continue
 		}
 		for code, table := range all {
+			// A catalogue that has not translated this yet is the other rule's
+			// business, and it holds the list of what is still waiting. This
+			// one is about translations that dropped a value on the way.
+			if strings.TrimSpace(table[key]) == "" {
+				continue
+			}
 			got := sorted(placeholder.FindAllString(table[key], -1))
 			if strings.Join(got, ",") != strings.Join(want, ",") {
 				t.Errorf("%s / %s has placeholders %v, English has %v", code, key, got, want)
@@ -195,4 +206,71 @@ func sorted(in []string) []string {
 	out := append([]string(nil), in...)
 	sort.Strings(out)
 	return out
+}
+
+// untranslatedFile lists the keys whose screens are still being designed.
+//
+// Translating a sentence that is about to be rewritten is work done twice, so
+// while a screen is in flux its keys wait here. This is not a way to skip the
+// rule: the list is in the repository, it shows up in every diff, and the test
+// below refuses to let it hold a key that is already translated everywhere —
+// which is what stops it quietly becoming permanent.
+const untranslatedFile = "web/public/locales/UNTRANSLATED.txt"
+
+func untranslated(t *testing.T) map[string]bool {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), untranslatedFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]bool{}
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out := map[string]bool{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		out[line] = true
+	}
+	return out
+}
+
+// TestTheUntranslatedListIsHonest.
+//
+// A list of exceptions that nobody prunes becomes the rule. Every key waiting
+// here has to still be waiting somewhere, and has to still exist: a key that is
+// finished, or one that was deleted, has no business keeping its exemption.
+func TestTheUntranslatedListIsHonest(t *testing.T) {
+	pending := untranslated(t)
+	if len(pending) == 0 {
+		return
+	}
+
+	all := catalogues(t)
+	master := all["en"]
+
+	for key := range pending {
+		if _, known := master[key]; !known {
+			t.Errorf("\n%s lists %q, which no longer exists in en.json.\n\n"+
+				"Remove it: an exemption for a key nobody has is how this list\n"+
+				"stops meaning anything.", untranslatedFile, key)
+			continue
+		}
+
+		stillMissing := false
+		for code, table := range all {
+			if code != "en" && strings.TrimSpace(table[key]) == "" {
+				stillMissing = true
+				break
+			}
+		}
+		if !stillMissing {
+			t.Errorf("\n%s lists %q, which every catalogue already has.\n\n"+
+				"Remove it. The list is for work still to do.", untranslatedFile, key)
+		}
+	}
 }

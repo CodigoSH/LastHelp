@@ -18,7 +18,7 @@ func store(t *testing.T) Store {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if _, err := db.Exec(`INSERT INTO app_user (id, email, password_hash, created_at)
+	if _, err := db.Exec(`INSERT INTO app_user (id, username, password_hash, created_at)
 		VALUES (7, 'a@example.com', 'x', 0)`); err != nil {
 		t.Fatal(err)
 	}
