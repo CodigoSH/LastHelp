@@ -255,3 +255,75 @@ func TestNothingElseLivesUnderHooks(t *testing.T) {
 		}
 	}
 }
+
+// TestOnlyTheAdministratorSeesUpdates.
+//
+// Replacing the binary is not something an organisation's owner does to a
+// machine somebody else is also using.
+func TestOnlyTheAdministratorSeesUpdates(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	helper := team.anonymous()
+	makeCollaborator(t, team, helper, "helper@example.com")
+
+	resp := helper.do(http.MethodGet, "/api/update", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("a collaborator could see the update panel: %d", resp.StatusCode)
+	}
+
+	resp = helper.do(http.MethodPost, "/api/update", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("a collaborator could start an update: %d", resp.StatusCode)
+	}
+
+	stranger := team.anonymous()
+	resp = stranger.do(http.MethodGet, "/api/update", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("the update panel answered %d to the public", resp.StatusCode)
+	}
+}
+
+// TestABuildWithNoKeysSaysSoRatherThanLookingUpToDate.
+//
+// This build has no release keys yet, so it cannot verify anything. The panel
+// has to say that. An empty answer where a reason belongs reads as "you are up
+// to date", which is the one thing it must never say by accident.
+func TestABuildWithNoKeysSaysSoRatherThanLookingUpToDate(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+
+	body := decode(t, team.do(http.MethodGet, "/api/update", nil))
+
+	if body["can_verify"] != false {
+		t.Fatalf("this build reports it can verify releases, and it has no keys: %v", body)
+	}
+	if body["reason"] == nil || body["reason"] == "" {
+		t.Error("no reason was given; a missing reason reads as 'up to date'")
+	}
+	if body["available"] == true {
+		t.Error("an update is being offered by a build that cannot verify one")
+	}
+	if body["current"] == nil || body["current"] == "" {
+		t.Error("the panel does not say what is running")
+	}
+}
+
+// TestAnUpdateIsRefusedWhenItCannotBeVerified.
+//
+// No key does not mean accept anything.
+func TestAnUpdateIsRefusedWhenItCannotBeVerified(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+
+	resp := team.do(http.MethodPost, "/api/update", nil)
+	body := decode(t, resp)
+	if resp.StatusCode < 400 {
+		t.Fatalf("an unverifiable update returned %d %v", resp.StatusCode, body)
+	}
+}

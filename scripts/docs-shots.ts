@@ -164,6 +164,9 @@ await shoot("queue");
 await go(`/i/${seeded[0]}`);
 await shoot("item");
 
+await go("/panel");
+await shoot("update");
+
 page.close();
 console.log("\nlook at the images. A tick above says a file was written, nothing more.");
 export {};

@@ -44,6 +44,13 @@ account and no configuration at all, or leave an email if a relay is set up:
 that address is stored encrypted, is visible only to the team, and is deleted
 when the item closes.
 
+Installing and updating are one script and one button. `install.sh` verifies the
+release signature before it puts anything on disk, and the panel updates in
+place — checking the signature, then the checksum, then making the downloaded
+binary prove it runs and understands your database, then backing that database
+up, and only then replacing anything. In a container it says to pull an image
+instead of offering a button that would silently revert.
+
 Not there yet: Bitbucket, and a first release — there is no tag, so there are no
 binaries to download and no signing key in `internal/version/keys.go` yet.
 

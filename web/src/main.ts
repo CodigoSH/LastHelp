@@ -412,6 +412,37 @@ async function showPanel(): Promise<void> {
   const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
   show(views.panelHome(organizations ?? [], text));
 
+  // Updates, for the administrator only. Asking is the check: the endpoint
+  // refuses anybody else, and a panel that decided for itself who may see this
+  // would be a second implementation of the rules.
+  const status = await api
+    .get<{ current: string; latest?: string; available?: boolean; notes?: string; reason?: string }>(
+      "/api/update",
+    )
+    .catch(() => null);
+  if (status) {
+    root?.insertAdjacentHTML("beforeend", views.updatePanel(status, text));
+
+    root?.querySelector<HTMLButtonElement>("[data-update]")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget as HTMLButtonElement;
+      const note = root?.querySelector<HTMLParagraphElement>(".update-note");
+      button.disabled = true;
+      if (note) {
+        note.textContent = i18n.t("update.installing");
+        note.hidden = false;
+      }
+      try {
+        await api.post("/api/update");
+        // The server restarts a moment after answering, so waiting and
+        // reloading is what brings the page back on the new version.
+        setTimeout(() => location.reload(), 4000);
+      } catch (err) {
+        button.disabled = false;
+        if (note) note.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+      }
+    });
+  }
+
   const form = root?.querySelector<HTMLFormElement>("form.new-org");
   const forgeFields = root?.querySelector<HTMLDivElement>(".forge-fields");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");

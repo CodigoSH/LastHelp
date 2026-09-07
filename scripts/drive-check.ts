@@ -269,7 +269,46 @@ async function main() {
   `);
   check("asking for an issue says something", issueNote.shown === true, issueNote.text.slice(0, 44));
 
-  // 11. Right to left, which is where a stylesheet written in left and right
+  // 11. The update panel. This build has no release keys, so what is checked is
+  //     that it says so rather than showing nothing — an empty answer where a
+  //     reason belongs reads as "you are up to date".
+  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(900);
+  const updates = await evaluate(`
+    const body = document.body.textContent;
+    return {
+      hasSection: !!document.querySelector(".running"),
+      offersInstall: !!document.querySelector("[data-update]"),
+      text: (document.querySelector(".notice")?.textContent ?? "").trim(),
+    };
+  `);
+  check("the panel says what version is running", updates.hasSection === true);
+
+  // Measured as geometry, not as an attribute. `hidden` applies display:none at
+  // the lowest specificity there is, so any class rule with a display of its own
+  // beats it — and the element sits in the layout wearing a correct `hidden`.
+  // Reading the attribute would say everything is fine.
+  const reallyHidden = await evaluate(`
+    const fields = document.querySelector(".forge-fields");
+    if (!fields) return "there are no forge fields";
+    const select = document.querySelector("#org-forge");
+    select.value = "none";
+    select.dispatchEvent(new Event("change"));
+    const box = fields.getBoundingClientRect();
+    return { attribute: fields.hidden, takesSpace: box.height > 0 };
+  `);
+  check(
+    "hidden fields take up no space",
+    reallyHidden.attribute === true && reallyHidden.takesSpace === false,
+    JSON.stringify(reallyHidden),
+  );
+  check(
+    "a build that cannot verify says so instead of offering an update",
+    updates.offersInstall === false && updates.text !== "",
+    updates.text.slice(0, 50),
+  );
+
+  // 12. Right to left, which is where a stylesheet written in left and right
   //     falls apart.
   await evaluate(`
     const select = document.querySelector("nav .lang");
@@ -300,7 +339,7 @@ async function main() {
   `);
   check("the layout mirrored", mirrored === true);
 
-  // 12. Nothing exploded along the way.
+  // 13. Nothing exploded along the way.
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
   await fetch(`http://127.0.0.1:${CDP}/json/close/${t.id}`);

@@ -114,6 +114,42 @@ export function panelHome(
     </form>`;
 }
 
+/**
+ * The update panel.
+ *
+ * It says why it cannot check as plainly as it says there is something to
+ * install. An empty answer where a reason belongs reads as "you are up to
+ * date", which is the one thing it must never say by accident.
+ */
+export function updatePanel(
+  status: {
+    current: string;
+    latest?: string;
+    available?: boolean;
+    notes?: string;
+    reason?: string;
+  },
+  text: Text,
+): string {
+  const running = `<p class="running">${escapeHTML(text.t("update.running", { version: status.current }))}</p>`;
+
+  if (status.reason) {
+    return `<h2>${escapeHTML(text.t("update.title"))}</h2>${running}
+      <p class="notice">${escapeHTML(text.t(status.reason))}</p>`;
+  }
+
+  if (!status.available) {
+    return `<h2>${escapeHTML(text.t("update.title"))}</h2>${running}
+      <p class="hint">${escapeHTML(text.t("update.upToDate"))}</p>`;
+  }
+
+  return `<h2>${escapeHTML(text.t("update.title"))}</h2>${running}
+    <p class="available">${escapeHTML(text.t("update.available", { version: status.latest ?? "" }))}</p>
+    ${status.notes ? `<pre class="notes">${escapeHTML(status.notes)}</pre>` : ""}
+    <button class="button primary" data-update>${escapeHTML(text.t("update.install"))}</button>
+    <p class="update-note" role="status" hidden></p>`;
+}
+
 /** One organisation in the panel: its boards, and a form to add another. */
 export function panelOrganization(
   org: OrganizationSummary,

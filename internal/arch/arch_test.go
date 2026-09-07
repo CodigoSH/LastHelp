@@ -205,7 +205,14 @@ func TestOnlyConfigReadsTheEnvironment(t *testing.T) {
 			continue
 		}
 		src := f.render(t)
-		for _, call := range []string{"os.Getenv", "os.LookupEnv", "os.Environ"} {
+		// Reading a setting, not forwarding the environment.
+		//
+		// os.Environ is deliberately absent: handing the whole environment
+		// unchanged to a process this one is replacing introduces no knob and
+		// hides nothing from .env.example — it is the opposite, it guarantees
+		// the restarted process has exactly what this one had. Getenv and
+		// LookupEnv are what add a setting nobody documented.
+		for _, call := range []string{"os.Getenv", "os.LookupEnv"} {
 			if strings.Contains(src, call) {
 				t.Errorf("\n%s uses %s\n\n"+
 					"Everything this binary reads from the environment is named in\n"+

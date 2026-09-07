@@ -47,6 +47,21 @@
 }
 
 /*
+ * hidden has to win.
+ *
+ * The attribute applies display:none at the lowest specificity there is, so any
+ * class rule with a display of its own silently beats it — and the element sits
+ * there in the layout wearing a correct `hidden` attribute. Every automated
+ * check passes, because the attribute really is set; it is only visible by
+ * looking at the page.
+ *
+ * This house has had that exact bug before, with a nav that had display:flex.
+ */
+[hidden] {
+  display: none !important;
+}
+
+/*
  * Links need a rule of their own. Without one they fall back to the browser's
  * blue and, once visited, its purple — which on a dark surface reads as a
  * different, broken colour and has nothing to do with this palette. A class
@@ -402,3 +417,18 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 
 .new-org, .new-repo { max-inline-size: 28rem; }
 .forge-fields { display: grid; gap: 0.35rem; }
+
+.running, .available { margin-block: 0.25rem; }
+.available { color: var(--accent); font-weight: 600; }
+.notes {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  max-block-size: 14rem;
+  overflow-y: auto;
+}
+.update-note { font-size: 0.875rem; color: var(--text-muted); }

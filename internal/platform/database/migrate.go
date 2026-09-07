@@ -14,6 +14,18 @@ type migration struct {
 	stmts   []string
 }
 
+// LatestSchema is the highest schema version this binary knows.
+//
+// It exists so a candidate binary can be asked, before it replaces anything,
+// whether it understands the database it is about to inherit. With a beta
+// channel and an updater, somebody will eventually try to install an older
+// binary over a newer database, and the only good moment to refuse is before
+// the swap.
+func LatestSchema() int { return migrations[len(migrations)-1].version }
+
+// SchemaVersion is what a database is currently at.
+func SchemaVersion(db *sql.DB) (int, error) { return userVersion(db) }
+
 // Migrate brings the database up to the schema this binary expects.
 //
 // PRAGMA user_version is the bookkeeping. It costs nothing, it is atomic with

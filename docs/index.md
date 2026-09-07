@@ -16,6 +16,7 @@ One binary, one SQLite file, no external services.
 - [Your first board](getting-started/first-board.md)
 - [Connecting a forge](forges/connecting.md)
 - [Notifications](administration/notifications.md)
+- [Updating](administration/updating.md)
 - [Keeping the queue readable](administration/anti-abuse.md)
 
 ## What it does not do

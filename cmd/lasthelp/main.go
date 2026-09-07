@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,6 +20,19 @@ import (
 )
 
 func main() {
+	// `lasthelp version` prints what this binary is, as JSON.
+	//
+	// It exists for the updater: before a downloaded binary replaces the
+	// running one, it is executed with this and has to answer. That proves it
+	// runs at all on this machine — right architecture, right libraries, not
+	// truncated — and it reports the highest schema it understands, so a binary
+	// older than the database can be refused before the swap rather than after.
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Printf(`{"version":%q,"commit":%q,"schema":%d}`+"\n",
+			version.Current, version.Commit, database.LatestSchema())
+		return
+	}
+
 	cfg := config.Load()
 	setupLogger(cfg)
 

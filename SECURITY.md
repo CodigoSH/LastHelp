@@ -94,6 +94,33 @@ Releases are published directly by us, with no intermediary.
   compares before publishing — because a promise nobody executes is one that
   quietly stops being true.
 
+## Updating
+
+The update path is the most dangerous code in a self-hosted product: it runs as
+whoever runs the server, fetches something from the internet, and puts it where
+the operating system will execute it. So every step either proves something or
+stops, and a refusal never falls back to a weaker check.
+
+- **A build with no release keys will not update at all.** No key does not mean
+  accept anything.
+- **A missing signature aborts.** It never falls back to checksum-only — a host
+  that could tamper with the binary could also delete the signature, and a
+  fallback would turn that into a way to strip the check.
+- Only a **verified** checksum file is allowed to say what the binary should
+  hash to.
+- The candidate is **executed before it replaces anything** and has to report
+  what it is. That catches the wrong architecture, a truncated download, a
+  missing library — every way a download can be intact and useless.
+- It is **refused if it understands an older schema** than your database, and
+  the database is **backed up** before the swap.
+- Nothing is decompressed, because nothing is compressed: the release asset is a
+  plain binary, so there is no decompression bomb to defend against.
+
+`install.sh` does the same verification with `openssl`, and a test signs with the
+release code and verifies with the exact command that script runs — otherwise
+both halves could drift together and every release would verify here while none
+of them installed.
+
 ## Supported versions
 
 While the project is pre-1.0, only the latest release receives fixes.

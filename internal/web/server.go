@@ -207,6 +207,9 @@ func (s *Server) routes() {
 	private("POST /api/orgs/{org}/credentials", s.handleSetCredentials)
 	private("POST /api/orgs/{org}/repos/{repo}/channel", s.handleSetNotifyChannel)
 
+	private("GET /api/update", s.handleUpdateStatus)
+	private("POST /api/update", s.handleUpdatePerform)
+
 	// The feed, under its own prefix.
 	//
 	// The obvious address — /{org}/{repo}/feed.atom — is ambiguous against
