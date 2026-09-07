@@ -46,6 +46,22 @@
   box-sizing: border-box;
 }
 
+/*
+ * Links need a rule of their own. Without one they fall back to the browser's
+ * blue and, once visited, its purple — which on a dark surface reads as a
+ * different, broken colour and has nothing to do with this palette. A class
+ * with no base rule is invisible when reading the stylesheet: it only shows up
+ * when somebody looks at the page.
+ */
+a {
+  color: var(--accent);
+  text-decoration-color: rgba(var(--accent-rgb), 0.4);
+}
+
+a:hover {
+  text-decoration-color: var(--accent);
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -353,6 +369,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 
 .roadmap li a {
   display: grid;
+  /* start, not stretch: a grid child fills its column by default, so the kind
+     badge — a pill sized to two words — was being stretched the full width of
+     the card. Only visible by looking at the page. */
+  justify-items: start;
   gap: 0.25rem;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);

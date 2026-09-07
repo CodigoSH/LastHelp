@@ -1,0 +1,76 @@
+# Notifications
+
+Two audiences with different needs, and one notifier for both would be wrong for
+one of them.
+
+## Telling your team
+
+Without this the portal dies quietly: nobody opens a moderation queue every day
+on the chance that it has something in it, so it fills, and a portal full of
+people talking to nobody reads worse from outside than no portal at all.
+
+Configured **per board**, so one board can go to one room and another somewhere
+else. A single global channel is a channel everybody eventually silences.
+
+```sh
+curl -X POST "$BASE/api/orgs/codigosh/repos/lastboard/channel" \
+  -H 'Content-Type: application/json' \
+  -H "X-CSRF-Token: $CSRF" -H 'Sec-Fetch-Site: same-origin' -b cookies.txt \
+  -d '{"kind":"ntfy","url":"https://ntfy.sh/your-private-topic"}'
+```
+
+| `kind` | Needs | Notes |
+|---|---|---|
+| `ntfy` | `url`, optional `token` | The topic URL. Title and click-through go in headers |
+| `gotify` | `url`, `token` | The server address; `/message` is appended |
+| `webhook` | `url`, optional `token` | Posts `{"title","body","url"}` — point it at Matrix, a bridge, a script |
+| `smtp` | `to` | Uses the relay configured on the server |
+| *(empty)* | — | No notifications |
+
+The webhook shape is three fields and is meant to stay that way: it is somebody's
+script.
+
+A notification carries a nudge, not the report. One containing the whole
+submission would deliver spam straight to wherever your team reads things, which
+is the one place the moderation queue exists to keep it out of.
+
+## Telling whoever reported something
+
+**The Atom feed** is the channel that needs no configuration, no address and no
+account, and stores nothing about whoever subscribes:
+
+```
+https://help.example.com/feed/codigosh/lastboard/atom.xml
+```
+
+It carries published items only, through the same listing the public page uses,
+so it cannot show something the page would not.
+
+**Email** if you configure a relay. Then, and only then, the report form offers
+an optional address field — with no relay it is not shown at all, because
+collecting an address nothing can use is collecting personal data for nothing.
+
+That address is encrypted with the same key as the forge tokens, is never
+returned by any endpoint, and is **deleted when the item closes**. It was
+collected for one purpose and that purpose is over.
+
+Mail is plain text, marked `Auto-Submitted: auto-generated`, and nobody reads
+replies to it.
+
+One honest limitation: the mail is in English. The reporter's language is not
+known, and asking for it would put another field on a form whose whole point is
+being short.
+
+## The relay
+
+```
+LASTHELP_SMTP_HOST=smtp.example.com
+LASTHELP_SMTP_PORT=587
+LASTHELP_SMTP_USERNAME=
+LASTHELP_SMTP_PASSWORD=
+LASTHELP_SMTP_FROM=lasthelp@example.com
+LASTHELP_SMTP_STARTTLS=true
+```
+
+STARTTLS can be turned off, and that is not an oversight: a relay on localhost
+or inside your own network is the common case for self-hosted mail.

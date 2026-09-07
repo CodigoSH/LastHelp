@@ -59,11 +59,16 @@ func (s *Server) handleRepositories(w http.ResponseWriter, r *http.Request) {
 // handleRepository describes one board: what it accepts, and therefore what the
 // form should offer.
 func (s *Server) handleRepository(w http.ResponseWriter, r *http.Request) {
-	repo, _, ok := s.lookupRepository(w, r)
+	repo, organisation, ok := s.lookupRepository(w, r)
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, describeRepository(repo, s.mailConfigured()))
+	// The organisation travels with it, because every page that shows a board
+	// also shows which organisation it belongs to — and asking for that
+	// separately is a second request every page has to remember to make.
+	body := describeRepository(repo, s.mailConfigured())
+	body["organization"] = map[string]any{"slug": organisation.Slug, "name": organisation.Name}
+	writeJSON(w, http.StatusOK, body)
 }
 
 // handleListItems is the public board.

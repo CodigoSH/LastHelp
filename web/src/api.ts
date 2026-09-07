@@ -84,6 +84,9 @@ export interface RepositorySummary {
   /** Whether a mail relay exists. Without one the form does not ask for an
    *  address, rather than collecting one nothing can use. */
   can_notify: boolean;
+  /** Present when a single board is fetched. The page shows the organisation's
+   *  name, and the address is not its name. */
+  organization?: OrganizationSummary;
 }
 
 export interface ItemSummary {

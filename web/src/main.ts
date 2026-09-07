@@ -154,7 +154,7 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
   };
 
   const draw = async () => {
-    show(views.board({ slug: orgSlug, name: orgSlug }, repo, await load(), filters, text));
+    show(views.board(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, await load(), filters, text));
     wire();
   };
 
@@ -267,7 +267,7 @@ async function showRoadmap(orgSlug: string, repoSlug: string): Promise<void> {
   const board = await api.get<{ columns: Array<{ column: string; items: ItemSummary[] }> }>(
     `${base}/roadmap`,
   );
-  show(views.roadmap({ slug: orgSlug, name: orgSlug }, repo, board.columns ?? [], text));
+  show(views.roadmap(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, board.columns ?? [], text));
 }
 
 async function showItem(publicID: string): Promise<void> {

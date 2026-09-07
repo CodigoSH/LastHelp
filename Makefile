@@ -71,6 +71,13 @@ drive: build ## Walk the whole journey in a real browser
 	@command -v google-chrome >/dev/null || { echo "google-chrome is required"; exit 1; }
 	@scripts/drive.sh
 
+# Screenshots are generated, never taken by hand: a hand-taken one is one nobody
+# can reproduce when the interface changes, so the documentation ends up showing
+# a version that no longer exists.
+shots: build ## Regenerate the documentation screenshots
+	@command -v google-chrome >/dev/null || { echo "google-chrome is required"; exit 1; }
+	@scripts/docs-shots.sh
+
 docker: ## Build the container image
 	@docker build -t $(APP):$(VERSION) --build-arg VERSION=$(VERSION) .
 
