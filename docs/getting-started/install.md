@@ -16,6 +16,11 @@ What it refuses rather than warns about:
 - A binary that does not match the signed checksums.
 - Not having `openssl`, because an unverified binary is not worth the
   convenience of installing without it.
+- Having an `openssl` older than **3.0**. Verifying an ed25519 signature from
+  the command line needs `pkeyutl -rawin`, which 1.1.1 does not have — and
+  there is no other way to do it there, so the script says so plainly instead
+  of failing with a message about an unknown option. Anything from Ubuntu
+  22.04, Debian 12 or RHEL 9 onwards is new enough.
 
 Run it again to update. It stops the service, **backs up the database first**,
 replaces the binary and starts again — and it keeps the port and settings it

@@ -121,6 +121,12 @@ release code and verifies with the exact command that script runs — otherwise
 both halves could drift together and every release would verify here while none
 of them installed.
 
+That verification needs **openssl 3.0 or newer**: an ed25519 signature over raw
+data is checked with `pkeyutl -rawin`, and 1.1.1 has no command-line way to do
+it at all. The installer checks the version and refuses with that reason, rather
+than letting openssl report an unknown option and leaving you to guess whether
+the signature is bad.
+
 ## Supported versions
 
 While the project is pre-1.0, only the latest release receives fixes.

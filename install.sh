@@ -91,6 +91,19 @@ if ! command -v openssl >/dev/null; then
     Install it and run this again — an unverified binary is not worth the convenience."
 fi
 
+# Ed25519 signatures over raw data need `pkeyutl -rawin`, and that arrived in
+# OpenSSL 3.0. On 1.1.1 there is no command-line way to verify one at all:
+# without the flag openssl answers "operation not supported for this keytype",
+# and with it, "Option unknown option -rawin". Neither says what is wrong, and
+# both look like our signature is broken rather than their openssl being old.
+openssl_major=$(openssl version 2>/dev/null | sed -nE 's/^OpenSSL ([0-9]+).*/\1/p')
+if [ -z "$openssl_major" ] || [ "$openssl_major" -lt 3 ]; then
+    die "openssl 3.0 or newer is required to verify an ed25519 signature.
+    This machine has: $(openssl version 2>&1 | head -1)
+    Older openssl cannot check this kind of signature at all, and installing
+    without checking is not something this script will do for you."
+fi
+
 step "Checking the signature…"
 curl -fsSL -o SHA256SUMS.sig "$BASE/SHA256SUMS.sig" || die "Could not download the signature."
 base64 -d < SHA256SUMS.sig > signature.bin 2>/dev/null || die "The signature is not valid base64."
