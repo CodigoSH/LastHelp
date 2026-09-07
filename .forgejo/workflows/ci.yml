@@ -16,6 +16,14 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # `ubuntu-latest` is a label the runner translates, and by default it lands
+    # on a Node image built on Debian bullseye — from 2021, carrying OpenSSL
+    # 1.1.1. That is not a detail: verifying an ed25519 signature needs
+    # `pkeyutl -rawin`, which arrived in OpenSSL 3.0, and bullseye has no
+    # openssl 3 to install, not even from backports. So the check that our
+    # signer and install.sh agree could not run there and skipped itself,
+    # leaving CI green over the one thing it exists to prove.
+    container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
 
@@ -89,6 +97,14 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    # `ubuntu-latest` is a label the runner translates, and by default it lands
+    # on a Node image built on Debian bullseye — from 2021, carrying OpenSSL
+    # 1.1.1. That is not a detail: verifying an ed25519 signature needs
+    # `pkeyutl -rawin`, which arrived in OpenSSL 3.0, and bullseye has no
+    # openssl 3 to install, not even from backports. So the check that our
+    # signer and install.sh agree could not run there and skipped itself,
+    # leaving CI green over the one thing it exists to prove.
+    container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
 
