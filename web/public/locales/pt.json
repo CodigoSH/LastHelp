@@ -29,7 +29,7 @@
   "error.no_forge": "Esta organização não está ligada a nenhuma forja.",
   "error.not_found": "Não está aqui.",
   "error.not_votable": "Os erros não se votam.",
-  "error.password_too_short": "A palavra-passe precisa de pelo menos 12 caracteres.",
+  "error.password_too_short": "A palavra-passe precisa de pelo menos 10 caracteres.",
   "error.rejected": "Este quadro não aceita isso.",
   "error.too_large": "Isso é demasiado grande.",
   "error.too_many": "Isso foi muito de uma vez. Espera um momento e tenta outra vez.",

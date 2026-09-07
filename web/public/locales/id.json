@@ -29,7 +29,7 @@
   "error.no_forge": "Organisasi ini belum terhubung ke forge.",
   "error.not_found": "Tidak ada di sini.",
   "error.not_votable": "Bug tidak dipilih lewat suara.",
-  "error.password_too_short": "Kata sandi butuh setidaknya 12 karakter.",
+  "error.password_too_short": "Kata sandi butuh setidaknya 10 karakter.",
   "error.rejected": "Papan ini tidak menerima hal itu.",
   "error.too_large": "Itu terlalu besar.",
   "error.too_many": "Terlalu banyak sekaligus. Tunggu sebentar lalu coba lagi.",

@@ -29,7 +29,7 @@
   "error.no_forge": "Deze organisatie is niet aan een forge gekoppeld.",
   "error.not_found": "Niet hier.",
   "error.not_votable": "Over fouten wordt niet gestemd.",
-  "error.password_too_short": "Het wachtwoord heeft minstens 12 tekens nodig.",
+  "error.password_too_short": "Het wachtwoord heeft minstens 10 tekens nodig.",
   "error.rejected": "Dit bord neemt dat niet aan.",
   "error.too_large": "Dat is te groot.",
   "error.too_many": "Dat was veel in één keer. Wacht even en probeer het opnieuw.",

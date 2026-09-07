@@ -29,7 +29,7 @@
   "error.no_forge": "Cette organisation n'est reliée à aucune forge.",
   "error.not_found": "Introuvable.",
   "error.not_votable": "On ne vote pas les bugs.",
-  "error.password_too_short": "Le mot de passe doit faire au moins 12 caractères.",
+  "error.password_too_short": "Le mot de passe doit faire au moins 10 caractères.",
   "error.rejected": "Ce tableau n'accepte pas cela.",
   "error.too_large": "C'est trop volumineux.",
   "error.too_many": "Cela fait beaucoup d'un coup. Attendez un instant et réessayez.",

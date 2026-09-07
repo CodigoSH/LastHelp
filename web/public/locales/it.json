@@ -29,7 +29,7 @@
   "error.no_forge": "Questa organizzazione non è collegata a nessuna forge.",
   "error.not_found": "Non c'è.",
   "error.not_votable": "I problemi non si votano.",
-  "error.password_too_short": "La password deve avere almeno 12 caratteri.",
+  "error.password_too_short": "La password deve avere almeno 10 caratteri.",
   "error.rejected": "Questa bacheca non lo accetta.",
   "error.too_large": "È troppo grande.",
   "error.too_many": "È stato tanto tutto insieme. Aspetta un momento e riprova.",

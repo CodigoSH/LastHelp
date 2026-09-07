@@ -29,7 +29,7 @@
   "error.no_forge": "这个组织还没有连接代码托管。",
   "error.not_found": "找不到。",
   "error.not_votable": "问题不参与投票。",
-  "error.password_too_short": "密码至少需要 12 个字符。",
+  "error.password_too_short": "密码至少需要 10 个字符。",
   "error.rejected": "这个看板不接受这样的内容。",
   "error.too_large": "这个太大了。",
   "error.too_many": "一下子太多了，请稍等片刻再试。",

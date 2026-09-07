@@ -19,7 +19,7 @@ const credentialsBodyLimit = 4 << 10 // 4 KiB
 // minPasswordLength is a floor, not a policy. No composition rules: they push
 // people towards "Password1!" and away from the long passphrase that is
 // actually strong, and argon2id does not care what characters are in it.
-const minPasswordLength = 12
+const minPasswordLength = 10
 
 type credentials struct {
 	Email       string `json:"email"`

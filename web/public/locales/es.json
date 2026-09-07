@@ -29,7 +29,7 @@
   "error.no_forge": "Esta organización no está conectada a ninguna forja.",
   "error.not_found": "Aquí no está.",
   "error.not_votable": "Los fallos no se votan.",
-  "error.password_too_short": "La contraseña necesita al menos 12 caracteres.",
+  "error.password_too_short": "La contraseña necesita al menos 10 caracteres.",
   "error.rejected": "Este tablero no admite eso.",
   "error.too_large": "Eso es demasiado grande.",
   "error.too_many": "Eso ha sido mucho de golpe. Espera un momento y vuelve a intentarlo.",

@@ -29,7 +29,7 @@
   "error.no_forge": "Ta organizacja nie jest połączona z żadnym forge.",
   "error.not_found": "Nie ma tego tutaj.",
   "error.not_votable": "Na błędy się nie głosuje.",
-  "error.password_too_short": "Hasło musi mieć co najmniej 12 znaków.",
+  "error.password_too_short": "Hasło musi mieć co najmniej 10 znaków.",
   "error.rejected": "Ta tablica tego nie przyjmuje.",
   "error.too_large": "To jest za duże.",
   "error.too_many": "To było dużo naraz. Poczekaj chwilę i spróbuj ponownie.",

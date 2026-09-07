@@ -29,7 +29,7 @@
   "error.no_forge": "Diese Organisation ist mit keiner Forge verbunden.",
   "error.not_found": "Nicht hier.",
   "error.not_votable": "Über Fehler wird nicht abgestimmt.",
-  "error.password_too_short": "Das Passwort braucht mindestens 12 Zeichen.",
+  "error.password_too_short": "Das Passwort braucht mindestens 10 Zeichen.",
   "error.rejected": "Dieser Bereich nimmt das nicht an.",
   "error.too_large": "Das ist zu groß.",
   "error.too_many": "Das war viel auf einmal. Warte einen Moment und versuch es erneut.",

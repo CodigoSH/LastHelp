@@ -29,7 +29,7 @@
   "error.no_forge": "This organisation is not connected to a forge.",
   "error.not_found": "Not here.",
   "error.not_votable": "Bugs are not voted on.",
-  "error.password_too_short": "The password needs at least 12 characters.",
+  "error.password_too_short": "The password needs at least 10 characters.",
   "error.rejected": "This board does not take that.",
   "error.too_large": "That is too big.",
   "error.too_many": "That was a lot at once. Wait a moment and try again.",

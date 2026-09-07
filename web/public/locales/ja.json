@@ -29,7 +29,7 @@
   "error.no_forge": "この組織はフォージにつながっていません。",
   "error.not_found": "見つかりません。",
   "error.not_votable": "不具合には投票しません。",
-  "error.password_too_short": "パスワードは 12 文字以上必要です。",
+  "error.password_too_short": "パスワードは 10 文字以上必要です。",
   "error.rejected": "このボードでは受け付けていません。",
   "error.too_large": "大きすぎます。",
   "error.too_many": "一度に多すぎました。少し待ってからお試しください。",

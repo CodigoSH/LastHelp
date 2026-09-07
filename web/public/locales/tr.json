@@ -29,7 +29,7 @@
   "error.no_forge": "Bu kuruluş bir forge'a bağlı değil.",
   "error.not_found": "Burada yok.",
   "error.not_votable": "Hatalar oylanmaz.",
-  "error.password_too_short": "Parola en az 12 karakter olmalı.",
+  "error.password_too_short": "Parola en az 10 karakter olmalı.",
   "error.rejected": "Bu pano bunu kabul etmiyor.",
   "error.too_large": "Bu çok büyük.",
   "error.too_many": "Bir anda çok fazla oldu. Biraz bekleyip tekrar dene.",
