@@ -52,6 +52,107 @@ export function repositoryList(
     .join("")}</ul>`;
 }
 
+/**
+ * The panel's front page, and the first minute of every operator.
+ *
+ * It exists because a fresh instance used to say "nothing is set up yet" and
+ * offer no way to set anything up: the only path was curl. A screen that names
+ * a problem it cannot help with reads as broken rather than as empty.
+ */
+export function panelHome(
+  orgs: OrganizationSummary[],
+  text: Text,
+): string {
+  const forges = [
+    ["none", text.t("panel.forgeNone")],
+    ["github", "GitHub"],
+    ["gitlab", "GitLab"],
+    ["gitea", "Gitea"],
+    ["forgejo", "Forgejo"],
+  ];
+
+  const list =
+    orgs.length === 0
+      ? `<p class="empty">${escapeHTML(text.t("panel.firstStep"))}</p>`
+      : `<ul class="cards">${orgs
+          .map(
+            (o) => `<li><a class="card" href="/panel/${escapeAttr(o.slug)}">
+              <span class="card-title">${escapeHTML(o.name)}</span>
+              <span class="card-sub">/${escapeHTML(o.slug)}</span>
+            </a></li>`,
+          )
+          .join("")}</ul>`;
+
+  return `
+    <h1>${escapeHTML(text.t("nav.panel"))}</h1>
+    ${list}
+
+    <h2>${escapeHTML(text.t("panel.newOrganization"))}</h2>
+    <form class="new-org">
+      <label for="org-name">${escapeHTML(text.t("panel.name"))}</label>
+      <input id="org-name" name="name" required />
+
+      <label for="org-slug">${escapeHTML(text.t("panel.address"))}</label>
+      <input id="org-slug" name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" />
+      <p class="hint">${escapeHTML(text.t("panel.addressHelp"))}</p>
+
+      <label for="org-forge">${escapeHTML(text.t("panel.forge"))}</label>
+      <select id="org-forge" name="forge">
+        ${forges.map(([value, label]) => `<option value="${escapeAttr(value ?? "")}">${escapeHTML(label ?? "")}</option>`).join("")}
+      </select>
+
+      <div class="forge-fields" hidden>
+        <label for="org-url">${escapeHTML(text.t("panel.forgeURL"))}</label>
+        <input id="org-url" name="base_url" placeholder="https://git.example.com" />
+
+        <label for="org-owner">${escapeHTML(text.t("panel.forgeOwner"))}</label>
+        <input id="org-owner" name="forge_owner" />
+      </div>
+
+      <p class="form-error" role="alert" hidden></p>
+      <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button>
+    </form>`;
+}
+
+/** One organisation in the panel: its boards, and a form to add another. */
+export function panelOrganization(
+  org: OrganizationSummary,
+  repos: RepositorySummary[],
+  text: Text,
+): string {
+  const list =
+    repos.length === 0
+      ? `<p class="empty">${escapeHTML(text.t("portal.empty"))}</p>`
+      : `<ul class="cards">${repos
+          .map(
+            (r) => `<li><a class="card" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}">
+              <span class="card-title">${escapeHTML(r.name)}</span>
+              <span class="card-sub">/${escapeHTML(org.slug)}/${escapeHTML(r.slug)}</span>
+            </a></li>`,
+          )
+          .join("")}</ul>`;
+
+  return `
+    <p class="crumb"><a href="/panel">${escapeHTML(text.t("nav.panel"))}</a></p>
+    <h1>${escapeHTML(org.name)}</h1>
+    ${list}
+
+    <h2>${escapeHTML(text.t("panel.newRepository"))}</h2>
+    <form class="new-repo">
+      <label for="repo-name">${escapeHTML(text.t("panel.name"))}</label>
+      <input id="repo-name" name="name" required />
+
+      <label for="repo-slug">${escapeHTML(text.t("panel.address"))}</label>
+      <input id="repo-slug" name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" />
+
+      <label for="repo-forge">${escapeHTML(text.t("panel.forgeRepo"))}</label>
+      <input id="repo-forge" name="forge_repo" placeholder="owner/repository" />
+
+      <p class="form-error" role="alert" hidden></p>
+      <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button>
+    </form>`;
+}
+
 export function board(
   org: OrganizationSummary,
   repo: RepositorySummary,

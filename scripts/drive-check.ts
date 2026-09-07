@@ -122,19 +122,45 @@ async function main() {
   const signedIn = await evaluate(`return location.pathname`);
   check("signing in lands on the panel", signedIn === "/panel", String(signedIn));
 
-  // 4. Create an organisation and a board through the API the panel uses.
-  const created = await evaluate(`
-    const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const post = (path, body) => fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
-      body: JSON.stringify(body),
-    }).then(r => r.status);
-    const a = await post("/api/organizations", { slug: "codigosh", name: "CodigoSH" });
-    const b = await post("/api/orgs/codigosh/repositories", { slug: "lastboard", name: "Lastboard" });
-    return [a, b];
+  // 4. The first minute of a real operator: an empty instance, and whether it
+  //    can be got started from the screen at all.
+  //
+  //    Every other check here runs against something seeded, which is the
+  //    comfortable one — it has data for everything. So none of them ever saw
+  //    what a fresh install looks like, and a fresh install used to say
+  //    "nothing is set up yet" while offering no way to set anything up: the
+  //    only path was curl. A screen that names a problem it cannot help with
+  //    reads as broken rather than as empty.
+  const navAfterSignIn = await evaluate(
+    `return [...document.querySelectorAll("nav a, nav button")].map(e => e.textContent.trim())`,
+  );
+  check(
+    "the nav knows somebody is signed in",
+    !navAfterSignIn.some((label: string) => label === "Sign in" || label === "Entrar"),
+    navAfterSignIn.join(" · "),
+  );
+
+  const started = await evaluate(`
+    const form = document.querySelector("form.new-org");
+    if (!form) return "no way to add an organisation";
+    form.querySelector('[name=name]').value = "CodigoSH";
+    form.querySelector('[name=slug]').value = "codigosh";
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 900));
+    return location.pathname;
   `);
-  check("organisation and board created", JSON.stringify(created) === "[201,201]", JSON.stringify(created));
+  check("an empty instance can be started from the screen", started === "/panel/codigosh", String(started));
+
+  const boards = await evaluate(`
+    const form = document.querySelector("form.new-repo");
+    if (!form) return "no way to add a board";
+    form.querySelector('[name=name]').value = "Lastboard";
+    form.querySelector('[name=slug]').value = "lastboard";
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 900));
+    return [...document.querySelectorAll(".cards .card-title")].map(e => e.textContent.trim());
+  `);
+  check("a board can be added from the screen", JSON.stringify(boards) === '["Lastboard"]', JSON.stringify(boards));
 
   // 5. Report something through the form, with no account.
   await evaluate(`history.pushState({}, "", "/codigosh/lastboard/new"); dispatchEvent(new PopStateEvent("popstate"));`);

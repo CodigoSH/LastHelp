@@ -399,3 +399,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .issue-control .attach input { flex: 1; }
 .issue-note { font-size: 0.875rem; color: var(--text-muted); margin: 0; }
 .issue-link { margin-block-start: 0.8rem; font-size: 0.9rem; }
+
+.new-org, .new-repo { max-inline-size: 28rem; }
+.forge-fields { display: grid; gap: 0.35rem; }

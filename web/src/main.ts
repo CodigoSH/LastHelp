@@ -105,6 +105,9 @@ async function render(): Promise<void> {
     if (path === "/") return await showOrganizations();
     if (path === "/sign-in") return await showSignIn();
     if (path === "/panel") return await showPanel();
+    if (parts[0] === "panel" && parts[1] && parts.length === 2) {
+      return await showPanelOrganization(parts[1]);
+    }
     if (parts[0] === "i" && parts[1]) return await showItem(parts[1]);
     if (parts.length === 1 && parts[0]) return await showRepositories(parts[0]);
     if (parts.length === 2 && parts[0] && parts[1]) return await showBoard(parts[0], parts[1]);
@@ -402,11 +405,79 @@ async function showSignIn(): Promise<void> {
 async function showPanel(): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
+  // Who is signed in changed, so the nav has to be redrawn: it was rendered
+  // before this ran and still says "sign in".
+  renderNav();
 
   const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
-  show(`<h1>${escapeHTML(i18n.t("nav.panel"))}</h1>
-        <h2>${escapeHTML(i18n.t("portal.boards"))}</h2>
-        ${views.organizationList(organizations ?? [], text)}`);
+  show(views.panelHome(organizations ?? [], text));
+
+  const form = root?.querySelector<HTMLFormElement>("form.new-org");
+  const forgeFields = root?.querySelector<HTMLDivElement>(".forge-fields");
+  const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
+
+  // The forge fields only when there is a forge. Asking for the address of
+  // something you said you do not have is a form arguing with you.
+  const select = root?.querySelector<HTMLSelectElement>("#org-forge");
+  const syncFields = () => {
+    if (forgeFields) forgeFields.hidden = (select?.value ?? "none") === "none";
+  };
+  select?.addEventListener("change", syncFields);
+  syncFields();
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    try {
+      await api.post("/api/organizations", {
+        name: String(data.get("name") ?? ""),
+        slug: String(data.get("slug") ?? ""),
+        forge: String(data.get("forge") ?? "none"),
+        base_url: String(data.get("base_url") ?? ""),
+        forge_owner: String(data.get("forge_owner") ?? ""),
+      });
+      go("/panel/" + String(data.get("slug") ?? ""));
+    } catch (err) {
+      if (errorLine) {
+        errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+        errorLine.hidden = false;
+      }
+    }
+  });
+}
+
+async function showPanelOrganization(orgSlug: string): Promise<void> {
+  me = await api.get<Me>("/api/me").catch(() => null);
+  if (!me) return go("/sign-in");
+  renderNav();
+
+  const body = await api.get<{
+    organization: OrganizationSummary;
+    repositories: RepositorySummary[];
+  }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
+
+  show(views.panelOrganization(body.organization, body.repositories ?? [], text));
+
+  const form = root?.querySelector<HTMLFormElement>("form.new-repo");
+  const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    try {
+      await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/repositories`, {
+        name: String(data.get("name") ?? ""),
+        slug: String(data.get("slug") ?? ""),
+        forge_repo: String(data.get("forge_repo") ?? ""),
+      });
+      await render();
+    } catch (err) {
+      if (errorLine) {
+        errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+        errorLine.hidden = false;
+      }
+    }
+  });
 }
 
 /**

@@ -15,6 +15,11 @@ in, and should not have to.
 
 ## Creating them
 
+From the panel: sign in, and the first screen asks for an organisation — a name,
+an address, and which forge it connects to, or none. Then a board under it.
+
+Or over the API, which is what the panel calls:
+
 ```sh
 # The address of your instance, and a session from signing in.
 BASE=http://localhost:8080
