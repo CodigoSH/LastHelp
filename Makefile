@@ -61,7 +61,7 @@ fmt: ## Format the Go sources
 vet: ## Run go vet
 	@go vet ./...
 
-lint: fmt vet ## Format and vet
+lint: fmt vet tidy ## Format, vet and tidy go.mod
 
 tidy: ## Tidy go.mod
 	@go mod tidy
