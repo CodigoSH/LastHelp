@@ -30,6 +30,7 @@ note()  { echo -e "${GRAY}    $1${NC}"; }
 # release signed with a rotated key has to remain verifiable by an installer
 # somebody downloaded last month. Empty means no release has been signed yet.
 RELEASE_KEYS=(
+    "BxLbpqP9EKO0HqYHddiBwZ9Jt0sTJsMQ2OMGTcfCCQA="
 )
 
 echo

@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/fake"
+
+	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
 )
 
 // connected sets an organisation up with a forge, credentials and a webhook
@@ -291,10 +293,19 @@ func TestOnlyTheAdministratorSeesUpdates(t *testing.T) {
 
 // TestABuildWithNoKeysSaysSoRatherThanLookingUpToDate.
 //
-// This build has no release keys yet, so it cannot verify anything. The panel
-// has to say that. An empty answer where a reason belongs reads as "you are up
-// to date", which is the one thing it must never say by accident.
+// A build with no release keys cannot verify anything, and the panel has to say
+// so. An empty answer where a reason belongs reads as "you are up to date",
+// which is the one thing it must never say by accident.
+//
+// The key list is emptied for the duration rather than relied upon to be empty:
+// this test passed for as long as no release had been cut, and the day the
+// first signing key was added it failed — not because the behaviour broke, but
+// because the test was reading the state of the world instead of setting it.
 func TestABuildWithNoKeysSaysSoRatherThanLookingUpToDate(t *testing.T) {
+	keys := version.ReleaseKeys
+	version.ReleaseKeys = nil
+	t.Cleanup(func() { version.ReleaseKeys = keys })
+
 	team := newInstance(t)
 	team.claim()
 
@@ -318,6 +329,10 @@ func TestABuildWithNoKeysSaysSoRatherThanLookingUpToDate(t *testing.T) {
 //
 // No key does not mean accept anything.
 func TestAnUpdateIsRefusedWhenItCannotBeVerified(t *testing.T) {
+	keys := version.ReleaseKeys
+	version.ReleaseKeys = nil
+	t.Cleanup(func() { version.ReleaseKeys = keys })
+
 	team := newInstance(t)
 	team.claim()
 

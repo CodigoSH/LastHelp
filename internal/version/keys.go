@@ -17,7 +17,8 @@ package version
 // this build cannot verify anything and will refuse to update, which is the
 // correct behaviour: no key does not mean accept anything.
 var ReleaseKeys = []string{
-	// No release has been cut yet, so there is no key. The first release adds
-	// the one CI signs with — and this comment stays, because the day somebody
-	// replaces rather than appends is the day this list needs to explain itself.
+	// The key CI signs with, added 2026-09-07 for the first release. Anything
+	// after it goes BELOW, never over it — the day somebody replaces rather
+	// than appends is the day this list needs to explain itself.
+	"BxLbpqP9EKO0HqYHddiBwZ9Jt0sTJsMQ2OMGTcfCCQA=",
 }
