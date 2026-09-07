@@ -347,7 +347,17 @@ if [ "$TYPE" == "stable" ]; then
 else
     LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
 fi
-[ -n "$LAST_TAG" ] || die "No previous tag found to build a changelog from."
+# A project's first release has nothing to diff against, and dying here means
+# this script cannot cut the release it exists for. The range is then the whole
+# history, which is exactly what a first changelog should say.
+if [ -n "$LAST_TAG" ]; then
+    RANGE="$LAST_TAG..HEAD"
+    RANGE_LABEL="$LAST_TAG..HEAD"
+else
+    RANGE="HEAD"
+    RANGE_LABEL="the beginning"
+    echo "ℹ️  No previous tag: the changelog covers the whole history."
+fi
 
 # Commits that describe the release process rather than the release, and the
 # types nobody deciding whether to update needs to read.
@@ -360,7 +370,7 @@ clean_subjects() {
     awk 'NF {$1=toupper(substr($1,1,1))substr($1,2); print "- " $0}' | \
     sort -u
 }
-subjects() { git log "$LAST_TAG..HEAD" --pretty=format:"%s"; }
+subjects() { git log "$RANGE" --pretty=format:"%s"; }
 
 # The [Unreleased] section, for projects whose notes come from the changelog.
 unreleased() {
@@ -392,7 +402,7 @@ else
         [ -n "$OTHER" ] && printf '### Changed\n%s\n' "$OTHER"
         true
     )
-    echo "📄 Release notes generated from $LAST_TAG..HEAD"
+    echo "📄 Release notes generated from $RANGE_LABEL"
 fi
 
 if [ "$DRY_RUN" = "1" ]; then
