@@ -61,6 +61,17 @@ RUNTIME="$(command -v podman || command -v docker || true)"
 WORK="$(mktemp -d)"
 CONTAINER="lasthelp-live-$FORGE_KIND"
 
+# The forge runs on the host network so it can deliver a webhook to LastHelp at
+# 127.0.0.1. That also means every port the forge opens is a port on this
+# machine, and a port already taken is a crash the forge reports as its own.
+free_port() {
+    python3 -c "import socket; s = socket.socket(); s.bind(('127.0.0.1', 0)); print(s.getsockname()[1]); s.close()"
+}
+
+port_is_free() {
+    ! ss -lntH "sport = :$1" 2>/dev/null | grep -q .
+}
+
 cleanup() {
     if [ -n "${CHROME_PID:-}" ]; then kill "$CHROME_PID" 2>/dev/null || true; wait "$CHROME_PID" 2>/dev/null || true; fi
     if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; fi
@@ -74,16 +85,46 @@ trap cleanup EXIT
 # says otherwise. All of that is set up here rather than left to the person
 # running this, because a check nobody can run is a check nobody runs.
 if [ "$FORGE_KIND" = gitlab ]; then
-    echo "==> starting gitlab (this takes several minutes)"
+    if ! port_is_free "$FORGE_PORT"; then
+        echo "port $FORGE_PORT is taken; set FORGE_PORT to a free one"; exit 2
+    fi
+    # Puma defaults to 127.0.0.1:8080, and on the host network that is a real
+    # port on a real machine. On the one this was written on, 8080 was held by
+    # Lastboard — so Puma could not bind, restarted for ever, and readiness
+    # never went green. Nothing in GitLab's own logs pointed at the host.
+    PUMA_PORT="$(free_port)"
+    echo "==> starting gitlab ($IMAGE, puma on $PUMA_PORT; this takes several minutes)"
     "$RUNTIME" rm -f "$CONTAINER" >/dev/null 2>&1 || true
     "$RUNTIME" run -d --name "$CONTAINER" --network=host --shm-size=256m \
-        -e GITLAB_OMNIBUS_CONFIG="external_url 'http://127.0.0.1:$FORGE_PORT'; gitlab_rails['initial_root_password'] = '$PASSWORD'; puma['worker_processes'] = 2; sidekiq['max_concurrency'] = 5; prometheus_monitoring['enable'] = false;" \
+        -e GITLAB_OMNIBUS_CONFIG="external_url 'http://127.0.0.1:$FORGE_PORT'; gitlab_rails['initial_root_password'] = '$PASSWORD'; puma['worker_processes'] = 2; puma['port'] = $PUMA_PORT; sidekiq['max_concurrency'] = 5; prometheus_monitoring['enable'] = false;" \
         "$IMAGE" >/dev/null
 
-    for _ in $(seq 1 900); do
-        curl -sf "http://127.0.0.1:$FORGE_PORT/-/readiness" >/dev/null 2>&1 && break
+    # Waiting without a failure branch is how the first attempt at this wasted
+    # eighteen minutes: the loop ran out, printed "up", and everything after it
+    # failed for reasons that looked like our bug. If it does not come up, say
+    # so, and say what the container thought it was doing.
+    READY=false
+    for i in $(seq 1 900); do
+        if curl -sf "http://127.0.0.1:$FORGE_PORT/-/readiness" >/dev/null 2>&1; then
+            READY=true; break
+        fi
+        if [ $((i % 30)) -eq 0 ]; then
+            echo "    still booting ($((i * 2))s) — $("$RUNTIME" exec "$CONTAINER" gitlab-ctl status 2>/dev/null |
+                awk '{print $1}' | sort | uniq -c | tr '\n' ' ')"
+        fi
         sleep 2
     done
+
+    if [ "$READY" != true ]; then
+        echo
+        echo "gitlab never became ready. This is what it was doing:"
+        "$RUNTIME" exec "$CONTAINER" gitlab-ctl status 2>&1 | sed 's/^/    /' || true
+        echo "    --- puma ---"
+        "$RUNTIME" exec "$CONTAINER" tail -n 40 /var/log/gitlab/puma/current 2>&1 | sed 's/^/    /' || true
+        echo "    --- reconfigure ---"
+        "$RUNTIME" logs --tail 40 "$CONTAINER" 2>&1 | sed 's/^/    /' || true
+        exit 1
+    fi
     echo "    up"
 
     echo "==> minting tokens and allowing local webhooks"

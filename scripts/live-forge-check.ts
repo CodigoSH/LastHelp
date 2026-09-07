@@ -73,6 +73,11 @@ const project = isGitLab
 
 /** The issue number people see. GitLab sends both, and only one is right. */
 const numberOf = (issue: any) => (isGitLab ? issue.iid : issue.number);
+// GitLab calls the issue body "description". Reading .body there yields
+// undefined, and String(undefined) fails the assertion with a message that
+// looks like the text never travelled — which is exactly how this read for a
+// while, against a product that had been sending the right field all along.
+const bodyOf = (issue: any) => String((isGitLab ? issue.description : issue.body) ?? "");
 
 async function target(url: string) {
   const res = await fetch(`http://127.0.0.1:${CDP}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
@@ -233,12 +238,12 @@ check("the issue really exists on the forge", Boolean(issue), issue ? `#${number
 if (issue) {
   check(
     "the report's own text travelled with it",
-    String(issue.body).includes("It closes with no message"),
-    (String(issue.body).split("\n")[0] ?? "").slice(0, 44),
+    bodyOf(issue).includes("It closes with no message"),
+    (bodyOf(issue).split("\n")[0] ?? "").slice(0, 44),
   );
   check(
     "and a way back to the report",
-    String(issue.body).includes(String(reported)),
+    bodyOf(issue).includes(String(reported)),
     "carries the item's identifier",
   );
 

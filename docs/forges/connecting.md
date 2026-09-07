@@ -98,26 +98,37 @@ would accept what it could not check.
 
 ## What has been checked against a real forge
 
-Forgejo and Gitea are walked end to end against a real instance in a container,
-by `make live-forge`: LastHelp creates the issue, the forge signs a webhook with
-its own code, our receiver verifies it, and closing the issue there closes the
-item here.
+Forgejo, Gitea and GitLab are walked end to end against a real instance in a
+container, by `make live-forge`: LastHelp creates the issue, the forge signs a
+webhook with its own code, our receiver verifies it, and closing the issue there
+closes the item here.
 
 It asks the forge which version it is and prints it, and pulls **the current
 stable** rather than a tag somebody pinned once — a check against a version
 nobody runs proves something about software that does not exist in the world.
 Set `FORGE_VERSION` to test against the one an operator reported a problem on.
 
-Last run against **Forgejo 16.0.3** and **Gitea 1.27.3**.
+Last run against **Forgejo 16.0.3**, **Gitea 1.27.3** and **GitLab 19.3.1**.
+
+```
+FORGE_KIND=gitlab make live-forge
+```
+
+GitLab takes a few minutes to boot and is the adapter least like the others —
+`iid` rather than `id`, a path that has to be escaped, a signature over a
+composed message, labels sent as a comma-separated string, and `description`
+where the rest say `body`. It is the one that most needed a real instance, and
+the run also confirms the forge itself recorded no failed delivery.
 
 That check also verifies the token scope this page tells you to create: LastHelp
 is handed one with **only `write:issue`** and the whole journey works with it.
 Adding the webhook needs more, which is why a person does that part in the
 forge's own settings.
 
-GitHub and GitLab are covered by tests against a fake that signs the way each of
-them documents, which is weaker: a fake written by the same hands as the adapter
-can be wrong in the same way and agree.
+GitHub cannot be run locally, so it remains covered only by tests against a fake
+that signs the way its documentation describes. That is weaker, and worth saying
+plainly: a fake written by the same hands as the adapter can be wrong in the same
+way and agree.
 
 ## Running without a forge
 
