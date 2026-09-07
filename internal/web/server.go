@@ -133,6 +133,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/orgs/{org}/repos/{repo}/items", s.handleSubmit)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/similar", s.handleSimilar)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/form", s.handleForm)
+	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/roadmap", s.handleRoadmap)
 
 	s.mux.HandleFunc("GET /api/items/{id}", s.handleItem)
 	s.mux.HandleFunc("POST /api/items/{id}/votes", s.handleVote)
@@ -156,6 +157,7 @@ func (s *Server) routes() {
 	private("GET /api/orgs/{org}/repos/{repo}/queue", s.handleQueue)
 
 	private("POST /api/items/{id}/moderation", s.handleModerate)
+	private("GET /api/items/{id}/statuses", s.handleStatuses)
 	private("POST /api/items/{id}/status", s.handleSetStatus)
 	private("POST /api/items/{id}/merge", s.handleMerge)
 	private("POST /api/items/{id}/reply", s.handleReply)

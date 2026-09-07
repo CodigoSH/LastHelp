@@ -112,6 +112,9 @@ async function render(): Promise<void> {
     if (parts.length === 3 && parts[2] === "queue" && parts[0] && parts[1]) {
       return await showQueue(parts[0], parts[1]);
     }
+    if (parts.length === 3 && parts[2] === "roadmap" && parts[0] && parts[1]) {
+      return await showRoadmap(parts[0], parts[1]);
+    }
     show(`<p class="empty">${escapeHTML(i18n.t("error.not_found"))}</p>`);
   } catch (err) {
     fail(err);
@@ -256,6 +259,15 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
   });
 }
 
+async function showRoadmap(orgSlug: string, repoSlug: string): Promise<void> {
+  const base = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}`;
+  const repo = await api.get<RepositorySummary>(base);
+  const board = await api.get<{ columns: Array<{ column: string; items: ItemSummary[] }> }>(
+    `${base}/roadmap`,
+  );
+  show(views.roadmap({ slug: orgSlug, name: orgSlug }, repo, board.columns ?? [], text));
+}
+
 async function showItem(publicID: string): Promise<void> {
   const token = new URLSearchParams(location.search).get("k");
   const path = `/api/items/${encodeURIComponent(publicID)}${token ? `?k=${encodeURIComponent(token)}` : ""}`;
@@ -276,6 +288,27 @@ async function showItem(publicID: string): Promise<void> {
     const count = button.querySelector(".count");
     if (count) count.textContent = i18n.number(result.votes);
   });
+
+  // The team's control, and only if the server says this person may use it.
+  // Asking is the check; drawing the select is not. A page that decides for
+  // itself who may act is a second implementation of the rules.
+  if (me) {
+    const allowed = await api
+      .get<{ current: string; statuses: string[] }>(`/api/items/${encodeURIComponent(publicID)}/statuses`)
+      .catch(() => null);
+    if (allowed) {
+      root
+        ?.querySelector("article.detail")
+        ?.insertAdjacentHTML("beforeend", views.statusControl(allowed.current, allowed.statuses, text));
+
+      root?.querySelector<HTMLSelectElement>("#status-select")?.addEventListener("change", async (e) => {
+        const select = e.target as HTMLSelectElement;
+        await api
+          .post(`/api/items/${encodeURIComponent(publicID)}/status`, { status: select.value })
+          .catch((err) => fail(err));
+      });
+    }
+  }
 
   const commentForm = root?.querySelector<HTMLFormElement>("form.comment-form");
   commentForm?.addEventListener("submit", async (event) => {

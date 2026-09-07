@@ -100,6 +100,39 @@ func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": out})
 }
 
+// handleRoadmap is the board that nobody maintains by hand.
+//
+// It is derived from the state of the items, which in turn follows what happens
+// in the forge once that is connected. A roadmap somebody updates manually is a
+// roadmap that is wrong within a month; this one cannot be, because there is
+// nothing to forget to update.
+func (s *Server) handleRoadmap(w http.ResponseWriter, r *http.Request) {
+	repo, _, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+
+	board, err := s.items().Roadmap(repo.ID, 25)
+	if err != nil {
+		slog.Error("building the roadmap", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	voter := s.voterID(w, r)
+	columns := make([]map[string]any, 0, len(item.Columns))
+	for _, column := range item.Columns {
+		entries := make([]map[string]any, 0, len(board[column]))
+		for _, it := range board[column] {
+			entries = append(entries, s.describeItem(it, voter))
+		}
+		// Every column is sent even when empty: a page that draws two columns
+		// leaves the reader wondering which two they are looking at.
+		columns = append(columns, map[string]any{"column": string(column), "items": entries})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"columns": columns})
+}
+
 // handleSimilar is the "this looks like these" hint, asked while somebody is
 // still typing the title.
 func (s *Server) handleSimilar(w http.ResponseWriter, r *http.Request) {

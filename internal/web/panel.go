@@ -332,3 +332,27 @@ func keyForOrgError(err error) string {
 		return "error.invalid_request"
 	}
 }
+
+// handleStatuses tells the panel which statuses this item may take.
+//
+// The list comes from the domain rather than being written into the page: a
+// status the server refuses but the interface offers is a button that fails,
+// and a status the server accepts but the interface never offers is a state
+// nobody can reach.
+func (s *Server) handleStatuses(w http.ResponseWriter, r *http.Request) {
+	it, _, ok := s.triageTarget(w, r)
+	if !ok {
+		return
+	}
+
+	statuses := item.StatusesFor(it.Kind)
+	out := make([]string, 0, len(statuses))
+	for _, status := range statuses {
+		out = append(out, string(status))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"kind":     string(it.Kind),
+		"current":  string(it.Status),
+		"statuses": out,
+	})
+}

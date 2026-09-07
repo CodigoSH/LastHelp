@@ -202,8 +202,33 @@ async function main() {
   const voteCount = await evaluate(`return document.querySelector("[data-vote] .count")?.textContent ?? ""`);
   check("voting updates the button in place", String(voteCount).trim() === "1", `count=${voteCount}`);
 
-  // 9. Right to left, which is where a stylesheet written in left and right
-  //    falls apart.
+  // 9. The team's status control, and the roadmap it feeds.
+  //
+  //    The control is drawn only if the server says this person may use it, so
+  //    this also checks that asking is the check rather than the drawing.
+  const statusControl = await evaluate(`return !!document.querySelector("#status-select")`);
+  check("the team sees the status control", statusControl === true);
+
+  await evaluate(`
+    const select = document.querySelector("#status-select");
+    select.value = "planned";
+    select.dispatchEvent(new Event("change"));
+  `);
+  await sleep(600);
+
+  await evaluate(`history.pushState({}, "", "/codigosh/lastboard/roadmap"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(700);
+  const roadmap = await evaluate(`
+    return {
+      columns: document.querySelectorAll(".roadmap .column").length,
+      planned: document.querySelectorAll(".roadmap .column:first-child li").length,
+    };
+  `);
+  check("the roadmap draws all three columns", roadmap.columns === 3, `columns=${roadmap.columns}`);
+  check("what was just planned is on it", roadmap.planned === 1, `planned=${roadmap.planned}`);
+
+  // 10. Right to left, which is where a stylesheet written in left and right
+  //     falls apart.
   await evaluate(`
     const select = document.querySelector("nav .lang");
     select.value = "ar";
@@ -233,7 +258,7 @@ async function main() {
   `);
   check("the layout mirrored", mirrored === true);
 
-  // 10. Nothing exploded along the way.
+  // 11. Nothing exploded along the way.
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
   await fetch(`http://127.0.0.1:${CDP}/json/close/${t.id}`);

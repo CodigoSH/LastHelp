@@ -83,7 +83,10 @@ export function board(
         <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
         <h1>${escapeHTML(repo.name)}</h1>
       </div>
-      <a class="button primary" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new">${escapeHTML(text.t("board.report"))}</a>
+      <div class="head-actions">
+        <a class="button" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/roadmap">${escapeHTML(text.t("nav.roadmap"))}</a>
+        <a class="button primary" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new">${escapeHTML(text.t("board.report"))}</a>
+      </div>
     </header>
     <div class="controls">
       <div class="tabs">${tabs}</div>
@@ -106,6 +109,65 @@ function itemRow(item: ItemSummary, text: Text): string {
     <span class="status">${escapeHTML(text.t(`status.${item.status}`))}</span>
     ${votes}
   </a></li>`;
+}
+
+/**
+ * The roadmap: three columns, and all three are drawn even when empty.
+ *
+ * Drawing only the columns that have something in them leaves the reader
+ * working out which two of the three they are looking at, and makes an empty
+ * board look broken rather than quiet.
+ */
+export function roadmap(
+  org: OrganizationSummary,
+  repo: RepositorySummary,
+  columns: Array<{ column: string; items: ItemSummary[] }>,
+  text: Text,
+): string {
+  return `
+    <p class="crumb"><a href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">${escapeHTML(repo.name)}</a></p>
+    <h1>${escapeHTML(text.t("nav.roadmap"))}</h1>
+    <p class="lead">${escapeHTML(text.t("roadmap.lead"))}</p>
+    <div class="roadmap">
+      ${columns
+        .map(
+          (c) => `<section class="column">
+            <h2>${escapeHTML(text.t(`roadmap.${c.column}`))}</h2>
+            ${
+              c.items.length === 0
+                ? `<p class="empty">${escapeHTML(text.t("roadmap.emptyColumn"))}</p>`
+                : `<ul>${c.items
+                    .map(
+                      (i) => `<li><a href="/i/${escapeAttr(i.public_id)}">
+                        <span class="kind kind-${escapeAttr(i.kind)}">${escapeHTML(text.t(`kind.${i.kind}`))}</span>
+                        <span class="item-title">${escapeHTML(i.title)}</span>
+                      </a></li>`,
+                    )
+                    .join("")}</ul>`
+            }
+          </section>`,
+        )
+        .join("")}
+    </div>`;
+}
+
+/** The team's status control, drawn only for somebody who may use it. */
+export function statusControl(
+  current: string,
+  statuses: string[],
+  text: Text,
+): string {
+  return `<div class="status-control">
+    <label for="status-select">${escapeHTML(text.t("panel.status"))}</label>
+    <select id="status-select">
+      ${statuses
+        .map(
+          (s) =>
+            `<option value="${escapeAttr(s)}"${s === current ? " selected" : ""}>${escapeHTML(text.t(`status.${s}`))}</option>`,
+        )
+        .join("")}
+    </select>
+  </div>`;
 }
 
 export function reportForm(repo: RepositorySummary, kind: string, text: Text): string {

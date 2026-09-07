@@ -404,3 +404,80 @@ func TestAVoterCookieCannotBeForged(t *testing.T) {
 		}
 	}
 }
+
+// TestTheRoadmapIsPublicAndTheControlIsNot.
+//
+// The board itself is the point of the product, so it is readable by anybody.
+// The control that moves an item along it is not, and the page asks the server
+// whether to draw it rather than deciding for itself — a page that decides is a
+// second implementation of the rules.
+func TestTheRoadmapIsPublicAndTheControlIsNot(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submit("codigosh", "lastboard", "idea", "dark mode")
+	resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+	resp = team.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": "planned"})
+	_ = resp.Body.Close()
+
+	// Anybody can read it.
+	board := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/roadmap", nil))
+	columns, _ := board["columns"].([]any)
+	if len(columns) != 3 {
+		t.Fatalf("the roadmap came back with %d columns; all three are always sent so the reader "+
+			"is not left working out which ones they are looking at", len(columns))
+	}
+	first, _ := columns[0].(map[string]any)
+	if got := len(first["items"].([]any)); got != 1 {
+		t.Errorf("the planned column has %d items", got)
+	}
+
+	// Nobody without a session may ask what statuses are available, let alone
+	// set one.
+	resp = public.do(http.MethodGet, "/api/items/"+id+"/statuses", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("the status list answered %d to the public", resp.StatusCode)
+	}
+
+	resp = public.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": "done"})
+	_ = resp.Body.Close()
+	if resp.StatusCode < 400 {
+		t.Errorf("the public moved an item along the roadmap: %d", resp.StatusCode)
+	}
+}
+
+// TestTheRoadmapNeverShowsWhatNobodyHasRead.
+//
+// The default listing is published only, and the roadmap leans on that. If it
+// ever stopped doing so, the public board would be showing submissions no
+// person has looked at — which is the one thing the moderation queue exists to
+// prevent.
+func TestTheRoadmapNeverShowsWhatNobodyHasRead(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	waiting, _ := public.submit("codigosh", "lastboard", "idea", "still in the queue")
+
+	// Reach past the API to put it in a roadmap status while it is still
+	// waiting: no endpoint allows that, which is the point — this is testing
+	// the listing, not the endpoint.
+	if _, err := team.db().Exec(`UPDATE item SET status = 'planned' WHERE public_id = ?`, waiting); err != nil {
+		t.Fatal(err)
+	}
+
+	board := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/roadmap", nil))
+	for _, raw := range board["columns"].([]any) {
+		column, _ := raw.(map[string]any)
+		if got := len(column["items"].([]any)); got != 0 {
+			t.Errorf("column %v shows %d items, and nothing has been approved", column["column"], got)
+		}
+	}
+}

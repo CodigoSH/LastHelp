@@ -20,7 +20,8 @@ that makes people stop trusting one.
 Working today, end to end and driven through a real browser: organisations and
 boards, reporting without an account, the secret follow link, the moderation
 queue, publishing, voting on ideas, comment threads, similar-item hints while
-you type, and the whole interface in twenty languages including right-to-left.
+you type, a public roadmap nobody maintains by hand, and the whole interface in
+twenty languages including right-to-left.
 
 Also working: the anti-abuse layers — a signed single-use form token, a timing
 window, a honeypot, rate limits keyed on the address a caller cannot choose,
