@@ -203,20 +203,9 @@ export function panelOrganization(
     ${list}
     ${exports}
 
-    <h2>${escapeHTML(text.t("panel.newRepository"))}</h2>
-    <form class="new-repo">
-      <label for="repo-name">${escapeHTML(text.t("panel.name"))}</label>
-      <input id="repo-name" name="name" required />
-
-      <label for="repo-slug">${escapeHTML(text.t("panel.address"))}</label>
-      <input id="repo-slug" name="slug" required pattern="[a-z0-9]+(-[a-z0-9]+)*" />
-
-      <label for="repo-forge">${escapeHTML(text.t("panel.forgeRepo"))}</label>
-      <input id="repo-forge" name="forge_repo" placeholder="owner/repository" />
-
-      <p class="form-error" role="alert" hidden></p>
-      <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button>
-    </form>`;
+    <p class="head-actions">
+      <a class="button primary" href="/panel/${escapeAttr(org.slug)}/new">${escapeHTML(text.t("panel.newRepository"))}</a>
+    </p>`;
 }
 
 /**
@@ -578,23 +567,30 @@ export function itemView(item: ItemDetail, text: Text): string {
     </section>`;
 }
 
-export function signInForm(needsSetup: boolean, text: Text): string {
-  return `
-    <h1>${escapeHTML(needsSetup ? text.t("auth.setupTitle") : text.t("nav.signIn"))}</h1>
-    ${needsSetup ? `<p class="hint">${escapeHTML(text.t("auth.setupHelp"))}</p>` : ""}
+/**
+ * Signing in, once the instance has been claimed.
+ *
+ * Claiming goes through the wizard, so this no longer takes a flag for it: a
+ * parameter that nothing passes is a branch nobody tests. It wears the same card
+ * as the wizard steps, because a login that looks like a different product is
+ * how a page reads as bolted on.
+ */
+export function signInForm(text: Text): string {
+  return `<section class="wizard">
+    <header class="wizard-head">
+      <h1>${escapeHTML(text.t("nav.signIn"))}</h1>
+    </header>
     <form class="auth">
-      <label for="auth-email">${escapeHTML(text.t("auth.email"))}</label>
-      <input id="auth-email" name="email" type="email" autocomplete="username" required />
-
-      <label for="auth-password">${escapeHTML(text.t("auth.password"))}</label>
-      <input id="auth-password" name="password" type="password"
-             autocomplete="${needsSetup ? "new-password" : "current-password"}" required />
-
+      <div class="wizard-card">
+        ${field({ id: "auth-email", name: "email", label: text.t("auth.email"), type: "email", required: true, autocomplete: "username" }, text)}
+        ${field({ id: "auth-password", name: "password", label: text.t("auth.password"), type: "password", required: true, autocomplete: "current-password" }, text)}
+      </div>
       <p class="form-error" role="alert" hidden></p>
-      <button class="button primary" type="submit">
-        ${escapeHTML(needsSetup ? text.t("auth.create") : text.t("nav.signIn"))}
-      </button>
-    </form>`;
+      <div class="wizard-actions">
+        <button class="button primary" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
+      </div>
+    </form>
+  </section>`;
 }
 
 export function queueView(items: ItemSummary[], bodies: Map<string, string>, text: Text): string {

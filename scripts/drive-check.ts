@@ -364,7 +364,7 @@ async function main() {
   await sleep(900);
   const orgPanel = await evaluate(`
     return {
-      addBoard: !!document.querySelector("form.new-repo"),
+      addBoard: !!document.querySelector('a[href$="/new"]'),
       channel: !!document.querySelector("form.channel"),
       // No forge was chosen for this organisation, so the credentials form
       // should not be offered at all.

@@ -733,7 +733,7 @@ async function showSignIn(): Promise<void> {
   if (status.needs_setup) {
     show(views.setupWizard(1, text));
   } else {
-    show(views.signInForm(false, text));
+    show(views.signInForm(text));
   }
 
   const form = root?.querySelector<HTMLFormElement>("form.auth, form.setup-account");
@@ -853,26 +853,6 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   wireCredentials(orgSlug, body.organization.webhook_path);
   wireChannel(orgSlug);
 
-  const form = root?.querySelector<HTMLFormElement>("form.new-repo");
-  const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
-
-  form?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    try {
-      await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/repositories`, {
-        name: String(data.get("name") ?? ""),
-        slug: String(data.get("slug") ?? ""),
-        forge_repo: String(data.get("forge_repo") ?? ""),
-      });
-      await render();
-    } catch (err) {
-      if (errorLine) {
-        errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
-        errorLine.hidden = false;
-      }
-    }
-  });
 }
 
 /**
