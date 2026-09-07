@@ -61,22 +61,16 @@ for (const file of sources("web/src")) {
   // written here from the start and nothing ever ran it — `void
   // secondInterpolator` at the foot of the file was silencing the warning that
   // said so.
-  const lines = text.split("\n");
-  const flagged = new Set<number>();
   for (const match of text.matchAll(new RegExp(secondInterpolator, "g"))) {
-    flagged.add(text.slice(0, match.index).split("\n").length - 1);
+    const line = text.slice(0, match.index).split("\n").length;
+    problems++;
+    console.log(
+      `${file}:${line}: a second interpolator\n` +
+        `  t() isolates every interpolated value so a name or a number keeps its own\n` +
+        `  direction inside an Arabic sentence. A .replace() on the translated string\n` +
+        `  skips that. Pass the value to t() as a parameter instead.`,
+    );
   }
-  lines.forEach((line, index) => {
-    if (flagged.has(index)) {
-      problems++;
-      console.log(
-        `${file}:${index + 1}: a second interpolator\n` +
-          `  t() isolates every interpolated value so a name or a number keeps its own\n` +
-          `  direction inside an Arabic sentence. A .replace() on the translated string\n` +
-          `  skips that. Pass the value to t() as a parameter instead.`,
-      );
-    }
-  });
 }
 
 // Keys the server emits. A handler answers with a translation key rather than a

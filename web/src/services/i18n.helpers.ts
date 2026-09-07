@@ -17,10 +17,17 @@ export function translate(
   let text = current?.[key] ?? fallback?.[key];
   if (!text) return key;
 
+  // One pass over the template, never over what was substituted into it.
+  //
+  // Replacing the placeholders one at a time re-scans the text after each
+  // substitution, so a value that happens to contain `{count}` — and on this
+  // board every title is written by a stranger — gets a later parameter
+  // interpolated into it. That corrupts the text and, worse, nests the bidi
+  // isolates, which is the exact invariant this file exists to hold.
   if (params) {
-    for (const name of Object.keys(params)) {
-      text = text.replaceAll(`{${name}}`, isolate(String(params[name])));
-    }
+    text = text.replace(/\{([a-zA-Z0-9_]+)\}/g, (placeholder, name: string) =>
+      name in params ? isolate(String(params[name])) : placeholder,
+    );
   }
   return text;
 }

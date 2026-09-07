@@ -48,6 +48,8 @@ test: ## Run every test
 	@go test ./...
 	@go test -count=1 ./internal/arch/
 	@bun test
+	@bun run typecheck
+	@bun run i18n:scan
 
 test-cover: ## Run the Go tests with coverage
 	@go test -coverprofile=coverage.out ./...
