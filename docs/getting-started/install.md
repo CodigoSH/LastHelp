@@ -1,5 +1,28 @@
 # Install
 
+## One command
+
+```sh
+curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo bash
+```
+
+It downloads a release, **checks that it is ours before installing anything**,
+and sets up a systemd service. Read it first if you would rather — it is one
+file, and piping a script into a root shell is a thing to do knowingly.
+
+What it refuses rather than warns about:
+
+- A checksum file whose signature does not match a key it knows.
+- A binary that does not match the signed checksums.
+- Not having `openssl`, because an unverified binary is not worth the
+  convenience of installing without it.
+
+Run it again to update. It stops the service, **backs up the database first**,
+replaces the binary and starts again — and it keeps the port and settings it
+finds rather than asking twice.
+
+`CHANNEL=beta` installs the latest beta instead of the latest stable.
+
 ## With Docker
 
 ```sh

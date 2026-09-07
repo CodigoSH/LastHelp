@@ -3,6 +3,7 @@ package arch
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -102,5 +103,43 @@ func TestTheReleaseKeysAreAList(t *testing.T) {
 	if !strings.Contains(string(source), "ReleaseKeys = []string{") {
 		t.Error("ReleaseKeys is no longer a list; rotation has to be overlapping, so there " +
 			"has to be room for two keys at once")
+	}
+}
+
+// TestTheInstallerAndTheBinaryTrustTheSameKeys.
+//
+// There are two lists of release keys: the one compiled into the binary and the
+// one in install.sh. They have to hold the same keys, and the way they stop
+// doing so is somebody rotating a key in one place — after which either every
+// new install fails to verify, or the updater does, and only one of those gets
+// noticed.
+func TestTheInstallerAndTheBinaryTrustTheSameKeys(t *testing.T) {
+	root := repoRoot(t)
+
+	goKeys, err := os.ReadFile(filepath.Join(root, "internal/version/keys.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	installer, err := os.ReadFile(filepath.Join(root, "install.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := regexp.MustCompile(`"([A-Za-z0-9+/]{42,44}=*)"`)
+	inBinary := key.FindAllStringSubmatch(string(goKeys), -1)
+	inInstaller := key.FindAllStringSubmatch(string(installer), -1)
+
+	if len(inBinary) != len(inInstaller) {
+		t.Errorf("\nthe binary trusts %d release key(s) and install.sh trusts %d\n\n"+
+			"They have to hold the same keys. When they diverge, either every new install\n"+
+			"stops verifying or the updater does — and only one of those gets noticed.",
+			len(inBinary), len(inInstaller))
+		return
+	}
+
+	for i := range inBinary {
+		if inBinary[i][1] != inInstaller[i][1] {
+			t.Errorf("release key %d differs between the binary and install.sh", i+1)
+		}
 	}
 }
