@@ -245,4 +245,25 @@ var migrations = []migration{
 			END`,
 		},
 	},
+	{
+		version: 2,
+		name:    "opaque webhook address per organisation",
+		// The address a forge delivers to must not be guessable from anything
+		// public, and it must identify the connection on its own — because the
+		// receiver is chosen from this record and never from the request's
+		// headers. Forgejo sends GitHub's headers as well as its own, so a
+		// server that decided what a delivery was by looking at them would let
+		// the caller choose which verification it faced.
+		//
+		// Added by ALTER rather than only in the CREATE above, because the
+		// CREATE only ever runs on a fresh install and every database that
+		// already exists gets this column from here.
+		stmts: []string{
+			`ALTER TABLE organization ADD COLUMN hook_id TEXT NOT NULL DEFAULT ''`,
+			// After the ALTER, never before: an index on a column that does not
+			// exist yet fails with "no such column" on every existing database
+			// and on none of the new ones.
+			`CREATE INDEX organization_by_hook ON organization (hook_id)`,
+		},
+	},
 }

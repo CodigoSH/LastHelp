@@ -227,7 +227,23 @@ async function main() {
   check("the roadmap draws all three columns", roadmap.columns === 3, `columns=${roadmap.columns}`);
   check("what was just planned is on it", roadmap.planned === 1, `planned=${roadmap.planned}`);
 
-  // 10. Right to left, which is where a stylesheet written in left and right
+  // 10. The bridge control. There is no forge connected in this run, so what
+  //     is checked is that the control is there for the team and that asking
+  //     for an issue answers rather than failing silently.
+  await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(700);
+  const bridgeControl = await evaluate(`return !!document.querySelector("[data-create-issue]")`);
+  check("the team sees the bridge control", bridgeControl === true);
+
+  await evaluate(`document.querySelector("[data-create-issue]").click()`);
+  await sleep(600);
+  const issueNote = await evaluate(`
+    const note = document.querySelector(".issue-note");
+    return { shown: note ? !note.hidden : false, text: note?.textContent?.trim() ?? "" };
+  `);
+  check("asking for an issue says something", issueNote.shown === true, issueNote.text.slice(0, 44));
+
+  // 11. Right to left, which is where a stylesheet written in left and right
   //     falls apart.
   await evaluate(`
     const select = document.querySelector("nav .lang");
@@ -258,7 +274,7 @@ async function main() {
   `);
   check("the layout mirrored", mirrored === true);
 
-  // 11. Nothing exploded along the way.
+  // 12. Nothing exploded along the way.
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
   await fetch(`http://127.0.0.1:${CDP}/json/close/${t.id}`);

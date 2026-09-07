@@ -481,3 +481,29 @@ func TestTheRoadmapNeverShowsWhatNobodyHasRead(t *testing.T) {
 		}
 	}
 }
+
+// makeCollaborator gives an account triage rights on codigosh/lastboard and
+// signs the given client in as them.
+func makeCollaborator(t *testing.T, team, client *instance, email string) {
+	t.Helper()
+
+	accounts := account.Store{DB: team.db()}
+	user, err := accounts.Create(email, "a good long passphrase", "Helper", false, team.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var repoID int64
+	if err := team.db().QueryRow(`SELECT id FROM repository WHERE slug = 'lastboard'`).Scan(&repoID); err != nil {
+		t.Fatal(err)
+	}
+	if err := accounts.Grant(user.ID, authz.Repository(repoID, 0), authz.RoleCollaborator, team.now()); err != nil {
+		t.Fatal(err)
+	}
+
+	resp := client.do(http.MethodPost, "/api/session",
+		map[string]string{"email": email, "password": "a good long passphrase"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the collaborator could not sign in: %d", resp.StatusCode)
+	}
+}

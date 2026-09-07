@@ -347,6 +347,9 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	body["body"] = it.Body
 	body["comments"] = thread
 	body["mine"] = mine
+	if linked, err := s.bridge().Link(it.ID); err == nil {
+		body["issue"] = map[string]any{"number": linked.Number, "url": linked.URL}
+	}
 	if it.MergedInto != 0 {
 		if survivor, err := store.ByID(it.MergedInto); err == nil {
 			body["merged_into"] = survivor.PublicID

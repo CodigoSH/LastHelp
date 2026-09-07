@@ -221,3 +221,66 @@ func names(list []Organization) []string {
 	}
 	return out
 }
+
+func TestCredentialsGoInAndOutSealed(t *testing.T) {
+	s := store(t)
+	o, err := s.CreateOrganization(Organization{Slug: "codigosh", Forge: ForgeForgejo}, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := s.Credentials(o.ID); !errors.Is(err, ErrNoCredentials) {
+		t.Errorf("a fresh organisation reported %v", err)
+	}
+
+	if err := s.SetCredentials(o.ID, []byte("sealed-token"), []byte("sealed-secret")); err != nil {
+		t.Fatal(err)
+	}
+	token, secret, err := s.Credentials(o.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(token) != "sealed-token" || string(secret) != "sealed-secret" {
+		t.Errorf("came back as %q / %q", token, secret)
+	}
+}
+
+// TestTheWebhookAddressIsStableAndOpaque.
+//
+// Stable because a forge is configured with it once; opaque because it is the
+// only thing identifying the connection, and the verification to use is chosen
+// from that record rather than from headers a caller controls.
+func TestTheWebhookAddressIsStableAndOpaque(t *testing.T) {
+	s := store(t)
+	o, err := s.CreateOrganization(Organization{Slug: "codigosh"}, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := s.HookID(o.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first) < 20 {
+		t.Errorf("the address is %d characters; it has to be unguessable", len(first))
+	}
+	if strings.Contains(first, "codigosh") {
+		t.Error("the address contains the slug, so it can be guessed from a public page")
+	}
+
+	again, err := s.HookID(o.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != first {
+		t.Error("the address changed on the second call; every forge configured with the old one stops working")
+	}
+
+	found, err := s.ByHookID(first)
+	if err != nil || found.ID != o.ID {
+		t.Errorf("resolving the address gave %+v, %v", found, err)
+	}
+	if _, err := s.ByHookID("something-else"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("an unknown address resolved to %v", err)
+	}
+}

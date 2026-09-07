@@ -1,6 +1,7 @@
 package arch
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -41,6 +42,11 @@ func TestEveryOutboundConnectionGoesThroughAGate(t *testing.T) {
 
 	// What dialling looks like. Constructing a client is enough to fail: a
 	// package holding its own http.Client is a package that will use it.
+	//
+	// Matched on word boundaries, not as substrings. The first version of this
+	// looked for "http.Head" inside the source and fired on every file that
+	// mentioned http.Header — which is most of them. A rule that cries wolf is
+	// a rule people silence with exemptions instead of fixing.
 	dialers := []string{
 		"net.Dial", "net.DialTimeout", "net.Dialer",
 		"http.Get", "http.Post", "http.PostForm", "http.Head",
@@ -59,7 +65,7 @@ func TestEveryOutboundConnectionGoesThroughAGate(t *testing.T) {
 		}
 		src := f.render(t)
 		for _, d := range dialers {
-			if !strings.Contains(src, d) {
+			if !mentions(src, d) {
 				continue
 			}
 			t.Errorf("\n%s uses %s\n\n"+
@@ -108,4 +114,28 @@ func contains(haystack []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+// mentions reports whether the source uses this identifier, rather than merely
+// containing its letters. "http.Head" is a prefix of "http.Header", and
+// "net.Dial" of "net.Dialer" — without the boundary, half the repository looks
+// like it opens sockets.
+func mentions(source, identifier string) bool {
+	pattern := regexp.MustCompile(`\b` + regexp.QuoteMeta(identifier) + `\b`)
+	for _, match := range pattern.FindAllStringIndex(source, -1) {
+		end := match[1]
+		// Reject a match that is only a prefix of a longer identifier:
+		// FindAllStringIndex with \b already stops "http.Header", but an
+		// identifier ending in a letter followed by a digit or underscore
+		// would slip through.
+		if end < len(source) && (source[end] == '_' || isWordByte(source[end])) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func isWordByte(b byte) bool {
+	return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' || b >= '0' && b <= '9'
 }

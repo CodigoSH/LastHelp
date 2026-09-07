@@ -151,6 +151,34 @@ export function roadmap(
     </div>`;
 }
 
+/**
+ * The team's bridge to the forge: open an issue, or attach one that exists.
+ *
+ * Both, because a project with four thousand open issues does not want a four
+ * thousand and first — it wants to say "this is already #4213". Offering only
+ * the first is what makes this unusable on day one for anybody who has been
+ * going for a while.
+ */
+export function issueControl(
+  linked: { number: number; url: string } | null,
+  text: Text,
+): string {
+  if (linked) {
+    return `<p class="issue-link">${escapeHTML(text.t("item.issue"))}
+      <a href="${escapeAttr(linked.url)}" target="_blank" rel="noopener">#${escapeHTML(String(linked.number))}</a></p>`;
+  }
+
+  return `<div class="issue-control">
+    <button class="button" data-create-issue>${escapeHTML(text.t("panel.createIssue"))}</button>
+    <form class="attach">
+      <input name="issue" placeholder="${escapeAttr(text.t("panel.attachPlaceholder"))}"
+             aria-label="${escapeAttr(text.t("panel.attachIssue"))}" />
+      <button class="button" type="submit">${escapeHTML(text.t("panel.attachIssue"))}</button>
+    </form>
+    <p class="issue-note" role="status" hidden></p>
+  </div>`;
+}
+
 /** The team's status control, drawn only for somebody who may use it. */
 export function statusControl(
   current: string,

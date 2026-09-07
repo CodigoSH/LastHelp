@@ -32,6 +32,20 @@ assumptions apply, and keeping them apart is most of the design:
   who has decided to target your project and is willing to work at it by hand.
   Against that the tools are the breaker, closing submissions for a while, and
   the fact that nothing is published without a person approving it.
+- **The forge credential never leaves encrypted.** The token and webhook secret
+  are sealed with a key kept in a file beside the database, not in it: a leaked
+  backup is then a leak of hashes and public text rather than of write access to
+  your forge. Nothing echoes a stored token back, and a collaborator — somebody
+  trusted to triage one repository — cannot reach it at all.
+
+- **A webhook is authenticated by its signature and nothing else.** A forge
+  cannot sign in, so that endpoint sits outside the session and CSRF checks. The
+  address it delivers to is opaque and identifies the connection, and the
+  connection is what says which verifier to use — never the request's headers.
+  That matters: Forgejo sends GitHub's headers alongside its own, so a server
+  that guessed from headers would let a caller choose which verification it
+  faced, and one of the four paths is weaker than the others.
+
 - **The forge URL comes from the operator.** Pointing at a Gitea on
   `192.168.1.x` with a self-signed certificate is the feature, not the
   vulnerability, so private addresses are allowed there. Cloud metadata

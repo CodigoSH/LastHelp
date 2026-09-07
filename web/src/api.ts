@@ -97,6 +97,7 @@ export interface ItemDetail extends ItemSummary {
   body: string;
   mine: boolean;
   merged_into?: string;
+  issue?: { number: number; url: string };
   comments: Array<{ author: string; name: string; body: string; created_at: number }>;
 }
 

@@ -248,3 +248,55 @@ func itoa(n int) string {
 	}
 	return string(b)
 }
+
+// TestADatabaseFromTheOlderBinaryStillOpens.
+//
+// This is the check the house rule insists on: not "does it work on a fresh
+// install", but "does it work on a database the previous version wrote". A
+// migration is only ever wrong on data that already exists.
+//
+// The old database is built by running only the migrations that existed then,
+// which is exactly what an older binary would have done.
+func TestADatabaseFromTheOlderBinaryStillOpens(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+
+	old, err := sql.Open("sqlite", dsn(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the first migration, as version 1 of this binary would have applied.
+	if err := apply(old, migrations[0]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := old.Exec(`INSERT INTO organization
+		(id, slug, name, forge_kind, base_url, forge_owner, created_at)
+		VALUES (1, 'codigosh', 'CodigoSH', 'forgejo', '', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Now open it with today's binary.
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("a database written by the older version could not be opened: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var slug, hook string
+	if err := db.QueryRow(`SELECT slug, hook_id FROM organization WHERE id = 1`).Scan(&slug, &hook); err != nil {
+		t.Fatalf("the row from the old database did not survive: %v", err)
+	}
+	if slug != "codigosh" {
+		t.Errorf("the row came back as %q", slug)
+	}
+
+	version, err := userVersion(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := migrations[len(migrations)-1].version; version != want {
+		t.Errorf("schema version is %d after upgrading, want %d", version, want)
+	}
+}

@@ -51,13 +51,16 @@ func (c *testClock) advance(d time.Duration) {
 func newInstance(t *testing.T) *instance {
 	t.Helper()
 
-	db, err := database.Open(filepath.Join(t.TempDir(), "test.db"))
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	db, err := database.Open(dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
 
-	srv, err := New(config.Config{}, db)
+	// A key file per test, in the same temporary directory as the database,
+	// which is exactly where it lives in a real installation.
+	srv, err := New(config.Config{KeyFile: filepath.Join(filepath.Dir(dbPath), "test.key")}, db)
 	if err != nil {
 		t.Fatal(err)
 	}

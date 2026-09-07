@@ -16,9 +16,12 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/outbox"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/session"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/outbound"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/secretbox"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
@@ -45,6 +48,12 @@ type Server struct {
 	// would allocate the whole stack on every hit for no reason.
 	handler http.Handler
 
+	// hooks is where a forge delivers, on a shorter chain: no session, no CSRF
+	// and no same-site check, because a forge has none of those and its
+	// signature is what authenticates it instead.
+	hooks       *http.ServeMux
+	hookHandler http.Handler
+
 	// voterKey signs the cookie that identifies a voter. Read once at startup,
 	// generated on the first ever start.
 	voterKey []byte
@@ -59,6 +68,14 @@ type Server struct {
 	// one person. Both are bounded: the keys are chosen by whoever is calling.
 	perAddress *middleware.Limiter
 	perBlock   *middleware.Limiter
+
+	// box seals the forge credentials. Its key lives in a file beside the
+	// database rather than in it, so a leaked backup is not write access to
+	// somebody's forge.
+	box secretbox.Box
+
+	// out is the one way to somebody else's server.
+	out *outbound.Client
 
 	// shell is index.html, read once. Every request stamps a language into a
 	// copy of it.
@@ -103,11 +120,35 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	}
 	s.shell = string(shell)
 
+	if s.box, err = secretbox.Open(cfg.KeyFile); err != nil {
+		return nil, err
+	}
+	s.out = outbound.New(cfg.Offline, 20*time.Second)
+
 	s.perAddress = middleware.NewLimiter(240, time.Minute, 20_000, s.now)
 	s.perBlock = middleware.NewLimiter(600, time.Minute, 20_000, s.now)
 
 	s.routes()
+	// The webhook endpoint is not on the application's mux at all.
+	//
+	// A forge cannot sign in, sends no CSRF token, and is cross-site by
+	// definition — it is somebody else's server. Every one of those checks
+	// would refuse it, and correctly. So it lives on its own handler with its
+	// own, shorter chain, and its authentication is the signature: an opaque
+	// address identifies the connection, and the connection says which verifier
+	// to use.
+	//
+	// It is separated here, where the routes are declared, rather than by a
+	// path exemption inside a middleware. An exemption list is invisible from
+	// the place people add routes, which is how something ends up outside a
+	// check nobody remembered was there.
+	s.hooks = http.NewServeMux()
+	s.hooks.HandleFunc("POST /hooks/{hook}", s.handleWebhook)
+
 	s.handler = s.wrap()
+	s.hookHandler = middleware.Recover(
+		middleware.BodyLimit(webhookBodyLimit)(
+			middleware.RateLimit(s.perAddress, s.perBlock, s.addressOf)(s.hooks)))
 	return s, nil
 }
 
@@ -161,6 +202,9 @@ func (s *Server) routes() {
 	private("POST /api/items/{id}/status", s.handleSetStatus)
 	private("POST /api/items/{id}/merge", s.handleMerge)
 	private("POST /api/items/{id}/reply", s.handleReply)
+	private("POST /api/items/{id}/issue", s.handleCreateIssue)
+	private("POST /api/items/{id}/attach", s.handleAttachIssue)
+	private("POST /api/orgs/{org}/credentials", s.handleSetCredentials)
 
 	// Public, and only these: the health check and the static frontend.
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
@@ -239,6 +283,12 @@ func (s *Server) wrap() http.Handler {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// One branch, in the open, rather than an exemption buried in a middleware.
+	// Everything not under /hooks/ goes through the full chain.
+	if strings.HasPrefix(r.URL.Path, "/hooks/") {
+		s.hookHandler.ServeHTTP(w, r)
+		return
+	}
 	s.handler.ServeHTTP(w, r)
 }
 
@@ -247,6 +297,7 @@ func (s *Server) sessions() session.Store  { return session.Store{DB: s.db} }
 func (s *Server) orgs() org.Store          { return org.Store{DB: s.db} }
 func (s *Server) items() item.Store        { return item.Store{DB: s.db} }
 func (s *Server) settings() settings.Store { return settings.Store{DB: s.db} }
+func (s *Server) outbox() outbox.Store     { return outbox.Store{DB: s.db} }
 
 func (s *Server) now() time.Time {
 	if s.Clock != nil {

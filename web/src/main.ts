@@ -307,6 +307,8 @@ async function showItem(publicID: string): Promise<void> {
           .post(`/api/items/${encodeURIComponent(publicID)}/status`, { status: select.value })
           .catch((err) => fail(err));
       });
+
+      wireIssueControl(publicID, item.issue ?? null);
     }
   }
 
@@ -323,6 +325,48 @@ async function showItem(publicID: string): Promise<void> {
     commentForm.reset();
     const sent = commentForm.querySelector<HTMLParagraphElement>(".comment-sent");
     if (sent) sent.hidden = false;
+  });
+}
+
+/**
+ * The bridge control, and the only place the panel talks to a forge.
+ *
+ * Creating an issue answers "queued", not "created": the request does not call
+ * the forge — forges rate-limit and forges go down — so saying it was created
+ * would be reporting something that has not happened yet.
+ */
+function wireIssueControl(publicID: string, linked: { number: number; url: string } | null): void {
+  root
+    ?.querySelector("article.detail")
+    ?.insertAdjacentHTML("beforeend", views.issueControl(linked, text));
+
+  const note = root?.querySelector<HTMLParagraphElement>(".issue-note");
+  const say = (key: string) => {
+    if (note) {
+      note.textContent = i18n.t(key);
+      note.hidden = false;
+    }
+  };
+
+  root?.querySelector<HTMLButtonElement>("[data-create-issue]")?.addEventListener("click", async () => {
+    try {
+      await api.post(`/api/items/${encodeURIComponent(publicID)}/issue`);
+      say("panel.issueQueued");
+    } catch (err) {
+      say(err instanceof ApiError ? err.key : "error.internal");
+    }
+  });
+
+  const attach = root?.querySelector<HTMLFormElement>("form.attach");
+  attach?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const value = String(new FormData(attach).get("issue") ?? "");
+    try {
+      await api.post(`/api/items/${encodeURIComponent(publicID)}/attach`, { issue: value });
+      await render();
+    } catch (err) {
+      say(err instanceof ApiError ? err.key : "error.internal");
+    }
   });
 }
 

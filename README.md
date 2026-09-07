@@ -30,8 +30,13 @@ closes a board rather than hand somebody a queue they will not open. Every
 refusal is counted by layer, because a filter nobody can measure is a filter
 quietly turning away people who never complain.
 
-Not there yet: the forge integration — creating and linking issues, and the
-status coming back when an issue closes — and the notification channels.
+The forge bridge works too: GitHub, GitLab, Gitea and Forgejo, hosted anywhere
+including your own network. A triaged item becomes an issue — or is attached to
+one that already exists, which is what a project with four thousand open issues
+actually needs — and when that issue is closed or reopened, the item follows.
+That is what makes the roadmap something nobody has to maintain.
+
+Not there yet: the notification channels, and Bitbucket.
 
 ## Why it exists
 

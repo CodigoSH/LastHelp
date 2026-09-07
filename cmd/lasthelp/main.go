@@ -40,6 +40,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// The queue drains in the background. Nothing calls a forge from a request:
+	// forges rate-limit and forges go down, and a report lost because somebody
+	// else's server was having a bad afternoon is a report nobody writes twice.
+	workCtx, stopWork := context.WithCancel(context.Background())
+	defer stopWork()
+	go server.Work(workCtx)
+
 	if err := serve(web.HTTPServer(cfg, server)); err != nil {
 		slog.Error("the server stopped", "error", err)
 		os.Exit(1)

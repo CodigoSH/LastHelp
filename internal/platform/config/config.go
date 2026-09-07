@@ -8,6 +8,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -33,6 +34,11 @@ type Config struct {
 	// X-Forwarded-For — never the leftmost, which the caller writes.
 	TrustProxyHops int
 
+	// KeyFile holds the key that encrypts the forge credentials. It sits beside
+	// the database rather than inside it: a backup script copies the database,
+	// and a key that travelled with it would make the encryption decorative.
+	KeyFile string
+
 	// Offline stops every outbound connection this binary can make. It exists
 	// so the claim in SECURITY.md — that the only connections are the forge and
 	// the notification channel the operator configured — is something an
@@ -48,6 +54,7 @@ func Load() Config {
 	return Config{
 		Addr:           addr(),
 		DBFile:         str("LASTHELP_DB_FILE", "lasthelp.db"),
+		KeyFile:        keyFile(),
 		LogJSON:        strings.EqualFold(str("LASTHELP_LOG_FORMAT", "text"), "json"),
 		TrustProxy:     boolean("LASTHELP_TRUST_PROXY", false),
 		TrustProxyHops: hops(),
@@ -91,4 +98,14 @@ func boolean(key string, fallback bool) bool {
 		return fallback
 	}
 	return v
+}
+
+// keyFile defaults to sitting next to the database, which is where an operator
+// looks for it and where the documentation says it is.
+func keyFile() string {
+	if explicit := str("LASTHELP_KEY_FILE", ""); explicit != "" {
+		return explicit
+	}
+	db := str("LASTHELP_DB_FILE", "lasthelp.db")
+	return filepath.Join(filepath.Dir(db), "lasthelp.key")
 }
