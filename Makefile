@@ -64,6 +64,13 @@ lint: fmt vet ## Format and vet
 tidy: ## Tidy go.mod
 	@go mod tidy
 
+# Building is not running, and a passing suite is not a working page. This
+# starts the real binary on a scratch database, drives a real browser through
+# the whole journey, and checks the interface in Arabic on the way out.
+drive: build ## Walk the whole journey in a real browser
+	@command -v google-chrome >/dev/null || { echo "google-chrome is required"; exit 1; }
+	@scripts/drive.sh
+
 docker: ## Build the container image
 	@docker build -t $(APP):$(VERSION) --build-arg VERSION=$(VERSION) .
 

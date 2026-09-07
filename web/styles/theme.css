@@ -53,3 +53,270 @@ body {
   font-family: var(--font);
   line-height: 1.5;
 }
+
+/* --- layout ---------------------------------------------------------------
+ *
+ * Logical properties throughout: inset-inline, margin-inline, text-align:start.
+ * Three of the twenty languages read right to left, and a stylesheet written in
+ * left and right is a stylesheet that has to be written twice.
+ */
+
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-block-end: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--accent-alt);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+main {
+  max-inline-size: 46rem;
+  margin-inline: auto;
+  padding: 1.5rem 1.25rem 4rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin-block: 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+h2 { font-size: 1.1rem; margin-block: 2rem 0.5rem; }
+
+.lead { color: var(--text-muted); margin-block-start: 0; }
+.hint { color: var(--text-muted); font-size: 0.875rem; }
+.crumb { margin: 0 0 0.25rem; font-size: 0.875rem; }
+.crumb a, .brand:hover { text-decoration: none; }
+
+.empty {
+  color: var(--text-muted);
+  padding: 2.5rem 0;
+  text-align: center;
+}
+
+ul { list-style: none; margin: 0; padding: 0; }
+
+.cards { display: grid; gap: 0.5rem; margin-block-start: 1rem; }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-decoration: none;
+  color: inherit;
+}
+
+.card:hover { border-color: var(--accent); }
+.card-title { font-weight: 600; }
+.card-sub { color: var(--text-muted); font-size: 0.85rem; }
+
+.board-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block-end: 1rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-block-end: 1rem;
+}
+
+.tabs, .sorts { display: flex; gap: 0.25rem; }
+
+.tab, .sort, .choice {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.tab.on, .sort.on, .choice.on {
+  border-color: var(--accent);
+  color: var(--accent-alt);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.search {
+  flex: 1 1 12rem;
+  min-inline-size: 8rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+}
+
+.items { display: grid; gap: 0.35rem; }
+
+.item {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  background: var(--surface);
+}
+
+.item:hover { border-color: var(--accent); }
+.item-title { font-weight: 500; }
+
+.kind {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.kind-bug { border-color: rgba(var(--accent-rgb), 0.5); color: var(--accent-alt); }
+
+.status, .when, .votes {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.votes.voted { color: var(--accent-alt); font-weight: 600; }
+
+form { display: grid; gap: 0.35rem; margin-block-start: 1rem; }
+label { font-size: 0.875rem; font-weight: 600; }
+
+input, textarea, select {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  /* start, not left: the caret belongs at the beginning of the line in every
+     reading direction. */
+  text-align: start;
+}
+
+textarea { resize: vertical; }
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.choices { display: flex; gap: 0.5rem; margin-block-end: 0.5rem; }
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  justify-self: start;
+}
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.button.danger { color: var(--accent-alt); }
+.button.vote.voted { border-color: var(--accent); color: var(--accent-alt); }
+.button .count { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.link {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.form-error { color: var(--accent-alt); font-size: 0.875rem; }
+
+.notice {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.9rem;
+}
+
+.similar {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+}
+
+.similar-head { font-weight: 600; margin-block: 0 0.35rem; }
+
+.detail .meta { display: flex; gap: 0.6rem; align-items: center; }
+.detail .body { white-space: pre-wrap; }
+
+.follow-link { display: flex; gap: 0.5rem; margin-block-start: 0.5rem; }
+.follow-link input { flex: 1; font-family: ui-monospace, monospace; font-size: 0.8rem; }
+.keep { font-weight: 600; }
+
+.comments { display: grid; gap: 0.6rem; margin-block: 0.5rem 1rem; }
+
+.comment {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.comment-team { border-inline-start: 3px solid var(--accent); }
+.comment .who { margin: 0 0 0.25rem; font-size: 0.8rem; color: var(--text-muted); }
+.comment .what { margin: 0; white-space: pre-wrap; }
+
+.queue { display: grid; gap: 0.75rem; margin-block-start: 1rem; }
+.queue li {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.queue h3 { margin: 0.25rem 0; }
+.queue .body { white-space: pre-wrap; color: var(--text-muted); }
+.actions { display: flex; gap: 0.5rem; margin-block-start: 0.6rem; }

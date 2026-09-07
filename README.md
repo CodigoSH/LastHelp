@@ -13,12 +13,18 @@ file, no external services.
 
 ## Status
 
-**Early development.** The repository is being built in the open and there is no
-release yet. What exists today is the skeleton: the server boots, serves its
-embedded frontend and answers a health check. Nothing described above is
-implemented yet, and this section will say so until it is — a README that
-promises a server nobody wrote is the first thing that makes people stop
-trusting one.
+**Early development, and no release yet.** This section says what actually
+works, because a README that describes a server nobody wrote is the first thing
+that makes people stop trusting one.
+
+Working today, end to end and driven through a real browser: organisations and
+boards, reporting without an account, the secret follow link, the moderation
+queue, publishing, voting on ideas, comment threads, similar-item hints while
+you type, and the whole interface in twenty languages including right-to-left.
+
+Not there yet: the forge integration — creating and linking issues, and the
+status coming back when an issue closes — the notification channels, and the
+anti-abuse layers beyond the moderation queue.
 
 ## Why it exists
 

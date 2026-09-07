@@ -4,9 +4,12 @@ package web
 import (
 	"database/sql"
 	"embed"
+	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -46,6 +49,10 @@ type Server struct {
 	// generated on the first ever start.
 	voterKey []byte
 
+	// shell is index.html, read once. Every request stamps a language into a
+	// copy of it.
+	shell string
+
 	// Clock is the one source of time in the HTTP layer, replaceable so a test
 	// can place a session in the past without sleeping.
 	Clock func() time.Time
@@ -72,6 +79,15 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	if s.voterKey, err = (settings.Store{DB: db}).Secret(settings.VoterSigningKey); err != nil {
 		return nil, err
 	}
+
+	shell, err := fs.ReadFile(assets, "index.html")
+	if err != nil {
+		// The binary embeds whatever the frontend build produced. Without an
+		// index there is no application, and failing at startup says so once
+		// rather than 404ing for ever.
+		return nil, fmt.Errorf("the embedded frontend has no index.html: %w", err)
+	}
+	s.shell = string(shell)
 
 	s.routes()
 	s.handler = s.wrap()
@@ -145,8 +161,39 @@ func (s *Server) static() http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+
+		// A path with no extension is a client-side route, not a file. It gets
+		// the shell, stamped with a language, rather than a 404.
+		clean := path.Clean(r.URL.Path)
+		if clean == "/" || path.Ext(clean) == "" {
+			s.serveShell(w, r)
+			return
+		}
 		files.ServeHTTP(w, r)
 	})
+}
+
+// serveShell writes index.html with the language and reading direction filled
+// in, so the first paint is already right.
+//
+// Leaving lang="en" on the document is not cosmetic: it is what a screen reader
+// announces, and what the browser hyphenates and spellchecks by. And dir has to
+// be there before the first pixel, or an Arabic page renders left-to-right and
+// then jumps.
+func (s *Server) serveShell(w http.ResponseWriter, r *http.Request) {
+	lang := negotiateLanguage(r.Header.Get("Accept-Language"))
+
+	shell := strings.NewReplacer(
+		`lang="en"`, `lang="`+lang+`"`,
+		`dir="ltr"`, `dir="`+direction(lang)+`"`,
+	).Replace(s.shell)
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// The shell carries the language of whoever asked, so a shared cache must
+	// not hand an Arabic document to the next person.
+	w.Header().Set("Vary", "Accept-Language")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = io.WriteString(w, shell)
 }
 
 // wrap puts everything that applies to every request around the routes,

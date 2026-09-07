@@ -1,4 +1,11 @@
 <!doctype html>
+<!--
+  lang and dir are stamped by the server from Accept-Language before the first
+  byte reaches the browser, and re-stamped by the script if somebody changes
+  language without reloading. Leaving lang="en" here is what a screen reader
+  would announce for an Arabic page, and a missing dir is a page that renders
+  one way and then flips.
+-->
 <html lang="en" dir="ltr">
   <head>
     <meta charset="utf-8" />
@@ -8,6 +15,7 @@
     <script type="module" src="/main.js?v=0BUILDSTAMP0"></script>
   </head>
   <body>
+    <nav id="nav"></nav>
     <main id="app"></main>
   </body>
 </html>
