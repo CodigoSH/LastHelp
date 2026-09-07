@@ -83,15 +83,19 @@ jobs:
 
       - name: publish
         env:
-          FORGE_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          CI_TOKEN: ${{ secrets.CI_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
+          # Without this the first sign of a missing secret is a release that
+          # never appears, diagnosed from a curl that said nothing.
+          [ -n "$CI_TOKEN" ] || { echo "CI_TOKEN is not set" >&2; exit 1; }
+
           notes="CHANGELOG.md"
           body=$(awk "/^## \\[${TAG#v}\\]/{flag=1; next} /^## \\[/{flag=0} flag" "$notes")
 
           release=$(curl -sf -X POST \
             "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases" \
-            -H "Authorization: token ${FORGE_TOKEN}" \
+            -H "Authorization: token ${CI_TOKEN}" \
             -H 'Content-Type: application/json' \
             -d "$(jq -n --arg tag "$TAG" --arg body "$body" \
                   '{tag_name:$tag, name:$tag, body:$body, draft:true}')")
@@ -101,7 +105,7 @@ jobs:
           for file in dist/*; do
             curl -sf -X POST \
               "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases/${id}/assets?name=$(basename "$file")" \
-              -H "Authorization: token ${FORGE_TOKEN}" \
+              -H "Authorization: token ${CI_TOKEN}" \
               -F "attachment=@${file}" > /dev/null
           done
 
@@ -109,6 +113,6 @@ jobs:
           # before its assets is one somebody downloads empty.
           curl -sf -X PATCH \
             "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases/${id}" \
-            -H "Authorization: token ${FORGE_TOKEN}" \
+            -H "Authorization: token ${CI_TOKEN}" \
             -H 'Content-Type: application/json' \
             -d '{"draft": false}' > /dev/null
