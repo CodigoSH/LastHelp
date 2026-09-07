@@ -72,13 +72,53 @@ port_is_free() {
     ! ss -lntH "sport = :$1" 2>/dev/null | grep -q .
 }
 
+# Chrome does not fail loudly when its debugging port is taken: it exits, and
+# the wait below then finds somebody else's browser answering on that port and
+# drives that instead. It happened — a Chrome left over from another session
+# ran the whole check. The assertions still held, because they are about
+# LastHelp and the forge, but the script was not driving what it thought it was.
+for named in "PORT:$PORT" "CDP:$CDP"; do
+    if ! port_is_free "${named#*:}"; then
+        echo "${named%%:*}=${named#*:} is taken; set ${named%%:*} to a free port"
+        exit 2
+    fi
+done
+
 cleanup() {
     if [ -n "${CHROME_PID:-}" ]; then kill "$CHROME_PID" 2>/dev/null || true; wait "$CHROME_PID" 2>/dev/null || true; fi
     if [ -n "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; fi
     "$RUNTIME" rm -f "$CONTAINER" >/dev/null 2>&1 || true
+    # The forge's data directory is bind-mounted, and rootless podman writes it
+    # as a subordinate uid this user cannot unlink. A plain rm fails, `|| true`
+    # swallows the failure, and every run leaves the tree behind for ever.
+    # RUNTIME holds a path, not a name — comparing it to "podman" is always
+    # false, which is how the first version of this fix ran green while
+    # cleaning nothing.
+    if [ -d "$WORK/forge" ] && [ "$(basename "$RUNTIME")" = podman ]; then
+        "$RUNTIME" unshare rm -rf "$WORK/forge" >/dev/null 2>&1 || true
+    fi
     rm -rf "$WORK" 2>/dev/null || true
+    if [ -d "$WORK" ]; then
+        echo "note: could not remove $WORK — remove it by hand" >&2
+    fi
 }
 trap cleanup EXIT
+
+wait_for_local_stack() {
+    for _ in $(seq 1 80); do
+        if curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 &&
+           curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1; then return 0; fi
+        sleep 0.25
+    done
+    echo
+    echo "LastHelp or Chrome never came up:"
+    curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 || echo "    no /healthz on $PORT"
+    curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1 || echo "    no debugger on $CDP"
+    sed 's/^/    /' "$WORK/server.log" 2>/dev/null | tail -20
+    sed 's/^/    /' "$WORK/chrome.log" 2>/dev/null | tail -20
+    return 1
+}
+
 
 # GitLab is a different animal: minutes to boot, its own way of minting a token,
 # and it refuses to deliver a webhook to a local address until an administrator
@@ -154,11 +194,7 @@ if [ "$FORGE_KIND" = gitlab ]; then
         about:blank > "$WORK/chrome.log" 2>&1 &
     CHROME_PID=$!
 
-    for _ in $(seq 1 80); do
-        if curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 &&
-           curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1; then break; fi
-        sleep 0.25
-    done
+    wait_for_local_stack
 
     PORT="$PORT" CDP="$CDP" \
         FORGE_URL="http://127.0.0.1:$FORGE_PORT" \
@@ -220,11 +256,7 @@ google-chrome --headless=new --disable-gpu --no-first-run --no-default-browser-c
     about:blank > "$WORK/chrome.log" 2>&1 &
 CHROME_PID=$!
 
-for _ in $(seq 1 80); do
-    if curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 &&
-       curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1; then break; fi
-    sleep 0.25
-done
+wait_for_local_stack
 
 PORT="$PORT" CDP="$CDP" \
     FORGE_URL="http://127.0.0.1:$FORGE_PORT" \
