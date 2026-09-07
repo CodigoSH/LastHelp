@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/session"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
@@ -39,6 +42,10 @@ type Server struct {
 	// would allocate the whole stack on every hit for no reason.
 	handler http.Handler
 
+	// voterKey signs the cookie that identifies a voter. Read once at startup,
+	// generated on the first ever start.
+	voterKey []byte
+
 	// Clock is the one source of time in the HTTP layer, replaceable so a test
 	// can place a session in the past without sleeping.
 	Clock func() time.Time
@@ -58,6 +65,14 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 		assets: assets,
 		Clock:  time.Now,
 	}
+
+	// Generated on the first ever start and kept. Regenerating it would
+	// invalidate every voter identity at once — everybody could vote again on
+	// everything — and nothing would look broken.
+	if s.voterKey, err = (settings.Store{DB: db}).Secret(settings.VoterSigningKey); err != nil {
+		return nil, err
+	}
+
 	s.routes()
 	s.handler = s.wrap()
 	return s, nil
@@ -69,15 +84,47 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 // being wrapped. There is deliberately no list of public paths anywhere: this
 // file is the list, and it is the file somebody reads when they add a route.
 func (s *Server) routes() {
-	// Public: the setup screen has to be reachable before anybody exists, and
-	// signing in cannot require being signed in.
+	// --- Public -------------------------------------------------------------
+	//
+	// The setup screen has to be reachable before anybody exists, signing in
+	// cannot require being signed in, and the whole portal is public by
+	// definition: that is the product.
 	s.mux.HandleFunc("GET /api/status", s.handleStatus)
 	s.mux.HandleFunc("POST /api/setup", s.handleSetup)
 	s.mux.HandleFunc("POST /api/session", s.handleSignIn)
 
-	// Private.
-	s.mux.Handle("DELETE /api/session", middleware.RequireActor(http.HandlerFunc(s.handleSignOut)))
-	s.mux.Handle("GET /api/me", middleware.RequireActor(http.HandlerFunc(s.handleMe)))
+	s.mux.HandleFunc("GET /api/orgs", s.handleOrganizations)
+	s.mux.HandleFunc("GET /api/orgs/{org}/repos", s.handleRepositories)
+	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}", s.handleRepository)
+	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/items", s.handleListItems)
+	s.mux.HandleFunc("POST /api/orgs/{org}/repos/{repo}/items", s.handleSubmit)
+	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/similar", s.handleSimilar)
+
+	s.mux.HandleFunc("GET /api/items/{id}", s.handleItem)
+	s.mux.HandleFunc("POST /api/items/{id}/votes", s.handleVote)
+	s.mux.HandleFunc("DELETE /api/items/{id}/votes", s.handleUnvote)
+	s.mux.HandleFunc("POST /api/items/{id}/comments", s.handleComment)
+
+	// --- Private ------------------------------------------------------------
+	//
+	// Wrapped, which is the only thing that makes a route private. Every one of
+	// these then asks authz whether this particular actor may act on this
+	// particular thing — being signed in is the door, not the permission.
+	private := func(pattern string, h http.HandlerFunc) {
+		s.mux.Handle(pattern, middleware.RequireActor(h))
+	}
+
+	private("DELETE /api/session", s.handleSignOut)
+	private("GET /api/me", s.handleMe)
+
+	private("POST /api/organizations", s.handleCreateOrganization)
+	private("POST /api/orgs/{org}/repositories", s.handleCreateRepository)
+	private("GET /api/orgs/{org}/repos/{repo}/queue", s.handleQueue)
+
+	private("POST /api/items/{id}/moderation", s.handleModerate)
+	private("POST /api/items/{id}/status", s.handleSetStatus)
+	private("POST /api/items/{id}/merge", s.handleMerge)
+	private("POST /api/items/{id}/reply", s.handleReply)
 
 	// Public, and only these: the health check and the static frontend.
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
@@ -124,8 +171,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handler.ServeHTTP(w, r)
 }
 
-func (s *Server) accounts() account.Store { return account.Store{DB: s.db} }
-func (s *Server) sessions() session.Store { return session.Store{DB: s.db} }
+func (s *Server) accounts() account.Store  { return account.Store{DB: s.db} }
+func (s *Server) sessions() session.Store  { return session.Store{DB: s.db} }
+func (s *Server) orgs() org.Store          { return org.Store{DB: s.db} }
+func (s *Server) items() item.Store        { return item.Store{DB: s.db} }
+func (s *Server) settings() settings.Store { return settings.Store{DB: s.db} }
 
 func (s *Server) now() time.Time {
 	if s.Clock != nil {

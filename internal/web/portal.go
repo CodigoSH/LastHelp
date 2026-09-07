@@ -1,0 +1,409 @@
+package web
+
+import (
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
+)
+
+// reportBodyLimit is what a submission may be. Generous enough for a stack
+// trace pasted into the description, small enough that a flood costs the
+// sender something.
+const reportBodyLimit = 64 << 10
+
+// handleOrganizations lists what this instance serves. Public: it is the front
+// page of the portal.
+func (s *Server) handleOrganizations(w http.ResponseWriter, _ *http.Request) {
+	list, err := s.orgs().ListOrganizations()
+	if err != nil {
+		slog.Error("listing organisations", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	out := make([]map[string]any, 0, len(list))
+	for _, o := range list {
+		out = append(out, map[string]any{"slug": o.Slug, "name": o.Name})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"organizations": out})
+}
+
+// handleRepositories lists one organisation's repositories.
+func (s *Server) handleRepositories(w http.ResponseWriter, r *http.Request) {
+	o, ok := s.lookupOrganization(w, r)
+	if !ok {
+		return
+	}
+	list, err := s.orgs().ListRepositories(o.ID)
+	if err != nil {
+		slog.Error("listing repositories", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	out := make([]map[string]any, 0, len(list))
+	for _, repo := range list {
+		out = append(out, describeRepository(repo))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"organization": map[string]any{"slug": o.Slug, "name": o.Name},
+		"repositories": out,
+	})
+}
+
+// handleRepository describes one board: what it accepts, and therefore what the
+// form should offer.
+func (s *Server) handleRepository(w http.ResponseWriter, r *http.Request) {
+	repo, _, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+	writeJSON(w, http.StatusOK, describeRepository(repo))
+}
+
+// handleListItems is the public board.
+func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
+	repo, _, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+
+	q := r.URL.Query()
+	filter := item.Filter{
+		RepoID:     repo.ID,
+		Kind:       item.Kind(q.Get("kind")),
+		Status:     item.Status(q.Get("status")),
+		Search:     q.Get("q"),
+		SortByVote: q.Get("sort") == "votes",
+		Limit:      intParam(q.Get("limit"), 50),
+		Offset:     intParam(q.Get("offset"), 0),
+	}
+	// Moderation is deliberately not taken from the query: the public listing
+	// is published items, and the queue is a different route behind a session.
+	list, err := s.items().List(filter)
+	if err != nil {
+		slog.Error("listing items", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	voter := s.voterID(w, r)
+	out := make([]map[string]any, 0, len(list))
+	for _, it := range list {
+		out = append(out, s.describeItem(it, voter))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+}
+
+// handleSimilar is the "this looks like these" hint, asked while somebody is
+// still typing the title.
+func (s *Server) handleSimilar(w http.ResponseWriter, r *http.Request) {
+	repo, _, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+	found, err := s.items().Similar(repo.ID, r.URL.Query().Get("title"), 3)
+	if err != nil {
+		slog.Error("looking for similar items", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	out := make([]map[string]any, 0, len(found))
+	for _, it := range found {
+		out = append(out, map[string]any{
+			"public_id": it.PublicID, "title": it.Title,
+			"kind": string(it.Kind), "votes": it.VoteCount,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"similar": out})
+}
+
+type submission struct {
+	Kind   string            `json:"kind"`
+	Title  string            `json:"title"`
+	Body   string            `json:"body"`
+	Email  string            `json:"email"`
+	Fields map[string]string `json:"fields"`
+}
+
+// handleSubmit takes a report. No account, no email required.
+//
+// The follow link is returned once, here, and never again: only its hash is
+// stored, so there is nowhere to look it up from later.
+func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
+	repo, _, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, reportBodyLimit)
+	var in submission
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	kind := item.Kind(in.Kind)
+	switch {
+	case kind == item.Bug && !repo.AcceptsBugs, kind == item.Idea && !repo.AcceptsIdeas:
+		writeError(w, http.StatusBadRequest, "error.kind_not_accepted")
+		return
+	case kind != item.Bug && kind != item.Idea:
+		writeError(w, http.StatusBadRequest, "error.unknown_kind")
+		return
+	}
+
+	fields := make([]item.Field, 0, len(in.Fields))
+	for key, value := range in.Fields {
+		fields = append(fields, item.Field{Key: key, Label: key, Value: value})
+	}
+
+	// Everything waits for a human unless the repository says otherwise. The
+	// queue is the protection: nothing the public writes reaches a public page
+	// without somebody having looked at it.
+	moderation := item.Pending
+	created, token, err := s.items().Create(item.New{
+		RepoID: repo.ID, Kind: kind, Title: in.Title, Body: in.Body,
+		Email: in.Email, Fields: fields,
+	}, moderation, s.now())
+	if err != nil {
+		if errors.Is(err, item.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "error.not_found")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "error.invalid_report")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"public_id": created.PublicID,
+		// Shown once. Only the hash is stored, so this is the only moment it
+		// exists anywhere outside the reporter's browser.
+		"follow_token": token,
+		"moderation":   string(created.Moderation),
+	})
+}
+
+// handleItem shows one item and its published thread.
+//
+// A follow token in the query is what lets a reporter see their own submission
+// while it is still waiting, and nothing else: it does not reveal anybody
+// else's, and it is compared against the stored hash in constant time.
+func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
+	publicID := r.PathValue("id")
+	store := s.items()
+
+	it, err := store.ByPublicID(publicID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+
+	mine := false
+	if token := r.URL.Query().Get("k"); token != "" {
+		if _, err := store.CheckFollowToken(publicID, token); err == nil {
+			mine = true
+		}
+	}
+
+	if it.Moderation != item.Published && !mine {
+		// Not "it is waiting for review": an unauthenticated caller learns
+		// nothing about what exists and is not public yet.
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+
+	comments, err := store.Comments(it.ID, item.Published)
+	if err != nil {
+		slog.Error("reading the thread", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	thread := make([]map[string]any, 0, len(comments))
+	for _, c := range comments {
+		thread = append(thread, map[string]any{
+			"author":     string(c.Author),
+			"name":       c.AuthorRef,
+			"body":       c.Body,
+			"created_at": c.CreatedAt.Unix(),
+		})
+	}
+
+	body := s.describeItem(it, s.voterID(w, r))
+	body["body"] = it.Body
+	body["comments"] = thread
+	body["mine"] = mine
+	if it.MergedInto != 0 {
+		if survivor, err := store.ByID(it.MergedInto); err == nil {
+			body["merged_into"] = survivor.PublicID
+		}
+	}
+	writeJSON(w, http.StatusOK, body)
+}
+
+// handleVote records a vote for an idea.
+func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
+	it, ok := s.lookupItem(w, r)
+	if !ok {
+		return
+	}
+	voter := s.voterID(w, r)
+	if voter == "" {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	err := s.items().Vote(it.ID, voter, s.now())
+	switch {
+	case errors.Is(err, item.ErrAlreadyVoted):
+		// Not a failure: the vote is there, which is what they wanted.
+	case errors.Is(err, item.ErrNotVotable):
+		writeError(w, http.StatusBadRequest, "error.not_votable")
+		return
+	case err != nil:
+		slog.Error("voting", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	s.writeVoteState(w, it.ID, voter)
+}
+
+// handleUnvote takes a vote back.
+func (s *Server) handleUnvote(w http.ResponseWriter, r *http.Request) {
+	it, ok := s.lookupItem(w, r)
+	if !ok {
+		return
+	}
+	voter := s.voterID(w, r)
+	if err := s.items().Unvote(it.ID, voter); err != nil {
+		slog.Error("removing a vote", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	s.writeVoteState(w, it.ID, voter)
+}
+
+func (s *Server) writeVoteState(w http.ResponseWriter, itemID int64, voter string) {
+	fresh, err := s.items().ByID(itemID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	voted, err := s.items().HasVoted(itemID, voter)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"votes": fresh.VoteCount, "voted": voted})
+}
+
+type newComment struct {
+	Body  string `json:"body"`
+	Token string `json:"token"`
+}
+
+// handleComment adds a message to a thread.
+//
+// A reporter with their follow token is recognised as the reporter; anybody
+// else is a visitor. Neither is published without review — the token proves who
+// somebody is, not that what they wrote belongs on a public page.
+func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
+	it, ok := s.lookupItem(w, r)
+	if !ok {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, reportBodyLimit)
+	var in newComment
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	author := item.AuthorVisitor
+	if in.Token != "" {
+		if _, err := s.items().CheckFollowToken(it.PublicID, in.Token); err == nil {
+			author = item.AuthorReporter
+		}
+	}
+
+	if _, err := s.items().Comment(it.ID, author, "", in.Body, s.now()); err != nil {
+		writeError(w, http.StatusBadRequest, "error.invalid_comment")
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"moderation": string(item.Pending)})
+}
+
+// --- shared lookups --------------------------------------------------------
+
+func (s *Server) lookupOrganization(w http.ResponseWriter, r *http.Request) (org.Organization, bool) {
+	o, err := s.orgs().OrganizationBySlug(r.PathValue("org"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return org.Organization{}, false
+	}
+	return o, true
+}
+
+func (s *Server) lookupRepository(w http.ResponseWriter, r *http.Request) (org.Repository, org.Organization, bool) {
+	o, ok := s.lookupOrganization(w, r)
+	if !ok {
+		return org.Repository{}, org.Organization{}, false
+	}
+	repo, err := s.orgs().RepositoryBySlugs(o.Slug, r.PathValue("repo"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return org.Repository{}, org.Organization{}, false
+	}
+	return repo, o, true
+}
+
+func (s *Server) lookupItem(w http.ResponseWriter, r *http.Request) (item.Item, bool) {
+	it, err := s.items().ByPublicID(r.PathValue("id"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return item.Item{}, false
+	}
+	return it, true
+}
+
+func describeRepository(r org.Repository) map[string]any {
+	return map[string]any{
+		"slug":          r.Slug,
+		"name":          r.Name,
+		"accepts_bugs":  r.AcceptsBugs,
+		"accepts_ideas": r.AcceptsIdeas,
+	}
+}
+
+func (s *Server) describeItem(it item.Item, voter string) map[string]any {
+	voted := false
+	if voter != "" && it.Kind == item.Idea {
+		voted, _ = s.items().HasVoted(it.ID, voter)
+	}
+	return map[string]any{
+		"public_id":  it.PublicID,
+		"kind":       string(it.Kind),
+		"title":      it.Title,
+		"status":     string(it.Status),
+		"votes":      it.VoteCount,
+		"voted":      voted,
+		"created_at": it.CreatedAt.Unix(),
+	}
+}
+
+func intParam(raw string, fallback int) int {
+	if raw == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return fallback
+	}
+	return n
+}

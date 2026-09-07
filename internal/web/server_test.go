@@ -2,12 +2,14 @@ package web
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
@@ -18,9 +20,11 @@ import (
 // the only way to check the things that only exist at this level: cookies,
 // headers, and whether a route is actually behind the door.
 type instance struct {
-	t      *testing.T
-	server *httptest.Server
-	client *http.Client
+	t        *testing.T
+	server   *httptest.Server
+	client   *http.Client
+	dbHandle *sql.DB
+	clock    func() time.Time
 }
 
 func newInstance(t *testing.T) *instance {
@@ -45,11 +49,19 @@ func newInstance(t *testing.T) *instance {
 		t.Fatal(err)
 	}
 	return &instance{
-		t:      t,
-		server: httpSrv,
-		client: &http.Client{Jar: jar},
+		t:        t,
+		server:   httpSrv,
+		client:   &http.Client{Jar: jar},
+		dbHandle: db,
+		clock:    srv.now,
 	}
 }
+
+// db and now let a test set up state the API has no route for yet — granting
+// somebody a role, for instance — without reaching for a second database
+// connection with its own view of the file.
+func (i *instance) db() *sql.DB    { return i.dbHandle }
+func (i *instance) now() time.Time { return i.clock() }
 
 // do sends a request the way the page would: same-origin, with the CSRF token
 // echoed back from the cookie.
