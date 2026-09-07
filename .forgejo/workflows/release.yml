@@ -25,6 +25,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # See ci.yml: the label lands on a 2021 Debian image by default. Pinned so
+    # what the release is built and published on is a decision in the diff.
+    container: node:22-bookworm
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,14 +96,19 @@ jobs:
           notes="CHANGELOG.md"
           body=$(awk "/^## \\[${TAG#v}\\]/{flag=1; next} /^## \\[/{flag=0} flag" "$notes")
 
+          # python3, not jq: jq is in neither the bullseye nor the bookworm
+          # image, and this step had never run — the first release would have
+          # died on `jq: command not found` with the tag already pushed.
+          payload=$(TAG="$TAG" BODY="$body" python3 -c 'import json, os; print(json.dumps({"tag_name": os.environ["TAG"], "name": os.environ["TAG"], "body": os.environ["BODY"], "draft": True}))')
+
           release=$(curl -sf -X POST \
             "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases" \
             -H "Authorization: token ${CI_TOKEN}" \
             -H 'Content-Type: application/json' \
-            -d "$(jq -n --arg tag "$TAG" --arg body "$body" \
-                  '{tag_name:$tag, name:$tag, body:$body, draft:true}')")
+            -d "$payload")
 
-          id=$(echo "$release" | jq -r .id)
+          id=$(echo "$release" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          [ -n "$id" ] || { echo "the forge did not return a release id" >&2; exit 1; }
 
           for file in dist/*; do
             curl -sf -X POST \
