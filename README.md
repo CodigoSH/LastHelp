@@ -44,7 +44,8 @@ account and no configuration at all, or leave an email if a relay is set up:
 that address is stored encrypted, is visible only to the team, and is deleted
 when the item closes.
 
-Not there yet: Bitbucket, and the public documentation under docs/.
+Not there yet: Bitbucket, and a first release — there is no tag, so there are no
+binaries to download and no signing key in `internal/version/keys.go` yet.
 
 ## Why it exists
 
@@ -72,11 +73,20 @@ Requires Go and [bun](https://bun.sh).
 ```sh
 make build     # frontend + binaries into bin/
 make run       # build and run
-make test      # go test, the architecture rules, bun test
+make test      # go test and the architecture rules
+make drive     # walk the whole journey in a real browser
+make shots     # regenerate the documentation screenshots
 ```
 
-The frontend is stamped with a digest of its own output, so two builds of the
-same commit produce the same bytes.
+The frontend is stamped with a digest of its own output, and the release
+binaries are built with `-trimpath` and `CGO_ENABLED=0`, so two builds of the
+same commit produce the same bytes — see [SECURITY.md](SECURITY.md) for how to
+check that yourself.
+
+## Documentation
+
+[docs/](docs/) — installing, your first board, connecting a forge, notifications,
+and keeping the queue readable.
 
 ## License
 

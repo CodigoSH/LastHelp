@@ -191,8 +191,17 @@ func TestLayering(t *testing.T) {
 func TestOnlyConfigReadsTheEnvironment(t *testing.T) {
 	const gate = "internal/platform/config"
 
+	// cmd/sign is not the server. It is a build-time tool that runs in CI, and
+	// the one thing it reads is the signing secret — which is not an operator
+	// setting, does not belong in .env.example, and must never be readable from
+	// anything that ships.
+	//
+	// Named here rather than left to the rule, so that the next thing added to
+	// cmd/ has to argue for itself instead of inheriting an exemption.
+	exempt := []string{"cmd/sign"}
+
 	for _, f := range loadSources(t) {
-		if f.pkg == gate || strings.HasSuffix(f.path, "_test.go") {
+		if f.pkg == gate || strings.HasSuffix(f.path, "_test.go") || under(f.pkg, exempt) {
 			continue
 		}
 		src := f.render(t)

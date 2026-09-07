@@ -1,0 +1,114 @@
+# Builds, signs and publishes a release when a v* tag is pushed.
+#
+# Only tags. Nothing here runs on a branch, so a release is always something
+# somebody chose to cut rather than something a merge caused.
+#
+# The build is scripts/build-artefacts.sh, not a copy of it. A workflow that
+# rebuilt that by hand would be a second implementation of the release and the
+# two would drift — and that script is also what an outsider runs to check that
+# the published binaries match the published source.
+#
+# Signing is not optional. A release nobody can verify is worse than no release:
+# it teaches people that the signature is decoration.
+#
+# The signing key lives in a repository secret, which is to say on a server, and
+# that is a real trade made knowingly. The alternative is a human at a terminal
+# for every release, and a release nobody can cut is a fix nobody receives.
+# Losing the secret costs a release; losing the key costs every future update.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The suite before anything is published. A tag can be deleted; a release
+      # people have already downloaded cannot.
+      - name: preflight
+        run: |
+          bun install --frozen-lockfile
+          test -z "$(gofmt -l ./cmd ./internal)"
+          go vet ./...
+          go test -count=1 ./internal/arch/
+          bun run build
+          go test -count=1 -race ./...
+          bun run typecheck
+          bun run i18n:sync
+
+      - name: build
+        env:
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: ./scripts/build-artefacts.sh
+
+      # Built twice and compared, because "rebuild it and compare the hashes" is
+      # written in SECURITY.md and a promise nobody executes is a promise that
+      # quietly stops being true.
+      - name: the build is reproducible
+        env:
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          cp dist/SHA256SUMS /tmp/first.sums
+          OUT=dist2 ./scripts/build-artefacts.sh >/dev/null
+          if ! diff <(sed 's|dist2/||' dist2/SHA256SUMS) /tmp/first.sums; then
+            echo "two builds of the same commit produced different bytes."
+            echo "SECURITY.md tells people they can rebuild and compare; that has to be true."
+            exit 1
+          fi
+          rm -rf dist2
+
+      - name: sign the checksums
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+        run: |
+          go run ./cmd/sign sign dist/SHA256SUMS
+          test -s dist/SHA256SUMS.sig
+
+      - name: publish
+        env:
+          FORGE_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          notes="CHANGELOG.md"
+          body=$(awk "/^## \\[${TAG#v}\\]/{flag=1; next} /^## \\[/{flag=0} flag" "$notes")
+
+          release=$(curl -sf -X POST \
+            "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases" \
+            -H "Authorization: token ${FORGE_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg tag "$TAG" --arg body "$body" \
+                  '{tag_name:$tag, name:$tag, body:$body, draft:true}')")
+
+          id=$(echo "$release" | jq -r .id)
+
+          for file in dist/*; do
+            curl -sf -X POST \
+              "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases/${id}/assets?name=$(basename "$file")" \
+              -H "Authorization: token ${FORGE_TOKEN}" \
+              -F "attachment=@${file}" > /dev/null
+          done
+
+          # Published last, once every file is attached. A release that appears
+          # before its assets is one somebody downloads empty.
+          curl -sf -X PATCH \
+            "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases/${id}" \
+            -H "Authorization: token ${FORGE_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d '{"draft": false}' > /dev/null

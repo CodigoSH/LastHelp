@@ -81,8 +81,17 @@ Releases are published directly by us, with no intermediary.
   downloaded would be a key an attacker could substitute.
 - Builds are reproducible: `-trimpath`, `CGO_ENABLED=0`, pinned `GOOS`/`GOARCH`,
   and a frontend stamp derived from the build's own output rather than the
-  clock. Two builds of the same commit produce the same bytes, so you can
-  rebuild a release yourself and compare hashes.
+  clock. Two builds of the same commit produce the same bytes:
+
+  ```sh
+  git checkout <tag>
+  VERSION=<tag> ./scripts/build-artefacts.sh
+  sha256sum -c dist/SHA256SUMS
+  ```
+
+  That is the same script our CI runs, and the release workflow builds twice and
+  compares before publishing — because a promise nobody executes is one that
+  quietly stops being true.
 
 ## Supported versions
 

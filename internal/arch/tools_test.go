@@ -1,6 +1,8 @@
 package arch
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -60,5 +62,45 @@ func TestEveryAdapterUsesTheGate(t *testing.T) {
 	}
 	if !seen {
 		t.Error("no adapter files were read; this rule is checking nothing")
+	}
+}
+
+// TestTheSigningToolStaysOutOfWhatWeShip.
+//
+// cmd/sign holds the code that turns a private key into a signature. It is a
+// separate binary and must stay one: reachable from the server, it is a signing
+// tool on every user's machine, and the only thing standing between somebody
+// with the binary and a release that looks like ours is the key — which is one
+// mistake away from being somewhere it can be read.
+func TestTheSigningToolStaysOutOfWhatWeShip(t *testing.T) {
+	for _, f := range loadSources(t) {
+		if strings.HasSuffix(f.path, "_test.go") || under(f.pkg, []string{"cmd/sign"}) {
+			continue
+		}
+		for _, imp := range f.imports() {
+			if under(imp, []string{"cmd/sign"}) {
+				t.Errorf("\n%s imports %s\n\n"+
+					"The signing tool is a separate binary. Inside the server it ships to every "+
+					"user, and what stands between them and a release that looks like ours "+
+					"becomes the key alone.", f.path, imp)
+			}
+		}
+	}
+}
+
+// TestTheReleaseKeysAreAList.
+//
+// A binary verifies only with the keys it was built with. Replacing the key
+// rather than appending leaves everybody on an older version unable to verify
+// anything — exactly the people who most need to update — and the mistake is
+// invisible until somebody tries.
+func TestTheReleaseKeysAreAList(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join(repoRoot(t), "internal/version/keys.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(source), "ReleaseKeys = []string{") {
+		t.Error("ReleaseKeys is no longer a list; rotation has to be overlapping, so there " +
+			"has to be room for two keys at once")
 	}
 }

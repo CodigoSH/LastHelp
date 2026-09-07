@@ -112,10 +112,12 @@ PREFLIGHT=(
     "gofmt|test -z \"\$(gofmt -l ./cmd ./internal)\""
     "go vet|go vet ./..."
     "architecture rules|go test -count=1 ./internal/arch/"
-    "go test -race|go test -count=1 -race ./..."
     "bun install|bun install --frozen-lockfile"
-    "typecheck|bun run typecheck"
     "frontend build|bun run build"
+    "go test -race|go test -count=1 -race ./..."
+    "typecheck|bun run typecheck"
+    "i18n:sync|bun run i18n:sync"
+    "i18n:scan|bun run i18n:scan"
 )
 
 # --- Everything below is the same in every CodigoSH project ---------------
