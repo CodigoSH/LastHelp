@@ -37,6 +37,10 @@ THIRD-PARTY COMPONENTS
      github.com/remyoudompheng/bigfft    BSD 3-Clause
      golang.org/x/sys                    BSD 3-Clause
 
+   Password hashing (argon2id):
+
+     golang.org/x/crypto                 BSD 3-Clause
+
    Everything else this binary does uses the Go standard library.
 
 2. Build-time only, not redistributed
