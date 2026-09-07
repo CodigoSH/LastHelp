@@ -251,6 +251,29 @@ NEW_TAG="v$NEW_VERSION"
 # computed version is the one already tagged.
 if [ -n "$FORCED_VERSION" ]; then
     NEW_VERSION="$FORCED_VERSION"
+
+    # The channel still decides the suffix. Taking the number literally means
+    # `release.sh beta 1.0.0` prepares the tag v1.0.0 — a stable tag, cut on the
+    # beta channel, from a command that says beta in it. The number given is the
+    # base; if it already carries a suffix it is used as written.
+    case "$NEW_VERSION" in
+        *-Beta.*|*-RC.*) ;;
+        *)
+            case "$TYPE" in
+                beta) NEW_VERSION="$NEW_VERSION-Beta.01" ;;
+                rc)   NEW_VERSION="$NEW_VERSION-RC.01" ;;
+            esac
+            ;;
+    esac
+
+    # And the contradiction in the other direction is a mistake, not a default.
+    if [ "$TYPE" = stable ]; then
+        case "$NEW_VERSION" in
+            *-Beta.*|*-RC.*)
+                die "Asked for a stable release of $NEW_VERSION. Drop the suffix, or use the matching channel." ;;
+        esac
+    fi
+
     NEW_TAG="v$NEW_VERSION"
     echo "ℹ️  Version given on the command line: $NEW_VERSION"
 fi
