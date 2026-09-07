@@ -96,6 +96,22 @@ That is also why there is no generic verifier anywhere in this codebase: one
 that hashed the body would reject GitLab outright, and one written to be lenient
 would accept what it could not check.
 
+## What has been checked against a real forge
+
+Forgejo and Gitea are walked end to end against a real instance in a container,
+by `make live-forge`: LastHelp creates the issue, the forge signs a webhook with
+its own code, our receiver verifies it, and closing the issue there closes the
+item here.
+
+That check also verifies the token scope this page tells you to create: LastHelp
+is handed one with **only `write:issue`** and the whole journey works with it.
+Adding the webhook needs more, which is why a person does that part in the
+forge's own settings.
+
+GitHub and GitLab are covered by tests against a fake that signs the way each of
+them documents, which is weaker: a fake written by the same hands as the adapter
+can be wrong in the same way and agree.
+
 ## Running without a forge
 
 Set `forge` to `none`, or simply do not add credentials. Everything except
