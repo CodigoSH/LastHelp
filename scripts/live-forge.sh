@@ -24,7 +24,8 @@ PASSWORD="a good long passphrase"
 case "$FORGE_KIND" in
     forgejo) IMAGE="codeberg.org/forgejo/forgejo:11"; ENV_PREFIX=FORGEJO; BIN=forgejo ;;
     gitea)   IMAGE="docker.io/gitea/gitea:1";         ENV_PREFIX=GITEA;   BIN=gitea ;;
-    *) echo "FORGE_KIND must be forgejo or gitea"; exit 2 ;;
+    gitlab)  IMAGE="docker.io/gitlab/gitlab-ce:latest" ;;
+    *) echo "FORGE_KIND must be forgejo, gitea or gitlab"; exit 2 ;;
 esac
 
 RUNTIME="$(command -v podman || command -v docker || true)"
@@ -40,6 +41,64 @@ cleanup() {
     rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
+
+# GitLab is a different animal: minutes to boot, its own way of minting a token,
+# and it refuses to deliver a webhook to a local address until an administrator
+# says otherwise. All of that is set up here rather than left to the person
+# running this, because a check nobody can run is a check nobody runs.
+if [ "$FORGE_KIND" = gitlab ]; then
+    echo "==> starting gitlab (this takes several minutes)"
+    "$RUNTIME" rm -f "$CONTAINER" >/dev/null 2>&1 || true
+    "$RUNTIME" run -d --name "$CONTAINER" --network=host --shm-size=256m \
+        -e GITLAB_OMNIBUS_CONFIG="external_url 'http://127.0.0.1:$FORGE_PORT'; gitlab_rails['initial_root_password'] = '$PASSWORD'; puma['worker_processes'] = 2; sidekiq['max_concurrency'] = 5; prometheus_monitoring['enable'] = false;" \
+        "$IMAGE" >/dev/null
+
+    for _ in $(seq 1 900); do
+        curl -sf "http://127.0.0.1:$FORGE_PORT/-/readiness" >/dev/null 2>&1 && break
+        sleep 2
+    done
+    echo "    up"
+
+    echo "==> minting tokens and allowing local webhooks"
+    # Without this GitLab refuses to deliver to 127.0.0.1, which would look
+    # exactly like our receiver rejecting the delivery.
+    "$RUNTIME" exec "$CONTAINER" gitlab-rails runner \
+        "ApplicationSetting.current.update!(allow_local_requests_from_web_hooks_and_services: true)" >/dev/null 2>&1
+
+    SETUP_TOKEN="$("$RUNTIME" exec "$CONTAINER" gitlab-rails runner \
+        "t = User.find_by_username('root').personal_access_tokens.create!(scopes: ['api'], name: 'setup', expires_at: 1.year.from_now); t.set_token('glpat-lasthelpsetup00000'); t.save!; puts t.token" 2>/dev/null | tail -1)"
+    ISSUE_TOKEN="$SETUP_TOKEN"
+
+    PROJECT="$(curl -s -X POST "http://127.0.0.1:$FORGE_PORT/api/v4/projects" \
+        -H "PRIVATE-TOKEN: $SETUP_TOKEN" -H 'Content-Type: application/json' \
+        -d '{"name":"lastboard","path":"lastboard","visibility":"public","issues_enabled":true}' |
+        python3 -c "import sys,json;print(json.load(sys.stdin).get('path_with_namespace',''))" 2>/dev/null)"
+    echo "    project: $PROJECT"
+
+    echo "==> starting LastHelp"
+    LASTHELP_PORT="$PORT" LASTHELP_DB_FILE="$WORK/live.db" \
+        LASTHELP_PUBLIC_URL="http://127.0.0.1:$PORT" \
+        ./bin/lasthelp > "$WORK/server.log" 2>&1 &
+    SERVER_PID=$!
+
+    google-chrome --headless=new --disable-gpu --no-first-run --no-default-browser-check \
+        --remote-debugging-port="$CDP" --user-data-dir="$WORK/profile" \
+        about:blank > "$WORK/chrome.log" 2>&1 &
+    CHROME_PID=$!
+
+    for _ in $(seq 1 80); do
+        if curl -sf "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 &&
+           curl -sf "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1; then break; fi
+        sleep 0.25
+    done
+
+    PORT="$PORT" CDP="$CDP" \
+        FORGE_URL="http://127.0.0.1:$FORGE_PORT" \
+        FORGE_TOKEN="$ISSUE_TOKEN" FORGE_OPERATOR_TOKEN="$SETUP_TOKEN" \
+        FORGE_KIND=gitlab FORGE_OWNER=root FORGE_REPO=lastboard \
+        bun run scripts/live-forge-check.ts
+    exit $?
+fi
 
 echo "==> starting $FORGE_KIND"
 "$RUNTIME" rm -f "$CONTAINER" >/dev/null 2>&1 || true

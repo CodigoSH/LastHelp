@@ -24,6 +24,13 @@ people who cannot open an account on your forge, and it is itself developed on a
 forge where you cannot open an account. That is exactly the problem it exists to
 fix, and it will be fixed here first.
 
+If you run a forge we do not test against — a self-managed GitLab, GitHub
+Enterprise Server, an older Gitea — and something about it surprises us, that is
+the most valuable report this project can get. `make live-forge` walks the whole
+bridge against a real Forgejo or Gitea in a container; GitHub and GitLab are
+covered only by a test double, and a double written by the same hands as the
+adapter can be wrong in the same way and agree.
+
 What is most useful to report, for this project in particular:
 
 - **A forge that behaves differently from what we assumed.** The four we support

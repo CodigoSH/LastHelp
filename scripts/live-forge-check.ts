@@ -40,11 +40,24 @@ const check = (label: string, ok: boolean, detail = "") => {
   if (!ok) failed = true;
 };
 
+const isGitLab = KIND === "gitlab";
+
+/**
+ * The forge's own API, in its own dialect.
+ *
+ * The three disagree about the header, the path shape and the vocabulary — a
+ * GitLab project path is escaped into the URL, and closing an issue there is
+ * `state_event: "close"` rather than `state: "closed"`. Absorbing that here
+ * rather than writing three scripts is the same trade the adapters make.
+ */
 const forgeAPI = async (path: string, init: RequestInit = {}, asOperator = false) => {
-  const res = await fetch(`${FORGE}/api/v1${path}`, {
+  const token = asOperator ? OPERATOR_TOKEN : FORGE_TOKEN;
+  const url = isGitLab ? `${FORGE}/api/v4${path}` : `${FORGE}/api/v1${path}`;
+
+  const res = await fetch(url, {
     ...init,
     headers: {
-      "Authorization": `token ${asOperator ? OPERATOR_TOKEN : FORGE_TOKEN}`,
+      ...(isGitLab ? { "PRIVATE-TOKEN": token } : { "Authorization": `token ${token}` }),
       "Content-Type": "application/json",
       ...(init.headers ?? {}),
     },
@@ -52,6 +65,14 @@ const forgeAPI = async (path: string, init: RequestInit = {}, asOperator = false
   const text = await res.text();
   return { status: res.status, body: text ? JSON.parse(text) : null };
 };
+
+/** Where this forge keeps a project's issues. */
+const project = isGitLab
+  ? `/projects/${encodeURIComponent(`${FORGE_OWNER}/${FORGE_REPO}`)}`
+  : `/repos/${FORGE_OWNER}/${FORGE_REPO}`;
+
+/** The issue number people see. GitLab sends both, and only one is right. */
+const numberOf = (issue: any) => (isGitLab ? issue.iid : issue.number);
 
 async function target(url: string) {
   const res = await fetch(`http://127.0.0.1:${CDP}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
@@ -137,14 +158,18 @@ check("the instance is connected to the forge", Boolean(setup?.webhook_path), se
 
 // --- the forge delivers to us ----------------------------------------------
 const hookURL = `${BASE}${setup.webhook_path}`;
-const hook = await forgeAPI(`/repos/${FORGE_OWNER}/${FORGE_REPO}/hooks`, {
+const hook = await forgeAPI(`${project}/hooks`, {
   method: "POST",
-  body: JSON.stringify({
-    type: KIND === "gitea" ? "gitea" : "forgejo",
-    active: true,
-    events: ["issues"],
-    config: { url: hookURL, content_type: "json", secret: SECRET },
-  }),
+  body: JSON.stringify(
+    isGitLab
+      ? { url: hookURL, issues_events: true, push_events: false, token: SECRET }
+      : {
+          type: KIND === "gitea" ? "gitea" : "forgejo",
+          active: true,
+          events: ["issues"],
+          config: { url: hookURL, content_type: "json", secret: SECRET },
+        },
+  ),
 }, true);
 check("the forge accepted a webhook pointing here", hook.status === 201, `HTTP ${hook.status}`);
 
@@ -183,11 +208,11 @@ console.log("  … waiting for the queue to drain");
 let issue: any = null;
 for (let attempt = 0; attempt < 20; attempt++) {
   await sleep(2000);
-  const list = await forgeAPI(`/repos/${FORGE_OWNER}/${FORGE_REPO}/issues?state=all`);
+  const list = await forgeAPI(`${project}/issues${isGitLab ? "" : "?state=all"}`);
   issue = (list.body ?? []).find((i: any) => i.title === "Crashes when importing a folder");
   if (issue) break;
 }
-check("the issue really exists on the forge", Boolean(issue), issue ? `#${issue.number}` : "never appeared");
+check("the issue really exists on the forge", Boolean(issue), issue ? `#${numberOf(issue)}` : "never appeared");
 
 if (issue) {
   check(
@@ -202,9 +227,9 @@ if (issue) {
   );
 
   // --- and now the direction nothing else can test -------------------------
-  const closed = await forgeAPI(`/repos/${FORGE_OWNER}/${FORGE_REPO}/issues/${issue.number}`, {
-    method: "PATCH",
-    body: JSON.stringify({ state: "closed" }),
+  const closed = await forgeAPI(`${project}/issues/${numberOf(issue)}`, {
+    method: isGitLab ? "PUT" : "PATCH",
+    body: JSON.stringify(isGitLab ? { state_event: "close" } : { state: "closed" }),
   });
   check("the issue was closed on the forge", closed.status === 201 || closed.status === 200, `HTTP ${closed.status}`);
 
@@ -229,12 +254,25 @@ if (issue) {
   // Delivered by the forge, verified by us. If the header name, the algorithm
   // or the bytes we sign over were wrong, the delivery would have been refused
   // and the status above would still be "new".
-  const hooks = await forgeAPI(`/repos/${FORGE_OWNER}/${FORGE_REPO}/hooks`, {}, true);
+  const hooks = await forgeAPI(`${project}/hooks`, {}, true);
   check(
-    "the webhook is still active on the forge",
-    Array.isArray(hooks.body) && hooks.body.length > 0 && hooks.body[0].active === true,
+    "the webhook is still there on the forge",
+    Array.isArray(hooks.body) && hooks.body.length > 0,
     `${(hooks.body ?? []).length} hook(s)`,
   );
+
+  // GitLab's own record of what it sent. If our receiver had refused the
+  // delivery — wrong header, wrong algorithm, wrong bytes — the forge would
+  // have recorded the failure, and the status check above would have been the
+  // only sign.
+  if (isGitLab && hooks.body?.[0]) {
+    const detail = await forgeAPI(`${project}/hooks/${hooks.body[0].id}`, {}, true);
+    check(
+      "the forge did not record a failed delivery",
+      !detail.body?.disabled_until && detail.body?.alert_status !== "disabled",
+      String(detail.body?.alert_status ?? "no status"),
+    );
+  }
 }
 
 await fetch(`http://127.0.0.1:${CDP}/json/close/${(await target("about:blank")).id}`).catch(() => undefined);
