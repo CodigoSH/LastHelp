@@ -47,19 +47,32 @@ func keygen() {
 		fail("generating a key: %v", err)
 	}
 
-	fmt.Println("Private key — put this in the CI secret RELEASE_SIGNING_KEY.")
-	fmt.Println("It never goes near the download server, and never into this repository.")
+	// Both keys are base64 and both end in "=", so the only thing telling them
+	// apart used to be a paragraph of prose above each one — and by the time you
+	// reached the key you had lost track of which was which. The operator who
+	// asked for this said so. Each key now carries its label on its own line,
+	// directly above it, and the explanation comes after both.
 	fmt.Println()
+	fmt.Println("=== SECRET — the CI secret RELEASE_SIGNING_KEY (the long one) ===")
 	fmt.Println(base64.StdEncoding.EncodeToString(private))
 	fmt.Println()
-	fmt.Println("Public key — APPEND it to BOTH of these, or half the release is unverifiable:")
-	fmt.Println("  internal/version/keys.go   ReleaseKeys   (the binary, so it can update itself)")
-	fmt.Println("  install.sh                 RELEASE_KEYS  (the installer, so a first install works)")
-	fmt.Println()
-	fmt.Println("Append, never replace: a binary verifies only with the keys it was built")
-	fmt.Println("with, so replacing leaves everybody on an older version unable to verify.")
-	fmt.Println()
+	fmt.Println("=== PUBLIC — goes in the repository (the short one) ===")
 	fmt.Println(base64.StdEncoding.EncodeToString(public))
+	fmt.Println()
+	fmt.Println("What to do with them:")
+	fmt.Println()
+	fmt.Println("  SECRET  Settings → Actions → Secrets, as RELEASE_SIGNING_KEY.")
+	fmt.Println("          Never in this repository, never on the download server.")
+	fmt.Println("          Keep a copy somewhere safe: losing it means you cannot")
+	fmt.Println("          sign with this key again, and rotation takes three releases.")
+	fmt.Println()
+	fmt.Println("  PUBLIC  APPEND it to BOTH of these, or half the release is unverifiable:")
+	fmt.Println("            internal/version/keys.go  ReleaseKeys   so the binary can update itself")
+	fmt.Println("            install.sh                RELEASE_KEYS  so a first install works")
+	fmt.Println()
+	fmt.Println("          Append, never replace: a binary verifies only with the keys it")
+	fmt.Println("          was built with, so replacing leaves everybody on an older")
+	fmt.Println("          version unable to verify. `make test` fails if you do only one.")
 }
 
 func sign(path string) {
