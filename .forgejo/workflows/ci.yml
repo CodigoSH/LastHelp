@@ -48,6 +48,14 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum
 
+      # Before anything that compiles Go. The binary embeds internal/web/dist,
+      # which is build output and therefore not in the repository, so on a fresh
+      # checkout `go vet` fails with "pattern all:dist: no matching files found"
+      # — a message about embedding that reads like a broken build. Locally it
+      # never happens, because the directory is left over from the last build.
+      - name: frontend build
+        run: bun run build
+
       - name: go vet
         run: go vet ./...
 
@@ -56,9 +64,6 @@ jobs:
       # nothing.
       - name: architecture rules
         run: go test -count=1 ./internal/arch/
-
-      - name: frontend build
-        run: bun run build
 
       - name: typecheck
         run: bun run typecheck
