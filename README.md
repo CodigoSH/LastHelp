@@ -36,7 +36,15 @@ one that already exists, which is what a project with four thousand open issues
 actually needs — and when that issue is closed or reopened, the item follows.
 That is what makes the roadmap something nobody has to maintain.
 
-Not there yet: the notification channels, and Bitbucket.
+Notifications work in both directions they need to. The team is told something
+arrived — ntfy, Gotify, a generic webhook, or mail — configured per board, so a
+group can send one board to one room and another somewhere else. Whoever
+reported something can follow the board's Atom feed, which needs no address, no
+account and no configuration at all, or leave an email if a relay is set up:
+that address is stored encrypted, is visible only to the team, and is deleted
+when the item closes.
+
+Not there yet: Bitbucket, and the public documentation under docs/.
 
 ## Why it exists
 

@@ -59,8 +59,16 @@ assumptions apply, and keeping them apart is most of the design:
 - **No third parties.** No CDN, no captcha service, no AI provider. What people
   write in your portal reaches your database and nowhere else.
 - **No account for the public.** We cannot leak a password database we do not
-  have. An email address is stored only if a reporter asked to be notified, is
-  visible only to your team, and is deleted when the item closes.
+  have. An email address is stored only if a reporter asked to be notified — and
+  the field is not even offered unless a mail relay is configured, because
+  collecting an address nothing can use is collecting personal data for nothing.
+  It is encrypted with the same key as the forge credentials, is never returned
+  by any endpoint, and is deleted when the item closes. That last part is a
+  test, not a sentence.
+
+- **The feed asks for nothing.** Following a board over Atom stores nothing
+  about you: no address, no account, no subscription. It is the notification
+  channel this product leans on for exactly that reason.
 
 ## Secure update delivery
 

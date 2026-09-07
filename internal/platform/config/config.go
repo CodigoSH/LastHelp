@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/mail"
 )
 
 // Config is the whole of what the environment can say to this binary.
@@ -39,6 +41,15 @@ type Config struct {
 	// and a key that travelled with it would make the encryption decorative.
 	KeyFile string
 
+	// PublicURL is where this instance is reachable from outside, used to build
+	// the links in notifications and follow-up mail. Nothing breaks without it;
+	// the links are simply omitted, which is worse and honest.
+	PublicURL string
+
+	// Mail is the optional relay. With no host configured the notify-me
+	// checkbox never appears, rather than promising mail that will not arrive.
+	Mail mail.Config
+
 	// Offline stops every outbound connection this binary can make. It exists
 	// so the claim in SECURITY.md — that the only connections are the forge and
 	// the notification channel the operator configured — is something an
@@ -59,6 +70,15 @@ func Load() Config {
 		TrustProxy:     boolean("LASTHELP_TRUST_PROXY", false),
 		TrustProxyHops: hops(),
 		Offline:        boolean("LASTHELP_OFFLINE", false),
+		PublicURL:      str("LASTHELP_PUBLIC_URL", ""),
+		Mail: mail.Config{
+			Host:     str("LASTHELP_SMTP_HOST", ""),
+			Port:     number("LASTHELP_SMTP_PORT", 587),
+			Username: str("LASTHELP_SMTP_USERNAME", ""),
+			Password: str("LASTHELP_SMTP_PASSWORD", ""),
+			From:     str("LASTHELP_SMTP_FROM", ""),
+			StartTLS: boolean("LASTHELP_SMTP_STARTTLS", true),
+		},
 	}
 }
 
@@ -108,4 +128,11 @@ func keyFile() string {
 	}
 	db := str("LASTHELP_DB_FILE", "lasthelp.db")
 	return filepath.Join(filepath.Dir(db), "lasthelp.key")
+}
+
+func number(key string, fallback int) int {
+	if n, err := strconv.Atoi(os.Getenv(key)); err == nil && n > 0 {
+		return n
+	}
+	return fallback
 }

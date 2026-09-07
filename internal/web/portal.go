@@ -48,7 +48,7 @@ func (s *Server) handleRepositories(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, repo := range list {
-		out = append(out, describeRepository(repo))
+		out = append(out, describeRepository(repo, s.mailConfigured()))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"organization": map[string]any{"slug": o.Slug, "name": o.Name},
@@ -63,7 +63,7 @@ func (s *Server) handleRepository(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, describeRepository(repo))
+	writeJSON(w, http.StatusOK, describeRepository(repo, s.mailConfigured()))
 }
 
 // handleListItems is the public board.
@@ -274,10 +274,23 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	// Everything waits for a human unless the repository says otherwise. The
 	// queue is the protection: nothing the public writes reaches a public page
 	// without somebody having looked at it.
+	// The address is sealed here, at the edge, so the domain never holds it in
+	// the clear. Left blank — which is the normal case and what the form
+	// encourages — nothing is stored at all.
+	var sealedEmail []byte
+	if address := strings.TrimSpace(in.Email); address != "" {
+		var sealErr error
+		if sealedEmail, sealErr = s.box.Seal(address); sealErr != nil {
+			slog.Error("sealing a reporter address", "error", sealErr)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+	}
+
 	moderation := item.Pending
 	created, token, createErr := s.items().Create(item.New{
 		RepoID: repo.ID, Kind: kind, Title: in.Title, Body: in.Body,
-		Email: in.Email, Fields: fields,
+		EmailSealed: sealedEmail, Fields: fields,
 	}, moderation, s.now())
 	if createErr != nil {
 		if errors.Is(createErr, item.ErrNotFound) {
@@ -286,6 +299,13 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(w, http.StatusBadRequest, "error.invalid_report")
 		return
+	}
+
+	// Tell the team, later. Not from here: a slow relay or a chat server having
+	// a bad afternoon must not be something the person reporting a bug waits
+	// for, or worse, is refused by.
+	if err := s.bridge().RequestAnnouncement(created.ID, s.now()); err != nil {
+		slog.Error("queueing a notification", "error", err)
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{
@@ -484,12 +504,15 @@ func (s *Server) lookupItem(w http.ResponseWriter, r *http.Request) (item.Item, 
 	return it, true
 }
 
-func describeRepository(r org.Repository) map[string]any {
+func describeRepository(r org.Repository, mailConfigured bool) map[string]any {
 	return map[string]any{
 		"slug":          r.Slug,
 		"name":          r.Name,
 		"accepts_bugs":  r.AcceptsBugs,
 		"accepts_ideas": r.AcceptsIdeas,
+		// With no relay there is nothing to notify anybody with, so the form
+		// does not ask for an address rather than collecting one it cannot use.
+		"can_notify": mailConfigured,
 	}
 }
 

@@ -100,7 +100,13 @@ type Repository struct {
 	AcceptsBugs    bool
 	AcceptsIdeas   bool
 	ModerationMode ModerationMode
-	CreatedAt      time.Time
+
+	// NotifyConfig is the channel this board's team reads, stored as JSON. It
+	// is opaque here on purpose: the domain has no business knowing what a
+	// Gotify token is.
+	NotifyConfig string
+
+	CreatedAt time.Time
 }
 
 // Store reads and writes both levels.
@@ -249,7 +255,7 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.moderation_mode, r.created_at
+		       r.accepts_bugs, r.accepts_ideas, r.moderation_mode, r.notify_config, r.created_at
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
 		WHERE o.slug = ? AND r.slug = ?`, NormaliseSlug(orgSlug), NormaliseSlug(repoSlug)))
@@ -258,14 +264,14 @@ func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 func (s Store) RepositoryByID(id int64) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, moderation_mode, created_at
+		       accepts_bugs, accepts_ideas, moderation_mode, notify_config, created_at
 		FROM repository WHERE id = ?`, id))
 }
 
 func (s Store) ListRepositories(orgID int64) ([]Repository, error) {
 	rows, err := s.DB.Query(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, moderation_mode, created_at
+		       accepts_bugs, accepts_ideas, moderation_mode, notify_config, created_at
 		FROM repository WHERE org_id = ? ORDER BY name COLLATE NOCASE, id`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("listing repositories: %w", err)
@@ -317,7 +323,7 @@ func scanRepositoryRow(row scanner) (Repository, error) {
 	var mode string
 	var created int64
 	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.ForgeRepo,
-		&r.AcceptsBugs, &r.AcceptsIdeas, &mode, &created)
+		&r.AcceptsBugs, &r.AcceptsIdeas, &mode, &r.NotifyConfig, &created)
 	if err != nil {
 		return Repository{}, err
 	}
@@ -332,4 +338,20 @@ func isUnique(err error) bool {
 
 func isForeignKey(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "FOREIGN KEY constraint failed")
+}
+
+// SetNotifyConfig stores the channel a board's team reads.
+//
+// Stored as opaque JSON: this package does not know what a Gotify token is, and
+// the less of the notification setup that reaches the domain the fewer places
+// there are to leak one.
+func (s Store) SetNotifyConfig(repoID int64, config string) error {
+	res, err := s.DB.Exec(`UPDATE repository SET notify_config = ? WHERE id = ?`, config, repoID)
+	if err != nil {
+		return fmt.Errorf("storing the notification channel: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }

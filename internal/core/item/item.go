@@ -139,8 +139,15 @@ type New struct {
 	Kind   Kind
 	Title  string
 	Body   string
-	Email  string // optional, only if they asked to be notified
 	Fields []Field
+
+	// EmailSealed is the reporter's address, already encrypted, and only if
+	// they asked to be told about changes.
+	//
+	// Sealed by the caller rather than here: the domain does not do
+	// cryptography, and taking the address in the clear would mean this package
+	// had it in memory and in every stack trace. Empty is the normal case.
+	EmailSealed []byte
 }
 
 // Store reads and writes items.
@@ -184,13 +191,18 @@ func (s Store) Create(in New, moderation Moderation, now time.Time) (Item, strin
 		return Item{}, "", err
 	}
 
+	var email any
+	if len(in.EmailSealed) > 0 {
+		email = in.EmailSealed
+	}
+
 	res, err := s.DB.Exec(`INSERT INTO item
 		(public_id, repo_id, kind, title, body, status, moderation_state,
-		 body_hash, follow_token_hash, created_at, published_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 body_hash, author_email_enc, follow_token_hash, created_at, published_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		publicID, in.RepoID, string(in.Kind), in.Title, in.Body,
 		string(StatusNew), string(moderation),
-		BodyHash(in.Title, in.Body), hashToken(token), now.Unix(),
+		BodyHash(in.Title, in.Body), email, hashToken(token), now.Unix(),
 		publishedAt(moderation, now))
 	if err != nil {
 		if strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
@@ -433,4 +445,35 @@ func sameToken(a, b string) bool {
 		diff |= a[i] ^ b[i]
 	}
 	return diff == 0
+}
+
+// SealedEmail returns the reporter's encrypted address, or nothing.
+//
+// It comes back sealed. Only the caller with the key can read it, which is what
+// keeps the address out of every listing, every log line and every response
+// that merely happens to load an item.
+func (s Store) SealedEmail(itemID int64) ([]byte, error) {
+	var sealed []byte
+	err := s.DB.QueryRow(`SELECT author_email_enc FROM item WHERE id = ?`, itemID).Scan(&sealed)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return nil, ErrNotFound
+	case err != nil:
+		return nil, fmt.Errorf("reading the address: %w", err)
+	}
+	return sealed, nil
+}
+
+// ForgetEmail removes the address.
+//
+// Called when an item closes: the address was collected for one purpose, that
+// purpose is over, and keeping it afterwards is keeping personal data for no
+// reason. SECURITY.md says it is deleted when the item closes, and this is the
+// code that has to make that true.
+func (s Store) ForgetEmail(itemID int64) error {
+	_, err := s.DB.Exec(`UPDATE item SET author_email_enc = NULL WHERE id = ?`, itemID)
+	if err != nil {
+		return fmt.Errorf("forgetting the address: %w", err)
+	}
+	return nil
 }

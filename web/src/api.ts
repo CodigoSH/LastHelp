@@ -81,6 +81,9 @@ export interface RepositorySummary {
   name: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  /** Whether a mail relay exists. Without one the form does not ask for an
+   *  address, rather than collecting one nothing can use. */
+  can_notify: boolean;
 }
 
 export interface ItemSummary {

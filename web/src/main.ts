@@ -44,7 +44,9 @@ document.addEventListener("click", (event) => {
   const link = (event.target as HTMLElement | null)?.closest?.("a");
   if (!link) return;
   const href = link.getAttribute("href");
-  if (!href?.startsWith("/") || link.hasAttribute("target")) return;
+  // The feed is served by the server, not by this router: intercepting it
+  // would show a blank page where a reader expects XML.
+  if (!href?.startsWith("/") || href.startsWith("/feed/") || link.hasAttribute("target")) return;
   event.preventDefault();
   go(href);
 });

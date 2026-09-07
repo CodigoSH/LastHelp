@@ -113,7 +113,7 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 		writeError(w, statusForOrgError(err), keyForOrgError(err))
 		return
 	}
-	writeJSON(w, http.StatusCreated, describeRepository(created))
+	writeJSON(w, http.StatusCreated, describeRepository(created, s.mailConfigured()))
 }
 
 // handleQueue is the moderation queue: the panel's front page.
@@ -203,6 +203,17 @@ func (s *Server) handleModerate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
+
+	// Only when it is published. Somebody whose report was rejected is not
+	// told, on purpose: a rejection notice is an invitation to argue with a
+	// filter, and the person who most wants to argue is the one it caught
+	// correctly.
+	if item.Moderation(in.State) == item.Published {
+		if err := s.bridge().RequestTellReporter(it.ID, "is now public", s.now()); err != nil {
+			slog.Error("queueing a reporter notification", "error", err)
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"moderation": in.State})
 }
 
@@ -230,6 +241,14 @@ func (s *Server) handleSetStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "error.unknown_status")
 		return
 	}
+
+	// The reporter hears about it, and if this closed the item their address is
+	// forgotten on the way — collected for one purpose, and that purpose is now
+	// over.
+	if err := s.bridge().RequestTellReporter(it.ID, "changed status", s.now()); err != nil {
+		slog.Error("queueing a reporter notification", "error", err)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{"status": in.Status})
 }
 

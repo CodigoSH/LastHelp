@@ -84,6 +84,7 @@ export function board(
         <h1>${escapeHTML(repo.name)}</h1>
       </div>
       <div class="head-actions">
+        <a class="button" href="/feed/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/atom.xml">${escapeHTML(text.t("nav.feed"))}</a>
         <a class="button" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/roadmap">${escapeHTML(text.t("nav.roadmap"))}</a>
         <a class="button primary" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new">${escapeHTML(text.t("board.report"))}</a>
       </div>
@@ -230,9 +231,15 @@ export function reportForm(repo: RepositorySummary, kind: string, text: Text): s
       <textarea id="report-body" name="body" rows="6"
                 placeholder="${escapeAttr(text.t("form.bodyPlaceholder"))}"></textarea>
 
-      <label for="report-email">${escapeHTML(text.t("form.email"))}</label>
-      <input id="report-email" name="email" type="email" />
-      <p class="hint">${escapeHTML(text.t("form.emailHelp"))}</p>
+      ${
+        // Only when there is a relay to notify with. Asking for an address the
+        // server cannot use is collecting personal data for nothing.
+        repo.can_notify
+          ? `<label for="report-email">${escapeHTML(text.t("form.email"))}</label>
+             <input id="report-email" name="email" type="email" />
+             <p class="hint">${escapeHTML(text.t("form.emailHelp"))}</p>`
+          : ""
+      }
 
       <p class="form-error" role="alert" hidden></p>
       <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>

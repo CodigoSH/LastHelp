@@ -205,6 +205,15 @@ func (s *Server) routes() {
 	private("POST /api/items/{id}/issue", s.handleCreateIssue)
 	private("POST /api/items/{id}/attach", s.handleAttachIssue)
 	private("POST /api/orgs/{org}/credentials", s.handleSetCredentials)
+	private("POST /api/orgs/{org}/repos/{repo}/channel", s.handleSetNotifyChannel)
+
+	// The feed, under its own prefix.
+	//
+	// The obvious address — /{org}/{repo}/feed.atom — is ambiguous against
+	// /api/items/{id}, and Go's mux says so at registration rather than picking
+	// one at random. Which is the right behaviour and the reason this is not a
+	// bug discovered by somebody whose repository happens to be called "items".
+	s.mux.HandleFunc("GET /feed/{org}/{repo}/atom.xml", s.handleFeed)
 
 	// Public, and only these: the health check and the static frontend.
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)

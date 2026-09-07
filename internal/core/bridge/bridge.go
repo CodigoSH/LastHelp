@@ -26,8 +26,33 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
 )
 
-// JobCreateIssue is the only kind of work this queue carries so far.
-const JobCreateIssue = "create_issue"
+// The kinds of work this queue carries.
+const (
+	JobCreateIssue = "create_issue"
+
+	// JobTellReporter tells the person who reported that something changed.
+	JobTellReporter = "tell_reporter"
+
+	// JobAnnounce tells the team something arrived. It goes through the queue
+	// for the same reason the forge calls do: a slow relay or a chat server
+	// having a bad afternoon must not be something the person reporting a bug
+	// waits for, and must never be a reason to refuse their report.
+	JobAnnounce = "announce"
+)
+
+// Announcer delivers a notification.
+//
+// A function rather than a dependency on the notification package, so the
+// domain stays free of channels, tokens and HTTP: it says what happened, and
+// something outside decides where that goes.
+type Announcer func(ctx context.Context, repoID int64, title, body, url string) error
+
+// Teller delivers to the person who reported something.
+//
+// It is handed the address still sealed: the domain never holds it in the
+// clear, so it cannot end up in a log line, an error, or a stack trace. What
+// can decrypt it is outside, and only for as long as it takes to send.
+type Teller func(ctx context.Context, sealedEmail []byte, title, body, url string) error
 
 // ErrNoForge means the organisation is not connected to one. It is not a
 // failure state: running with no forge at all is supported, and everything
@@ -46,10 +71,52 @@ type Bridge struct {
 	Items   item.Store
 	Queue   outbox.Store
 	Clients Clients
+
+	// Announce is optional: an instance with no channel configured simply has
+	// nothing here, and the job finishes doing nothing.
+	Announce Announcer
+
+	// Tell is optional in the same way. With no mail relay there is nothing to
+	// tell anybody with, which is why the form never offers the address field
+	// in that case rather than collecting one it cannot use.
+	Tell Teller
+
+	// PublicURL is where this instance is reachable, used to build the link in
+	// a notification. Empty means the notification carries no link, which is
+	// worse but not broken.
+	PublicURL string
 }
 
 type createIssuePayload struct {
 	ItemID int64 `json:"item_id"`
+}
+
+type announcePayload struct {
+	ItemID int64 `json:"item_id"`
+}
+
+type tellPayload struct {
+	ItemID int64  `json:"item_id"`
+	Reason string `json:"reason"`
+}
+
+// RequestTellReporter asks for the reporter to be told, later.
+//
+// Nothing happens when there is no relay or no address, which is the common
+// case: the job runs, finds nothing to do, and finishes.
+func (b Bridge) RequestTellReporter(itemID int64, reason string, now time.Time) error {
+	if b.Tell == nil {
+		return nil
+	}
+	return b.Queue.Enqueue(JobTellReporter, tellPayload{ItemID: itemID, Reason: reason}, now)
+}
+
+// RequestAnnouncement asks for the team to be told, later.
+func (b Bridge) RequestAnnouncement(itemID int64, now time.Time) error {
+	if b.Announce == nil {
+		return nil
+	}
+	return b.Queue.Enqueue(JobAnnounce, announcePayload{ItemID: itemID}, now)
 }
 
 // RequestIssue asks for an issue to be created, later.
@@ -118,6 +185,21 @@ func (b Bridge) run(ctx context.Context, job outbox.Job, now time.Time) error {
 			return fmt.Errorf("unreadable payload: %w", err)
 		}
 		return b.createIssue(ctx, payload.ItemID, now)
+
+	case JobTellReporter:
+		var payload tellPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err != nil {
+			return fmt.Errorf("unreadable payload: %w", err)
+		}
+		return b.tellReporter(ctx, payload.ItemID, payload.Reason)
+
+	case JobAnnounce:
+		var payload announcePayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err != nil {
+			return fmt.Errorf("unreadable payload: %w", err)
+		}
+		return b.announce(ctx, payload.ItemID)
+
 	default:
 		return fmt.Errorf("unknown job kind %q", job.Kind)
 	}
@@ -275,4 +357,71 @@ func Fingerprint(issue forge.Issue) string {
 	sort.Strings(labels)
 	sum := sha256.Sum256([]byte(string(issue.State) + "|" + strings.Join(labels, ",")))
 	return hex.EncodeToString(sum[:8])
+}
+
+// announce tells the team one thing arrived.
+//
+// Short on purpose: what it carries is a nudge to go and look, not a copy of
+// the submission. A notification containing the whole report is a notification
+// that delivers spam to wherever the team reads it — which is the one place the
+// moderation queue was supposed to keep it out of.
+func (b Bridge) announce(ctx context.Context, itemID int64) error {
+	if b.Announce == nil {
+		return nil
+	}
+
+	it, err := b.Items.ByID(itemID)
+	if err != nil {
+		return err
+	}
+
+	link := ""
+	if b.PublicURL != "" {
+		link = strings.TrimSuffix(b.PublicURL, "/") + "/i/" + it.PublicID
+	}
+	return b.Announce(ctx, it.RepoID, it.Title, string(it.Kind), link)
+}
+
+// tellReporter tells the person who reported that their item moved.
+//
+// And then, if the item is finished, forgets their address. It was collected
+// for one purpose; that purpose is over, and keeping it afterwards is holding
+// somebody's personal data for no reason at all. SECURITY.md says it is deleted
+// when the item closes, and this is the code that has to make that true rather
+// than the sentence that promises it.
+func (b Bridge) tellReporter(ctx context.Context, itemID int64, reason string) error {
+	if b.Tell == nil {
+		return nil
+	}
+
+	it, err := b.Items.ByID(itemID)
+	if err != nil {
+		return err
+	}
+
+	sealed, err := b.Items.SealedEmail(itemID)
+	if err != nil {
+		return err
+	}
+	if len(sealed) == 0 {
+		// Nobody asked to be told. The common case, and not a failure.
+		return b.forgetIfFinished(it)
+	}
+
+	link := ""
+	if b.PublicURL != "" {
+		link = strings.TrimSuffix(b.PublicURL, "/") + "/i/" + it.PublicID
+	}
+	if err := b.Tell(ctx, sealed, it.Title, reason, link); err != nil {
+		return err
+	}
+	return b.forgetIfFinished(it)
+}
+
+func (b Bridge) forgetIfFinished(it item.Item) error {
+	switch it.Status {
+	case item.StatusDone, item.StatusClosed, item.StatusDeclined, item.StatusNotReproducible:
+		return b.Items.ForgetEmail(it.ID)
+	}
+	return nil
 }

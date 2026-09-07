@@ -18,6 +18,8 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/gitea"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/github"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/gitlab"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/mail"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/notify"
 )
 
 // webhookBodyLimit is what a delivery may be. Generous — an issue payload with
@@ -71,7 +73,8 @@ func receiverFor(kind org.Forge) (forge.Receiver, bool) {
 func (s *Server) bridge() bridge.Bridge {
 	return bridge.Bridge{
 		DB: s.db, Orgs: s.orgs(), Items: s.items(), Queue: s.outbox(),
-		Clients: s.clientFor,
+		Clients: s.clientFor, Announce: s.announce, Tell: s.tellReporter,
+		PublicURL: s.cfg.PublicURL,
 	}
 }
 
@@ -288,3 +291,120 @@ func (s *Server) handleSetCredentials(w http.ResponseWriter, r *http.Request) {
 	// read a credential through the panel.
 	writeJSON(w, http.StatusOK, map[string]any{"webhook_path": "/hooks/" + hook})
 }
+
+// announce delivers a notification for one repository, on whatever channel that
+// repository has configured.
+//
+// Per repository, so a group can send one board to one room and another
+// somewhere else. One global channel is a channel everybody eventually
+// silences, and a silenced channel is the same as no channel with extra steps.
+func (s *Server) announce(ctx context.Context, repoID int64, title, kind, link string) error {
+	repo, err := s.orgs().RepositoryByID(repoID)
+	if err != nil {
+		return err
+	}
+
+	cfg := notify.Parse(repo.NotifyConfig)
+	if !cfg.Active() {
+		return nil
+	}
+
+	notifier := notify.Notifier{
+		Out: s.out,
+		Mail: mail.Sender{
+			Config:  s.cfg.Mail,
+			Offline: s.cfg.Offline,
+		},
+	}
+	return notifier.Send(ctx, cfg, notify.Message{
+		Title: repo.Name + ": " + kind,
+		Body:  title,
+		URL:   link,
+	})
+}
+
+type notifyChannel struct {
+	Kind  string `json:"kind"`
+	URL   string `json:"url"`
+	Token string `json:"token"`
+	To    string `json:"to"`
+}
+
+// handleSetNotifyChannel stores where a board's team wants to be told.
+//
+// Owner-level, like the forge credentials and for the same reason: the channel
+// carries a token, and somebody trusted to triage a repository is not
+// automatically somebody trusted with a credential.
+func (s *Server) handleSetNotifyChannel(w http.ResponseWriter, r *http.Request) {
+	repo, organisation, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+	if !s.may(w, r, authz.ManageOrganization, authz.Organization(organisation.ID)) {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	var in notifyChannel
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	cfg := notify.Config{
+		Kind: notify.Kind(in.Kind), URL: in.URL, Token: in.Token, To: in.To,
+	}
+	if in.Kind != "" && !cfg.Active() {
+		writeError(w, http.StatusBadRequest, "error.channel_incomplete")
+		return
+	}
+
+	encoded, err := json.Marshal(cfg)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if err := s.orgs().SetNotifyConfig(repo.ID, string(encoded)); err != nil {
+		slog.Error("storing the notification channel", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	// The token is not echoed back, for the same reason the forge token is not:
+	// an endpoint that returns what it stored is a way to read a credential.
+	writeJSON(w, http.StatusOK, map[string]any{"kind": in.Kind, "active": cfg.Active()})
+}
+
+// tellReporter delivers to the person who reported, opening the address only
+// for as long as it takes to send.
+//
+// The reason is a translation key, and it is looked up in the catalogue the
+// server ships rather than composed here — but the reporter's language is not
+// known, so it goes out in English. That is a real limitation, written down
+// rather than hidden: the honest fix is asking for a language alongside the
+// address, and that costs a field on a form whose whole point is being short.
+func (s *Server) tellReporter(_ context.Context, sealed []byte, title, reason, link string) error {
+	if s.cfg.Mail.From == "" {
+		return nil
+	}
+	address, err := s.box.Open(sealed)
+	if err != nil {
+		return err
+	}
+
+	sender := mail.Sender{Config: s.cfg.Mail, Offline: s.cfg.Offline}
+	body := "Your report \"" + title + "\" " + reason + ".\n"
+	if link != "" {
+		body += "\n" + link + "\n"
+	}
+	body += "\nNobody reads replies to this address."
+
+	return sender.Send(address, "LastHelp: "+title, body)
+}
+
+// mailConfigured says whether the notify-me field should be offered at all.
+//
+// With no relay there is nothing to notify anybody with, so the form does not
+// ask for an address — rather than collecting one it cannot use, which is
+// collecting personal data for nothing.
+func (s *Server) mailConfigured() bool { return s.cfg.Mail.Host != "" && s.cfg.Mail.From != "" }
