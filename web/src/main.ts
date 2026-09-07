@@ -18,6 +18,7 @@ import type {
 } from "./api";
 import { i18n } from "./services/i18n";
 import { availableLocales } from "./locales/metadata";
+import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import * as views from "./views/templates";
 
@@ -93,7 +94,66 @@ function renderNav(): void {
 }
 
 function show(html: string): void {
+  document.body.classList.remove("admin-view");
   if (root) root.innerHTML = html;
+}
+
+/**
+ * Draw a panel page inside the administration shell.
+ *
+ * The sidebar needs the organisations and, when you are inside one, its boards,
+ * so this fetches them once for every panel page rather than each screen
+ * building its own navigation and drifting from the others.
+ */
+async function showInShell(content: string, path: string): Promise<void> {
+  const { organizations } = await api
+    .get<{ organizations: OrganizationSummary[] }>("/api/orgs")
+    .catch(() => ({ organizations: [] as OrganizationSummary[] }));
+
+  const orgs: views.SideOrganization[] = organizations ?? [];
+  const inside = orgs.find((o) => path.startsWith(`/panel/${o.slug}`) || path.startsWith(`/${o.slug}/`));
+  if (inside) {
+    const body = await api
+      .get<{ repositories: RepositorySummary[] }>(`/api/orgs/${encodeURIComponent(inside.slug)}/repos`)
+      .catch(() => ({ repositories: [] as RepositorySummary[] }));
+    inside.repos = (body.repositories ?? []).map((r) => ({ slug: r.slug, name: r.name }));
+  }
+
+  if (root) {
+    root.innerHTML = views.adminShell(
+      {
+        path,
+        organizations: orgs,
+        who: me?.email ?? "",
+        isAdmin: me?.admin === true,
+        theme: currentTheme(),
+        languages: availableLocales.map((l) => ({ code: l.code, name: l.name })),
+        language: i18n.current,
+        content,
+      },
+      text,
+    );
+  }
+  document.body.classList.add("admin-view");
+  wireShell();
+}
+
+/** The controls that live in the shell rather than in any one screen. */
+function wireShell(): void {
+  root?.querySelectorAll<HTMLButtonElement>("[data-theme-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      applyTheme((button.dataset.themeChoice ?? "system") as Theme);
+      void render();
+    });
+  });
+  root?.querySelector<HTMLSelectElement>(".side .lang")?.addEventListener("change", (e) => {
+    void i18n.setLanguage((e.target as HTMLSelectElement).value).then(() => void render());
+  });
+  root?.querySelector<HTMLButtonElement>(".side [data-signout]")?.addEventListener("click", async () => {
+    await api.del("/api/session").catch(() => undefined);
+    me = null;
+    go("/");
+  });
 }
 
 function fail(err: unknown): void {
@@ -104,6 +164,7 @@ function fail(err: unknown): void {
 // --- the views -------------------------------------------------------------
 
 async function render(): Promise<void> {
+  restoreTheme();
   await i18n.ready;
   renderNav();
 
@@ -113,14 +174,17 @@ async function render(): Promise<void> {
   try {
     if (path === "/") return await showOrganizations();
     if (path === "/sign-in") return await showSignIn();
-    if (path === "/setup/organization") return showSetupStep(2);
-    if (path === "/setup/board") return showSetupStep(3);
+    if (path === "/setup") return showSetupStep(1);
+    if (path === "/setup/account") return showSetupStep(2);
+    if (path === "/setup/organization") return showSetupStep(3);
+    if (path === "/setup/board") return showSetupStep(4);
     if (path === "/setup/done") return showSetupDone();
     if (path === "/panel") return await showPanel();
+    if (path === "/panel/updates") return await showUpdates();
     // Before the generic /panel/{org}: "new" is a screen, not an organisation
     // anybody would be able to open.
-    if (path === "/panel/new") return showOrganizationWizard(1);
-    if (path === "/panel/new/connection") return showOrganizationWizard(2);
+    if (path === "/panel/new") return await showOrganizationWizard(1);
+    if (path === "/panel/new/connection") return await showOrganizationWizard(2);
     if (parts[0] === "panel" && parts[2] === "new" && parts[1]) {
       return await showRepositoryWizard(parts[1], 1);
     }
@@ -564,10 +628,61 @@ function wireForgeChoice(rerender: (forge: string) => void): void {
   });
 }
 
-function showSetupStep(step: 2 | 3): void {
-  show(views.setupWizard(step, text, draft.forge));
+function showSetupStep(step: 1 | 2 | 3 | 4): void {
+  show(
+    views.setupWizard(step, text, draft.forge, {
+      languages: availableLocales.map((l) => ({ code: l.code, name: l.name })),
+      language: i18n.current,
+      theme: currentTheme(),
+    }),
+  );
+
+  if (step === 1) {
+    // Applied as they are chosen, not on submit: a language you cannot read is
+    // a poor way to ask whether you can read it.
+    root?.querySelectorAll<HTMLButtonElement>("[data-theme-choice]").forEach((button) =>
+      button.addEventListener("click", () => {
+        applyTheme((button.dataset.themeChoice ?? "system") as Theme);
+        void render();
+      }),
+    );
+    root?.querySelector<HTMLSelectElement>("#setup-language")?.addEventListener("change", (e) => {
+      void i18n.setLanguage((e.target as HTMLSelectElement).value).then(() => void render());
+    });
+    root?.querySelector<HTMLFormElement>("form.setup-preferences")?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      go("/setup/account");
+    });
+    return;
+  }
 
   if (step === 2) {
+    root?.querySelector<HTMLFormElement>("form.setup-account")?.addEventListener(
+      "submit",
+      async (event) => {
+        event.preventDefault();
+        const data = new FormData(event.currentTarget as HTMLFormElement);
+        const password = String(data.get("password") ?? "");
+        if (password !== String(data.get("password_again") ?? "")) {
+          // Caught here rather than at the server, which never sees the second
+          // box: this is the one mistake that would lock somebody out of an
+          // instance with no reset to fall back on.
+          showFormError(new ApiError(400, "error.password_mismatch"));
+          return;
+        }
+        try {
+          await api.post("/api/setup", { email: String(data.get("email") ?? ""), password });
+          me = await api.get<Me>("/api/me");
+          go("/setup/organization");
+        } catch (err) {
+          showFormError(err);
+        }
+      },
+    );
+    return;
+  }
+
+  if (step === 3) {
     wireForgeChoice((forge) => showSetupStep2(forge));
     root?.querySelector<HTMLFormElement>("form.setup-organization")?.addEventListener(
       "submit",
@@ -631,8 +746,8 @@ function showSetupDone(): void {
   show(views.wizardDone(draft.orgSlug, draft.repoSlug, draft.forge !== "none", text));
 }
 
-function showOrganizationWizard(step: 1 | 2): void {
-  show(views.organizationWizard(step, text, draft.forge));
+async function showOrganizationWizard(step: 1 | 2): Promise<void> {
+  await showInShell(views.organizationWizard(step, text, draft.forge), "/panel/new");
 
   if (step === 1) {
     wireForgeChoice((forge) => {
@@ -686,7 +801,7 @@ async function showRepositoryWizard(orgSlug: string, step: 1 | 2): Promise<void>
     organization: OrganizationSummary & { forge?: string };
   }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
   draft.orgSlug = orgSlug;
-  show(views.repositoryWizard(body.organization, step, text));
+  await showInShell(views.repositoryWizard(body.organization, step, text), `/panel/${orgSlug}`);
 
   root?.querySelector<HTMLFormElement>("form.setup-repository-identity")?.addEventListener(
     "submit",
@@ -730,13 +845,12 @@ let pendingRepository: { name: string; slug: string; forge_repo: string } = {
 
 async function showSignIn(): Promise<void> {
   const status = await api.get<Status>("/api/status");
-  if (status.needs_setup) {
-    show(views.setupWizard(1, text));
-  } else {
-    show(views.signInForm(text));
-  }
+  // A fresh instance is claimed through the wizard, which starts by asking
+  // which language to say the rest of it in.
+  if (status.needs_setup) return go("/setup");
+  show(views.signInForm(text));
 
-  const form = root?.querySelector<HTMLFormElement>("form.auth, form.setup-account");
+  const form = root?.querySelector<HTMLFormElement>("form.auth");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
 
   form?.addEventListener("submit", async (event) => {
@@ -769,19 +883,36 @@ async function showPanel(): Promise<void> {
   renderNav();
 
   const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
-  show(views.panelHome(organizations ?? [], text));
+  await showInShell(views.panelHome(organizations ?? [], text), "/panel");
+}
 
-  // Updates, for the administrator only. Asking is the check: the endpoint
-  // refuses anybody else, and a panel that decided for itself who may see this
-  // would be a second implementation of the rules.
+/**
+ * Updates, on a page of their own.
+ *
+ * They used to hang off the bottom of the panel's front page, under the form
+ * for adding an organisation, which is not where anybody looks for them. The
+ * endpoint refuses anybody who may not see this, and asking it is the check: a
+ * screen that decided for itself who may look would be a second implementation
+ * of the rules.
+ */
+async function showUpdates(): Promise<void> {
+  me = await api.get<Me>("/api/me").catch(() => null);
+  if (!me) return go("/sign-in");
+
   const status = await api
     .get<{ current: string; latest?: string; available?: boolean; notes?: string; reason?: string }>(
       "/api/update",
     )
     .catch(() => null);
-  if (status) {
-    root?.insertAdjacentHTML("beforeend", views.updatePanel(status, text));
 
+  await showInShell(
+    status
+      ? views.updatePanel(status, text)
+      : `<p class="empty">${escapeHTML(i18n.t("error.forbidden"))}</p>`,
+    "/panel/updates",
+  );
+
+  if (status) {
     root?.querySelector<HTMLButtonElement>("[data-update]")?.addEventListener("click", async (event) => {
       const button = event.currentTarget as HTMLButtonElement;
       const note = root?.querySelector<HTMLParagraphElement>(".update-note");
@@ -802,38 +933,6 @@ async function showPanel(): Promise<void> {
     });
   }
 
-  const form = root?.querySelector<HTMLFormElement>("form.new-org");
-  const forgeFields = root?.querySelector<HTMLDivElement>(".forge-fields");
-  const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
-
-  // The forge fields only when there is a forge. Asking for the address of
-  // something you said you do not have is a form arguing with you.
-  const select = root?.querySelector<HTMLSelectElement>("#org-forge");
-  const syncFields = () => {
-    if (forgeFields) forgeFields.hidden = (select?.value ?? "none") === "none";
-  };
-  select?.addEventListener("change", syncFields);
-  syncFields();
-
-  form?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    try {
-      await api.post("/api/organizations", {
-        name: String(data.get("name") ?? ""),
-        slug: String(data.get("slug") ?? ""),
-        forge: String(data.get("forge") ?? "none"),
-        base_url: String(data.get("base_url") ?? ""),
-        forge_owner: String(data.get("forge_owner") ?? ""),
-      });
-      go("/panel/" + String(data.get("slug") ?? ""));
-    } catch (err) {
-      if (errorLine) {
-        errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
-        errorLine.hidden = false;
-      }
-    }
-  });
 }
 
 async function showPanelOrganization(orgSlug: string): Promise<void> {
@@ -847,8 +946,11 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
 
   const repos = body.repositories ?? [];
-  show(views.panelOrganization(body.organization, repos, text));
-  root?.insertAdjacentHTML("beforeend", views.connectionForms(body.organization, repos, text));
+  await showInShell(
+    views.panelOrganization(body.organization, repos, text) +
+      views.connectionForms(body.organization, repos, text),
+    `/panel/${orgSlug}`,
+  );
 
   wireCredentials(orgSlug, body.organization.webhook_path);
   wireChannel(orgSlug);
@@ -872,9 +974,12 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
   const items = body.items ?? [];
   const bodies = new Map(items.map((i) => [i.public_id, i.body]));
 
-  show(`<p class="crumb"><a href="/${escapeAttr(orgSlug)}/${escapeAttr(repoSlug)}">${escapeHTML(i18n.t("nav.back"))}</a></p>
-        <h1>${escapeHTML(i18n.t("panel.queue"))}</h1>
-        ${views.queueView(items, bodies, text)}`);
+  await showInShell(
+    `<p class="crumb"><a href="/${escapeAttr(orgSlug)}/${escapeAttr(repoSlug)}">${escapeHTML(i18n.t("shell.publicBoard"))}</a></p>
+     <h1>${escapeHTML(i18n.t("panel.queue"))}</h1>
+     ${views.queueView(items, bodies, text)}`,
+    `/${orgSlug}/${repoSlug}/queue`,
+  );
 
   root?.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((button) =>
     button.addEventListener("click", async () => {

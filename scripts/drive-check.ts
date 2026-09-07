@@ -108,30 +108,68 @@ async function main() {
 
   // 3. Sign in through the form, as a person would.
   await evaluate(`history.pushState({}, "", "/sign-in"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(400);
+  await sleep(900);
   // A fresh instance opens the wizard rather than a bare login: the first
   // screen has to carry its own progress, or nobody knows how many more there
   // are. The dots are read from the markup, not from the shape.
   const firstStep = await evaluate(`
-    const form = document.querySelector("form.setup-account");
     return {
-      there: !!form,
+      path: location.pathname,
+      prefs: !!document.querySelector("form.setup-preferences"),
       dots: document.querySelectorAll(".steps li").length,
       current: document.querySelector('.steps [aria-current="step"] .step-name')?.textContent?.trim(),
+      theme: !!document.querySelector("[data-theme-choice]"),
     };`);
   check(
-    "the first run opens on step one of a wizard",
-    firstStep.there === true && firstStep.dots === 3,
-    `${firstStep.dots} steps, on "${firstStep.current}"`,
+    "a fresh instance opens on the wizard, asking language first",
+    firstStep.path === "/setup" && firstStep.prefs === true && firstStep.dots === 4 && firstStep.theme === true,
+    `${firstStep.path}, ${firstStep.dots} steps, on "${firstStep.current}"`,
+  );
+
+  // Choosing dark has to work on a light system too. A toggle that only ever
+  // darkens is one that cannot be turned back, and the media query alone gives
+  // exactly that.
+  const themed = await evaluate(`
+    document.querySelector('[data-theme-choice="dark"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    const dark = document.documentElement.getAttribute("data-theme");
+    document.querySelector('[data-theme-choice="light"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    return { dark, light: document.documentElement.getAttribute("data-theme") };`);
+  check(
+    "the theme choice sticks in both directions",
+    themed.dark === "dark" && themed.light === "light",
+    JSON.stringify(themed),
+  );
+
+  await evaluate(`
+    document.querySelector("form.setup-preferences").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  `);
+  await sleep(700);
+
+  // The second box is the one thing standing between a typo and an instance
+  // nobody can sign into: there is no reset here.
+  const mismatch = await evaluate(`
+    const f = document.querySelector("form.setup-account");
+    f.querySelector('[name=email]').value = "k4wit0@codigosh.com";
+    f.querySelector('[name=password]').value = "una contraseña larga de verdad";
+    f.querySelector('[name=password_again]').value = "otra cosa completamente";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 500));
+    const line = document.querySelector(".form-error");
+    return { path: location.pathname, shown: line && !line.hidden, said: line?.textContent?.trim() };`);
+  check(
+    "two passwords that differ are refused before the server sees them",
+    mismatch.path === "/setup/account" && mismatch.shown === true,
+    String(mismatch.said),
   );
 
   await evaluate(`
     const f = document.querySelector("form.setup-account");
-    f.querySelector('[name=email]').value = "k4wit0@codigosh.com";
-    f.querySelector('[name=password]').value = "una contraseña larga de verdad";
+    f.querySelector('[name=password_again]').value = "una contraseña larga de verdad";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   `);
-  await sleep(900);
+  await sleep(1000);
   const signedIn = await evaluate(`return location.pathname`);
   check("the account carries on into the wizard", signedIn === "/setup/organization", String(signedIn));
 
@@ -314,8 +352,11 @@ async function main() {
   // 11. The update panel. This build has no release keys, so what is checked is
   //     that it says so rather than showing nothing — an empty answer where a
   //     reason belongs reads as "you are up to date".
-  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  // Updates have a section of their own in the sidebar now. They used to hang
+  // off the bottom of the panel's front page, under a form, which is not where
+  // anybody looks for them.
+  await evaluate(`history.pushState({}, "", "/panel/updates"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1100);
   const updates = await evaluate(`
     const body = document.body.textContent;
     return {
@@ -325,6 +366,23 @@ async function main() {
     };
   `);
   check("the panel says what version is running", updates.hasSection === true);
+
+  const sidebar = await evaluate(`
+    return {
+      items: [...document.querySelectorAll(".side-item")].map(a => a.textContent.trim()),
+      current: document.querySelector('.side-item[aria-current="page"]')?.textContent?.trim(),
+      who: document.querySelector(".who")?.textContent?.trim(),
+      publicNavHidden: getComputedStyle(document.querySelector("body > nav")).display === "none",
+    };`);
+  check(
+    "the administration shows its options down one side",
+    sidebar.items.length >= 3 && Boolean(sidebar.current) && Boolean(sidebar.who),
+    `${sidebar.items.join(" · ")} — on "${sidebar.current}" as ${sidebar.who}`,
+  );
+  check(
+    "and does not stack two navigations on top of each other",
+    sidebar.publicNavHidden === true,
+  );
 
   // Measured as geometry, not as an attribute. `hidden` applies display:none at
   // the lowest specificity there is, so any class rule with a display of its own

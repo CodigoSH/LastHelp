@@ -32,14 +32,31 @@
   --rtl-flip: -1;
 }
 
+/*
+ * Dark, twice, and the guard on the first one is the whole point.
+ *
+ * The reader's choice is stamped on <html data-theme>. With no choice stamped
+ * the system decides, which is the media query below; with "light" stamped it
+ * must not, which is what :not() holds. And the explicit dark rule repeats the
+ * values so that choosing dark on a light system works too — a theme toggle
+ * that only ever turns things darker is one that cannot be turned back.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #101215;
     --surface: #181b1f;
     --text: #e8eaed;
     --text-muted: #9aa4b0;
     --border: #2a2f36;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #101215;
+  --surface: #181b1f;
+  --text: #e8eaed;
+  --text-muted: #9aa4b0;
+  --border: #2a2f36;
 }
 
 * {
@@ -92,7 +109,15 @@ body {
  * left and right is a stylesheet that has to be written twice.
  */
 
-nav {
+/* The page's own bar, and only that one.
+ *
+ * A bare `nav` selector reaches every nav anywhere, including the one inside
+ * the administration sidebar — which then laid its links out in a row and grew
+ * a horizontal scrollbar. Same for `main`: the sidebar's content column is a
+ * <main> too, and inherited a 46rem cap meant for the reading width of the
+ * public pages. Both are scoped to the direct children of body, which is what
+ * they always meant. */
+body > nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -115,7 +140,7 @@ nav {
   gap: 0.75rem;
 }
 
-main {
+body > main {
   max-inline-size: 46rem;
   margin-inline: auto;
   padding: 1.5rem 1.25rem 4rem;
@@ -673,4 +698,196 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .field textarea {
   inline-size: 100%;
   margin: 0;
+}
+
+/* ------------------------------------------------------------- admin shell
+ *
+ * The public side is a page. The administration is an application, and an
+ * application shows what it can do down one side rather than making somebody
+ * remember the URLs. Until now the panel was a page with a list and a button,
+ * so the answer to "what can I do here?" was "whatever this screen happens to
+ * be showing".
+ *
+ * The public nav is hidden here instead of stacked on top: two navigations, one
+ * horizontal and one vertical, is how a screen stops having an obvious start.
+ */
+/* The flag on <body> is deliberately not the same word as the layout class on
+ * the wrapper. It was, once, and `.admin { display: grid }` matched the body as
+ * well — so the body became the grid, #app landed in its first column, and the
+ * content rendered 254px wide inside a 1225px page. Nothing about the markup
+ * looked wrong; only measuring the boxes showed it. */
+body.admin-view > nav {
+  display: none;
+}
+
+body.admin-view > main {
+  max-inline-size: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin {
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  min-block-size: 100vh;
+}
+
+.side {
+  border-inline-end: 1px solid var(--border);
+  background: var(--surface);
+  padding: 1.25rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: sticky;
+  top: 0;
+  block-size: 100vh;
+  overflow-y: auto;
+}
+
+.side .brand {
+  font-size: 1.15rem;
+  padding: 0 0.6rem 1rem;
+}
+
+.side-label {
+  margin: 1rem 0 0.35rem;
+  padding-inline-start: 0.6rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.side-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.side-item:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
+
+/* The current page, marked with aria-current in the markup as well: a colour
+   and a bar are not something a screen reader can hear. */
+.side-item[aria-current="page"] {
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-alt);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+:root[dir="rtl"] .side-item[aria-current="page"] {
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+
+.side-item.sub {
+  padding-inline-start: 1.6rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.side-item.sub[aria-current="page"] {
+  color: var(--accent-alt);
+}
+
+.side-foot {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 0.5rem;
+}
+
+.side-foot .who {
+  margin: 0;
+  padding-inline-start: 0.6rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.side-foot select {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.admin-main {
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  max-inline-size: 52rem;
+}
+
+/* Narrow: the sidebar becomes a strip across the top that scrolls sideways.
+   A drawer would need a button, a state and a trap; a strip needs none of it
+   and never hides where you are. */
+@media (max-width: 52rem) {
+  .admin {
+    grid-template-columns: 1fr;
+  }
+
+  .side {
+    position: static;
+    block-size: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.4rem;
+    overflow-x: auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--border);
+    padding: 0.6rem 0.75rem;
+  }
+
+  .side .brand,
+  .side-label,
+  .side-foot .who {
+    display: none;
+  }
+
+  .side-item {
+    white-space: nowrap;
+  }
+
+  .side-item[aria-current="page"] {
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  .side-foot {
+    margin: 0 0 0 auto;
+    padding: 0;
+    border: 0;
+    grid-auto-flow: column;
+    align-items: center;
+  }
+}
+
+/* The theme choice, three buttons rather than a switch: a switch has two ends
+   and there are three answers, one of which is "whatever the system says". */
+.theme-choice {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.theme-choice button {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+}
+
+.theme-choice button[aria-pressed="true"] {
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent-alt);
+  font-weight: 600;
 }

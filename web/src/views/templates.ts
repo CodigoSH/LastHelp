@@ -644,7 +644,55 @@ function accountFields(text: Text): string {
       required: true,
       autocomplete: "new-password",
       hint: text.t("auth.passwordHelp"),
+    }, text) +
+    // Confirm password, spelled the way every application spells it. A second
+    // box is what stops the first install being locked out by a typo nobody
+    // can see, and there is no reset to fall back on here.
+    field({
+      id: "password-again",
+      name: "password_again",
+      label: text.t("auth.passwordAgain"),
+      type: "password",
+      required: true,
+      autocomplete: "new-password",
     }, text)
+  );
+}
+
+/** The first thing the wizard asks, and the one thing every later screen uses. */
+function preferenceFields(
+  text: Text,
+  languages: { code: string; name: string }[],
+  language: string,
+  theme: string,
+): string {
+  return (
+    choiceField({
+      id: "setup-language",
+      name: "language",
+      label: text.t("shell.language"),
+      options: languages.map((l) => [l.code, l.name] as [string, string]),
+      selected: language,
+    }) +
+    `<div class="field">
+      <label>${escapeHTML(text.t("shell.theme"))}</label>
+      <div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
+        ${(["system", "light", "dark"] as const)
+          .map(
+            (value) =>
+              `<button type="button" data-theme-choice="${value}" aria-pressed="${theme === value}">${escapeHTML(
+                text.t(
+                  value === "system"
+                    ? "shell.themeSystem"
+                    : value === "light"
+                      ? "shell.themeLight"
+                      : "shell.themeDark",
+                ),
+              )}</button>`,
+          )
+          .join("")}
+      </div>
+    </div>`
   );
 }
 
@@ -740,9 +788,26 @@ function acceptsFields(text: Text): string {
   </div>`;
 }
 
-/** The first run: account, organisation, board. */
-export function setupWizard(step: number, text: Text, forge = "none"): string {
+/**
+ * The first run: language, administrator, organisation, board.
+ *
+ * Language and look come first because everything after them is read in
+ * whatever they choose, and because the account created in step two is the
+ * administrator — there is no sign-up afterwards and no password reset, so the
+ * step that makes it deserves not to be the first thing somebody sees.
+ */
+export function setupWizard(
+  step: number,
+  text: Text,
+  forge = "none",
+  prefs: { languages: { code: string; name: string }[]; language: string; theme: string } = {
+    languages: [],
+    language: "en",
+    theme: "system",
+  },
+): string {
   const names = [
+    text.t("setup.stepLanguage"),
     text.t("setup.stepAccount"),
     text.t("setup.stepOrganization"),
     text.t("setup.stepBoard"),
@@ -752,6 +817,21 @@ export function setupWizard(step: number, text: Text, forge = "none"): string {
     return wizard(
       {
         step: 1,
+        names,
+        title: text.t("setup.languageTitle"),
+        lead: text.t("setup.languageLead"),
+        body: preferenceFields(text, prefs.languages, prefs.language, prefs.theme),
+        submit: text.t("wizard.continue"),
+        formClass: "setup-preferences",
+      },
+      text,
+    );
+  }
+
+  if (step === 2) {
+    return wizard(
+      {
+        step: 2,
         names,
         title: text.t("auth.setupTitle"),
         lead: text.t("auth.setupHelp"),
@@ -763,10 +843,10 @@ export function setupWizard(step: number, text: Text, forge = "none"): string {
     );
   }
 
-  if (step === 2) {
+  if (step === 3) {
     return wizard(
       {
-        step: 2,
+        step: 3,
         names,
         title: text.t("setup.orgTitle"),
         lead: text.t("setup.orgLead"),
@@ -780,7 +860,7 @@ export function setupWizard(step: number, text: Text, forge = "none"): string {
 
   return wizard(
     {
-      step: 3,
+      step: 4,
       names,
       title: text.t("setup.boardTitle"),
       lead: text.t("setup.boardLead"),
@@ -900,4 +980,87 @@ export function wizardDone(
       <a class="link" href="/panel/${escapeAttr(orgSlug)}">${escapeHTML(text.t("nav.panel"))}</a>
     </div>
   </section>`;
+}
+
+/* -------------------------------------------------------------- admin shell */
+
+export interface SideOrganization {
+  slug: string;
+  name: string;
+  repos?: { slug: string; name: string }[];
+}
+
+export interface ShellSpec {
+  /** The path of the page being shown, so exactly one item is current. */
+  path: string;
+  organizations: SideOrganization[];
+  /** Shown at the foot, so it is obvious which account is acting. */
+  who: string;
+  isAdmin: boolean;
+  theme: "system" | "light" | "dark";
+  languages: { code: string; name: string }[];
+  language: string;
+  content: string;
+}
+
+/**
+ * The administration, with its options down one side.
+ *
+ * The panel used to be a page with a list and a button, so the answer to "what
+ * can I do here?" was whatever that screen happened to show. Everything an
+ * account can reach is in the sidebar, and the current page is marked with
+ * aria-current rather than only with a colour and a bar.
+ */
+export function adminShell(spec: ShellSpec, text: Text): string {
+  const item = (href: string, label: string, extra = ""): string => {
+    const current = spec.path === href;
+    return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${escapeHTML(label)}</a>`;
+  };
+
+  const orgs = spec.organizations
+    .map((org) => {
+      const inside = spec.path.startsWith(`/panel/${org.slug}`) || spec.path.startsWith(`/${org.slug}/`);
+      const boards =
+        inside && org.repos?.length
+          ? org.repos
+              .map((r) => item(`/${org.slug}/${r.slug}/queue`, r.name, "sub"))
+              .join("")
+          : "";
+      return item(`/panel/${org.slug}`, org.name) + boards;
+    })
+    .join("");
+
+  const themeButton = (value: string, label: string) =>
+    `<button type="button" data-theme-choice="${escapeAttr(value)}" aria-pressed="${spec.theme === value}">${escapeHTML(label)}</button>`;
+
+  return `<div class="admin">
+    <aside class="side">
+      <a class="brand" href="/">${escapeHTML(text.t("app.name"))}</a>
+      <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
+        ${item("/panel", text.t("shell.overview"))}
+        ${spec.isAdmin ? item("/panel/updates", text.t("shell.updates")) : ""}
+        <p class="side-label">${escapeHTML(text.t("shell.organizations"))}</p>
+        ${orgs}
+        ${item("/panel/new", text.t("panel.newOrganization"), "add")}
+      </nav>
+      <div class="side-foot">
+        <p class="who">${escapeHTML(spec.who)}</p>
+        <div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
+          ${themeButton("system", text.t("shell.themeSystem"))}
+          ${themeButton("light", text.t("shell.themeLight"))}
+          ${themeButton("dark", text.t("shell.themeDark"))}
+        </div>
+        <select class="lang" aria-label="${escapeAttr(text.t("shell.language"))}">
+          ${spec.languages
+            .map(
+              (l) =>
+                `<option value="${escapeAttr(l.code)}"${l.code === spec.language ? " selected" : ""}>${escapeHTML(l.name)}</option>`,
+            )
+            .join("")}
+        </select>
+        <button class="link" data-signout>${escapeHTML(text.t("nav.signOut"))}</button>
+      </div>
+    </aside>
+    <main class="admin-main">${spec.content}</main>
+  </div>`;
 }

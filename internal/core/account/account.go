@@ -114,6 +114,26 @@ func (s Store) Authenticate(email, plainPassword string) (User, error) {
 	return u, nil
 }
 
+// ByID reads an account, for a screen that has to say which one is acting.
+//
+// It carries no password material and asks for nothing beyond the identity: a
+// lookup used to label a page must not become the second place a credential can
+// leak from.
+func (s Store) ByID(userID int64) (User, error) {
+	var u User
+	err := s.DB.QueryRow(`SELECT id, email, display_name, is_administrator, disabled
+		FROM app_user WHERE id = ?`, userID).
+		Scan(&u.ID, &u.Email, &u.DisplayName, &u.IsAdministrator, &u.Disabled)
+
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return User{}, ErrNotFound
+	case err != nil:
+		return User{}, fmt.Errorf("looking up the account: %w", err)
+	}
+	return u, nil
+}
+
 // Actor loads everything authz needs to answer questions about this account.
 //
 // A repository membership carries the organisation the repository belongs to,

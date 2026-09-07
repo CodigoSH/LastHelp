@@ -147,11 +147,18 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	// role is ever renamed, a key spelled out here would quietly become stale —
 	// which is the same reason the architecture rule refuses to see role names
 	// outside authz, and it fired on this exact line.
-	writeJSON(w, http.StatusOK, map[string]any{
+	// The address, so the panel can say which account is acting. An
+	// administration that does not name the account it is acting as is one
+	// where a shared browser becomes somebody else's mistake.
+	body := map[string]any{
 		"id":          actor.UserID,
 		"admin":       actor.IsAdministrator,
 		"memberships": memberships,
-	})
+	}
+	if user, err := s.accounts().ByID(actor.UserID); err == nil {
+		body["email"] = user.Email
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) {
