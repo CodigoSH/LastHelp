@@ -103,6 +103,13 @@ by `make live-forge`: LastHelp creates the issue, the forge signs a webhook with
 its own code, our receiver verifies it, and closing the issue there closes the
 item here.
 
+It asks the forge which version it is and prints it, and pulls **the current
+stable** rather than a tag somebody pinned once — a check against a version
+nobody runs proves something about software that does not exist in the world.
+Set `FORGE_VERSION` to test against the one an operator reported a problem on.
+
+Last run against **Forgejo 16.0.3** and **Gitea 1.27.3**.
+
 That check also verifies the token scope this page tells you to create: LastHelp
 is handed one with **only `write:issue`** and the whole journey works with it.
 Adding the webhook needs more, which is why a person does that part in the

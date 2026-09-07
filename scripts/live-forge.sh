@@ -21,10 +21,37 @@ CDP="${CDP:-9222}"
 FORGE_PORT="${FORGE_PORT:-3000}"
 PASSWORD="a good long passphrase"
 
+# The version matters, and pinning one by eye is how a check ends up proving
+# something about software nobody runs. The first version of this pinned Forgejo
+# 11 while CodigoSH — and everybody else — was on 16.
+#
+# So the tag is asked for rather than assumed, with a floor that is only used
+# when there is no network. FORGE_VERSION overrides it, which is how you test
+# against the version an operator reported a problem on.
+latest_forgejo() {
+    curl -s --max-time 15 "https://codeberg.org/api/v1/repos/forgejo/forgejo/releases?limit=20" 2>/dev/null |
+        python3 -c "
+import sys, json
+try:
+    releases = [r['tag_name'].lstrip('v') for r in json.load(sys.stdin)
+                if not r.get('prerelease') and not r.get('draft')]
+    print(sorted(releases, key=lambda v: [int(p) for p in v.split('.')], reverse=True)[0])
+except Exception:
+    pass" 2>/dev/null
+}
+
 case "$FORGE_KIND" in
-    forgejo) IMAGE="codeberg.org/forgejo/forgejo:11"; ENV_PREFIX=FORGEJO; BIN=forgejo ;;
-    gitea)   IMAGE="docker.io/gitea/gitea:1";         ENV_PREFIX=GITEA;   BIN=gitea ;;
-    gitlab)  IMAGE="docker.io/gitlab/gitlab-ce:latest" ;;
+    forgejo)
+        VERSION="${FORGE_VERSION:-$(latest_forgejo)}"
+        VERSION="${VERSION:-16}"
+        IMAGE="codeberg.org/forgejo/forgejo:$VERSION"
+        ENV_PREFIX=FORGEJO; BIN=forgejo ;;
+    gitea)
+        # Gitea's "1" is a rolling tag on the current stable line, which is what
+        # people actually run. It prints its real version on startup below.
+        IMAGE="docker.io/gitea/gitea:${FORGE_VERSION:-1}"
+        ENV_PREFIX=GITEA; BIN=gitea ;;
+    gitlab)  IMAGE="docker.io/gitlab/gitlab-ce:${FORGE_VERSION:-latest}" ;;
     *) echo "FORGE_KIND must be forgejo, gitea or gitlab"; exit 2 ;;
 esac
 
@@ -100,7 +127,7 @@ if [ "$FORGE_KIND" = gitlab ]; then
     exit $?
 fi
 
-echo "==> starting $FORGE_KIND"
+echo "==> starting $FORGE_KIND ($IMAGE)"
 "$RUNTIME" rm -f "$CONTAINER" >/dev/null 2>&1 || true
 mkdir -p "$WORK/forge"
 "$RUNTIME" run -d --name "$CONTAINER" --network=host \

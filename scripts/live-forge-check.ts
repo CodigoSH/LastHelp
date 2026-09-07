@@ -127,7 +127,23 @@ const evaluate = async (expression: string) => {
 await sleep(1200);
 
 // --- set the instance up, through the browser ------------------------------
-console.log(`\nAgainst a real ${KIND} at ${FORGE}\n`);
+const version = await (async () => {
+  try {
+    if (isGitLab) {
+      const res = await forgeAPI("/version", {}, true);
+      return String(res.body?.version ?? "unknown");
+    }
+    const res = await fetch(`${FORGE}/api/v1/version`);
+    return String((await res.json()).version ?? "unknown");
+  } catch {
+    return "unknown";
+  }
+})();
+
+// Printed, always. The first run of this checked Forgejo 11 while everybody —
+// including the operator who asked for it — was on 16, and nothing in the
+// output said so.
+console.log(`\nAgainst a real ${KIND} ${version} at ${FORGE}\n`);
 
 const setup = await evaluate(`
   const csrf = () => document.cookie.split(";").map(c => c.trim())
