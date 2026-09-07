@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"testing"
+	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
@@ -18,7 +19,7 @@ func (i *instance) anonymous() *instance {
 		i.t.Fatal(err)
 	}
 	return &instance{t: i.t, server: i.server, client: &http.Client{Jar: jar},
-		dbHandle: i.dbHandle, clock: i.clock}
+		dbHandle: i.dbHandle, clock: i.clock, tick: i.tick}
 }
 
 func (i *instance) createOrg(slug string) {
@@ -40,10 +41,22 @@ func (i *instance) createRepo(orgSlug, repoSlug string) {
 	}
 }
 
+// submit does what the page does: fetch the form, take a moment to fill it in,
+// then send it with the token.
 func (i *instance) submit(orgSlug, repoSlug, kind, title string) (publicID, token string) {
 	i.t.Helper()
-	resp := i.do(http.MethodPost, "/api/orgs/"+orgSlug+"/repos/"+repoSlug+"/items",
-		map[string]any{"kind": kind, "title": title, "body": "what happened"})
+	base := "/api/orgs/" + orgSlug + "/repos/" + repoSlug
+
+	formResp := i.do(http.MethodGet, base+"/form", nil)
+	form := decode(i.t, formResp)
+	formToken, _ := form["token"].(string)
+
+	// Long enough that it was typed rather than posted.
+	i.tick.advance(5 * time.Second)
+
+	resp := i.do(http.MethodPost, base+"/items",
+		map[string]any{"kind": kind, "title": title, "body": "what happened for " + title,
+			"token": formToken})
 	body := decode(i.t, resp)
 	if resp.StatusCode != http.StatusCreated {
 		i.t.Fatalf("submitting returned %d: %v", resp.StatusCode, body)
@@ -310,8 +323,11 @@ func TestAKindTheBoardDoesNotAcceptIsRefused(t *testing.T) {
 	}
 
 	public := team.anonymous()
+	form := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/ideas-only/form", nil))
+	public.tick.advance(5 * time.Second)
+
 	resp = public.do(http.MethodPost, "/api/orgs/codigosh/repos/ideas-only/items",
-		map[string]any{"kind": "bug", "title": "a bug"})
+		map[string]any{"kind": "bug", "title": "a bug", "token": form["token"]})
 	body := decode(t, resp)
 	if resp.StatusCode != http.StatusBadRequest || body["error"] != "error.kind_not_accepted" {
 		t.Errorf("a bug on an ideas-only board returned %d %v", resp.StatusCode, body)

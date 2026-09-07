@@ -142,16 +142,32 @@ async function main() {
   const formThere = await evaluate(`return !!document.querySelector("form.report")`);
   check("the report form is on screen", formThere === true);
 
-  await evaluate(`
-    // An idea, not a bug: only ideas are voted, so this is what exercises the
-    // vote button further down.
-    document.querySelector('[data-choice="idea"]').click();
-    const f = document.querySelector("form.report");
-    f.querySelector('[name=title]').value = "dark mode for the dashboard";
-    f.querySelector('[name=body]').value = "the white is bright at night";
-    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  const fillIn = async () =>
+    evaluate(`
+      // An idea, not a bug: only ideas are voted, so this is what exercises the
+      // vote button further down.
+      document.querySelector('[data-choice="idea"]').click();
+      const f = document.querySelector("form.report");
+      f.querySelector('[name=title]').value = "dark mode for the dashboard";
+      f.querySelector('[name=body]').value = "the white is bright at night";
+      f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    `);
+
+  // Submitting the instant the form appeared is refused, and should be: nobody
+  // types that fast. Checking it here rather than only in the Go tests is what
+  // proves the message reaches the screen instead of failing silently.
+  await fillIn();
+  await sleep(500);
+  const tooFast = await evaluate(`
+    const line = document.querySelector(".form-error");
+    return { shown: line ? !line.hidden : false, text: line?.textContent?.trim() ?? "" };
   `);
-  await sleep(700);
+  check("an instant submission is refused, visibly", tooFast.shown === true, tooFast.text.slice(0, 50));
+
+  // Now wait the way a person filling in a form does.
+  await sleep(2500);
+  await fillIn();
+  await sleep(900);
   const followLink = await evaluate(`return document.querySelector(".follow-link input")?.value ?? ""`);
   check("the follow link is shown once", String(followLink).includes("?k="), String(followLink).slice(0, 48));
 

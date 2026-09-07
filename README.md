@@ -22,9 +22,15 @@ boards, reporting without an account, the secret follow link, the moderation
 queue, publishing, voting on ideas, comment threads, similar-item hints while
 you type, and the whole interface in twenty languages including right-to-left.
 
+Also working: the anti-abuse layers — a signed single-use form token, a timing
+window, a honeypot, rate limits keyed on the address a caller cannot choose,
+duplicate and link heuristics, an operator word list, and a circuit breaker that
+closes a board rather than hand somebody a queue they will not open. Every
+refusal is counted by layer, because a filter nobody can measure is a filter
+quietly turning away people who never complain.
+
 Not there yet: the forge integration — creating and linking issues, and the
-status coming back when an issue closes — the notification channels, and the
-anti-abuse layers beyond the moderation queue.
+status coming back when an issue closes — and the notification channels.
 
 ## Why it exists
 

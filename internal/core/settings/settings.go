@@ -19,6 +19,13 @@ import (
 // everything, and nothing would look broken.
 const VoterSigningKey = "voter_signing_key"
 
+// FormSigningKey signs the token a report form carries.
+//
+// Deliberately a different secret from the voter key. Two things that are not
+// the same secret should not be the same secret: leaking one must not hand over
+// the other, and they have very different lifetimes.
+const FormSigningKey = "form_signing_key"
+
 type Store struct {
 	DB database.Execer
 }

@@ -17,7 +17,21 @@ assumptions apply, and keeping them apart is most of the design:
 
 - **The content comes from strangers.** Anyone on the internet can submit. So
   nothing is published without approval, every request body is bounded, and the
-  rate limits are keyed on an address a caller cannot choose for themselves.
+  rate limits are keyed on an address a caller cannot choose for themselves —
+  the entry *our* proxy appended, never the leftmost one, and bucketed by /24
+  and /64 because a single IPv6 customer holds eighteen quintillion addresses.
+
+  What that protects is not the database — nothing reaches a public page
+  unapproved — it is the operator's attention. A queue too full to open is how
+  a portal dies. The layers are a signed single-use form token, a timing window,
+  a honeypot, those rate limits, duplicate and link heuristics, a word list the
+  operator controls, and a breaker that closes a board for a while rather than
+  filling a queue nobody will read.
+
+  Honestly: this stops the ambient automated flood. It does not stop somebody
+  who has decided to target your project and is willing to work at it by hand.
+  Against that the tools are the breaker, closing submissions for a while, and
+  the fact that nothing is published without a person approving it.
 - **The forge URL comes from the operator.** Pointing at a Gitea on
   `192.168.1.x` with a self-signed certificate is the feature, not the
   vulnerability, so private addresses are allowed there. Cloud metadata

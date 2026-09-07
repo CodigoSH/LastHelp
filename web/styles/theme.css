@@ -320,3 +320,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .queue h3 { margin: 0.25rem 0; }
 .queue .body { white-space: pre-wrap; color: var(--text-muted); }
 .actions { display: flex; gap: 0.5rem; margin-block-start: 0.6rem; }
+
+/* The honeypot: out of the layout entirely rather than display:none, because
+ * some automated fillers skip anything that is not rendered. Nobody who can see
+ * or hear the page is ever offered it. */
+.trap {
+  position: absolute;
+  inset-inline-start: -9999px;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+}

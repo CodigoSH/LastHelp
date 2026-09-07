@@ -181,6 +181,19 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
   const repo = await api.get<RepositorySummary>(base);
 
   let kind = repo.accepts_bugs ? "bug" : "idea";
+
+  // Fetching the form is what separates somebody who opened the page from a
+  // script that found the endpoint. The token it returns is bound to this
+  // board, this moment and this part of the internet, and is spent once.
+  const ticket = await api
+    .get<{ token: string; accepting: boolean }>(`${base}/form`)
+    .catch(() => ({ token: "", accepting: true }));
+
+  if (!ticket.accepting) {
+    show(`<p class="notice">${escapeHTML(i18n.t("error.board_closed"))}</p>`);
+    return;
+  }
+
   show(views.reportForm(repo, kind, text));
 
   const form = root?.querySelector<HTMLFormElement>("form.report");
@@ -225,6 +238,8 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
         title: String(data.get("title") ?? ""),
         body: String(data.get("body") ?? ""),
         email: String(data.get("email") ?? ""),
+        website: String(data.get("website") ?? ""),
+        token: ticket.token,
       });
       const link = `${location.origin}/i/${sent.public_id}?k=${sent.follow_token}`;
       show(views.submitted(link, text));

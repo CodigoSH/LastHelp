@@ -120,6 +120,16 @@ export function reportForm(repo: RepositorySummary, kind: string, text: Text): s
         ${repo.accepts_ideas ? choice("idea", text.t("form.kindIdea")) : ""}
       </div>
 
+      <!--
+        The honeypot. Hidden from people by CSS and from assistive technology by
+        aria-hidden and tabindex, so nobody who can see or hear the page is ever
+        offered it; something filling in every input it finds will fill it in.
+      -->
+      <div class="trap" aria-hidden="true">
+        <label for="report-website">Website</label>
+        <input id="report-website" name="website" type="text" tabindex="-1" autocomplete="off" />
+      </div>
+
       <label for="report-title">${escapeHTML(text.t("form.title"))}</label>
       <input id="report-title" name="title" maxlength="200" required
              placeholder="${escapeAttr(text.t("form.titlePlaceholder"))}" />

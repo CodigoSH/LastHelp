@@ -8,6 +8,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,6 +26,26 @@ type instance struct {
 	client   *http.Client
 	dbHandle *sql.DB
 	clock    func() time.Time
+	tick     *testClock
+}
+
+// testClock is the one source of time in these tests. Real sleeps would make
+// the suite slower than everything else in the repository put together.
+type testClock struct {
+	mu sync.Mutex
+	at time.Time
+}
+
+func (c *testClock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.at
+}
+
+func (c *testClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.at = c.at.Add(d)
 }
 
 func newInstance(t *testing.T) *instance {
@@ -41,6 +62,12 @@ func newInstance(t *testing.T) *instance {
 		t.Fatal(err)
 	}
 
+	// A clock the test moves. The form token refuses a submission that arrives
+	// faster than a person types, so a test that submits instantly has to be
+	// able to say that three seconds passed rather than sleep for them.
+	clock := &testClock{at: time.Unix(1_700_000_000, 0)}
+	srv.Clock = clock.now
+
 	httpSrv := httptest.NewServer(srv)
 	t.Cleanup(httpSrv.Close)
 
@@ -54,6 +81,7 @@ func newInstance(t *testing.T) *instance {
 		client:   &http.Client{Jar: jar},
 		dbHandle: db,
 		clock:    srv.now,
+		tick:     clock,
 	}
 }
 

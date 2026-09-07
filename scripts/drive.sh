@@ -9,9 +9,19 @@ CDP="${CDP:-9222}"
 WORK="$(mktemp -d)"
 
 cleanup() {
-    [ -n "${CHROME_PID:-}" ] && kill "$CHROME_PID" 2>/dev/null || true
-    [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null || true
-    rm -rf "$WORK"
+    # Wait for the browser to actually exit before removing its profile: kill
+    # returns as soon as the signal is sent, and Chrome is still writing to the
+    # directory for a moment afterwards, so the rm fails and the run reports a
+    # failure it did not have.
+    if [ -n "${CHROME_PID:-}" ]; then
+        kill "$CHROME_PID" 2>/dev/null || true
+        wait "$CHROME_PID" 2>/dev/null || true
+    fi
+    if [ -n "${SERVER_PID:-}" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
+    rm -rf "$WORK" 2>/dev/null || true
 }
 trap cleanup EXIT
 

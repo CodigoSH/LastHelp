@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/guard"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
 )
@@ -122,12 +123,43 @@ func (s *Server) handleSimilar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"similar": out})
 }
 
+// handleForm hands out the token a submission has to carry.
+//
+// Fetching it is what separates a person who opened the page from a script that
+// found the endpoint, and it is bound to this board, this moment and this part
+// of the internet.
+func (s *Server) handleForm(w http.ResponseWriter, r *http.Request) {
+	repo, _, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+
+	accepting, err := s.guard().Accepting(repo.ID, s.now())
+	if err != nil {
+		slog.Error("checking the breaker", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"token":     s.guard().IssueToken(repo.ID, s.bucketOf(r), s.now()),
+		"accepting": accepting,
+	})
+}
+
 type submission struct {
 	Kind   string            `json:"kind"`
 	Title  string            `json:"title"`
 	Body   string            `json:"body"`
 	Email  string            `json:"email"`
 	Fields map[string]string `json:"fields"`
+
+	// Token is what handleForm issued.
+	Token string `json:"token"`
+
+	// Website is the honeypot: no person sees the field, so anything in it was
+	// put there by something filling in every input it found.
+	Website string `json:"website"`
 }
 
 // handleSubmit takes a report. No account, no email required.
@@ -144,6 +176,50 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	var in submission
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	// The layers, cheapest first. Each refusal is counted so the operator can
+	// see which one is doing the work — a layer that never refuses anything is
+	// a layer to delete, and one that refuses nearly everything is biting
+	// people who did nothing wrong.
+	if err := guard.Honeypot(in.Website); err != nil {
+		s.refused(repo.ID, "honeypot")
+		// Answered as if it worked. Telling a script which check caught it is
+		// telling it what to change.
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"public_id": "", "follow_token": "", "moderation": string(item.Pending),
+		})
+		return
+	}
+
+	if err := s.guard().CheckToken(in.Token, repo.ID, s.bucketOf(r), s.now()); err != nil {
+		s.refused(repo.ID, "form_token")
+		writeError(w, http.StatusBadRequest, keyForGuardError(err))
+		return
+	}
+
+	accepting, err := s.guard().Accepting(repo.ID, s.now())
+	if err != nil {
+		slog.Error("checking the breaker", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if !accepting {
+		s.refused(repo.ID, "breaker")
+		writeError(w, http.StatusServiceUnavailable, "error.board_closed")
+		return
+	}
+
+	verdict, err := s.guard().Inspect(repo.ID, in.Title, in.Body, s.stoplist(), s.now())
+	if err != nil {
+		slog.Error("inspecting a submission", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if !verdict.OK {
+		s.refused(repo.ID, verdict.Layer)
+		writeError(w, http.StatusBadRequest, verdict.Reason)
 		return
 	}
 
@@ -166,12 +242,12 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	// queue is the protection: nothing the public writes reaches a public page
 	// without somebody having looked at it.
 	moderation := item.Pending
-	created, token, err := s.items().Create(item.New{
+	created, token, createErr := s.items().Create(item.New{
 		RepoID: repo.ID, Kind: kind, Title: in.Title, Body: in.Body,
 		Email: in.Email, Fields: fields,
 	}, moderation, s.now())
-	if err != nil {
-		if errors.Is(err, item.ErrNotFound) {
+	if createErr != nil {
+		if errors.Is(createErr, item.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "error.not_found")
 			return
 		}
@@ -406,4 +482,18 @@ func intParam(raw string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+// keyForGuardError turns a refusal into something the page can say in the
+// reader's language. The token failures deliberately collapse into one message:
+// the difference between "too fast" and "already used" is only useful to
+// somebody tuning a script.
+func keyForGuardError(err error) string {
+	switch {
+	case errors.Is(err, guard.ErrTooFast), errors.Is(err, guard.ErrStale),
+		errors.Is(err, guard.ErrUsed), errors.Is(err, guard.ErrNoToken):
+		return "error.form_stale"
+	default:
+		return "error.bad_request"
+	}
 }

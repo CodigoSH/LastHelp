@@ -49,6 +49,17 @@ type Server struct {
 	// generated on the first ever start.
 	voterKey []byte
 
+	// formKey signs the token a report form carries. A separate key from the
+	// voter one: two things that are not the same secret should not be the
+	// same secret, so that leaking one does not hand over the other.
+	formKey []byte
+
+	// Two limiters, because an address alone means nothing in IPv6 — a single
+	// customer holds a /64 — and a block alone would punish a whole office for
+	// one person. Both are bounded: the keys are chosen by whoever is calling.
+	perAddress *middleware.Limiter
+	perBlock   *middleware.Limiter
+
 	// shell is index.html, read once. Every request stamps a language into a
 	// copy of it.
 	shell string
@@ -79,6 +90,9 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	if s.voterKey, err = (settings.Store{DB: db}).Secret(settings.VoterSigningKey); err != nil {
 		return nil, err
 	}
+	if s.formKey, err = (settings.Store{DB: db}).Secret(settings.FormSigningKey); err != nil {
+		return nil, err
+	}
 
 	shell, err := fs.ReadFile(assets, "index.html")
 	if err != nil {
@@ -88,6 +102,9 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 		return nil, fmt.Errorf("the embedded frontend has no index.html: %w", err)
 	}
 	s.shell = string(shell)
+
+	s.perAddress = middleware.NewLimiter(240, time.Minute, 20_000, s.now)
+	s.perBlock = middleware.NewLimiter(600, time.Minute, 20_000, s.now)
 
 	s.routes()
 	s.handler = s.wrap()
@@ -115,6 +132,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/items", s.handleListItems)
 	s.mux.HandleFunc("POST /api/orgs/{org}/repos/{repo}/items", s.handleSubmit)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/similar", s.handleSimilar)
+	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/form", s.handleForm)
 
 	s.mux.HandleFunc("GET /api/items/{id}", s.handleItem)
 	s.mux.HandleFunc("POST /api/items/{id}/votes", s.handleVote)
@@ -206,9 +224,13 @@ func (s *Server) wrap() http.Handler {
 	}
 
 	var h http.Handler = s.mux
-	h = auth.Attach(h)                           // who is asking
-	h = middleware.CSRF(s.cfg.TrustProxy)(h)     // and did the page ask
-	h = middleware.CrossSite(h)                  // and was it this site
+	h = auth.Attach(h)                       // who is asking
+	h = middleware.CSRF(s.cfg.TrustProxy)(h) // and did the page ask
+	h = middleware.CrossSite(h)              // and was it this site
+	// How busy this caller has been. Not the anti-spam layer — the form token
+	// and the queue are — this is the ceiling that stops one caller spending
+	// the whole server on itself.
+	h = middleware.RateLimit(s.perAddress, s.perBlock, s.addressOf)(h)
 	h = middleware.BodyLimit(GlobalBodyLimit)(h) // and is it a sane size
 	h = middleware.Recover(h)                    // and if it explodes, say so
 	return h
