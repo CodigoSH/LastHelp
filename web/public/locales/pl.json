@@ -85,6 +85,7 @@
   "panel.connection": "Połączenie z forge",
   "panel.createIssue": "Załóż zgłoszenie",
   "panel.empty": "Nic nie czeka.",
+  "panel.export": "Eksportuj {board}",
   "panel.firstStep": "Nic tu jeszcze nie ma. Zacznij od organizacji: to połączenie z forge albo z niczym.",
   "panel.forge": "Forge",
   "panel.forgeNone": "Żaden — działa i bez niego",

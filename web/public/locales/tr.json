@@ -85,6 +85,7 @@
   "panel.connection": "Forge bağlantısı",
   "panel.createIssue": "Konu aç",
   "panel.empty": "Bekleyen yok.",
+  "panel.export": "{board} dışa aktar",
   "panel.firstStep": "Burada henüz bir şey yok. Bir kuruluşla başla: bir forge bağlantısıdır, ya da hiçbiriyle.",
   "panel.forge": "Forge",
   "panel.forgeNone": "Yok — onsuz da çalışır",

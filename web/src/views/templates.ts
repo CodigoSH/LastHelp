@@ -168,10 +168,22 @@ export function panelOrganization(
           )
           .join("")}</ul>`;
 
+  const exports =
+    repos.length === 0
+      ? ""
+      : `<p class="exports">${repos
+          .map(
+            (r) =>
+              `<a href="/api/orgs/${escapeAttr(org.slug)}/repos/${escapeAttr(r.slug)}/export"
+                  download>${escapeHTML(text.t("panel.export", { board: r.name }))}</a>`,
+          )
+          .join(" · ")}</p>`;
+
   return `
     <p class="crumb"><a href="/panel">${escapeHTML(text.t("nav.panel"))}</a></p>
     <h1>${escapeHTML(org.name)}</h1>
     ${list}
+    ${exports}
 
     <h2>${escapeHTML(text.t("panel.newRepository"))}</h2>
     <form class="new-repo">

@@ -85,6 +85,7 @@
   "panel.connection": "Connessione alla forge",
   "panel.createIssue": "Apri una segnalazione",
   "panel.empty": "Niente in attesa.",
+  "panel.export": "Esporta {board}",
   "panel.firstStep": "Qui non c'è ancora niente. Comincia da un'organizzazione: è una connessione a una forge, o a nessuna.",
   "panel.forge": "Forge",
   "panel.forgeNone": "Nessuna — funziona lo stesso",

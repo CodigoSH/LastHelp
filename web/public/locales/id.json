@@ -85,6 +85,7 @@
   "panel.connection": "Koneksi forge",
   "panel.createIssue": "Buka isu",
   "panel.empty": "Tidak ada yang menunggu.",
+  "panel.export": "Ekspor {board}",
   "panel.firstStep": "Belum ada apa-apa di sini. Mulai dengan menambah organisasi: itu koneksi ke forge, atau ke tidak satu pun.",
   "panel.forge": "Forge",
   "panel.forgeNone": "Tidak ada — tetap berfungsi",

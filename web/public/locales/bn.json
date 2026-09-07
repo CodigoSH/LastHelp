@@ -85,6 +85,7 @@
   "panel.connection": "ফোর্জ সংযোগ",
   "panel.createIssue": "ইস্যু খুলুন",
   "panel.empty": "অপেক্ষমাণ কিছু নেই。",
+  "panel.export": "{board} রপ্তানি করুন",
   "panel.firstStep": "এখানে এখনও কিছু নেই। একটি সংস্থা যোগ করে শুরু করুন — এটি কোনো ফোর্জের সংযোগ, বা কোনোটিরই নয়।",
   "panel.forge": "ফোর্জ",
   "panel.forgeNone": "কোনোটি নয় — এটি ছাড়াও চলে",

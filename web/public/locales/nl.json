@@ -85,6 +85,7 @@
   "panel.connection": "Forge-verbinding",
   "panel.createIssue": "Issue aanmaken",
   "panel.empty": "Niets in afwachting.",
+  "panel.export": "{board} exporteren",
   "panel.firstStep": "Hier is nog niets. Begin met een organisatie — dat is een verbinding met een forge, of met geen enkele.",
   "panel.forge": "Forge",
   "panel.forgeNone": "Geen — werkt ook zonder",

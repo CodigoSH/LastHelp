@@ -85,6 +85,7 @@
   "panel.connection": "Σύνδεση με forge",
   "panel.createIssue": "Άνοιγμα ζητήματος",
   "panel.empty": "Τίποτα σε αναμονή.",
+  "panel.export": "Εξαγωγή {board}",
   "panel.firstStep": "Δεν υπάρχει τίποτα ακόμη. Ξεκίνα με έναν οργανισμό: είναι μια σύνδεση με ένα forge, ή με κανένα.",
   "panel.forge": "Forge",
   "panel.forgeNone": "Καμία — δουλεύει και χωρίς",

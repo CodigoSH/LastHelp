@@ -445,3 +445,5 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 .triage { margin-block-start: 2rem; padding-block-start: 1rem; border-block-start: 1px solid var(--border); }
 .triage-note { font-size: 0.875rem; color: var(--text-muted); }
+
+.exports { font-size: 0.875rem; margin-block: 0.5rem 0; }

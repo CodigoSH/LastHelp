@@ -85,6 +85,7 @@
   "panel.connection": "Forge connection",
   "panel.createIssue": "Open an issue",
   "panel.empty": "Nothing waiting.",
+  "panel.export": "Export {board}",
   "panel.firstStep": "Nothing here yet. Add an organisation to start — it is a connection to a forge, or to nothing at all.",
   "panel.forge": "Forge",
   "panel.forgeNone": "None — works without one",

@@ -85,6 +85,7 @@
   "panel.connection": "Forge-Verbindung",
   "panel.createIssue": "Ticket anlegen",
   "panel.empty": "Nichts wartet.",
+  "panel.export": "{board} exportieren",
   "panel.firstStep": "Hier ist noch nichts. Fang mit einer Organisation an — sie ist eine Verbindung zu einer Forge, oder zu gar keiner.",
   "panel.forge": "Forge",
   "panel.forgeNone": "Keine — geht auch ohne",

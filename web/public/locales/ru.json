@@ -85,6 +85,7 @@
   "panel.connection": "Подключение к форжу",
   "panel.createIssue": "Создать задачу",
   "panel.empty": "Ничего не ждёт.",
+  "panel.export": "Выгрузить {board}",
   "panel.firstStep": "Здесь пока пусто. Начните с организации: это подключение к форжу — или ни к чему.",
   "panel.forge": "Форж",
   "panel.forgeNone": "Нет — работает и без него",

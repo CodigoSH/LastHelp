@@ -85,6 +85,7 @@
   "panel.connection": "الاتصال بالمنصة",
   "panel.createIssue": "فتح مسألة",
   "panel.empty": "لا شيء في الانتظار.",
+  "panel.export": "تصدير {board}",
   "panel.firstStep": "لا شيء هنا بعد. ابدأ بإضافة منظمة: إنها اتصال بمنصة، أو بلا شيء.",
   "panel.forge": "المنصة",
   "panel.forgeNone": "بدون — يعمل من دونها",

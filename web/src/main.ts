@@ -46,7 +46,16 @@ document.addEventListener("click", (event) => {
   const href = link.getAttribute("href");
   // The feed is served by the server, not by this router: intercepting it
   // would show a blank page where a reader expects XML.
-  if (!href?.startsWith("/") || href.startsWith("/feed/") || link.hasAttribute("target")) return;
+  // The feed and the export are served by the server, not by this router:
+  // intercepting either shows a blank page where a file was expected.
+  if (
+    !href?.startsWith("/") ||
+    href.startsWith("/feed/") ||
+    href.startsWith("/api/") ||
+    link.hasAttribute("target")
+  ) {
+    return;
+  }
   event.preventDefault();
   go(href);
 });

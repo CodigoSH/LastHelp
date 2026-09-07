@@ -85,6 +85,7 @@
   "panel.connection": "اتصال فورج",
   "panel.createIssue": "ایجاد مسئله",
   "panel.empty": "چیزی در انتظار نیست.",
+  "panel.export": "برون‌بری {board}",
   "panel.firstStep": "هنوز چیزی اینجا نیست. با افزودن یک سازمان شروع کنید: اتصالی به یک فورج، یا به هیچ.",
   "panel.forge": "فورج",
   "panel.forgeNone": "هیچ‌کدام — بدون آن هم کار می‌کند",

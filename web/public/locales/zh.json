@@ -85,6 +85,7 @@
   "panel.connection": "代码托管连接",
   "panel.createIssue": "创建议题",
   "panel.empty": "没有待处理的内容。",
+  "panel.export": "导出 {board}",
   "panel.firstStep": "这里还什么都没有。先添加一个组织：它是到代码托管的连接，也可以什么都不连。",
   "panel.forge": "代码托管",
   "panel.forgeNone": "不连接，照样能用",

@@ -85,6 +85,7 @@
   "panel.connection": "フォージ接続",
   "panel.createIssue": "イシューを作る",
   "panel.empty": "確認待ちはありません。",
+  "panel.export": "{board} を書き出す",
   "panel.firstStep": "まだ何もありません。組織を追加するところから。フォージへの接続、あるいは接続なしでも。",
   "panel.forge": "フォージ",
   "panel.forgeNone": "なし — なくても動きます",

@@ -87,6 +87,18 @@ documented limit rather than a defect. The alternative is asking people to
 create an account, which is the thing this product exists not to do, so treat a
 vote count as a signal of what is popular rather than as a count of people.
 
+## Taking your data with you
+
+Every board exports as JSON, from the organisation's screen in the panel or at
+`/api/orgs/<org>/repos/<board>/export`. It carries everything the operator
+decided — the published items, the queue, the rejections, the merged duplicates,
+the comments and the issue links — because an export that showed only the
+approved half would misrepresent the record.
+
+It deliberately carries **no reporter email addresses and no follow tokens**.
+Taking your data with you must not mean taking everybody's: those addresses are
+personal data collected for one purpose, and a follow token is a credential.
+
 ## The roadmap
 
 Both journeys land on the same three columns, and all three are always drawn —
