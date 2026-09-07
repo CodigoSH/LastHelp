@@ -314,6 +314,7 @@ async function showItem(publicID: string): Promise<void> {
       });
 
       wireIssueControl(publicID, item.issue ?? null);
+      wireTriage(publicID);
     }
   }
 
@@ -330,6 +331,93 @@ async function showItem(publicID: string): Promise<void> {
     commentForm.reset();
     const sent = commentForm.querySelector<HTMLParagraphElement>(".comment-sent");
     if (sent) sent.hidden = false;
+  });
+}
+
+/** Storing the forge token, and showing where the forge should deliver. */
+function wireCredentials(orgSlug: string, existingPath?: string): void {
+  const form = root?.querySelector<HTMLFormElement>("form.credentials");
+  if (!form) return;
+
+  const path = form.querySelector<HTMLParagraphElement>(".webhook-path");
+  const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
+
+  const showPath = (value: string) => {
+    if (!path) return;
+    // The address is shown as text to copy, not as a link: it only answers
+    // POST, so a link would go to a 404 and read as broken.
+    path.textContent = `${i18n.t("panel.webhookPath")}: ${location.origin}${value}`;
+    path.hidden = false;
+  };
+  if (existingPath) showPath(existingPath);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    try {
+      const saved = await api.post<{ webhook_path: string }>(
+        `/api/orgs/${encodeURIComponent(orgSlug)}/credentials`,
+        {
+          token: String(data.get("token") ?? ""),
+          webhook_secret: String(data.get("webhook_secret") ?? ""),
+        },
+      );
+      form.reset();
+      showPath(saved.webhook_path);
+    } catch (err) {
+      if (errorLine) {
+        errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+        errorLine.hidden = false;
+      }
+    }
+  });
+}
+
+/** Choosing where a board's team is told something arrived. */
+function wireChannel(orgSlug: string): void {
+  const form = root?.querySelector<HTMLFormElement>("form.channel");
+  if (!form) return;
+
+  const kind = form.querySelector<HTMLSelectElement>("#chan-kind");
+  const fields = form.querySelector<HTMLDivElement>(".channel-fields");
+  const mail = form.querySelector<HTMLDivElement>(".channel-mail");
+  const note = form.querySelector<HTMLParagraphElement>(".channel-note");
+  const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
+
+  // Only the fields the chosen channel needs. Asking for a URL for an email
+  // channel is a form arguing with the person filling it in.
+  const sync = () => {
+    const value = kind?.value ?? "";
+    if (fields) fields.hidden = value === "" || value === "smtp";
+    if (mail) mail.hidden = value !== "smtp";
+  };
+  kind?.addEventListener("change", sync);
+  sync();
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const repo = String(data.get("repo") ?? "");
+    try {
+      await api.post(
+        `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repo)}/channel`,
+        {
+          kind: String(data.get("kind") ?? ""),
+          url: String(data.get("url") ?? ""),
+          token: String(data.get("token") ?? ""),
+          to: String(data.get("to") ?? ""),
+        },
+      );
+      if (note) {
+        note.textContent = i18n.t("panel.saved");
+        note.hidden = false;
+      }
+    } catch (err) {
+      if (errorLine) {
+        errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+        errorLine.hidden = false;
+      }
+    }
   });
 }
 
@@ -368,6 +456,49 @@ function wireIssueControl(publicID: string, linked: { number: number; url: strin
     const value = String(new FormData(attach).get("issue") ?? "");
     try {
       await api.post(`/api/items/${encodeURIComponent(publicID)}/attach`, { issue: value });
+      await render();
+    } catch (err) {
+      say(err instanceof ApiError ? err.key : "error.internal");
+    }
+  });
+}
+
+/** Replying as the team, and merging a duplicate away. */
+function wireTriage(publicID: string): void {
+  root?.insertAdjacentHTML("beforeend", views.triageControls(text));
+
+  const note = root?.querySelector<HTMLParagraphElement>(".triage-note");
+  const say = (key: string) => {
+    if (note) {
+      note.textContent = i18n.t(key);
+      note.hidden = false;
+    }
+  };
+
+  const reply = root?.querySelector<HTMLFormElement>("form.team-reply");
+  reply?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(reply);
+    try {
+      await api.post(`/api/items/${encodeURIComponent(publicID)}/reply`, {
+        body: String(data.get("body") ?? ""),
+      });
+      reply.reset();
+      await render();
+    } catch (err) {
+      say(err instanceof ApiError ? err.key : "error.internal");
+    }
+  });
+
+  const merge = root?.querySelector<HTMLFormElement>("form.merge");
+  merge?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(merge);
+    try {
+      await api.post(`/api/items/${encodeURIComponent(publicID)}/merge`, {
+        into: String(data.get("into") ?? ""),
+      });
+      // The merged item now redirects, so the page it lands on is the survivor.
       await render();
     } catch (err) {
       say(err instanceof ApiError ? err.key : "error.internal");
@@ -487,7 +618,12 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
     repositories: RepositorySummary[];
   }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
 
-  show(views.panelOrganization(body.organization, body.repositories ?? [], text));
+  const repos = body.repositories ?? [];
+  show(views.panelOrganization(body.organization, repos, text));
+  root?.insertAdjacentHTML("beforeend", views.connectionForms(body.organization, repos, text));
+
+  wireCredentials(orgSlug, body.organization.webhook_path);
+  wireChannel(orgSlug);
 
   const form = root?.querySelector<HTMLFormElement>("form.new-repo");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");

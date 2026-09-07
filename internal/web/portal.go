@@ -8,9 +8,11 @@ import (
 	"strconv"
 	"strings"
 
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/guard"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
 // reportBodyLimit is what a submission may be. Generous enough for a stack
@@ -50,8 +52,20 @@ func (s *Server) handleRepositories(w http.ResponseWriter, r *http.Request) {
 	for _, repo := range list {
 		out = append(out, describeRepository(repo, s.mailConfigured()))
 	}
+	organisation := map[string]any{"slug": o.Slug, "name": o.Name, "forge": string(o.Forge)}
+
+	// The webhook address, but only for somebody who may manage this
+	// organisation. It is not a secret exactly — a delivery still has to be
+	// signed — but it is the one thing that identifies the connection, and
+	// handing it to the public would be handing out the surface to hammer.
+	if actor, ok := middleware.ActorFrom(r); ok && actor.Can(authz.ManageOrganization, authz.Organization(o.ID)) {
+		if hook, err := s.orgs().HookID(o.ID); err == nil && hook != "" {
+			organisation["webhook_path"] = "/hooks/" + hook
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"organization": map[string]any{"slug": o.Slug, "name": o.Name},
+		"organization": organisation,
 		"repositories": out,
 	})
 }

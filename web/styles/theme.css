@@ -432,3 +432,16 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   overflow-y: auto;
 }
 .update-note { font-size: 0.875rem; color: var(--text-muted); }
+
+.credentials, .channel, .team-reply, .merge { max-inline-size: 28rem; }
+.channel-fields, .channel-mail { display: grid; gap: 0.35rem; }
+.merge { display: flex; gap: 0.5rem; align-items: start; }
+.merge input { flex: 1; }
+.webhook-path {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.triage { margin-block-start: 2rem; padding-block-start: 1rem; border-block-start: 1px solid var(--border); }
+.triage-note { font-size: 0.875rem; color: var(--text-muted); }

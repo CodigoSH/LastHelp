@@ -74,6 +74,10 @@ export interface Me {
 export interface OrganizationSummary {
   slug: string;
   name: string;
+  /** Present when a single organisation is fetched. */
+  forge?: string;
+  /** Only for somebody who may manage this organisation. */
+  webhook_path?: string;
 }
 
 export interface RepositorySummary {

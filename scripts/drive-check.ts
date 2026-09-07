@@ -308,7 +308,95 @@ async function main() {
     updates.text.slice(0, 50),
   );
 
-  // 12. Right to left, which is where a stylesheet written in left and right
+  // 12. Everything the panel can do, it can do from the screen.
+  //
+  //     Four actions were API-only for a while: the forge token, the
+  //     notification channel, replying as the team and merging a duplicate.
+  //     Each one was a screen naming something it could not do — the same
+  //     failure as a panel that says nothing is configured and offers nothing
+  //     to configure, which is how an operator ends up in a terminal.
+  await evaluate(`history.pushState({}, "", "/panel/codigosh"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(900);
+  const orgPanel = await evaluate(`
+    return {
+      addBoard: !!document.querySelector("form.new-repo"),
+      channel: !!document.querySelector("form.channel"),
+      // No forge was chosen for this organisation, so the credentials form
+      // should not be offered at all.
+      credentials: !!document.querySelector("form.credentials"),
+    };
+  `);
+  check("the organisation panel can add a board", orgPanel.addBoard === true);
+  check("and can choose where the team is told", orgPanel.channel === true);
+  check(
+    "and does not ask for a token when there is no forge",
+    orgPanel.credentials === false,
+    JSON.stringify(orgPanel),
+  );
+
+  // And the positive case, which is the one that matters: an organisation with
+  // a forge has to be connectable from here. Checking only the negative would
+  // pass with the form never rendering at all.
+  const connected = await evaluate(`
+    const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/organizations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+      body: JSON.stringify({ slug: "withforge", name: "With a forge", forge: "forgejo",
+                             base_url: "https://git.example.com", forge_owner: "CodigoSH" }),
+    });
+    history.pushState({}, "", "/panel/withforge");
+    dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 900));
+
+    const form = document.querySelector("form.credentials");
+    if (!form) return { form: false };
+
+    form.querySelector("[name=token]").value = "a-token";
+    form.querySelector("[name=webhook_secret]").value = "a long random secret";
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 900));
+
+    const path = document.querySelector(".webhook-path");
+    return {
+      form: true,
+      shown: path ? !path.hidden : false,
+      text: (path?.textContent ?? "").trim(),
+      tokenCleared: form.querySelector("[name=token]").value === "",
+    };
+  `);
+  check("an organisation with a forge asks for its token", connected.form === true);
+  check(
+    "and shows where the forge should deliver",
+    connected.shown === true && String(connected.text).includes("/hooks/"),
+    String(connected.text).slice(0, 56),
+  );
+  check("and does not leave the token in the field", connected.tokenCleared === true);
+
+  // Coming back later still shows the address: it is configured once on the
+  // forge, and somebody who lost it has no other way to find it.
+  const revisit = await evaluate(`
+    history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 600));
+    history.pushState({}, "", "/panel/withforge"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 900));
+    const path = document.querySelector(".webhook-path");
+    return path && !path.hidden ? (path.textContent ?? "").trim() : "";
+  `);
+  check("and it is still there on the next visit", String(revisit).includes("/hooks/"), String(revisit).slice(0, 56));
+
+  await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(800);
+  const triage = await evaluate(`
+    return {
+      reply: !!document.querySelector("form.team-reply"),
+      merge: !!document.querySelector("form.merge"),
+    };
+  `);
+  check("the team can reply and merge from the item", triage.reply === true && triage.merge === true,
+    JSON.stringify(triage));
+
+  // 13. Right to left, which is where a stylesheet written in left and right
   //     falls apart.
   await evaluate(`
     const select = document.querySelector("nav .lang");
@@ -339,7 +427,7 @@ async function main() {
   `);
   check("the layout mirrored", mirrored === true);
 
-  // 13. Nothing exploded along the way.
+  // 14. Nothing exploded along the way.
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
   await fetch(`http://127.0.0.1:${CDP}/json/close/${t.id}`);

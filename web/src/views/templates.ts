@@ -189,6 +189,101 @@ export function panelOrganization(
     </form>`;
 }
 
+/**
+ * The forge connection, and the channel the team reads.
+ *
+ * Both were API-only for a while, which meant the panel offered a forge in the
+ * organisation form and then abandoned whoever chose one: no way to enter a
+ * token, no way to find the webhook address. The same failure as an empty panel
+ * that says nothing is configured and offers nothing to configure.
+ */
+export function connectionForms(
+  org: OrganizationSummary & { forge?: string; webhook_path?: string },
+  repos: RepositorySummary[],
+  text: Text,
+): string {
+  const forgeBlock =
+    !org.forge || org.forge === "none"
+      ? ""
+      : `<h2>${escapeHTML(text.t("panel.connection"))}</h2>
+         <form class="credentials">
+           <label for="cred-token">${escapeHTML(text.t("panel.token"))}</label>
+           <input id="cred-token" name="token" type="password" autocomplete="off" required />
+           <p class="hint">${escapeHTML(text.t("panel.tokenHelp"))}</p>
+
+           <label for="cred-secret">${escapeHTML(text.t("panel.webhookSecret"))}</label>
+           <input id="cred-secret" name="webhook_secret" type="password" autocomplete="off" required />
+
+           <p class="form-error" role="alert" hidden></p>
+           <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button>
+           <p class="webhook-path" hidden></p>
+         </form>`;
+
+  const kinds = [
+    ["", text.t("panel.channelNone")],
+    ["ntfy", "ntfy"],
+    ["gotify", "Gotify"],
+    ["webhook", "Webhook"],
+    ["smtp", "Email"],
+  ];
+
+  const channelBlock =
+    repos.length === 0
+      ? ""
+      : `<h2>${escapeHTML(text.t("panel.channel"))}</h2>
+         <p class="hint">${escapeHTML(text.t("panel.channelHelp"))}</p>
+         <form class="channel">
+           <label for="chan-repo">${escapeHTML(text.t("portal.boards"))}</label>
+           <select id="chan-repo" name="repo">
+             ${repos.map((r) => `<option value="${escapeAttr(r.slug)}">${escapeHTML(r.name)}</option>`).join("")}
+           </select>
+
+           <label for="chan-kind">${escapeHTML(text.t("panel.channel"))}</label>
+           <select id="chan-kind" name="kind">
+             ${kinds.map(([v, l]) => `<option value="${escapeAttr(v ?? "")}">${escapeHTML(l ?? "")}</option>`).join("")}
+           </select>
+
+           <div class="channel-fields" hidden>
+             <label for="chan-url">${escapeHTML(text.t("panel.address2"))}</label>
+             <input id="chan-url" name="url" />
+
+             <label for="chan-token">${escapeHTML(text.t("panel.token"))}</label>
+             <input id="chan-token" name="token" type="password" autocomplete="off" />
+           </div>
+
+           <div class="channel-mail" hidden>
+             <label for="chan-to">${escapeHTML(text.t("auth.email"))}</label>
+             <input id="chan-to" name="to" type="email" />
+           </div>
+
+           <p class="form-error" role="alert" hidden></p>
+           <button class="button" type="submit">${escapeHTML(text.t("auth.create"))}</button>
+           <p class="channel-note" role="status" hidden></p>
+         </form>`;
+
+  return forgeBlock + channelBlock;
+}
+
+/** The team's triage controls on one item: reply, and merge a duplicate away. */
+export function triageControls(text: Text): string {
+  return `
+    <section class="triage">
+      <h2>${escapeHTML(text.t("panel.reply"))}</h2>
+      <form class="team-reply">
+        <textarea name="body" rows="3" placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
+        <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
+      </form>
+
+      <h2>${escapeHTML(text.t("panel.merge"))}</h2>
+      <p class="hint">${escapeHTML(text.t("panel.mergeHelp"))}</p>
+      <form class="merge">
+        <input name="into" placeholder="${escapeAttr(text.t("panel.mergePlaceholder"))}" required />
+        <button class="button" type="submit">${escapeHTML(text.t("panel.merge"))}</button>
+      </form>
+      <p class="triage-note" role="status" hidden></p>
+    </section>`;
+}
+
 export function board(
   org: OrganizationSummary,
   repo: RepositorySummary,

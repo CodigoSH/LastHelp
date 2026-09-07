@@ -29,6 +29,22 @@ not anybody wanted a second level.
 
 ## 2. Store it
 
+In the panel, open the organisation. If it has a forge, it asks for the token
+and a webhook secret, and answers with the address to configure:
+
+```
+Deliver here: https://help.example.com/hooks/xO3f…
+```
+
+That address is opaque and stable, and it stays on that screen — a forge is
+configured with it once, and somebody who lost it has no other way to find it.
+
+The token is **never shown again**, by design: it is stored encrypted, and no
+endpoint here returns a stored credential, because one that did would be a way
+to read it through the panel.
+
+Over the API, which is what the panel calls:
+
 ```sh
 curl -X POST "$BASE/api/orgs/codigosh/credentials" \
   -H 'Content-Type: application/json' \
@@ -36,18 +52,6 @@ curl -X POST "$BASE/api/orgs/codigosh/credentials" \
   -b cookies.txt \
   -d '{"token":"...","webhook_secret":"pick something long and random"}'
 ```
-
-The response contains the webhook address to configure and **not** the token:
-nothing here ever returns a stored credential, because an endpoint that does is
-a way to read one through the panel.
-
-```json
-{"webhook_path": "/hooks/xO3f…"}
-```
-
-That address is opaque and stable. It is what identifies the connection, and the
-connection is what says how a delivery is verified — see below for why that
-matters.
 
 ## 3. Point the forge at it
 
