@@ -82,7 +82,7 @@ shots: build ## Regenerate the documentation screenshots
 # reading the structs they serialise. Everything else that tests them uses a fake
 # this repository also wrote, so both halves could be wrong the same way and
 # agree. This is the only check that can tell.
-live-forge: build ## Walk the forge bridge against a real Forgejo (FORGE_KIND=gitea for Gitea)
+live-forge: build ## Walk the forge bridge against a real forge (FORGE_KIND=forgejo|gitea|gitlab)
 	@command -v podman >/dev/null || command -v docker >/dev/null || { echo "podman or docker is required"; exit 1; }
 	@scripts/live-forge.sh
 

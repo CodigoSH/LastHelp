@@ -82,7 +82,7 @@ make build     # frontend + binaries into bin/
 make run       # build and run
 make test      # go test and the architecture rules
 make drive     # walk the whole journey in a real browser
-make live-forge # and again against a real Forgejo or Gitea in a container
+make live-forge # and again against a real Forgejo, Gitea or GitLab in a container
 make shots     # regenerate the documentation screenshots
 ```
 

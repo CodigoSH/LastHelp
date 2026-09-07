@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Walks the forge bridge against a real Forgejo or Gitea, in a container.
+# Walks the forge bridge against a real Forgejo, Gitea or GitLab, in a container.
 #
 # The adapters were written from documentation, and for Gitea and Forgejo from
 # reading the structs they serialise — their webhook payload is not documented.
@@ -8,8 +8,12 @@
 # halves could be wrong in the same way and agree. This is the only check that
 # can tell.
 #
-#   ./scripts/live-forge.sh            # Forgejo
+#   ./scripts/live-forge.sh              # Forgejo
 #   FORGE_KIND=gitea ./scripts/live-forge.sh
+#   FORGE_KIND=gitlab ./scripts/live-forge.sh    # several minutes to boot
+#
+# PORT, CDP and FORGE_PORT must be free; the script says so rather than quietly
+# driving somebody else's browser or failing to bind.
 #
 # It needs podman or docker, and pulls an image the first time. Nothing is
 # installed on this machine and nothing is left behind.

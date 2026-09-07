@@ -40,8 +40,11 @@ let problems = 0;
 const used = new Set<string>();
 const prefixes = new Set<string>();
 
+let blob = "";
+
 for (const file of sources("web/src")) {
   const text = readFileSync(file, "utf-8");
+  blob += text;
 
   for (const match of text.matchAll(usedKey)) {
     const key = match[1];
@@ -52,9 +55,19 @@ for (const file of sources("web/src")) {
     if (prefix) prefixes.add(prefix);
   }
 
+  // Both forms, and the second one is why this is not a per-line test: a call
+  // site that parks the translated sentence in a variable and calls .replace()
+  // a few lines later skips the isolates just as thoroughly. That pattern was
+  // written here from the start and nothing ever ran it — `void
+  // secondInterpolator` at the foot of the file was silencing the warning that
+  // said so.
   const lines = text.split("\n");
+  const flagged = new Set<number>();
+  for (const match of text.matchAll(new RegExp(secondInterpolator, "g"))) {
+    flagged.add(text.slice(0, match.index).split("\n").length - 1);
+  }
   lines.forEach((line, index) => {
-    if (/t\([^)]*\)\s*\.replace\(/.test(line)) {
+    if (flagged.has(index)) {
       problems++;
       console.log(
         `${file}:${index + 1}: a second interpolator\n` +
@@ -82,7 +95,18 @@ if (unknown.length) {
   for (const key of unknown.sort()) console.log(`  ${key}`);
 }
 
-const unused = [...known].filter((key) => !used.has(key) && !coveredByPrefix(key));
+// The unused report is deliberately more lenient than the unknown-key one. A
+// key handed to a small wrapper — `say("panel.issueQueued")`, which passes it
+// to t() — is used, and reporting it as dead is how a scan trains people to
+// ignore it. So for this direction the question is only whether the literal
+// appears in the sources at all. The strict t() set still drives the report
+// above, where precision is what catches a typo.
+const mentioned = (key: string) =>
+  blob.includes(`"${key}"`) || blob.includes(`'${key}'`) || blob.includes(`\`${key}\``);
+
+const unused = [...known].filter(
+  (key) => !used.has(key) && !mentioned(key) && !coveredByPrefix(key),
+);
 if (unused.length) {
   console.log(`\nkeys in the catalogues that nothing uses (${unused.length}):`);
   for (const key of unused.sort()) console.log(`  ${key}`);
@@ -91,4 +115,3 @@ if (unused.length) {
 if (problems === 0) console.log(`\nno unknown keys, no second interpolator`);
 else process.exitCode = 1;
 
-void secondInterpolator;
