@@ -1746,27 +1746,15 @@ export function avatar(name: string, src?: string, big = false): string {
 }
 
 /**
- * The front page of the panel: what this installation holds, in numbers.
+ * Every card the overview shows, in the order it shows them.
  *
- * Counted by the server rather than by fetching everything and counting here,
- * so a portal that has been useful for two years opens as fast as one installed
- * this morning.
- */
-/**
- * Every card the overview can show, in the order it shows them by default.
+ * One order, the same for everybody who opens this installation. It used to be
+ * arrangeable per account, and two people looking at the same server were then
+ * looking at two different screens: nothing could be pointed at by where it is,
+ * and a card somebody had hidden made half a conversation about it impossible.
  *
- * Named rather than numbered, because the layout an account saves is a list of
- * these names: a number would mean the order in this array is part of the wire
- * format, and reordering the default would silently rearrange everybody's
- * saved dashboard.
- */
-/**
- * Every card the overview can show, in the order it shows them by default.
- *
- * Named rather than numbered, because the layout an account saves is a list of
- * these names: a number would mean the order in this array is part of the wire
- * format, and reordering the default would silently rearrange everybody's
- * saved dashboard.
+ * The counting is the server's, not the browser's: a portal that has been
+ * useful for two years opens as fast as one installed this morning.
  */
 export const overviewCards = [
   "reports",
@@ -1843,28 +1831,21 @@ function briefRow(b: Brief, text: Text, showVotes = false): string {
 }
 
 /**
- * The front page of the panel, arranged by whoever is looking at it.
+ * The front page of the panel, the same one for everybody on the team.
  *
  * It was a wall of tiles each holding one number, and a number on its own
  * answers "how many" and nothing else: not whether it is getting busier, not
  * what people are actually asking for, not which board the work is in, and not
- * where to go next. Every tile is now a way into the listing it counts, and
- * beside them are the three things the numbers cannot say — the last thirty
- * days, the most wanted ideas, and the newest reports.
+ * where to go next. Every tile is a way into the listing it counts, and beside
+ * them are the three things the numbers cannot say — the last thirty days, the
+ * most wanted ideas, and the newest reports.
  *
- * The cards are dragged with the browser's own drag and drop rather than with
- * pointer maths, which is what this house already does elsewhere: it carries
- * the drag image, the drop effect and the keyboard's idea of a grab for free.
- * It is only turned on while editing — a page whose contents move when you
- * meant to click one is worse than one that cannot be arranged at all — and it
- * stays off on touch, where the same gesture is how you scroll.
+ * There is no arranging it. A dashboard that every account rearranges is one
+ * nobody can talk about: "the third card" and "the one at the top" stop meaning
+ * anything, and a card somebody hid is a screen the person beside them cannot
+ * see. One order, decided here.
  */
-export function overviewScreen(
-  data: OverviewData,
-  layout: OverviewCard[],
-  editing: boolean,
-  text: Text,
-): string {
+export function overviewScreen(data: OverviewData, text: Text): string {
   const number = (value: number) => escapeHTML(text.number(value));
 
   const stat = (id: string, value: number, label: string, icon: string, href?: string) => {
@@ -1872,7 +1853,7 @@ export function overviewScreen(
       <span class="label">${icon}${escapeHTML(label)}</span>`;
     return card(
       id,
-      href && !editing
+      href
         ? `<a class="stat" href="${escapeAttr(href)}">${inner}<span class="stat-go" aria-hidden="true">${icons.chevron(14)}</span></a>`
         : `<div class="stat">${inner}</div>`,
       "narrow",
@@ -1899,17 +1880,7 @@ export function overviewScreen(
   };
 
   function card(id: string, body: string, size: string): string {
-    return `<li class="dash-card ${size}" data-card="${escapeAttr(id)}"${editing ? ' draggable="true"' : ""}>
-      ${
-        editing
-          ? `<div class="dash-tools">
-               <span class="grip" aria-hidden="true">${icons.grip()}</span>
-               ${iconButton("remove", text.t("overview.hide"), `class="icon-button danger" data-hide="${escapeAttr(id)}"`)}
-             </div>`
-          : ""
-      }
-      ${body}
-    </li>`;
+    return `<li class="dash-card ${size}" data-card="${escapeAttr(id)}">${body}</li>`;
   }
 
   const total = Object.values(data.kinds).reduce((a, b) => a + b, 0);
@@ -2020,39 +1991,14 @@ export function overviewScreen(
     boards,
   };
 
-  const hidden = overviewCards.filter((name) => !layout.includes(name));
-
   return `<div class="screen-head">
       <h1>${escapeHTML(text.t("shell.overview"))}</h1>
-      ${
-        editing
-          ? actionButton("check", text.t("overview.done"), "data-edit-done", "primary")
-          : actionButton("edit", text.t("overview.arrange"), "data-edit-dash")
-      }
     </div>
-    ${
-      editing || total === 0
-        ? `<p class="lead">${escapeHTML(
-            editing ? text.t("overview.arrangeHelp") : text.t("overview.emptyLead"),
-          )}</p>`
-        : ""
-    }
+    ${total === 0 ? `<p class="lead">${escapeHTML(text.t("overview.emptyLead"))}</p>` : ""}
 
-    <ul class="dashboard${editing ? " editing" : ""}">
-      ${layout.map((name) => all[name]).join("")}
-    </ul>
-
-    ${
-      editing && hidden.length > 0
-        ? `<h2>${escapeHTML(text.t("overview.hidden"))}</h2>
-           <p class="choices">${hidden
-             .map(
-               (name) =>
-                 `<button type="button" class="button ghost with-icon" data-show="${escapeAttr(name)}">${icons.add()}<span>${escapeHTML(text.t(`overview.card.${name}`))}</span></button>`,
-             )
-             .join("")}</p>`
-        : ""
-    }`;
+    <ul class="dashboard">
+      ${overviewCards.map((name) => all[name]).join("")}
+    </ul>`;
 }
 
 /**

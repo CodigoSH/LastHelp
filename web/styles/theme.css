@@ -2297,47 +2297,6 @@ body > nav .brand {
   block-size: 100%;
 }
 
-/* While arranging: a grab cursor, the grip, and a way to take a card out. */
-.dashboard.editing .dash-card {
-  cursor: grab;
-  border-style: dashed;
-}
-
-.dashboard.editing .dash-card:active {
-  cursor: grabbing;
-}
-
-.dash-card.dragging {
-  opacity: 0.45;
-  border-color: var(--accent);
-}
-
-.dash-tools {
-  position: absolute;
-  inset-block-start: 0.35rem;
-  inset-inline-end: 0.35rem;
-  display: flex;
-  align-items: center;
-  gap: 0.15rem;
-  z-index: 1;
-}
-
-.dash-tools .grip {
-  color: var(--text-muted);
-  display: inline-grid;
-  place-items: center;
-  inline-size: 1.5rem;
-}
-
-/* Touch: the same gesture is how the page scrolls, so cards are not draggable
-   there and the tools are all there is. Said in CSS as well as in the script,
-   because a card that looks draggable and is not is a card people fight. */
-@media (hover: none) {
-  .dashboard.editing .dash-card {
-    cursor: default;
-  }
-}
-
 /* -------------------------------------------------------- one report, public */
 
 /* The page that travels: reached from a link somebody was sent, by a reader
@@ -2732,26 +2691,6 @@ body > nav .brand {
   /* The countdown bar is functional and stays; the slide is decoration. */
   .toast, .toast-visible, .toast-leaving { transform: none; }
   .toast { transition: opacity 120ms linear; }
-}
-
-/* The slot a card is about to land in.
- *
- * Green and dashed, which is Lastboard's: the accent is what the interface uses
- * for everything else, so a drop target painted in it says "selected" rather
- * than "here". This is the one place in the product that means "release now",
- * and it earns a colour nothing else uses.
- */
-.dash-ghost {
-  border: 2px dashed #22c55e;
-  border-radius: calc(var(--radius) + 2px);
-  background: rgba(34, 197, 94, 0.1);
-  min-block-size: 6rem;
-  pointer-events: none;
-  list-style: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .dash-ghost { transition: none; }
 }
 
 /* The picture, as one control: the circle is the button.

@@ -896,106 +896,36 @@ async function main() {
   check("the layout mirrored", mirrored === true);
 
   // 14. Nothing exploded along the way.
-  // 11b. The dashboard, arranged. It is the one screen somebody sees every day,
-  //      so it is the one worth being able to change — and a saved arrangement
-  //      that does not survive the next visit is worse than none.
+  // 11b. The overview, which is one screen and the same one for everybody.
+  //
+  //      It used to be arrangeable per account — drag, hide, and a layout
+  //      saved per person — and that is gone on purpose: two people looking at
+  //      the same installation were looking at two different screens, so
+  //      nothing could be pointed at by where it is. What is checked is that
+  //      every card is drawn, that there is nothing to arrange with, and that
+  //      the endpoint that stored a layout is not there any more. A feature
+  //      removed from a screen but left in the server is a feature that comes
+  //      back the next time somebody wires a button.
   await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(1300);
 
-  const dashboard = await evaluate(`
-    const before = [...document.querySelectorAll("[data-card]")].map(c => c.dataset.card);
-    const draggableWhileReading = document.querySelectorAll("[data-card][draggable=true]").length;
-
-    document.querySelector("[data-edit-dash]").click();
-    await new Promise(r => setTimeout(r, 900));
-    const draggableWhileEditing = document.querySelectorAll("[data-card][draggable=true]").length;
-
-    // Drag the first card past the last one, the way a pointer would.
-    const list = document.querySelector(".dashboard");
-    const cards = [...list.querySelectorAll("[data-card]")];
-    const first = cards[0], last = cards[cards.length - 1];
-    const dt = new DataTransfer();
-    first.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
-    const box = last.getBoundingClientRect();
-    last.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer: dt, clientY: box.bottom - 2 }));
-    list.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer: dt }));
-    await new Promise(r => setTimeout(r, 1200));
-
-    const saved = (await (await fetch("/api/me/dashboard")).json()).cards;
-    return { before, draggableWhileReading, draggableWhileEditing, saved };
-  `);
-
-  check(
-    "the dashboard is not draggable until you say so",
-    dashboard.draggableWhileReading === 0 && dashboard.draggableWhileEditing > 0,
-    `${dashboard.draggableWhileReading} reading, ${dashboard.draggableWhileEditing} editing`,
-  );
-  check(
-    "a card dragged to the end stays there",
-    dashboard.saved?.[dashboard.saved.length - 1] === dashboard.before[0],
-    `${dashboard.before[0]} → last of ${JSON.stringify(dashboard.saved)}`,
-  );
-
-  // The slot a card would land in, painted green because the accent means
-  // "selected" everywhere else in this interface and this one means "release".
-  const ghost = await evaluate(`
-    const cards = [...document.querySelectorAll("[data-card]")];
-    const dt = new DataTransfer();
-    cards[0].dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
-    const box = cards[2].getBoundingClientRect();
-    cards[2].dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt,
-      clientX: box.left + box.width * 0.9, clientY: box.top + box.height / 2 }));
-    const el = document.querySelector(".dash-ghost");
-    const style = el ? getComputedStyle(el) : null;
-    const out = { shown: !!el, colour: style?.borderColor ?? "", style: style?.borderStyle ?? "",
-                  sourceStays: cards[0].classList.contains("dragging") };
-    document.querySelector(".dashboard").dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
-    return out;
+  const overview = await evaluate(`
+    return {
+      cards: document.querySelectorAll("[data-card]").length,
+      draggable: document.querySelectorAll("[draggable=true]").length,
+      arrange: !!document.querySelector("[data-edit-dash], [data-hide], [data-show]"),
+      stored: (await fetch("/api/me/dashboard")).status,
+    };
   `);
   check(
-    "dragging shows the slot the card would land in",
-    ghost.shown && ghost.colour.includes("34, 197, 94") && ghost.style === "dashed" && ghost.sourceStays,
-    JSON.stringify(ghost),
+    "the overview is one screen, the same for everybody",
+    overview.cards === 14 && overview.draggable === 0 && overview.arrange === false,
+    JSON.stringify(overview),
   );
-
-  const hidden = await evaluate(`
-    document.querySelector("[data-hide]").click();
-    await new Promise(r => setTimeout(r, 1200));
-    return (await (await fetch("/api/me/dashboard")).json()).cards;
-  `);
   check(
-    "and a card hidden is remembered",
-    Array.isArray(hidden) && hidden.length === dashboard.saved.length - 1,
-    `${dashboard.saved.length} → ${hidden.length}`,
-  );
-
-  // 11c-bis. A dashboard arranged before the charts existed still gets them.
-  //
-  //          This is the house rule that a new feature has to reach the people
-  //          who were already here: a saved layout is the list of visible
-  //          cards, so a card added later is missing from it and would never
-  //          be drawn again for anybody who had ever pressed Arrange. The
-  //          payload below is what one of those layouts looks like — no record
-  //          of what existed when it was saved — and the new cards have to
-  //          appear at the end of it without the hidden one coming back.
-  const inherited = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    await fetch("/api/me/dashboard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ cards: ["reports", "waiting", "published", "votes", "kinds", "statuses", "recent"] }),
-    });
-    history.pushState({}, "", "/panel");
-    dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1400));
-    return [...document.querySelectorAll("[data-card]")].map(c => c.dataset.card);
-  `);
-  check(
-    "a dashboard arranged before the charts existed still gets them",
-    inherited.includes("activity") && inherited.includes("top") && inherited.includes("boards") &&
-      !inherited.includes("moderation") && inherited[0] === "reports",
-    JSON.stringify(inherited),
+    "and the layout it used to save is gone from the server too",
+    overview.stored === 404,
+    `GET /api/me/dashboard → ${overview.stored}`,
   );
 
   // 11d. The chart. A number says how many; only this says whether it is
@@ -1019,16 +949,10 @@ async function main() {
   // Out of arranging first: while the dashboard is being rearranged the tiles
   // are deliberately not links, because a card you meant to drag should not
   // navigate. Reading the href without leaving that mode measures the mode.
-  // Out of arranging first: while the dashboard is being rearranged the tiles
-  // are deliberately not links, because a card you meant to drag should not
-  // navigate. Reading the href without leaving that mode measures the mode.
-  //
-  // And read as a set rather than by name: the checks above dragged one card to
-  // the end and hid whichever was first, so naming a card here would be
-  // asserting the result of the previous test.
+  // Read as a set rather than by name, so this says what it means — every tile
+  // is a link, and more than one of them goes into the listing — rather than
+  // pinning the order the cards happen to be in.
   const tiles = await evaluate(`
-    document.querySelector("[data-edit-done]")?.click();
-    await new Promise(r => setTimeout(r, 900));
     const cards = [...document.querySelectorAll('.dash-card:has(.stat)')];
     return {
       stats: cards.length,

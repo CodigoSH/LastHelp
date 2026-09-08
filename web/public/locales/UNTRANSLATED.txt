@@ -72,9 +72,7 @@ organizations.confirmDelete
 organizations.confirmDeleteRepo
 organizations.lead
 organizations.noRepositories
-overview.arrangeHelp
 overview.emptyLead
-overview.lead
 overview.memberLead
 overview.noRoles
 panel.addressHelp

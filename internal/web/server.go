@@ -224,8 +224,6 @@ func (s *Server) routes() {
 	private("POST /api/me/profile", s.handleChangeProfile)
 	private("POST /api/me/language", s.handleChangeLanguage)
 	private("POST /api/me/avatar", s.handleChangeAvatar)
-	private("GET /api/me/dashboard", s.handleGetDashboard)
-	private("POST /api/me/dashboard", s.handleSetDashboard)
 
 	private("GET /api/overview", s.handleOverview)
 	private("GET /api/reports", s.handleReports)
