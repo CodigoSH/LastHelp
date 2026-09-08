@@ -250,9 +250,16 @@ async function main() {
   `);
   check("it says where the report is going", form.crumb === "/codigosh,/codigosh/lastboard", form.crumb);
   check("the kind is a choice of two cards", form.cards === 2, String(form.cards));
+  // Compared against the catalogue the page is actually in, not against the
+  // English words: this walk runs in whatever language the browser asks for,
+  // and a probe carrying its own copy of the expected text only measures
+  // whether the same words were typed twice.
+  const catalogue = await Bun.file(
+    `web/public/locales/${await evaluate(`return document.documentElement.lang`)}.json`,
+  ).json();
   check(
     "a bug is asked what makes it usable",
-    JSON.stringify(form.asked) === '["Which version","How to see it happen"]',
+    JSON.stringify(form.asked) === JSON.stringify([catalogue["form.version"], catalogue["form.steps"]]),
     JSON.stringify(form.asked),
   );
   check("and an idea is not asked it", form.hiddenForIdeas === true);

@@ -674,11 +674,27 @@ export function submitted(link: string, text: Text): string {
 }
 
 /**
- * The answers to the form, drawn where the report is.
+ * The label a question is shown under, in the reader's language.
  *
- * The label comes from the answer rather than from the current form: a question
- * reworded next month must not reword what somebody sent last month.
+ * The answer carries a label of its own and it is stored in English, because it
+ * travels into the forge issue, which the team reads — not necessarily in the
+ * language the reporter's browser happened to be in. Drawing that stored label
+ * here put two English words in the middle of an otherwise Arabic page.
+ *
+ * So the questions the form asks now are translated, and anything else falls
+ * back to what was stored: a question reworded or retired next month still
+ * reads the way it was sent, which is the reason the label is kept at all.
  */
+// The noun, not the question. The form asks "Which version"; a report shows
+// "Version" over the answer, which is what a definition list is for.
+const questionKeys: Record<string, string> = { version: "field.version", steps: "field.steps" };
+
+function questionLabel(field: ReportField, text: Text): string {
+  const key = questionKeys[field.key];
+  return key ? text.t(key) : field.label;
+}
+
+/** The answers to the form, drawn where the report is. */
 function answers(fields: ReportField[], text: Text): string {
   if (fields.length === 0) return "";
   // The heading sits outside the list. A <dl> may only hold dt/dd pairs, or
@@ -689,7 +705,7 @@ function answers(fields: ReportField[], text: Text): string {
     <dl>${fields
       .map(
         (f) => `<div>
-          <dt>${escapeHTML(f.label)}</dt>
+          <dt>${escapeHTML(questionLabel(f, text))}</dt>
           <dd>${escapeHTML(f.value)}</dd>
         </div>`,
       )

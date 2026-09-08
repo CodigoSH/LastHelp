@@ -81,6 +81,8 @@
   "error.update_wont_run": "The downloaded binary did not run on this machine, so it was not installed.",
   "error.username_required": "A username is needed.",
   "error.username_taken": "That username already has an account.",
+  "field.steps": "Steps to reproduce",
+  "field.version": "Version",
   "form.body": "Details",
   "form.bodyPlaceholder": "What happened, and what you expected instead",
   "form.email": "Email (optional)",
