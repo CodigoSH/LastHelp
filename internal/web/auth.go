@@ -179,6 +179,12 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		body["name"] = user.DisplayName
 		body["avatar"] = user.Avatar
 	}
+	// The language this account reads in, which follows the person rather than
+	// the browser: chosen once, and there on the next machine they sign in on.
+	// Empty means they have not chosen, and the browser still decides.
+	if code, err := s.accounts().Language(actor.UserID); err == nil {
+		body["language"] = code
+	}
 	writeJSON(w, http.StatusOK, body)
 }
 

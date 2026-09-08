@@ -392,7 +392,14 @@ async function showAppearance(): Promise<void> {
     }),
   );
   root?.querySelector<HTMLSelectElement>("#appearance-language")?.addEventListener("change", (e) => {
-    void i18n.setLanguage((e.target as HTMLSelectElement).value).then(() => void render());
+    const code = (e.target as HTMLSelectElement).value;
+    void i18n.setLanguage(code).then(async () => {
+      // On the account as well as in this browser, so it is there on the next
+      // machine. Failing quietly: the language has already changed on screen,
+      // and a toast about a preference nobody asked to save would be noise.
+      if (me) await api.post("/api/me/language", { language: code }).catch(() => undefined);
+      await render();
+    });
   });
 }
 
@@ -432,7 +439,18 @@ async function showPeople(): Promise<void> {
           body:
             views.field({ id: "person-username", name: "username", label: text.t("auth.username"), required: true, example: "ana" }, text) +
             views.field({ id: "person-name", name: "display_name", label: text.t("profile.name"), example: "Ana" }, text) +
-            views.field({ id: "person-password", name: "password", label: text.t("auth.password"), type: "password", required: true, hint: text.t("auth.passwordHelp") }, text),
+            views.field({ id: "person-password", name: "password", label: text.t("auth.password"), type: "password", required: true, hint: text.t("auth.passwordHelp") }, text) +
+            // Chosen here rather than left to whatever their browser asks for:
+            // otherwise somebody's first sign-in lands in a language they did
+            // not pick, and the setting to change it is in that language.
+            views.choiceField({
+              id: "person-language",
+              name: "language",
+              label: text.t("people.language"),
+              hint: text.t("people.languageHelp"),
+              options: availableLocales.map((l) => [l.code, l.name] as [string, string]),
+              selected: "en",
+            }),
           submit: text.t("auth.create"),
           formClass: "person-form",
         },
@@ -466,12 +484,14 @@ async function showPeople(): Promise<void> {
   );
 
   wireModalOpeners();
-    onSubmit("form.person-form", async (data) => {
+  onSubmit("form.person-form", async (data) => {
     await api.post("/api/people", {
       username: String(data.get("username") ?? ""),
       display_name: String(data.get("display_name") ?? ""),
       password: String(data.get("password") ?? ""),
+      language: String(data.get("language") ?? ""),
     });
+    toast(i18n.t("toast.personAdded"));
     await render();
   });
 
@@ -634,7 +654,14 @@ async function render(): Promise<void> {
   try {
     if (path === "/") return await showOrganizations();
     if (path === "/sign-in") return await showSignIn();
-    if (path === "/setup") return showSetupStep(1);
+    if (path === "/setup") {
+      // English, whatever the browser asks for. The first screen of the
+      // installation is where a language is chosen rather than inferred, and
+      // it is the language of this account and no one else's — everybody who
+      // arrives later reads English until they choose otherwise.
+      await startInEnglish();
+      return showSetupStep(1);
+    }
     if (path === "/setup/account") return showSetupStep(2);
     if (path === "/setup/instance") return showSetupStep(3);
     if (path === "/setup/done") return showSetupDone();
@@ -1412,18 +1439,37 @@ function wireDashboard(layout: views.OverviewCard[]): void {
 
   let dragging: HTMLLIElement | null = null;
 
+  // The slot the card would land in, drawn where it would land.
+  //
+  // Lastboard's model, and the reason it reads better than moving the card
+  // itself around under the pointer: the card stays where it is, dimmed, and a
+  // green outline shows the empty space it is about to occupy. Shuffling the
+  // real card meant the grid reflowed on every pixel of movement, so the thing
+  // you were aiming at kept moving.
+  const ghost = document.createElement("li");
+  ghost.className = "dash-ghost";
+  ghost.setAttribute("aria-hidden", "true");
+
+  const clearGhost = () => ghost.remove();
+
   list.addEventListener("dragstart", (event) => {
     const card = (event.target as HTMLElement).closest<HTMLLIElement>("[data-card]");
     if (!card) return;
     dragging = card;
     card.classList.add("dragging");
     event.dataTransfer?.setData("text/plain", card.dataset.card ?? "");
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      // The whole card as the drag image, not whichever child was grabbed.
+      const box = card.getBoundingClientRect();
+      event.dataTransfer.setDragImage(card, event.clientX - box.left, event.clientY - box.top);
+    }
   });
 
   list.addEventListener("dragend", () => {
     dragging?.classList.remove("dragging");
     dragging = null;
+    clearGhost();
   });
 
   list.addEventListener("dragover", (event) => {
@@ -1431,18 +1477,38 @@ function wireDashboard(layout: views.OverviewCard[]): void {
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
 
-    // The card the pointer is over, and which half of it. Inserting before or
-    // after depending on the half is what stops a card flickering between two
-    // places while the pointer sits still on the boundary.
     const over = (event.target as HTMLElement).closest<HTMLLIElement>("[data-card]");
-    if (!over || over === dragging) return;
+    if (!over || over === dragging) {
+      // Over the empty space past the last card: that is a real target, and
+      // the end of the row is where somebody drops a card they want last.
+      if (!over && event.target === list) list.appendChild(ghost);
+      return;
+    }
+
+    // Which side of the card the pointer is on. In a grid the answer is
+    // horizontal for two cards side by side and vertical for two stacked, so
+    // both are asked rather than assuming rows — and the horizontal question
+    // reverses when the page reads right to left, or the ghost lands on the
+    // wrong side of everything somebody drags in Arabic.
     const box = over.getBoundingClientRect();
-    const after = event.clientY - box.top > box.height / 2;
-    over.parentElement?.insertBefore(dragging, after ? over.nextSibling : over);
+    const sameRow = event.clientY >= box.top && event.clientY <= box.bottom;
+    const rtl = document.documentElement.dir === "rtl";
+    const after = sameRow
+      ? rtl
+        ? event.clientX < box.left + box.width / 2
+        : event.clientX > box.left + box.width / 2
+      : event.clientY > box.top + box.height / 2;
+
+    list.insertBefore(ghost, after ? over.nextSibling : over);
   });
 
   list.addEventListener("drop", (event) => {
     event.preventDefault();
+    if (!dragging) return;
+    // The card goes where the outline is. Without a ghost on the page the
+    // pointer never crossed a target, so the order is left as it was.
+    if (ghost.isConnected) list.insertBefore(dragging, ghost);
+    clearGhost();
     void save(
       [...list.querySelectorAll<HTMLLIElement>("[data-card]")].map((card) => card.dataset.card ?? ""),
     );
@@ -1806,9 +1872,29 @@ function debounce<T extends (...args: never[]) => void>(fn: T, ms: number): T {
   }) as T;
 }
 
+/**
+ * The language of the account that is signed in, if it has one.
+ *
+ * The browser's preference decides for somebody with no account, which is
+ * every visitor of a public board. For somebody signed in it is a setting of
+ * theirs, so it follows them to the next machine instead of living in one
+ * browser's storage.
+ */
+async function applyAccountLanguage(): Promise<void> {
+  const chosen = me?.language;
+  if (chosen && chosen !== i18n.current) await i18n.setLanguage(chosen);
+}
+
+/** The first run reads English until the administrator says otherwise. */
+async function startInEnglish(): Promise<void> {
+  if (i18n.chosen) return;
+  await i18n.setLanguage("en");
+}
+
 void (async () => {
   await i18n.ready;
   me = await api.get<Me>("/api/me").catch(() => null);
+  await applyAccountLanguage();
   i18n.subscribe(() => renderNav());
   await render();
 })();

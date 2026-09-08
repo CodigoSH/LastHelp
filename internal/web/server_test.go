@@ -60,7 +60,13 @@ func newInstance(t *testing.T) *instance {
 
 	// A key file per test, in the same temporary directory as the database,
 	// which is exactly where it lives in a real installation.
-	srv, err := New(config.Config{KeyFile: filepath.Join(filepath.Dir(dbPath), "test.key")}, db)
+	// DBFile as well as the key file: the About screen stats it to report how
+	// large the database has grown, and a harness that leaves it empty is a
+	// harness where that screen is tested against a path that does not exist.
+	srv, err := New(config.Config{
+		DBFile:  dbPath,
+		KeyFile: filepath.Join(filepath.Dir(dbPath), "test.key"),
+	}, db)
 	if err != nil {
 		t.Fatal(err)
 	}

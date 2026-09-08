@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -89,6 +90,39 @@ func (s *Server) handleChangeProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"display_name": strings.TrimSpace(in.DisplayName)})
+}
+
+type languageChange struct {
+	Language string `json:"language"`
+}
+
+// handleChangeLanguage stores the language this account reads in.
+//
+// On the account rather than in the browser, so it follows the person: chosen
+// on a desktop and there on the laptop. Empty is allowed and means "not
+// chosen", which hands the decision back to the browser.
+func (s *Server) handleChangeLanguage(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "error.unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, credentialsBodyLimit)
+	var in languageChange
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	if in.Language != "" && !knownLocale(in.Language) {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	if err := s.accounts().SetLanguage(actor.UserID, in.Language); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"language": in.Language})
 }
 
 const maxDisplayNameLength = 60
@@ -267,6 +301,10 @@ type newPerson struct {
 	Username    string `json:"username"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
+	// The language this person will read in. Chosen by whoever creates the
+	// account, because the alternative is somebody's first sign-in landing in a
+	// language they did not pick and having to find the setting in it.
+	Language string `json:"language"`
 }
 
 // handleCreatePerson adds an account.
@@ -293,6 +331,11 @@ func (s *Server) handleCreatePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if in.Language != "" && !knownLocale(in.Language) {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
 	user, err := s.accounts().Create(in.Username, in.Password, in.DisplayName, false, s.now())
 	switch {
 	case errors.Is(err, account.ErrNameTaken):
@@ -301,6 +344,11 @@ func (s *Server) handleCreatePerson(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
+	}
+	if in.Language != "" {
+		if err := s.accounts().SetLanguage(user.ID, in.Language); err != nil {
+			slog.Error("storing the language of a new account", "error", err)
+		}
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"id": user.ID, "username": user.Username})
 }

@@ -15,6 +15,20 @@ var locales = []string{
 	"ru", "zh", "ja", "ko", "hi", "bn", "id", "ar", "fa", "ur",
 }
 
+// knownLocale says whether a code is one this build ships.
+//
+// The gate on anything stored: a language is written into a row and then into
+// <html lang>, and a value nobody checked is a value the browser is told to
+// hyphenate and a screen reader is told to pronounce.
+func knownLocale(code string) bool {
+	for _, c := range locales {
+		if c == code {
+			return true
+		}
+	}
+	return false
+}
+
 // rtlLocales read right to left.
 //
 // There are two of these lists, this one and the frontend's, because the first

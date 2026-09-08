@@ -76,6 +76,11 @@ class I18n {
     return this.language;
   }
 
+  /** Whether a language was chosen here, as opposed to inferred from the browser. */
+  get chosen(): boolean {
+    return Boolean(safeRead(STORAGE_KEY));
+  }
+
   t(key: string, params?: Record<string, string | number>): string {
     return translate(key, this.tables.get(this.language), this.tables.get("en"), params);
   }

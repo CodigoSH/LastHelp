@@ -306,6 +306,20 @@ var migrations = []migration{
 			return addColumn(tx, "app_user", "dashboard", "TEXT NOT NULL DEFAULT ''")
 		},
 	},
+	{
+		version: 6,
+		name:    "an account keeps its own language",
+		// Per account rather than per browser, for the same reason as the
+		// dashboard: a language chosen on a desktop and not on the laptop is a
+		// setting that did not take.
+		//
+		// Empty means "not chosen", which is not the same as English: an empty
+		// value follows the browser, and English is what everything falls back
+		// to when the browser asks for a language this does not have.
+		fn: func(tx *sql.Tx) error {
+			return addColumn(tx, "app_user", "language", "TEXT NOT NULL DEFAULT ''")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

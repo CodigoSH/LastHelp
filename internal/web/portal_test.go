@@ -822,3 +822,114 @@ func TestTheAnswersReachTheForge(t *testing.T) {
 		t.Errorf("the answers arrive in the wrong order:\n%s", body)
 	}
 }
+
+// TestALanguageFollowsTheAccount.
+//
+// Not the browser. Somebody who chooses a language on a desktop has chosen
+// nothing at all if it lives in that browser's storage, and an account created
+// by an administrator lands in whatever its first browser asks for — which is
+// how a first sign-in arrives in a language nobody picked, with the setting to
+// change it written in that language.
+func TestALanguageFollowsTheAccount(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+
+	resp := team.do(http.MethodPost, "/api/people", map[string]any{
+		"username": "greta", "password": "a good long passphrase",
+		"display_name": "Greta", "language": "de",
+	})
+	body := decode(t, resp)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("creating the account returned %d: %v", resp.StatusCode, body)
+	}
+
+	them := team.anonymous()
+	resp = them.do(http.MethodPost, "/api/session",
+		map[string]string{"username": "greta", "password": "a good long passphrase"})
+	_ = resp.Body.Close()
+
+	resp = them.do(http.MethodGet, "/api/me", nil)
+	if got := decode(t, resp)["language"]; got != "de" {
+		t.Errorf("the account does not carry the language it was created with: %v", got)
+	}
+
+	// And they can change it themselves.
+	resp = them.do(http.MethodPost, "/api/me/language", map[string]string{"language": "ja"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("changing the language returned %d", resp.StatusCode)
+	}
+	resp = them.do(http.MethodGet, "/api/me", nil)
+	if got := decode(t, resp)["language"]; got != "ja" {
+		t.Errorf("the change did not take: %v", got)
+	}
+
+	// A language this build does not ship is refused rather than stored: the
+	// value ends up in <html lang>, which is what a screen reader pronounces by.
+	resp = them.do(http.MethodPost, "/api/me/language", map[string]string{"language": "klingon"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("a language that does not exist was accepted: %d", resp.StatusCode)
+	}
+
+	// Empty is not a language: it means "not chosen", and hands the decision
+	// back to the browser.
+	resp = them.do(http.MethodPost, "/api/me/language", map[string]string{"language": ""})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("clearing the language was refused: %d", resp.StatusCode)
+	}
+}
+
+// TestTheServerFactsAreForWhoeverRunsIt.
+//
+// The About screen reports how long the process has been up, how large the
+// database is and what is left on the disk under it. None of that is secret
+// exactly, and none of it is the public's business either.
+func TestTheServerFactsAreForWhoeverRunsIt(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+
+	resp := team.do(http.MethodGet, "/api/server", nil)
+	facts := decode(t, resp)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("reading the server facts returned %d", resp.StatusCode)
+	}
+	for _, key := range []string{"version", "uptime_seconds", "database_bytes", "memory_bytes"} {
+		if _, ok := facts[key]; !ok {
+			t.Errorf("the About screen has no %s to show: %v", key, facts)
+		}
+	}
+	// The database is on disk and has rows in it, so a zero here means the file
+	// was not found rather than that it is empty.
+	if size, _ := facts["database_bytes"].(float64); size <= 0 {
+		t.Errorf("the database reports %v bytes", facts["database_bytes"])
+	}
+
+	// Somebody with a session but no run of the place. The public being turned
+	// away proves nothing here: the route is private, so the session middleware
+	// answers before the rule is ever consulted.
+	accounts := account.Store{DB: team.db()}
+	if _, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now()); err != nil {
+		t.Fatal(err)
+	}
+	them := team.anonymous()
+	resp = them.do(http.MethodPost, "/api/session",
+		map[string]string{"username": "helper", "password": "a good long passphrase"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the helper could not sign in: %d", resp.StatusCode)
+	}
+	resp = them.do(http.MethodGet, "/api/server", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("somebody who does not run this server can read its disk: %d", resp.StatusCode)
+	}
+
+	public := team.anonymous()
+	resp = public.do(http.MethodGet, "/api/server", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized && resp.StatusCode != http.StatusForbidden {
+		t.Errorf("the free space on the operator's disk is public: %d", resp.StatusCode)
+	}
+}

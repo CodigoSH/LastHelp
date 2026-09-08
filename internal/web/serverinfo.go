@@ -46,7 +46,12 @@ func (s *Server) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 			dbBytes += info.Size()
 		}
 	}
-	out["database_bytes"] = dbBytes
+	// Omitted rather than reported as zero when there is nothing to stat. A
+	// zero on that card reads as "the database is empty"; the truth is "this
+	// server could not find its file", and those want different reactions.
+	if dbBytes > 0 {
+		out["database_bytes"] = dbBytes
+	}
 
 	if schema, err := database.SchemaVersion(s.db); err == nil {
 		out["schema"] = schema

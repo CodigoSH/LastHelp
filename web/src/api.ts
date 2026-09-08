@@ -80,6 +80,8 @@ export interface Status {
 export interface Me {
   id: number;
   username?: string;
+  /** The language this account reads in, or empty when it has not chosen. */
+  language?: string;
   name?: string;
   avatar?: string;
   admin: boolean;

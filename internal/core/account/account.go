@@ -394,6 +394,31 @@ func (s Store) Dashboard(userID int64) (string, error) {
 	return layout, nil
 }
 
+// Language is the one this account reads in, or empty for "not chosen".
+//
+// Empty is not English. It means nothing has been decided, so the browser's
+// preference still applies; English is what everything falls back to when the
+// browser asks for one this does not have.
+func (s Store) Language(userID int64) (string, error) {
+	var code string
+	err := s.DB.QueryRow(`SELECT language FROM app_user WHERE id = ?`, userID).Scan(&code)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", ErrNotFound
+	case err != nil:
+		return "", fmt.Errorf("reading the language: %w", err)
+	}
+	return code, nil
+}
+
+// SetLanguage stores it.
+func (s Store) SetLanguage(userID int64, code string) error {
+	if _, err := s.DB.Exec(`UPDATE app_user SET language = ? WHERE id = ?`, code, userID); err != nil {
+		return fmt.Errorf("storing the language: %w", err)
+	}
+	return nil
+}
+
 // SetDashboard stores it.
 func (s Store) SetDashboard(userID int64, layout string) error {
 	if _, err := s.DB.Exec(`UPDATE app_user SET dashboard = ? WHERE id = ?`, layout, userID); err != nil {

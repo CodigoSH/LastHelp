@@ -424,11 +424,20 @@ async function main() {
   const bridgeControl = await evaluate(`return !!document.querySelector("[data-create-issue]")`);
   check("the team sees the bridge control", bridgeControl === true);
 
+  // Every toast off the screen first. Reading whichever one happens to be
+  // there measures the last action, not this one — and it passed that way,
+  // reporting the status change from four steps earlier as the answer to a
+  // button it never pressed.
+  await evaluate(`document.querySelectorAll(".toast-close").forEach(b => b.click());`);
+  await sleep(400);
   await evaluate(`document.querySelector("[data-create-issue]").click()`);
   await sleep(600);
+  // It answers in a toast now, not in a line under the button. Which is the
+  // point of checking it here: the message moved, and the only thing that
+  // would have noticed is a probe that goes looking for it.
   const issueNote = await evaluate(`
-    const note = document.querySelector(".issue-note");
-    return { shown: note ? !note.hidden : false, text: note?.textContent?.trim() ?? "" };
+    const t = document.querySelector(".toast");
+    return { shown: !!t, text: t?.querySelector(".toast-message")?.textContent?.trim() ?? "" };
   `);
   check("asking for an issue says something", issueNote.shown === true, issueNote.text.slice(0, 44));
 
@@ -449,6 +458,28 @@ async function main() {
     };
   `);
   check("the panel says what version is running", updates.hasSection === true);
+
+  // 11b. About, which is the page somebody keeping a server running opens.
+  await evaluate(`history.pushState({}, "", "/panel/about"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(900);
+  const about = await evaluate(`
+    return {
+      cards: document.querySelectorAll(".bento-card").length,
+      // The commit hash and the name of the installation used to be here. One
+      // answers a question nobody asks on this page, and the other is a
+      // setting that lives on Personalization.
+      facts: [...document.querySelectorAll(".fact")].map(f => f.textContent.trim()),
+    };
+  `);
+  check("About reports the state of the server", about.cards >= 4, `${about.cards} cards`);
+  check(
+    "and every card of it has a number to report",
+    about.facts.length === about.cards && about.facts.every((f: string) => f.length > 0),
+    JSON.stringify(about.facts),
+  );
+
+  const picker = await evaluate(`return !!document.querySelector("body > nav select");`);
+  check("no language picker rides along in the top bar", picker === false);
 
   const sidebar = await evaluate(`
     return {
@@ -584,12 +615,17 @@ async function main() {
 
   // 13. Right to left, which is where a stylesheet written in left and right
   //     falls apart.
+  // Changed where somebody actually changes it, now that the top bar carries no
+  // picker: under Appearance, which is also the path that stores the choice on
+  // the account rather than in this browser.
+  await evaluate(`history.pushState({}, "", "/panel/appearance"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(900);
   await evaluate(`
-    const select = document.querySelector("nav .lang");
+    const select = document.querySelector("#appearance-language");
     select.value = "ar";
     select.dispatchEvent(new Event("change"));
   `);
-  await sleep(900);
+  await sleep(1200);
   const rtl = await evaluate(`return [document.documentElement.lang, document.documentElement.dir]`);
   check("switching to Arabic flips the document", JSON.stringify(rtl) === '["ar","rtl"]', JSON.stringify(rtl));
 
@@ -652,6 +688,28 @@ async function main() {
     "a card dragged to the end stays there",
     dashboard.saved?.[dashboard.saved.length - 1] === dashboard.before[0],
     `${dashboard.before[0]} → last of ${JSON.stringify(dashboard.saved)}`,
+  );
+
+  // The slot a card would land in, painted green because the accent means
+  // "selected" everywhere else in this interface and this one means "release".
+  const ghost = await evaluate(`
+    const cards = [...document.querySelectorAll("[data-card]")];
+    const dt = new DataTransfer();
+    cards[0].dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+    const box = cards[2].getBoundingClientRect();
+    cards[2].dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt,
+      clientX: box.left + box.width * 0.9, clientY: box.top + box.height / 2 }));
+    const el = document.querySelector(".dash-ghost");
+    const style = el ? getComputedStyle(el) : null;
+    const out = { shown: !!el, colour: style?.borderColor ?? "", style: style?.borderStyle ?? "",
+                  sourceStays: cards[0].classList.contains("dragging") };
+    document.querySelector(".dashboard").dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
+    return out;
+  `);
+  check(
+    "dragging shows the slot the card would land in",
+    ghost.shown && ghost.colour.includes("34, 197, 94") && ghost.style === "dashed" && ghost.sourceStays,
+    JSON.stringify(ghost),
   );
 
   const hidden = await evaluate(`
