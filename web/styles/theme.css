@@ -37,6 +37,11 @@
   /* State, as hues rather than as words. A board where everything is grey is a
      board nobody can scan; these are the four meanings a status can carry. */
   --hue-open: #2563eb;
+  /* The one red in the product: a refusal, a deletion, and leaving. Named here
+     so the three of them are the same red and so the dark theme can lighten it
+     — #dc2626 on a dark surface is under 4.5:1 and this is text people read. */
+  --danger: #dc2626;
+  --danger-rgb: 220, 38, 38;
   --hue-work: var(--accent);
   --hue-done: #15803d;
   --hue-hold: #b45309;
@@ -101,6 +106,8 @@
     --border: #242a34;
     --border-strong: #333c49;
     --hue-open: #60a5fa;
+    --danger: #f87171;
+    --danger-rgb: 248, 113, 113;
     --hue-done: #4ade80;
     --hue-hold: #fbbf24;
     --hue-off: #9aa3b2;
@@ -121,6 +128,8 @@
   --border: #242a34;
   --border-strong: #333c49;
   --hue-open: #60a5fa;
+  --danger: #f87171;
+  --danger-rgb: 248, 113, 113;
   --hue-done: #4ade80;
   --hue-hold: #fbbf24;
   --hue-off: #9aa3b2;
@@ -868,8 +877,8 @@ summary:focus-visible,
   box-shadow: var(--accent-glow), 0 0 0 4px rgba(var(--accent-rgb), 0.14);
 }
 
-.button.danger { color: #dc2626; }
-.button.danger:hover { border-color: rgba(220, 38, 38, 0.5); }
+.button.danger { color: var(--danger); }
+.button.danger:hover { border-color: rgba(var(--danger-rgb), 0.5); }
 .button .count { font-variant-numeric: tabular-nums; font-weight: 700; }
 .button.small { padding: 0.35rem 0.75rem; font-size: 0.875rem; }
 
@@ -885,7 +894,7 @@ summary:focus-visible,
 }
 
 .form-error {
-  color: #dc2626;
+  color: var(--danger);
   font-size: 0.875rem;
   font-weight: 600;
 }
@@ -1713,8 +1722,8 @@ body.admin-view > main {
 }
 
 .icon-button.danger:hover {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.12);
 }
 
 .side-item .icon {
@@ -3455,4 +3464,23 @@ a.stat:hover .stat-go {
   background: var(--surface);
   color: var(--accent-alt);
   box-shadow: var(--shadow-1);
+}
+
+/*
+ * Leaving, in red.
+ *
+ * It is the only control in the sidebar and in the bar that ends what you are
+ * doing, and the operator asked for it to look like it. Red at rest rather than
+ * on hover: a colour that only appears once the pointer is already on it is a
+ * warning nobody reads before pressing.
+ */
+.side-foot .link,
+.nav-right .sign-out {
+  color: var(--danger);
+}
+
+.side-foot .link:hover,
+.nav-right .sign-out:hover {
+  color: var(--danger);
+  background: rgba(var(--danger-rgb), 0.12);
 }
