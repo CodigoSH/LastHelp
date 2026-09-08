@@ -1038,6 +1038,45 @@ async function main() {
       state: r.querySelector(".status")?.className ?? "",
     }));
   `);
+
+  // The decision sits on the line of the state it would change — a queue of ten
+  // was ten double-height rows — and it is a group beside that state rather
+  // than four things heaped against the edge. Measured as a relationship
+  // between the two distances, not as a number of pixels: the point is that
+  // the gap outside the group is the larger one.
+  //
+  // In a window wide enough for one line, because at the 800px this browser
+  // opens at the row deliberately stacks — and a stacked row answers this
+  // question with the distances of a layout that is not the one under test.
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: 1280, height: 900, deviceScaleFactor: 1, mobile: false,
+  });
+  await sleep(400);
+  const grouped = await evaluate(`
+    const row = [...document.querySelectorAll(".report")].find(r => r.querySelector(".row-actions"));
+    const plain = [...document.querySelectorAll(".report")].find(r => !r.querySelector(".row-actions"));
+    const buttons = [...row.querySelectorAll(".row-actions .button")].map(b => b.getBoundingClientRect());
+    const chip = row.querySelector(".status").getBoundingClientRect();
+    // The distance between two boxes on a line, whichever way the line runs.
+    // By this point the walk is in Arabic, so "the one on the right" is the
+    // first of them — and a subtraction written for English answers with a
+    // negative number that still satisfies a "bigger than" comparison. Which
+    // is a check that passes on geometry it never measured.
+    const between = (a, b) => Math.round(Math.max(b.left - a.right, a.left - b.right));
+    return {
+      dir: getComputedStyle(document.documentElement).direction,
+      inside: between(buttons[0], buttons[1]),
+      outside: between(buttons[buttons.length - 1], chip),
+      taller: Math.round(row.getBoundingClientRect().height - plain.getBoundingClientRect().height),
+    };
+  `);
+  check(
+    "the decision is a group beside the state, and costs the row no height",
+    grouped.outside > grouped.inside * 2 && grouped.taller === 0,
+    JSON.stringify(grouped),
+  );
+  await page.send("Emulation.clearDeviceMetricsOverride");
+  await sleep(400);
   check(
     "and nothing waiting for review is called open",
     states.length > 1 &&

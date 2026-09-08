@@ -2199,20 +2199,24 @@ export function reportsScreen(data: ReportsData, filters: ReportFilters, text: T
             <span class="when">${escapeHTML(text.date(r.created_at))}</span>
           </span>
         </span>
-        ${stateChip(r, text)}
       </a>
       ${
-        // The decision, where the thing to decide about is. Only on what is
+        // The decision, on the same line as the state it would change, so a
+        // queue of ten does not become ten double-height rows. Only on what is
         // actually waiting: three buttons on a report published last March are
         // three ways to undo somebody's work by mistake.
+        //
+        // Outside the link and not inside it: a button inside an anchor is
+        // markup that navigates when you press it.
         r.moderation === "pending"
           ? `<div class="row-actions">
-               <button class="button primary with-icon" data-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
-               <button class="button with-icon" data-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
-               <button class="button danger with-icon" data-act="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
+               <button class="button primary small with-icon" data-act="published">${icons.check(13)}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+               <button class="button small with-icon" data-act="rejected">${icons.close(13)}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+               <button class="button danger small with-icon" data-act="spam">${icons.warning(13)}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
              </div>`
           : ""
       }
+      ${stateChip(r, text)}
     </li>`;
   };
 
