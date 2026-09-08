@@ -32,6 +32,10 @@ var (
 
 	// ErrUnknownForge means the forge is not one this binary can speak to.
 	ErrUnknownForge = errors.New("unknown forge")
+
+	// ErrNothingAccepted is a repository that takes neither bugs nor ideas,
+	// which is a page that refuses everything it offers.
+	ErrNothingAccepted = errors.New("a repository that accepts neither bugs nor ideas accepts nothing")
 )
 
 // Forge is which kind of forge an organisation connects to.
@@ -226,7 +230,7 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 		return Repository{}, fmt.Errorf("unknown moderation mode %q", r.ModerationMode)
 	}
 	if !r.AcceptsBugs && !r.AcceptsIdeas {
-		return Repository{}, errors.New("a repository that accepts neither bugs nor ideas accepts nothing")
+		return Repository{}, ErrNothingAccepted
 	}
 
 	res, err := s.DB.Exec(`INSERT INTO repository
@@ -352,6 +356,56 @@ func (s Store) SetNotifyConfig(repoID int64, config string) error {
 	}
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
 		return ErrNotFound
+	}
+	return nil
+}
+
+// RenameOrganization changes what an organisation is called, and nothing else.
+//
+// The slug is not among the things that change. It is in every URL anybody has
+// bookmarked, in every webhook a forge was told to deliver to, and in the links
+// inside issues already opened — renaming it breaks all three silently, and the
+// gain is a tidier address.
+func (s Store) RenameOrganization(id int64, name string) error {
+	_, err := s.DB.Exec(`UPDATE organization SET name = ? WHERE id = ?`, strings.TrimSpace(name), id)
+	if err != nil {
+		return fmt.Errorf("renaming the organisation: %w", err)
+	}
+	return nil
+}
+
+// DeleteOrganization removes an organisation and everything under it.
+//
+// Everything, and that is the point of saying so: the repositories, the reports
+// people wrote in them, the votes, the replies. The foreign keys cascade, so
+// this is one statement rather than five that could half-succeed — but a screen
+// offering it has to say what it means, because nothing here is recoverable
+// without a backup.
+func (s Store) DeleteOrganization(id int64) error {
+	if _, err := s.DB.Exec(`DELETE FROM organization WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("deleting the organisation: %w", err)
+	}
+	return nil
+}
+
+// UpdateRepository changes what can be changed about one.
+func (s Store) UpdateRepository(id int64, name, forgeRepo string, bugs, ideas bool) error {
+	if !bugs && !ideas {
+		return ErrNothingAccepted
+	}
+	_, err := s.DB.Exec(`UPDATE repository
+		SET name = ?, forge_repo = ?, accepts_bugs = ?, accepts_ideas = ?
+		WHERE id = ?`, strings.TrimSpace(name), strings.TrimSpace(forgeRepo), bugs, ideas, id)
+	if err != nil {
+		return fmt.Errorf("updating the repository: %w", err)
+	}
+	return nil
+}
+
+// DeleteRepository removes a repository and every report in it.
+func (s Store) DeleteRepository(id int64) error {
+	if _, err := s.DB.Exec(`DELETE FROM repository WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("deleting the repository: %w", err)
 	}
 	return nil
 }

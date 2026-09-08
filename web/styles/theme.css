@@ -982,3 +982,471 @@ body.admin-view > main {
 .admin-main .wizard-actions {
   max-inline-size: 34rem;
 }
+
+/* ------------------------------------------------------------------- icons */
+
+.icon {
+  flex: none;
+  vertical-align: -0.15em;
+}
+
+.button.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* A button that is only an icon still needs a hit area a thumb can find. */
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--text);
+}
+
+.icon-button.danger:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.side-item .icon {
+  color: var(--text-muted);
+}
+
+.side-item[aria-current="page"] .icon {
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ modals */
+
+.modal {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 6px);
+  background: var(--bg);
+  color: var(--text);
+  padding: 0;
+  inline-size: min(34rem, calc(100vw - 2rem));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.modal::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.modal form {
+  display: block;
+  margin: 0;
+  padding: 1.25rem;
+}
+
+.modal-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.modal-head h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.modal .lead {
+  color: var(--text-muted);
+  margin: 0.35rem 0 0;
+}
+
+.modal-body {
+  margin-top: 1.1rem;
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+}
+
+/* ------------------------------------------------------------------- cards */
+
+/* The house's card grid. Named for what it is rather than for its columns, so
+   a screen with three cards and one with nine use the same word. */
+.bento {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.9rem;
+  margin: 1.25rem 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.bento-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+a.bento-card:hover {
+  border-color: rgba(var(--accent-rgb), 0.55);
+  transform: translateY(-1px);
+}
+
+.bento-card .card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--accent);
+}
+
+.bento-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.bento-card .card-sub {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* The row of controls on a card, which appears on hover and on focus — on
+   focus because a keyboard never hovers, and a control that only a mouse can
+   reach is one half the people cannot use. */
+.card-actions {
+  position: absolute;
+  inset-block-start: 0.6rem;
+  inset-inline-end: 0.6rem;
+  display: flex;
+  gap: 0.15rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.bento-card:hover .card-actions,
+.card-actions:focus-within {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .card-actions {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------- stats */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.stat {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* A stat that is a link is still a card. Without this the anchor stays inline,
+   the list item keeps no border, and the number floats over the one below. */
+a.stat {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.stat:hover {
+  border-color: rgba(var(--accent-rgb), 0.55);
+}
+
+.stats > li {
+  display: contents;
+}
+
+.stat .value {
+  display: block;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat .label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* A bar per status, drawn from the numbers rather than from a chart library:
+   one dependency for eight rectangles is one dependency too many. */
+.bars {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1rem 0 2rem;
+  max-inline-size: 40rem;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 9rem 1fr 3rem;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.bar-track {
+  block-size: 0.55rem;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.16);
+  overflow: hidden;
+}
+
+.bar-fill {
+  block-size: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.bar-row .count {
+  text-align: end;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------ avatar */
+
+.avatar {
+  display: grid;
+  place-items: center;
+  inline-size: 3rem;
+  block-size: 3rem;
+  border-radius: 50%;
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent-alt);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  flex: none;
+}
+
+.avatar img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+.avatar.big {
+  inline-size: 5rem;
+  block-size: 5rem;
+  font-size: 1.75rem;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0 1.75rem;
+}
+
+.identity .name {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+/* A short, monospaced label for a role or a state. */
+.tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.14);
+  color: var(--text-muted);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.tag.accent {
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent-alt);
+}
+
+/* --------------------------------------------------- the rest of the panel */
+
+.screen-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.screen-head h1 {
+  margin: 0;
+  flex: 1;
+}
+
+.side .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.brand-logo {
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.logo-preview {
+  inline-size: 3rem;
+  block-size: 3rem;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.side-who {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-inline-size: 0;
+}
+
+.side-who .avatar {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  font-size: 0.7rem;
+}
+
+.side-who .who {
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A card whose whole face is a link, with its controls floating over the
+   corner. The link is the <a>, not the <li>, so the buttons are not inside it —
+   a button inside a link is a browser deciding which one you meant. */
+.card-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.bento-card:has(.card-link):hover {
+  border-color: rgba(var(--accent-rgb), 0.55);
+}
+
+.bento.wide {
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+}
+
+.person-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.person-head .name {
+  font-weight: 600;
+}
+
+.person-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+}
+
+.fact-value {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+}
+
+.accent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.accent-row input[type="color"] {
+  inline-size: 3rem;
+  block-size: 2.25rem;
+  padding: 0.15rem;
+  cursor: pointer;
+}
+
+.restore-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.notice {
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: rgba(232, 82, 14, 0.1);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.button.danger {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* A switch, which is a checkbox that says what it turns on. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  cursor: pointer;
+}
+
+.switch input {
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}

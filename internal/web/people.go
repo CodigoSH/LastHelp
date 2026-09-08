@@ -93,6 +93,41 @@ func (s *Server) handleChangeProfile(w http.ResponseWriter, r *http.Request) {
 
 const maxDisplayNameLength = 60
 
+// maxAvatarBytes bounds a picture that is stored in a row and sent with every
+// listing of people. Bigger than this is a file, and a file is a thing to
+// serve, cache and back up separately.
+const maxAvatarBytes = 96 << 10
+
+type avatarChange struct {
+	Avatar string `json:"avatar"`
+}
+
+// handleChangeAvatar stores the picture beside your name, or clears it.
+func (s *Server) handleChangeAvatar(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "error.unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBytes+(8<<10))
+	var in avatarChange
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	picture := strings.TrimSpace(in.Avatar)
+	if picture != "" && (!strings.HasPrefix(picture, "data:image/") || len(picture) > maxAvatarBytes) {
+		writeError(w, http.StatusBadRequest, "error.image_too_big")
+		return
+	}
+	if err := s.accounts().SetAvatar(actor.UserID, picture); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"avatar": picture})
+}
+
 // --- the people who may use this installation -------------------------------
 
 // handleListPeople answers who has an account and what each one may do.
@@ -128,6 +163,7 @@ func (s *Server) handleListPeople(w http.ResponseWriter, r *http.Request) {
 			"name":     u.DisplayName,
 			"admin":    u.IsAdministrator,
 			"disabled": u.Disabled,
+			"avatar":   u.Avatar,
 			"grants":   grants,
 		})
 	}

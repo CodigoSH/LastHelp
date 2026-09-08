@@ -42,6 +42,12 @@ let me: Me | null = null;
  */
 let instanceName = "";
 
+/** The logo beside it, if the operator chose one. */
+let instanceLogo = "";
+
+/** The accent this installation chose, applied to the document root. */
+let instanceAccent = "";
+
 // --- routing ---------------------------------------------------------------
 
 /** Navigate without a reload, so the language and the scroll survive. */
@@ -119,9 +125,14 @@ async function showInShell(content: string, path: string): Promise<void> {
     .get<{ organizations: OrganizationSummary[] }>("/api/orgs")
     .catch(() => ({ organizations: [] as OrganizationSummary[] }));
 
-  if (!instanceName) {
-    const instance = await api.get<{ name: string }>("/api/instance").catch(() => null);
-    instanceName = instance?.name ?? "";
+  const instance = await api
+    .get<{ name: string; logo: string; accent: string }>("/api/instance")
+    .catch(() => null);
+  if (instance) {
+    instanceName = instance.name;
+    instanceLogo = instance.logo;
+    instanceAccent = instance.accent;
+    applyAccent(instanceAccent);
   }
 
   const orgs: views.SideOrganization[] = organizations ?? [];
@@ -142,6 +153,8 @@ async function showInShell(content: string, path: string): Promise<void> {
         isAdmin: me?.admin === true,
         mayAddOrganization: me?.admin === true,
         instance: instanceName || i18n.t("app.name"),
+        logo: instanceLogo,
+        avatar: me?.avatar,
         content,
       },
       text,
@@ -161,6 +174,98 @@ function wireShell(): void {
   });
 }
 
+/**
+ * Read a chosen image as a data URL, refusing one too large to belong in a row.
+ *
+ * The bound is checked here as well as at the server, because a browser that
+ * has already read six megabytes into memory before being told no is a browser
+ * that stuttered for nothing.
+ */
+const maxImageBytes = 96 * 1024;
+
+function readAsDataURL(file: File | undefined): Promise<string | null> {
+  if (!file) return Promise.resolve(null);
+  if (file.size > maxImageBytes) {
+    showFormError(new ApiError(400, "error.image_too_big"));
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * The modal plumbing, in one place.
+ *
+ * <dialog> already does the hard parts — focus, Escape, inert background — so
+ * this is only opening, closing and the submit. Every screen wiring its own
+ * would be four copies of the same three listeners, and the fourth would be the
+ * one that forgot to close on cancel.
+ */
+/**
+ * The accent an operator chose, as a variable on the root.
+ *
+ * A style attribute rather than a stylesheet, because the value comes from the
+ * database and a stylesheet with a hole in it needs a nonce, a request and a
+ * cache story. The server only ever stores six hex digits, which is why this
+ * can be written into a property at all.
+ */
+function applyAccent(accent: string): void {
+  const root = document.documentElement;
+  if (!accent) {
+    root.style.removeProperty("--accent");
+    root.style.removeProperty("--accent-rgb");
+    root.style.removeProperty("--accent-alt");
+    return;
+  }
+  const [r, g, b] = [1, 3, 5].map((at) => parseInt(accent.slice(at, at + 2), 16));
+  root.style.setProperty("--accent", accent);
+  root.style.setProperty("--accent-rgb", `${r}, ${g}, ${b}`);
+  root.style.setProperty("--accent-alt", accent);
+}
+
+function openModal(id: string): void {
+  root?.querySelector<HTMLDialogElement>("#" + id)?.showModal();
+}
+
+function wireModalOpeners(): void {
+  // One attribute opens any of them. Screens used to wire their own opener and
+  // one of them forgot, which is a button that looks right and does nothing —
+  // the kind of bug that only a walk through the browser finds.
+  root?.querySelectorAll<HTMLElement>("[data-open-modal]").forEach((button) =>
+    button.addEventListener("click", () => openModal(button.dataset.openModal ?? "")),
+  );
+  root?.querySelectorAll<HTMLButtonElement>("[data-close]").forEach((button) =>
+    button.addEventListener("click", () => button.closest("dialog")?.close()),
+  );
+}
+
+/**
+ * Submit handling for a form, whether it is in a modal or on the page.
+ *
+ * A form inside <dialog method="dialog"> closes the dialog on submit, which is
+ * why the work happens first and the close is left to the browser: closing by
+ * hand as well means closing twice, and the second one throws.
+ */
+function onSubmit(selector: string, handler: (data: FormData) => Promise<void>): void {
+  root?.querySelector<HTMLFormElement>(selector)?.addEventListener("submit", async (event) => {
+    const form = event.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    const dialog = form.closest("dialog");
+    if (!dialog) event.preventDefault();
+    try {
+      await handler(data);
+    } catch (err) {
+      // The dialog has already closed itself by the time this runs, so the
+      // message goes where the screen can show it.
+      showFormError(err);
+    }
+  });
+}
+
 /** Signed in, or sent to the door. Every panel screen starts here. */
 async function requirePanel(): Promise<boolean> {
   me = await api.get<Me>("/api/me").catch(() => null);
@@ -173,7 +278,35 @@ async function requirePanel(): Promise<boolean> {
 
 async function showProfile(): Promise<void> {
   if (!(await requirePanel())) return;
-  await showInShell(views.profileScreen(me?.username ?? "", "", text), "/panel/account");
+  await showInShell(
+    views.profileScreen(
+      { username: me?.username ?? "", name: me?.name, avatar: me?.avatar, admin: me?.admin === true },
+      text,
+    ),
+    "/panel/account",
+  );
+
+  // The picture, which is read in the browser and sent as a data URL. A file
+  // upload would need a store, a route to serve it from and a second thing to
+  // back up; one small image belongs in the row beside the name.
+  const avatarFile = root?.querySelector<HTMLInputElement>("#avatar-file");
+  root?.querySelector<HTMLButtonElement>("[data-pick-avatar]")?.addEventListener("click", () => avatarFile?.click());
+  avatarFile?.addEventListener("change", async () => {
+    const picture = await readAsDataURL(avatarFile.files?.[0]);
+    if (picture === null) return;
+    try {
+      await api.post("/api/me/avatar", { avatar: picture });
+      me = null;
+      await render();
+    } catch (err) {
+      showFormError(err);
+    }
+  });
+  root?.querySelector<HTMLButtonElement>("[data-clear-avatar]")?.addEventListener("click", async () => {
+    await api.post("/api/me/avatar", { avatar: "" }).catch(() => undefined);
+    me = null;
+    await render();
+  });
 
   root?.querySelector<HTMLFormElement>("form.profile-name")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -236,27 +369,115 @@ async function showPeople(): Promise<void> {
     return;
   }
 
-  await showInShell(views.peopleScreen(body.people ?? [], text), "/panel/people");
+  await showInShell(
+    views.peopleScreen(body.people ?? [], text) +
+      views.modal(
+        {
+          id: "person-modal",
+          title: text.t("people.add"),
+          lead: text.t("people.addHelp"),
+          body:
+            views.field({ id: "person-username", name: "username", label: text.t("auth.username"), required: true, example: "ana" }, text) +
+            views.field({ id: "person-name", name: "display_name", label: text.t("profile.name"), example: "Ana" }, text) +
+            views.field({ id: "person-password", name: "password", label: text.t("auth.password"), type: "password", required: true, hint: text.t("auth.passwordHelp") }, text),
+          submit: text.t("auth.create"),
+          formClass: "person-form",
+        },
+        text,
+      ) +
+      views.modal(
+        {
+          id: "person-edit",
+          title: text.t("people.edit"),
+          lead: text.t("people.editHelp"),
+          body:
+            views.field({ id: "edit-name", name: "display_name", label: text.t("profile.name") }, text) +
+            views.field({ id: "edit-password", name: "password", label: text.t("people.newPassword"), type: "password", hint: text.t("people.newPasswordHelp") }, text),
+          submit: text.t("action.save"),
+          formClass: "person-edit-form",
+        },
+        text,
+      ),
+    "/panel/people",
+  );
 
-  root?.querySelector<HTMLFormElement>("form.new-person")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const data = new FormData(event.currentTarget as HTMLFormElement);
-    try {
-      await api.post("/api/people", {
-        username: String(data.get("username") ?? ""),
-        display_name: String(data.get("display_name") ?? ""),
-        password: String(data.get("password") ?? ""),
-      });
-      await render();
-    } catch (err) {
-      showFormError(err);
-    }
+  wireModalOpeners();
+    onSubmit("form.person-form", async (data) => {
+    await api.post("/api/people", {
+      username: String(data.get("username") ?? ""),
+      display_name: String(data.get("display_name") ?? ""),
+      password: String(data.get("password") ?? ""),
+    });
+    await render();
   });
+
+  let editing = 0;
+  root?.querySelectorAll<HTMLButtonElement>("[data-edit-person]").forEach((button) =>
+    button.addEventListener("click", () => {
+      editing = Number(button.dataset.editPerson ?? 0);
+      const name = root?.querySelector<HTMLInputElement>("#edit-name");
+      if (name) name.value = button.dataset.name ?? "";
+      const pass = root?.querySelector<HTMLInputElement>("#edit-password");
+      if (pass) pass.value = "";
+      openModal("person-edit");
+    }),
+  );
+  onSubmit("form.person-edit-form", async (data) => {
+    const payload: Record<string, string> = {};
+    const name = String(data.get("display_name") ?? "");
+    const pass = String(data.get("password") ?? "");
+    if (name) payload.display_name = name;
+    if (pass) payload.password = pass;
+    await api.patch(`/api/people/${editing}`, payload);
+    await render();
+  });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-delete-person]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      if (!confirm(i18n.t("people.confirmDelete", { name: button.dataset.name ?? "" }))) return;
+      try {
+        await api.del(`/api/people/${button.dataset.deletePerson}`);
+        await render();
+      } catch (err) {
+        showFormError(err);
+      }
+    }),
+  );
 }
 
 async function showBackups(): Promise<void> {
   if (!(await requirePanel())) return;
   await showInShell(views.backupScreen(text), "/panel/backups");
+
+  const file = root?.querySelector<HTMLInputElement>("#restore-file");
+  const note = root?.querySelector<HTMLParagraphElement>(".restore-note");
+  root?.querySelector<HTMLButtonElement>("[data-pick-restore]")?.addEventListener("click", () => file?.click());
+
+  file?.addEventListener("change", async () => {
+    const chosen = file.files?.[0];
+    if (!chosen) return;
+    // Asked in words rather than with a second button: this replaces every
+    // report anybody has written since the backup was taken, and there is no
+    // undo that is not another restore.
+    if (!confirm(i18n.t("backups.confirmRestore", { file: chosen.name }))) {
+      file.value = "";
+      return;
+    }
+
+    const form = new FormData();
+    form.set("backup", chosen);
+    if (note) {
+      note.textContent = i18n.t("backups.restoring");
+      note.hidden = false;
+    }
+    try {
+      const done = await api.upload<{ kept: string }>("/api/restore", form);
+      if (note) note.textContent = i18n.t("backups.restored", { kept: done.kept });
+    } catch (err) {
+      if (note) note.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+    }
+    file.value = "";
+  });
 }
 
 async function showAbout(): Promise<void> {
@@ -297,6 +518,8 @@ async function render(): Promise<void> {
     if (path === "/panel/account") return await showProfile();
     if (path === "/panel/appearance") return await showAppearance();
     if (path === "/panel/people") return await showPeople();
+    if (path === "/panel/organizations") return await showOrganizationsPanel();
+    if (path === "/panel/personalization") return await showPersonalization();
     if (path === "/panel/backups") return await showBackups();
     if (path === "/panel/about") return await showAbout();
     // Before the generic /panel/{org}: "new" is a screen, not an organisation
@@ -962,8 +1185,137 @@ async function showPanel(): Promise<void> {
   // before this ran and still says "sign in".
   renderNav();
 
+  const data = await api
+    .get<Parameters<typeof views.overviewScreen>[0]>("/api/overview")
+    .catch(() => null);
+
+  if (!data) {
+    // Not an administrator. The rest of the panel is still theirs; this one
+    // screen counts the whole installation, which is not.
+    const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
+    await showInShell(views.panelHome(organizations ?? [], text), "/panel");
+    return;
+  }
+  await showInShell(views.overviewScreen(data, text), "/panel");
+}
+
+/** The organisations, as cards, with the way to add one. */
+async function showOrganizationsPanel(): Promise<void> {
+  if (!(await requirePanel())) return;
   const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
-  await showInShell(views.panelHome(organizations ?? [], text), "/panel");
+  const canManage = me?.admin === true;
+
+  await showInShell(
+    views.organizationsScreen(organizations ?? [], canManage, text) +
+      views.modal(
+        {
+          id: "org-modal",
+          title: text.t("panel.newOrganization"),
+          lead: text.t("setup.orgLead"),
+          body: views.organizationFields(text, draft.forge),
+          submit: text.t("auth.create"),
+          formClass: "org-form",
+        },
+        text,
+      ) +
+      views.modal(
+        {
+          id: "org-rename",
+          title: text.t("organizations.rename"),
+          body: views.field({ id: "org-new-name", name: "name", label: text.t("panel.name"), required: true }, text),
+          submit: text.t("action.save"),
+          formClass: "org-rename-form",
+        },
+        text,
+      ),
+    "/panel/organizations",
+  );
+
+  wireModalOpeners();
+
+  onSubmit("form.org-form", async (data) => {
+    await api.post("/api/organizations", {
+      name: String(data.get("name") ?? ""),
+      slug: String(data.get("slug") ?? ""),
+      forge: String(data.get("forge") ?? "none"),
+      base_url: String(data.get("base_url") ?? ""),
+      forge_owner: String(data.get("forge_owner") ?? ""),
+    });
+    await render();
+  });
+
+  let renaming = "";
+  root?.querySelectorAll<HTMLButtonElement>("[data-edit-org]").forEach((button) =>
+    button.addEventListener("click", () => {
+      renaming = button.dataset.editOrg ?? "";
+      const input = root?.querySelector<HTMLInputElement>("#org-new-name");
+      if (input) input.value = button.dataset.name ?? "";
+      openModal("org-rename");
+    }),
+  );
+  onSubmit("form.org-rename-form", async (data) => {
+    await api.patch(`/api/orgs/${encodeURIComponent(renaming)}`, { name: String(data.get("name") ?? "") });
+    await render();
+  });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-delete-org]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const slug = button.dataset.deleteOrg ?? "";
+      if (!confirm(i18n.t("organizations.confirmDelete", { name: button.dataset.name ?? slug }))) return;
+      await api.del(`/api/orgs/${encodeURIComponent(slug)}`).catch(showFormError);
+      await render();
+    }),
+  );
+
+  // The forge fields follow the choice inside the modal too.
+  const select = root?.querySelector<HTMLSelectElement>("#org-forge");
+  const fields = root?.querySelector<HTMLDivElement>(".forge-fields");
+  const sync = () => {
+    if (fields) fields.hidden = (select?.value ?? "none") === "none";
+  };
+  select?.addEventListener("change", sync);
+  sync();
+}
+
+/** The name, the logo and the accent of this installation. */
+async function showPersonalization(): Promise<void> {
+  if (!(await requirePanel())) return;
+  const instance = (await api
+    .get<{ name: string; logo: string; accent: string }>("/api/instance")
+    .catch(() => null)) ?? { name: "", logo: "", accent: "" };
+
+  await showInShell(views.personalizationScreen(instance, text), "/panel/personalization");
+
+  let logo = instance.logo;
+  const logoFile = root?.querySelector<HTMLInputElement>("#logo-file");
+  root?.querySelector<HTMLButtonElement>("[data-pick-logo]")?.addEventListener("click", () => logoFile?.click());
+  logoFile?.addEventListener("change", async () => {
+    const picked = await readAsDataURL(logoFile.files?.[0]);
+    if (picked === null) return;
+    logo = picked;
+    await api.post("/api/instance", { ...instance, logo }).catch(showFormError);
+    instanceLogo = logo;
+    await render();
+  });
+  root?.querySelector<HTMLButtonElement>("[data-clear-logo]")?.addEventListener("click", async () => {
+    await api.post("/api/instance", { ...instance, logo: "" }).catch(showFormError);
+    instanceLogo = "";
+    await render();
+  });
+  root?.querySelector<HTMLButtonElement>("[data-reset-accent]")?.addEventListener("click", async () => {
+    await api.post("/api/instance", { ...instance, accent: "" }).catch(showFormError);
+    await render();
+  });
+
+  onSubmit("form.instance-settings", async (data) => {
+    await api.post("/api/instance", {
+      name: String(data.get("name") ?? ""),
+      logo,
+      accent: String(data.get("accent") ?? ""),
+    });
+    instanceName = String(data.get("name") ?? "");
+    await render();
+  });
 }
 
 /**
@@ -980,17 +1332,32 @@ async function showUpdates(): Promise<void> {
   if (!me) return go("/sign-in");
 
   const status = await api
-    .get<{ current: string; latest?: string; available?: boolean; notes?: string; reason?: string }>(
-      "/api/update",
-    )
+    .get<{
+      current: string;
+      latest?: string;
+      available?: boolean;
+      notes?: string;
+      reason?: string;
+      beta?: boolean;
+    }>("/api/update")
     .catch(() => null);
+  const beta = status?.beta === true;
 
   await showInShell(
     status
-      ? views.updatePanel(status, text)
+      ? `<h1>${escapeHTML(i18n.t("shell.updates"))}</h1>
+         <ul class="bento">${views.channelSwitch(beta, text)}</ul>
+         ${views.updatePanel(status, text)}`
       : `<p class="empty">${escapeHTML(i18n.t("error.forbidden"))}</p>`,
     "/panel/updates",
   );
+
+  root?.querySelector<HTMLInputElement>("[data-beta]")?.addEventListener("change", async (event) => {
+    await api
+      .post("/api/update/channel", { beta: (event.currentTarget as HTMLInputElement).checked })
+      .catch(showFormError);
+    await render();
+  });
 
   if (status) {
     root?.querySelector<HTMLButtonElement>("[data-update]")?.addEventListener("click", async (event) => {
@@ -1018,23 +1385,63 @@ async function showUpdates(): Promise<void> {
 async function showPanelOrganization(orgSlug: string): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
-  renderNav();
 
   const body = await api.get<{
-    organization: OrganizationSummary;
+    organization: OrganizationSummary & { forge?: string; webhook_path?: string };
     repositories: RepositorySummary[];
   }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
-
   const repos = body.repositories ?? [];
+  const canManage = me?.admin === true;
+  const forge = body.organization.forge ?? "none";
+
   await showInShell(
-    views.panelOrganization(body.organization, repos, text) +
-      views.connectionForms(body.organization, repos, text),
+    views.organizationScreen(body.organization, repos, canManage, text) +
+      views.connectionForms(body.organization, repos, text) +
+      views.modal(
+        {
+          id: "repo-modal",
+          title: text.t("panel.newRepository"),
+          lead: text.t("repo.lead"),
+          body: views.repositoryFields(text, forge, forge !== "none") + views.acceptsFields(text),
+          submit: text.t("auth.create"),
+          formClass: "repo-form",
+        },
+        text,
+      ),
     `/panel/${orgSlug}`,
   );
 
   wireCredentials(orgSlug, body.organization.webhook_path);
   wireChannel(orgSlug);
+  wireModalOpeners();
 
+  root?.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((button) =>
+    button.addEventListener("click", () => go(button.dataset.open ?? "/")),
+  );
+
+  onSubmit("form.repo-form", async (data) => {
+    await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/repositories`, {
+      name: String(data.get("name") ?? ""),
+      slug: String(data.get("slug") ?? ""),
+      forge_repo: String(data.get("forge_repo") ?? ""),
+      accepts_bugs: data.get("accepts_bugs") !== null,
+      accepts_ideas: data.get("accepts_ideas") !== null,
+    });
+    await render();
+  });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-delete-repo]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const slug = button.dataset.deleteRepo ?? "";
+      if (!confirm(i18n.t("organizations.confirmDeleteRepo", { name: button.dataset.name ?? slug }))) return;
+      try {
+        await api.del(`/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(slug)}`);
+        await render();
+      } catch (err) {
+        showFormError(err);
+      }
+    }),
+  );
 }
 
 /**

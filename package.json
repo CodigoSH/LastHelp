@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "i18n:sync": "bun run scripts/i18n-sync.ts",
     "i18n:audit": "bun run scripts/i18n-audit.ts",
-    "i18n:scan": "bun run scripts/i18n-scan.ts"
+    "i18n:scan": "bun run scripts/i18n-scan.ts",
+    "i18n:pending": "bun run scripts/i18n-pending.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

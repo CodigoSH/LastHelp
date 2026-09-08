@@ -161,6 +161,8 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	if user, err := s.accounts().ByID(actor.UserID); err == nil {
 		body["username"] = user.Username
+		body["name"] = user.DisplayName
+		body["avatar"] = user.Avatar
 	}
 	writeJSON(w, http.StatusOK, body)
 }

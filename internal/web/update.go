@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/updater"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
@@ -71,6 +73,10 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 		"offline":    s.cfg.Offline,
 	}
 
+	// Which channel this installation follows, so the panel can show it rather
+	// than keeping a copy of the answer and drifting from it.
+	body["beta"] = s.wantsBeta(r)
+
 	// Every reason it could not check, said plainly rather than as an empty
 	// answer that looks like "you are up to date".
 	switch {
@@ -84,7 +90,7 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
 
-		release, err := s.updater().Latest(ctx, r.URL.Query().Get("beta") == "true")
+		release, err := s.updater().Latest(ctx, s.wantsBeta(r))
 		if err != nil {
 			slog.Warn("checking for updates", "error", err)
 			body["reason"] = "error.update_unreachable"
@@ -114,7 +120,7 @@ func (s *Server) handleUpdatePerform(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
-	release, err := s.updater().Latest(ctx, r.URL.Query().Get("beta") == "true")
+	release, err := s.updater().Latest(ctx, s.wantsBeta(r))
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "error.update_unreachable")
 		return
@@ -185,4 +191,44 @@ func keyForUpdateError(err error) string {
 	default:
 		return "error.update_failed"
 	}
+}
+
+// wantsBeta answers which channel this installation follows.
+//
+// The query parameter still wins, so a check can be made against the other
+// channel without changing what the server follows — which is what "show me
+// what a beta would be" needs.
+func (s *Server) wantsBeta(r *http.Request) bool {
+	if value := r.URL.Query().Get("beta"); value != "" {
+		return value == "true"
+	}
+	channel, err := (settings.Store{DB: s.db}).Get(settings.UpdateChannel)
+	return err == nil && channel == "beta"
+}
+
+type channelChange struct {
+	Beta bool `json:"beta"`
+}
+
+// handleSetChannel remembers which channel to follow.
+func (s *Server) handleSetChannel(w http.ResponseWriter, r *http.Request) {
+	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	var in channelChange
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	channel := "stable"
+	if in.Beta {
+		channel = "beta"
+	}
+	if err := (settings.Store{DB: s.db}).Set(settings.UpdateChannel, channel); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"beta": in.Beta})
 }

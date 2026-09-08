@@ -36,8 +36,10 @@ type Store struct {
 
 // User is an account as stored.
 type User struct {
-	ID              int64
-	Username        string
+	ID       int64
+	Username string
+	// Avatar is a data URL, or empty. Kept in the row so a backup is one file.
+	Avatar          string
 	DisplayName     string
 	IsAdministrator bool
 	Disabled        bool
@@ -91,9 +93,9 @@ func (s Store) Authenticate(username, plainPassword string) (User, error) {
 		u          User
 		storedHash string
 	)
-	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled, password_hash
+	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled, avatar, password_hash
 		FROM app_user WHERE username = ?`, username).
-		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &storedHash)
+		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &u.Avatar, &storedHash)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -121,9 +123,9 @@ func (s Store) Authenticate(username, plainPassword string) (User, error) {
 // leak from.
 func (s Store) ByID(userID int64) (User, error) {
 	var u User
-	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled
+	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled, avatar
 		FROM app_user WHERE id = ?`, userID).
-		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled)
+		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &u.Avatar)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -261,7 +263,7 @@ var decoy = sync.OnceValue(func() string {
 // Ordered by name so the screen is stable: a list that reorders itself between
 // visits is one where somebody clicks the wrong row.
 func (s Store) List() ([]User, error) {
-	rows, err := s.DB.Query(`SELECT id, username, display_name, is_administrator, disabled
+	rows, err := s.DB.Query(`SELECT id, username, display_name, is_administrator, disabled, avatar
 		FROM app_user ORDER BY username`)
 	if err != nil {
 		return nil, fmt.Errorf("listing accounts: %w", err)
@@ -271,7 +273,7 @@ func (s Store) List() ([]User, error) {
 	var out []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &u.Avatar); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -334,6 +336,43 @@ func (s Store) SetDisplayName(userID int64, name string) error {
 func (s Store) SetDisabled(userID int64, disabled bool) error {
 	if _, err := s.DB.Exec(`UPDATE app_user SET disabled = ? WHERE id = ?`, disabled, userID); err != nil {
 		return fmt.Errorf("storing the account state: %w", err)
+	}
+	return nil
+}
+
+// ResetPassword sets a password without asking for the old one.
+//
+// Only an administrator reaches this, and only for somebody else: it is what
+// "I forgot mine" looks like on an installation with no email to send a link
+// to. Changing your own still goes through SetPassword, which proves the old
+// one first — the two look similar and mean opposite things.
+func (s Store) ResetPassword(userID int64, newPassword string) error {
+	hash, err := password.Hash(newPassword)
+	if err != nil {
+		return fmt.Errorf("hashing the password: %w", err)
+	}
+	if _, err := s.DB.Exec(`UPDATE app_user SET password_hash = ? WHERE id = ?`, hash, userID); err != nil {
+		return fmt.Errorf("storing the password: %w", err)
+	}
+	return nil
+}
+
+// Delete removes an account.
+//
+// The memberships go with it through the foreign key; what it wrote does not,
+// because a reply losing its author is better than a thread losing half a
+// conversation.
+func (s Store) Delete(userID int64) error {
+	if _, err := s.DB.Exec(`DELETE FROM app_user WHERE id = ?`, userID); err != nil {
+		return fmt.Errorf("deleting the account: %w", err)
+	}
+	return nil
+}
+
+// SetAvatar stores the picture shown beside a name, or clears it.
+func (s Store) SetAvatar(userID int64, dataURL string) error {
+	if _, err := s.DB.Exec(`UPDATE app_user SET avatar = ? WHERE id = ?`, dataURL, userID); err != nil {
+		return fmt.Errorf("storing the avatar: %w", err)
 	}
 	return nil
 }

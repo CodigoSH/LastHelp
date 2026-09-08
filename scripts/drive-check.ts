@@ -122,7 +122,7 @@ async function main() {
     };`);
   check(
     "a fresh instance opens on the wizard, asking language first",
-    firstStep.path === "/setup" && firstStep.prefs === true && firstStep.dots === 4 && firstStep.theme === true,
+    firstStep.path === "/setup" && firstStep.prefs === true && firstStep.dots === 3 && firstStep.theme === true,
     `${firstStep.path}, ${firstStep.dots} steps, on "${firstStep.current}"`,
   );
 
@@ -142,16 +142,14 @@ async function main() {
     JSON.stringify(themed),
   );
 
-  await evaluate(`
-    document.querySelector("form.setup-preferences").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-  `);
+  await evaluate(`document.querySelector("form.setup-preferences").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));`);
   await sleep(700);
 
   // The second box is the one thing standing between a typo and an instance
   // nobody can sign into: there is no reset here.
   const mismatch = await evaluate(`
     const f = document.querySelector("form.setup-account");
-    f.querySelector('[name=email]').value = "k4wit0@codigosh.com";
+    f.querySelector('[name=username]').value = "k4wit0";
     f.querySelector('[name=password]').value = "una contraseña larga de verdad";
     f.querySelector('[name=password_again]').value = "otra cosa completamente";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
@@ -169,77 +167,64 @@ async function main() {
     f.querySelector('[name=password_again]').value = "una contraseña larga de verdad";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   `);
-  await sleep(1000);
-  const signedIn = await evaluate(`return location.pathname`);
-  check("the account carries on into the wizard", signedIn === "/setup/organization", String(signedIn));
+  await sleep(1100);
+  const afterAccount = await evaluate(`return location.pathname`);
+  check("the account carries on into the wizard", afterAccount === "/setup/instance", String(afterAccount));
 
-  // 4. The first minute of a real operator: an empty instance, and whether it
-  //    can be got started from the screen at all.
-  //
-  //    Every other check here runs against something seeded, which is the
-  //    comfortable one — it has data for everything. So none of them ever saw
-  //    what a fresh install looks like, and a fresh install used to say
-  //    "nothing is set up yet" while offering no way to set anything up: the
-  //    only path was curl. A screen that names a problem it cannot help with
-  //    reads as broken rather than as empty.
-  const navAfterSignIn = await evaluate(
-    `return [...document.querySelectorAll("nav a, nav button")].map(e => e.textContent.trim())`,
-  );
-  check(
-    "the nav knows somebody is signed in",
-    !navAfterSignIn.some((label: string) => label === "Sign in" || label === "Entrar"),
-    navAfterSignIn.join(" · "),
-  );
-
-  // Every field that asks for a format has to show one. This is the check for
-  // the complaint that started the redesign: the operator could not tell what
-  // went in each box, because the boxes asked and showed nothing.
-  const examples = await evaluate(`
-    return [...document.querySelectorAll(".field")].map(f => ({
-      label: f.querySelector("label")?.textContent?.trim(),
-      example: f.querySelector(".example")?.textContent?.trim() ?? null,
-      placeholder: f.querySelector("input")?.placeholder ?? null,
-    }));`);
-  const textFields = examples.filter((f: any) => f.placeholder !== null);
-  check(
-    "every field on the step shows an example",
-    textFields.length > 0 && textFields.every((f: any) => f.example && f.placeholder),
-    textFields.map((f: any) => `${f.label}=${f.example}`).join(" · "),
-  );
-
-  const started = await evaluate(`
-    const form = document.querySelector("form.setup-organization");
-    if (!form) return "no way to add an organisation";
-    form.querySelector('[name=name]').value = "CodigoSH";
-    form.querySelector('[name=slug]').value = "codigosh";
-    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-    await new Promise(r => setTimeout(r, 900));
-    return location.pathname;
+  // The wizard configures the installation and stops there. Organisations and
+  // repositories are the work, and the work is done in the panel.
+  await evaluate(`
+    const f = document.querySelector("form.setup-instance");
+    f.querySelector('[name=name]').value = "CodigoSH";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
   `);
-  check("an empty instance can be started from the screen", started === "/setup/board", String(started));
-
-  const boards = await evaluate(`
-    const form = document.querySelector("form.setup-repository");
-    if (!form) return "no way to add a board";
-    form.querySelector('[name=name]').value = "Lastboard";
-    form.querySelector('[name=slug]').value = "lastboard";
-    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-    await new Promise(r => setTimeout(r, 900));
-    return location.pathname;
-  `);
-  check("a board can be added from the screen", boards === "/setup/done", String(boards));
-
-  // The last screen has to say where the thing now lives. A wizard that ends on
-  // a blank panel leaves somebody wondering whether it worked.
+  await sleep(1100);
   const ending = await evaluate(`
-    return {
-      open: document.querySelector(".wizard-card a.button")?.getAttribute("href"),
-      words: document.querySelector(".wizard-head h1")?.textContent?.trim(),
-    };`);
+    return { path: location.pathname, next: document.querySelector(".wizard-actions a")?.getAttribute("href") };`);
   check(
-    "the wizard ends by pointing at the board it made",
-    ending.open === "/codigosh/lastboard",
-    `${ending.words} → ${ending.open}`,
+    "the wizard ends by handing over to the work",
+    ending.path === "/setup/done" && ending.next === "/panel/new",
+    `${ending.path} → ${ending.next}`,
+  );
+
+  // 4b. An organisation and a repository, made the way an operator makes them:
+  //     from a modal on the screen that lists them.
+  await evaluate(`history.pushState({}, "", "/panel/organizations"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1200);
+  const started = await evaluate(`
+    document.querySelector("[data-add-org]").click();
+    await new Promise(r => setTimeout(r, 300));
+    const dialog = document.querySelector("#org-modal");
+    if (!dialog?.open) return "the modal did not open";
+    const f = dialog.querySelector("form");
+    f.querySelector('[name=name]').value = "CodigoSH";
+    f.querySelector('[name=slug]').value = "codigosh";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 1100));
+    return [...document.querySelectorAll(".bento-card h3")].map(e => e.textContent.trim());
+  `);
+  check(
+    "an organisation is added from a modal, not from a form left on the page",
+    JSON.stringify(started) === '["CodigoSH"]',
+    JSON.stringify(started),
+  );
+
+  await evaluate(`history.pushState({}, "", "/panel/codigosh"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1200);
+  const boards = await evaluate(`
+    document.querySelector("[data-add-repo]").click();
+    await new Promise(r => setTimeout(r, 300));
+    const f = document.querySelector("#repo-modal form");
+    f.querySelector('[name=name]').value = "Lastboard";
+    f.querySelector('[name=slug]').value = "lastboard";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 1100));
+    return [...document.querySelectorAll(".bento-card h3")].map(e => e.textContent.trim());
+  `);
+  check(
+    "a repository is added the same way",
+    JSON.stringify(boards) === '["Lastboard"]',
+    JSON.stringify(boards),
   );
 
   // 5. Report something through the form, with no account.
@@ -422,7 +407,7 @@ async function main() {
   await sleep(900);
   const orgPanel = await evaluate(`
     return {
-      addBoard: !!document.querySelector('a[href$="/new"]'),
+      addBoard: !!document.querySelector("[data-add-repo]"),
       channel: !!document.querySelector("form.channel"),
       // No forge was chosen for this organisation, so the credentials form
       // should not be offered at all.

@@ -210,6 +210,19 @@ func (s *Server) routes() {
 
 	private("POST /api/me/password", s.handleChangePassword)
 	private("POST /api/me/profile", s.handleChangeProfile)
+	private("POST /api/me/avatar", s.handleChangeAvatar)
+
+	private("GET /api/overview", s.handleOverview)
+
+	private("PATCH /api/orgs/{org}", s.handleRenameOrganization)
+	private("DELETE /api/orgs/{org}", s.handleDeleteOrganization)
+	private("PATCH /api/orgs/{org}/repos/{repo}", s.handleUpdateRepository)
+	private("DELETE /api/orgs/{org}/repos/{repo}", s.handleDeleteRepository)
+
+	private("PATCH /api/people/{id}", s.handleUpdatePerson)
+	private("DELETE /api/people/{id}", s.handleDeletePerson)
+
+	private("POST /api/restore", s.handleRestore)
 
 	private("GET /api/people", s.handleListPeople)
 	private("POST /api/people", s.handleCreatePerson)
@@ -222,6 +235,7 @@ func (s *Server) routes() {
 
 	private("GET /api/update", s.handleUpdateStatus)
 	private("POST /api/update", s.handleUpdatePerform)
+	private("POST /api/update/channel", s.handleSetChannel)
 
 	// The feed, under its own prefix.
 	//

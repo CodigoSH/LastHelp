@@ -8,6 +8,11 @@
  */
 import type { ItemDetail, ItemSummary, OrganizationSummary, RepositorySummary } from "../api";
 import { escapeAttr, escapeHTML } from "../escape";
+import { icons } from "./icons";
+import { actionButton, iconButton } from "./modal";
+
+export { modal, actionButton, iconButton } from "./modal";
+export { field, choiceField } from "./wizard";
 import { choiceField, exampleFor, field, wizard } from "./wizard";
 
 /** Everything a template needs to say something. */
@@ -139,6 +144,18 @@ export function forgeOptions(text: Text): [string, string][] {
  * install. An empty answer where a reason belongs reads as "you are up to
  * date", which is the one thing it must never say by accident.
  */
+/** The beta switch, which decides what "latest" means for this installation. */
+export function channelSwitch(beta: boolean, text: Text): string {
+  return `<li class="bento-card">
+    <div class="card-head">${icons.update()}<h3>${escapeHTML(text.t("update.channel"))}</h3></div>
+    <span class="card-sub">${escapeHTML(text.t("update.channelHelp"))}</span>
+    <label class="switch">
+      <input type="checkbox" data-beta ${beta ? "checked" : ""} />
+      <span>${escapeHTML(text.t("update.beta"))}</span>
+    </label>
+  </li>`;
+}
+
 export function updatePanel(
   status: {
     current: string;
@@ -696,7 +713,7 @@ function preferenceFields(
   );
 }
 
-function organizationFields(text: Text, forge: string): string {
+export function organizationFields(text: Text, forge: string): string {
   const example = exampleFor(forge === "none" ? "forgejo" : forge);
   return (
     field({
@@ -743,7 +760,7 @@ function organizationFields(text: Text, forge: string): string {
   );
 }
 
-function repositoryFields(text: Text, forge: string, hasForge: boolean): string {
+export function repositoryFields(text: Text, forge: string, hasForge: boolean): string {
   const example = exampleFor(forge);
   return (
     field({
@@ -777,7 +794,7 @@ function repositoryFields(text: Text, forge: string, hasForge: boolean): string 
 
 /** What a board takes. Both on by default: a board that accepts nothing is
  *  refused by the server, and defaulting to off makes that the common mistake. */
-function acceptsFields(text: Text): string {
+export function acceptsFields(text: Text): string {
   return `<div class="field">
     <label>${escapeHTML(text.t("repo.accepts"))}</label>
     <p class="choices">
@@ -999,6 +1016,8 @@ export interface ShellSpec {
   /** True for anybody who may create an organisation. */
   mayAddOrganization: boolean;
   instance: string;
+  logo?: string;
+  avatar?: string;
   content: string;
 }
 
@@ -1006,70 +1025,56 @@ export interface ShellSpec {
  * The administration, grouped.
  *
  * One flat list answers "where do I click" and nothing else. Grouped, it also
- * answers "what kind of thing is this" — the daily work, your own account, and
- * the server — which is the difference between a menu and an inventory.
+ * answers "what kind of thing is this" — the daily work, how it looks, your own
+ * account, and the server — which is the difference between a menu and an
+ * inventory.
  *
  * What each account sees is what it may do. The groups are built from the
  * permissions rather than rendered and then hidden, because an item you can see
  * and cannot use is worse than one that was never there.
  */
 export function adminShell(spec: ShellSpec, text: Text): string {
-  const item = (href: string, label: string, extra = ""): string => {
-    const current = spec.path === href;
-    return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${escapeHTML(label)}</a>`;
+  const item = (href: string, label: string, icon: string, extra = ""): string => {
+    const current = spec.path === href || (href !== "/panel" && spec.path.startsWith(href + "/"));
+    return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${icon}<span>${escapeHTML(label)}</span></a>`;
   };
 
   const group = (label: string, items: string): string =>
-    items.trim() === ""
-      ? ""
-      : `<p class="side-label">${escapeHTML(label)}</p>${items}`;
-
-  const orgs = spec.organizations
-    .map((org) => {
-      const inside =
-        spec.path.startsWith(`/panel/${org.slug}`) || spec.path.startsWith(`/${org.slug}/`);
-      const repos =
-        inside && org.repos?.length
-          ? org.repos
-              .map(
-                (r) =>
-                  item(`/${org.slug}/${r.slug}/queue`, r.name, "sub") ,
-              )
-              .join("")
-          : "";
-      return item(`/panel/${org.slug}`, org.name) + repos;
-    })
-    .join("");
+    items.trim() === "" ? "" : `<p class="side-label">${escapeHTML(label)}</p>${items}`;
 
   return `<div class="admin">
     <aside class="side">
-      <a class="brand" href="/">${escapeHTML(spec.instance)}</a>
+      <a class="brand" href="/">
+        ${spec.logo ? `<img class="brand-logo" src="${escapeAttr(spec.logo)}" alt="" />` : ""}
+        <span>${escapeHTML(spec.instance)}</span>
+      </a>
       <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
         ${group(
           text.t("shell.groupWork"),
-          item("/panel", text.t("shell.overview")) +
-            orgs +
-            (spec.mayAddOrganization
-              ? item("/panel/new", text.t("panel.newOrganization"), "add")
-              : ""),
+          item("/panel", text.t("shell.overview"), icons.overview()) +
+            item("/panel/organizations", text.t("shell.organizations"), icons.organization()),
         )}
         ${group(
           text.t("shell.groupAccount"),
-          item("/panel/account", text.t("shell.profile")) +
-            item("/panel/appearance", text.t("shell.appearance")),
+          item("/panel/account", text.t("shell.profile"), icons.person()) +
+            item("/panel/appearance", text.t("shell.appearance"), icons.palette()),
         )}
         ${group(
           text.t("shell.groupSystem"),
           spec.isAdmin
-            ? item("/panel/people", text.t("shell.people")) +
-                item("/panel/backups", text.t("shell.backups")) +
-                item("/panel/updates", text.t("shell.updates")) +
-                item("/panel/about", text.t("shell.about"))
+            ? item("/panel/people", text.t("shell.people"), icons.people()) +
+                item("/panel/personalization", text.t("shell.personalization"), icons.palette()) +
+                item("/panel/backups", text.t("shell.backups"), icons.backup()) +
+                item("/panel/updates", text.t("shell.updates"), icons.update()) +
+                item("/panel/about", text.t("shell.about"), icons.info())
             : "",
         )}
       </nav>
       <div class="side-foot">
-        <p class="who">${escapeHTML(spec.who)}</p>
+        <div class="side-who">
+          ${avatar(spec.who, spec.avatar)}
+          <span class="who">${escapeHTML(spec.who)}</span>
+        </div>
         <button class="link" data-signout>${escapeHTML(text.t("nav.signOut"))}</button>
       </div>
     </aside>
@@ -1077,33 +1082,150 @@ export function adminShell(spec: ShellSpec, text: Text): string {
   </div>`;
 }
 
-/** Your own account: the name beside your replies, and your password. */
-export function profileScreen(who: string, displayName: string, text: Text): string {
+/** Initials when there is no picture, which is most of the time. */
+export function avatar(name: string, src?: string, big = false): string {
+  const initials = (name || "?")
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => [...part][0]?.toUpperCase() ?? "")
+    .join("");
+  return `<span class="avatar${big ? " big" : ""}" aria-hidden="true">${
+    src ? `<img src="${escapeAttr(src)}" alt="" />` : escapeHTML(initials)
+  }</span>`;
+}
+
+/**
+ * The front page of the panel: what this installation holds, in numbers.
+ *
+ * Counted by the server rather than by fetching everything and counting here,
+ * so a portal that has been useful for two years opens as fast as one installed
+ * this morning.
+ */
+export function overviewScreen(
+  data: {
+    organizations: number;
+    repositories: number;
+    people: number;
+    pending: number;
+    published: number;
+    votes: number;
+    kinds: Record<string, number>;
+    statuses: Record<string, number>;
+    moderation: Record<string, number>;
+    last_report: number;
+  },
+  text: Text,
+): string {
+  const stat = (value: number, label: string, icon: string, href?: string) => {
+    const inner = `<span class="value">${escapeHTML(text.number(value))}</span>
+      <span class="label">${icon}${escapeHTML(label)}</span>`;
+    // Always <li> outside and the card inside, whether the card is a link or
+    // not. Two different shapes meant one of them lost its box the moment the
+    // list learned to get out of the way of the other.
+    return href
+      ? `<li><a class="stat" href="${escapeAttr(href)}">${inner}</a></li>`
+      : `<li><div class="stat">${inner}</div></li>`;
+  };
+
+  const bars = (title: string, counts: Record<string, number>, keyPrefix: string) => {
+    const entries = Object.entries(counts).filter(([, n]) => n > 0);
+    if (entries.length === 0) return "";
+    const most = Math.max(...entries.map(([, n]) => n));
+    return `<h2>${escapeHTML(title)}</h2>
+      <div class="bars">${entries
+        .sort((a, b) => b[1] - a[1])
+        .map(
+          ([key, n]) => `<div class="bar-row">
+            <span>${escapeHTML(text.t(`${keyPrefix}${key}`))}</span>
+            <span class="bar-track"><span class="bar-fill" style="inline-size: ${Math.round((n / most) * 100)}%"></span></span>
+            <span class="count">${escapeHTML(text.number(n))}</span>
+          </div>`,
+        )
+        .join("")}</div>`;
+  };
+
+  const total = Object.values(data.kinds).reduce((a, b) => a + b, 0);
+
+  return `<h1>${escapeHTML(text.t("shell.overview"))}</h1>
+    <p class="lead">${escapeHTML(
+      total === 0 ? text.t("overview.emptyLead") : text.t("overview.lead"),
+    )}</p>
+
+    <ul class="stats">
+      ${stat(total, text.t("overview.reports"), icons.repository())}
+      ${stat(data.pending, text.t("panel.queue"), icons.queue())}
+      ${stat(data.published, text.t("overview.published"), icons.check())}
+      ${stat(data.votes, text.t("overview.votes"), icons.idea())}
+      ${stat(data.organizations, text.t("shell.organizations"), icons.organization(), "/panel/organizations")}
+      ${stat(data.repositories, text.t("portal.boards"), icons.repository(), "/panel/organizations")}
+      ${stat(data.people, text.t("shell.people"), icons.people(), "/panel/people")}
+    </ul>
+
+    ${bars(text.t("overview.byKind"), data.kinds, "kind.")}
+    ${bars(text.t("overview.byStatus"), data.statuses, "status.")}
+    ${bars(text.t("overview.byModeration"), data.moderation, "moderation.")}
+
+    ${
+      data.last_report > 0
+        ? `<p class="hint">${escapeHTML(text.t("overview.lastReport", { when: text.date(data.last_report) }))}</p>`
+        : ""
+    }`;
+}
+
+/**
+ * Your own account.
+ *
+ * Identity first — the picture, the name, what you are — then the two things
+ * that can be changed. The old version was three stacked forms with a heading
+ * each, which reads as a settings file rather than as a page about a person.
+ */
+export function profileScreen(
+  me: { username: string; name?: string; avatar?: string; admin: boolean },
+  text: Text,
+): string {
   return `<h1>${escapeHTML(text.t("shell.profile"))}</h1>
-    <p class="lead">${escapeHTML(text.t("profile.lead", { username: who }))}</p>
 
-    <h2>${escapeHTML(text.t("profile.name"))}</h2>
-    <form class="profile-name">
-      <div class="wizard-card">
-        ${field({ id: "display-name", name: "display_name", label: text.t("profile.name"), hint: text.t("profile.nameHelp"), value: displayName, example: "k4wit0" }, text)}
+    <div class="identity">
+      ${avatar(me.name || me.username, me.avatar, true)}
+      <div>
+        <div class="name">${escapeHTML(me.name || me.username)}</div>
+        <div class="card-sub">
+          <span class="tag">${escapeHTML(me.username)}</span>
+          ${me.admin ? `<span class="tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+        </div>
       </div>
-      <p class="form-error" role="alert" hidden></p>
-      <div class="wizard-actions"><span class="spacer"></span>
-        <button class="button primary" type="submit">${escapeHTML(text.t("panel.saved"))}</button></div>
-    </form>
+      <span class="spacer"></span>
+      ${actionButton("upload", text.t("profile.picture"), 'data-pick-avatar')}
+      ${me.avatar ? actionButton("remove", text.t("profile.pictureClear"), "data-clear-avatar") : ""}
+      <input type="file" accept="image/*" id="avatar-file" hidden />
+    </div>
 
-    <h2>${escapeHTML(text.t("profile.password"))}</h2>
-    <form class="profile-password">
-      <div class="wizard-card">
-        ${field({ id: "current-password", name: "current", label: text.t("profile.current"), type: "password", required: true, autocomplete: "current-password" }, text)}
-        ${field({ id: "new-password", name: "new", label: text.t("profile.new"), type: "password", required: true, autocomplete: "new-password", hint: text.t("auth.passwordHelp") }, text)}
-        ${field({ id: "new-password-again", name: "again", label: text.t("auth.passwordAgain"), type: "password", required: true, autocomplete: "new-password" }, text)}
-      </div>
-      <p class="hint">${escapeHTML(text.t("profile.passwordHelp"))}</p>
-      <p class="form-error" role="alert" hidden></p>
-      <div class="wizard-actions"><span class="spacer"></span>
-        <button class="button primary" type="submit">${escapeHTML(text.t("profile.change"))}</button></div>
-    </form>`;
+    <ul class="bento">
+      <li class="bento-card">
+        <div class="card-head">${icons.person()}<h3>${escapeHTML(text.t("profile.name"))}</h3></div>
+        <span class="card-sub">${escapeHTML(text.t("profile.nameHelp"))}</span>
+        <form class="profile-name">
+          ${field({ id: "display-name", name: "display_name", label: text.t("profile.name"), value: me.name ?? "", example: "k4wit0" }, text)}
+          <p class="form-error" role="alert" hidden></p>
+          <div class="wizard-actions"><span class="spacer"></span>
+            <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+        </form>
+      </li>
+
+      <li class="bento-card">
+        <div class="card-head">${icons.warning()}<h3>${escapeHTML(text.t("profile.password"))}</h3></div>
+        <span class="card-sub">${escapeHTML(text.t("profile.passwordHelp"))}</span>
+        <form class="profile-password">
+          ${field({ id: "current-password", name: "current", label: text.t("profile.current"), type: "password", required: true, autocomplete: "current-password" }, text)}
+          ${field({ id: "new-password", name: "new", label: text.t("profile.new"), type: "password", required: true, autocomplete: "new-password" }, text)}
+          ${field({ id: "new-password-again", name: "again", label: text.t("auth.passwordAgain"), type: "password", required: true, autocomplete: "new-password" }, text)}
+          <p class="form-error" role="alert" hidden></p>
+          <div class="wizard-actions"><span class="spacer"></span>
+            <button class="button primary" type="submit">${escapeHTML(text.t("profile.change"))}</button></div>
+        </form>
+      </li>
+    </ul>`;
 }
 
 /** Language and look, which belong to the reader rather than to the server. */
@@ -1125,32 +1247,148 @@ export function appearanceScreen(
       })}
       <div class="field">
         <label>${escapeHTML(text.t("shell.theme"))}</label>
-        <div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
-          ${(["system", "light", "dark"] as const)
-            .map(
-              (value) =>
-                `<button type="button" data-theme-choice="${value}" aria-pressed="${theme === value}">${escapeHTML(
-                  text.t(
-                    value === "system"
-                      ? "shell.themeSystem"
-                      : value === "light"
-                        ? "shell.themeLight"
-                        : "shell.themeDark",
-                  ),
-                )}</button>`,
-            )
-            .join("")}
-        </div>
+        ${themeChoice(theme, text)}
       </div>
     </div>`;
 }
 
-/** Who may act here, and what each of them may do. */
+function themeChoice(theme: string, text: Text): string {
+  return `<div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
+    ${(["system", "light", "dark"] as const)
+      .map(
+        (value) =>
+          `<button type="button" data-theme-choice="${value}" aria-pressed="${theme === value}">${escapeHTML(
+            text.t(
+              value === "system"
+                ? "shell.themeSystem"
+                : value === "light"
+                  ? "shell.themeLight"
+                  : "shell.themeDark",
+            ),
+          )}</button>`,
+      )
+      .join("")}
+  </div>`;
+}
+
+/** Everything about this installation that an operator chose rather than typed. */
+export function personalizationScreen(
+  instance: { name: string; logo: string; accent: string },
+  text: Text,
+): string {
+  return `<h1>${escapeHTML(text.t("shell.personalization"))}</h1>
+    <p class="lead">${escapeHTML(text.t("personalization.lead"))}</p>
+
+    <form class="instance-settings">
+      <div class="wizard-card">
+        ${field({ id: "instance-name", name: "name", label: text.t("setup.instanceName"), hint: text.t("setup.instanceNameHelp"), value: instance.name, example: "CodigoSH" }, text)}
+
+        <div class="field">
+          <label>${escapeHTML(text.t("personalization.logo"))}</label>
+          <div class="identity" style="margin:0">
+            ${instance.logo ? `<img class="logo-preview" src="${escapeAttr(instance.logo)}" alt="" />` : avatar(instance.name || "L")}
+            ${actionButton("upload", text.t("personalization.chooseLogo"), "data-pick-logo")}
+            ${instance.logo ? actionButton("remove", text.t("personalization.clearLogo"), "data-clear-logo") : ""}
+            <input type="file" accept="image/*" id="logo-file" hidden />
+          </div>
+          <p class="hint">${escapeHTML(text.t("personalization.logoHelp"))}</p>
+        </div>
+
+        <div class="field">
+          <label for="accent">${escapeHTML(text.t("personalization.accent"))}</label>
+          <div class="accent-row">
+            <input type="color" id="accent" name="accent" value="${escapeAttr(instance.accent || "#e8520e")}" />
+            <button type="button" class="button ghost" data-reset-accent>${escapeHTML(text.t("personalization.accentReset"))}</button>
+          </div>
+          <p class="hint">${escapeHTML(text.t("personalization.accentHelp"))}</p>
+        </div>
+      </div>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="wizard-actions"><span class="spacer"></span>
+        <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+    </form>`;
+}
+
+/** The organisations, as cards. */
+export function organizationsScreen(orgs: OrganizationSummary[], canManage: boolean, text: Text): string {
+  const cards = orgs
+    .map(
+      (o) => `<li class="bento-card">
+        <a class="card-link" href="/panel/${escapeAttr(o.slug)}">
+          <div class="card-head">${icons.organization()}<h3>${escapeHTML(o.name)}</h3></div>
+          <span class="card-sub">/${escapeHTML(o.slug)}</span>
+        </a>
+        ${
+          canManage
+            ? `<div class="card-actions">
+                 ${iconButton("edit", text.t("action.edit"), `data-edit-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
+                 ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
+               </div>`
+            : ""
+        }
+      </li>`,
+    )
+    .join("");
+
+  return `<div class="screen-head">
+      <h1>${escapeHTML(text.t("shell.organizations"))}</h1>
+      ${canManage ? actionButton("add", text.t("panel.newOrganization"), 'data-add-org data-open-modal="org-modal"', "primary") : ""}
+    </div>
+    <p class="lead">${escapeHTML(text.t("organizations.lead"))}</p>
+    ${orgs.length === 0 ? `<p class="empty">${escapeHTML(text.t("panel.firstStep"))}</p>` : `<ul class="bento">${cards}</ul>`}`;
+}
+
+/** One organisation: its repositories, and what can be done to it. */
+export function organizationScreen(
+  org: OrganizationSummary & { forge?: string },
+  repos: RepositorySummary[],
+  canManage: boolean,
+  text: Text,
+): string {
+  const cards = repos
+    .map(
+      (r) => `<li class="bento-card">
+        <a class="card-link" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}/queue">
+          <div class="card-head">${icons.repository()}<h3>${escapeHTML(r.name)}</h3></div>
+          <span class="card-sub">/${escapeHTML(org.slug)}/${escapeHTML(r.slug)}</span>
+          <span class="card-sub">${[
+            r.accepts_bugs ? escapeHTML(text.t("kind.bug")) : "",
+            r.accepts_ideas ? escapeHTML(text.t("kind.idea")) : "",
+          ]
+            .filter(Boolean)
+            .join(" · ")}</span>
+        </a>
+        ${
+          canManage
+            ? `<div class="card-actions">
+                 ${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
+                 ${iconButton("edit", text.t("action.edit"), `data-edit-repo="${escapeAttr(r.slug)}"`)}
+                 ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`)}
+               </div>`
+            : ""
+        }
+      </li>`,
+    )
+    .join("");
+
+  return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a></p>
+    <div class="screen-head">
+      <h1>${escapeHTML(org.name)}</h1>
+      ${canManage ? actionButton("add", text.t("panel.newRepository"), 'data-add-repo data-open-modal="repo-modal"', "primary") : ""}
+    </div>
+    <p class="lead"><span class="tag">/${escapeHTML(org.slug)}</span>
+      ${org.forge && org.forge !== "none" ? `<span class="tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>
+
+    ${repos.length === 0 ? `<p class="empty">${escapeHTML(text.t("organizations.noRepositories"))}</p>` : `<ul class="bento">${cards}</ul>`}`;
+}
+
+/** Who may act here, what each of them is, and where. */
 export function peopleScreen(
   people: {
     id: number;
     username: string;
     name: string;
+    avatar?: string;
     admin: boolean;
     disabled: boolean;
     grants: { scope: string; id: number; role: string }[];
@@ -1159,65 +1397,92 @@ export function peopleScreen(
 ): string {
   const rows = people
     .map(
-      (p) => `<li class="person">
-        <span class="person-name">${escapeHTML(p.username)}</span>
-        <span class="person-role">${escapeHTML(
-          p.admin ? text.t("people.administrator") : text.t("people.grants", { count: p.grants.length }),
-        )}</span>
+      (p) => `<li class="bento-card person-card" data-person="${p.id}">
+        <div class="person-head">
+          ${avatar(p.name || p.username, p.avatar)}
+          <div>
+            <div class="name">${escapeHTML(p.name || p.username)}</div>
+            <div class="card-sub"><span class="tag">${escapeHTML(p.username)}</span></div>
+          </div>
+        </div>
+        <div class="person-tags">
+          ${p.admin ? `<span class="tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+          ${p.disabled ? `<span class="tag">${escapeHTML(text.t("people.disabled"))}</span>` : ""}
+          ${
+            p.grants.length === 0 && !p.admin
+              ? `<span class="tag">${escapeHTML(text.t("people.noRoles"))}</span>`
+              : p.grants
+                  .map(
+                    (g) =>
+                      `<span class="tag">${escapeHTML(text.t(`role.${g.role}`))} · ${escapeHTML(text.t(`scope.${g.scope}`))}</span>`,
+                  )
+                  .join("")
+          }
+        </div>
+        <div class="card-actions">
+          ${iconButton("edit", text.t("action.edit"), `data-edit-person="${p.id}" data-name="${escapeAttr(p.name)}" data-username="${escapeAttr(p.username)}"`)}
+          ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-person="${p.id}" data-name="${escapeAttr(p.username)}"`)}
+        </div>
       </li>`,
     )
     .join("");
 
-  return `<h1>${escapeHTML(text.t("shell.people"))}</h1>
+  return `<div class="screen-head">
+      <h1>${escapeHTML(text.t("shell.people"))}</h1>
+      ${actionButton("add", text.t("people.add"), 'data-open-modal="person-modal"', "primary")}
+    </div>
     <p class="lead">${escapeHTML(text.t("people.lead"))}</p>
-    <ul class="people">${rows}</ul>
-
-    <h2>${escapeHTML(text.t("people.add"))}</h2>
-    <form class="new-person">
-      <div class="wizard-card">
-        ${field({ id: "person-username", name: "username", label: text.t("auth.username"), required: true, example: "ana" }, text)}
-        ${field({ id: "person-name", name: "display_name", label: text.t("profile.name"), hint: text.t("profile.nameHelp"), example: "Ana" }, text)}
-        ${field({ id: "person-password", name: "password", label: text.t("auth.password"), type: "password", required: true, hint: text.t("auth.passwordHelp") }, text)}
-      </div>
-      <p class="hint">${escapeHTML(text.t("people.addHelp"))}</p>
-      <p class="form-error" role="alert" hidden></p>
-      <div class="wizard-actions"><span class="spacer"></span>
-        <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button></div>
-    </form>`;
+    <ul class="bento wide">${rows}</ul>`;
 }
 
 /**
- * Backups, which are a file you keep somewhere else.
+ * Backups: one file out, one file in.
  *
- * The snapshot is taken with VACUUM INTO rather than by copying the file: a
- * SQLite database copied while it is being written restores into something
- * missing whatever was in flight, and looks exactly like a backup until the day
- * it is needed.
+ * Restoring is deliberately the noisier half. Taking a copy is safe and can be
+ * done at any time; putting one back replaces everything anybody has written
+ * since, which is why it says so and asks again.
  */
 export function backupScreen(text: Text): string {
   return `<h1>${escapeHTML(text.t("shell.backups"))}</h1>
     <p class="lead">${escapeHTML(text.t("backups.lead"))}</p>
-    <div class="wizard-card">
-      <p class="hint">${escapeHTML(text.t("backups.help"))}</p>
-      <p><a class="button primary" href="/api/backup" download>${escapeHTML(text.t("backups.download"))}</a></p>
-    </div>`;
+
+    <ul class="bento">
+      <li class="bento-card">
+        <div class="card-head">${icons.download()}<h3>${escapeHTML(text.t("backups.take"))}</h3></div>
+        <span class="card-sub">${escapeHTML(text.t("backups.help"))}</span>
+        <p><a class="button primary with-icon" href="/api/backup" download>${icons.download()}<span>${escapeHTML(text.t("backups.download"))}</span></a></p>
+      </li>
+
+      <li class="bento-card">
+        <div class="card-head">${icons.upload()}<h3>${escapeHTML(text.t("backups.restore"))}</h3></div>
+        <span class="card-sub">${escapeHTML(text.t("backups.restoreHelp"))}</span>
+        <p class="notice">${icons.warning()} ${escapeHTML(text.t("backups.restoreWarning"))}</p>
+        <input type="file" accept=".db,application/octet-stream" id="restore-file" hidden />
+        ${actionButton("upload", text.t("backups.chooseFile"), "data-pick-restore", "danger")}
+        <p class="restore-note" hidden></p>
+      </li>
+    </ul>`;
 }
 
-/** What is running, and where it came from. */
+/** What is running, where it came from, and whether there is more of it. */
 export function aboutScreen(
   version: { current: string; commit?: string; schema?: number },
   instance: string,
   text: Text,
 ): string {
-  const row = (label: string, value: string) =>
-    `<li><span>${escapeHTML(label)}</span><code>${escapeHTML(value)}</code></li>`;
+  const fact = (label: string, value: string, icon: string) =>
+    `<li class="bento-card">
+      <div class="card-head">${icon}<h3>${escapeHTML(label)}</h3></div>
+      <code class="fact-value">${escapeHTML(value)}</code>
+    </li>`;
 
   return `<h1>${escapeHTML(text.t("shell.about"))}</h1>
-    <ul class="facts">
-      ${row(text.t("setup.instanceName"), instance)}
-      ${row(text.t("about.version"), version.current)}
-      ${version.commit ? row(text.t("about.commit"), version.commit) : ""}
-      ${version.schema !== undefined ? row(text.t("about.schema"), String(version.schema)) : ""}
+    <p class="lead">${escapeHTML(text.t("about.lead"))}</p>
+    <ul class="bento">
+      ${fact(text.t("about.version"), version.current || "—", icons.info())}
+      ${version.commit ? fact(text.t("about.commit"), version.commit, icons.repository()) : ""}
+      ${version.schema !== undefined ? fact(text.t("about.schema"), String(version.schema), icons.backup()) : ""}
+      ${fact(text.t("setup.instanceName"), instance, icons.organization())}
     </ul>
-    <p class="hint">${escapeHTML(text.t("about.lead"))}</p>`;
+    <p class="hint">${escapeHTML(text.t("about.source"))}</p>`;
 }

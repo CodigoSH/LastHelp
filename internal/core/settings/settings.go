@@ -33,6 +33,27 @@ const FormSigningKey = "form_signing_key"
 // see rather than a blank where a name should be.
 const InstanceName = "instance_name"
 
+// InstanceLogo is a small image shown beside the name, as a data URL.
+//
+// In the settings row rather than as a file: a backup that is one file only
+// stays one file if nothing lives outside it.
+const InstanceLogo = "instance_logo"
+
+// InstanceAccent overrides the house orange for this installation.
+//
+// The default is not stored. An operator who never chose one gets whatever the
+// stylesheet says, which is how a new accent can ever reach them — a value
+// written at install time would freeze the first one they ever saw.
+const InstanceAccent = "instance_accent"
+
+// UpdateChannel is "beta" when this installation wants prereleases.
+//
+// Stored rather than passed on every request: it is a decision about this
+// server, and a checkbox that forgets itself between visits is one nobody
+// trusts. Anything other than "beta" means stable, so a value nobody
+// understands fails towards the safer channel.
+const UpdateChannel = "update_channel"
+
 type Store struct {
 	DB database.Execer
 }

@@ -60,6 +60,7 @@ var migrations = []migration{
 				display_name     TEXT    NOT NULL DEFAULT '',
 				is_administrator INTEGER NOT NULL DEFAULT 0,
 				disabled         INTEGER NOT NULL DEFAULT 0,
+				avatar           TEXT    NOT NULL DEFAULT '',
 				created_at       INTEGER NOT NULL
 			)`,
 
@@ -280,6 +281,18 @@ var migrations = []migration{
 		// already called username — which is every database created by the
 		// CREATE above, and this migration runs on those too.
 		fn: renameEmailToUsername,
+	},
+	{
+		version: 4,
+		name:    "an account can carry a picture",
+		// Stored as a data URL in the row rather than as a file on disk: it is
+		// one small image per account, it has to survive a backup, and a backup
+		// that is one file only stays one file if nothing lives outside it.
+		// The size bound is enforced where it is uploaded.
+		stmts: []string{},
+		fn: func(tx *sql.Tx) error {
+			return addColumn(tx, "app_user", "avatar", "TEXT NOT NULL DEFAULT ''")
+		},
 	},
 }
 
