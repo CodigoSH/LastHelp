@@ -40,13 +40,27 @@ export interface Text {
  * installed it read that, correctly, as an unfinished product. A page that
  * admits it is empty before it says what it is has the order backwards.
  *
- * So: what this is, then what there is. An administrator looking at an empty
- * one is offered the way out; a visitor is told plainly, without being sent to
- * a form that would refuse them.
+ * What it says now is the name of the installation, under its own mark. This
+ * page is the front door of somebody's project — the first thing a stranger
+ * sees of it — and the software running it is not what they came to read. The
+ * name of the product lives on the About screen, where an operator looks for
+ * it. An administrator looking at an empty one is offered the way out; a
+ * visitor is told plainly, without being sent to a form that would refuse them.
  */
-export function landing(orgs: OrganizationSummary[], isAdmin: boolean, text: Text): string {
+export function landing(
+  orgs: OrganizationSummary[],
+  isAdmin: boolean,
+  text: Text,
+  instance?: { name?: string; logo?: string },
+): string {
+  // A mark and a sentence, not a paragraph of prose: three lines that each say
+  // one true thing about how this works.
+  const point = (icon: string, words: string) =>
+    `<li><span class="point-icon">${icon}</span><span>${escapeHTML(words)}</span></li>`;
+
   const hero = `<section class="hero">
-    <h1>LastHelp</h1>
+    <span class="hero-mark">${brandMark(instance?.logo, 44)}</span>
+    <h1>${escapeHTML(instance?.name || text.t("app.name"))}</h1>
     <p class="lead">${escapeHTML(text.t("app.tagline"))}</p>
     ${
       orgs.length === 0 && isAdmin
@@ -55,56 +69,122 @@ export function landing(orgs: OrganizationSummary[], isAdmin: boolean, text: Tex
            </div>`
         : ""
     }
-    <ul class="hero-points">
-      <li><span>${escapeHTML(text.t("landing.pointNoAccount"))}</span></li>
-      <li><span>${escapeHTML(text.t("landing.pointVotes"))}</span></li>
-      <li><span>${escapeHTML(text.t("landing.pointForge"))}</span></li>
-    </ul>
-  </section>`;
+  </section>
+  <ul class="points">
+    ${point(icons.person(18), text.t("landing.pointNoAccount"))}
+    ${point(icons.idea(18), text.t("landing.pointVotes"))}
+    ${point(icons.open(18), text.t("landing.pointForge"))}
+  </ul>`;
 
   if (orgs.length === 0) {
-    return `${hero}<p class="empty">${escapeHTML(
-      text.t(isAdmin ? "landing.emptyOperator" : "portal.empty"),
-    )}</p>`;
+    return `<div class="page">${hero}
+      ${emptyState(text.t(isAdmin ? "landing.emptyOperator" : "portal.empty"), icons.organization(28))}
+    </div>`;
   }
 
-  return `${hero}${organizationList(orgs, text)}`;
+  return `<div class="page">${hero}
+    <section>
+      ${sectionHead(text.t("shell.organizations"), text.number(orgs.length))}
+      ${organizationList(orgs, text)}
+    </section>
+  </div>`;
+}
+
+/**
+ * Nothing here, said as a place rather than as a missing thing.
+ *
+ * One function, because there are seven of these across the product and they
+ * used to be seven grey sentences of their own invention. A mark, the sentence,
+ * and — where there is one — the thing to do about it.
+ */
+export function emptyState(words: string, icon = "", action = ""): string {
+  return `<div class="empty">
+    ${icon}
+    <span>${escapeHTML(words)}</span>
+    ${action}
+  </div>`;
+}
+
+/** The small title of a part of a page, with what it holds counted beside it. */
+export function sectionHead(title: string, count?: string): string {
+  return `<div class="section-head">
+    <h2>${escapeHTML(title)}</h2>
+    ${count !== undefined ? `<span class="count-chip">${escapeHTML(count)}</span>` : ""}
+  </div>`;
+}
+
+/** The mark in front of a name: two letters of the thing itself. */
+export function initials(name: string): string {
+  return (name || "?")
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => [...part][0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 export function organizationList(orgs: OrganizationSummary[], text: Text): string {
-  if (orgs.length === 0) return `<p class="empty">${escapeHTML(text.t("portal.empty"))}</p>`;
+  if (orgs.length === 0) return emptyState(text.t("portal.empty"), icons.organization(28));
 
   return `<ul class="cards">${orgs
     .map(
       (o) => `<li><a class="card" href="/${escapeAttr(o.slug)}">
-        <span class="card-title">${escapeHTML(o.name)}</span>
-        <span class="card-sub">/${escapeHTML(o.slug)}</span>
+        <span class="card-mark" aria-hidden="true">${escapeHTML(initials(o.name))}</span>
+        <span class="card-body">
+          <span class="card-title">${escapeHTML(o.name)}</span>
+          <span class="card-sub">/${escapeHTML(o.slug)}</span>
+        </span>
+        <span class="card-go" aria-hidden="true">${icons.chevron(18)}</span>
       </a></li>`,
     )
     .join("")}</ul>`;
 }
 
+/**
+ * One organisation, and the boards inside it.
+ *
+ * What a board takes is said as two small words on the card rather than as a
+ * sentence under the name: it is what somebody is choosing between, and a line
+ * of prose repeated on every card is a line nobody reads twice.
+ */
 export function repositoryList(
   org: OrganizationSummary,
   repos: RepositorySummary[],
   text: Text,
 ): string {
-  const header = `<h1>${escapeHTML(org.name)}</h1>`;
-  if (repos.length === 0) return `${header}<p class="empty">${escapeHTML(text.t("portal.empty"))}</p>`;
+  const header = `<header class="page-head">
+    <div class="head-text">
+      <p class="crumb"><a href="/">${escapeHTML(text.t("nav.home"))}</a></p>
+      <h1>${escapeHTML(org.name)}</h1>
+    </div>
+  </header>`;
 
-  return `${header}<ul class="cards">${repos
-    .map(
-      (r) => `<li><a class="card" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}">
-        <span class="card-title">${escapeHTML(r.name)}</span>
-        <span class="card-sub">${[
-          r.accepts_bugs ? escapeHTML(text.t("repo.acceptsBugs")) : "",
-          r.accepts_ideas ? escapeHTML(text.t("repo.acceptsIdeas")) : "",
-        ]
-          .filter(Boolean)
-          .join(" · ")}</span>
-      </a></li>`,
-    )
-    .join("")}</ul>`;
+  if (repos.length === 0) {
+    return `<div class="page">${header}
+      ${emptyState(text.t("portal.empty"), icons.repository(28))}
+    </div>`;
+  }
+
+  return `<div class="page">${header}
+    <section>
+      ${sectionHead(text.t("portal.boards"), text.number(repos.length))}
+      <ul class="cards">${repos
+        .map(
+          (r) => `<li><a class="card" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}">
+            <span class="card-mark" aria-hidden="true">${escapeHTML(initials(r.name))}</span>
+            <span class="card-body">
+              <span class="card-title">${escapeHTML(r.name)}</span>
+              <span class="chips">
+                ${r.accepts_bugs ? `<span class="chip">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
+                ${r.accepts_ideas ? `<span class="chip">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
+              </span>
+            </span>
+            <span class="card-go" aria-hidden="true">${icons.chevron(18)}</span>
+          </a></li>`,
+        )
+        .join("")}</ul>
+    </section>
+  </div>`;
 }
 
 /**
@@ -129,7 +209,7 @@ export function memberHome(
 ): string {
   if (memberships.length === 0) {
     return `<h1>${escapeHTML(text.t("shell.overview"))}</h1>
-      <p class="empty">${escapeHTML(text.t("overview.noRoles"))}</p>`;
+      ${emptyState(text.t("overview.noRoles"), icons.person(28))}`;
   }
 
   const cards = memberships
@@ -220,7 +300,7 @@ export function panelOrganization(
 ): string {
   const list =
     repos.length === 0
-      ? `<p class="empty">${escapeHTML(text.t("portal.empty"))}</p>`
+      ? `${emptyState(text.t("portal.empty"), icons.repository(28))}`
       : `<ul class="cards">${repos
           .map(
             (r) => `<li><a class="card" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}">
@@ -381,58 +461,86 @@ export function board(
     <button class="sort${filters.sort !== "votes" ? " on" : ""}" data-sort="new">${escapeHTML(text.t("board.sortNew"))}</button>
     <button class="sort${filters.sort === "votes" ? " on" : ""}" data-sort="votes">${escapeHTML(text.t("board.sortVotes"))}</button>`;
 
+  const report = `/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new`;
+
+  // An empty board is not a failure, and it is the state every board starts in.
+  // It carries the one thing to do about it rather than a grey sentence.
   const list =
     items.length === 0
-      ? `<p class="empty">${escapeHTML(text.t("board.empty"))}</p>`
+      ? emptyState(
+          text.t("board.empty"),
+          icons.queue(28),
+          `<a class="button primary with-icon" href="${report}">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>`,
+        )
       : `<ul class="items">${items.map((i) => itemRow(i, text)).join("")}</ul>`;
 
-  return `
-    <header class="board-head">
-      <div>
+  return `<div class="page">
+    <header class="page-head board-head">
+      <div class="head-text">
         <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
         <h1>${escapeHTML(repo.name)}</h1>
+        <span class="chips">
+          ${repo.accepts_bugs ? `<span class="chip">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
+          ${repo.accepts_ideas ? `<span class="chip">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
+        </span>
       </div>
       <div class="head-actions">
-        <a class="button ghost" href="/feed/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/atom.xml">${escapeHTML(text.t("nav.feed"))}</a>
-        <a class="button ghost" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/roadmap">${escapeHTML(text.t("nav.roadmap"))}</a>
-        <a class="button primary with-icon" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>
+        <a class="icon-button" href="/feed/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/atom.xml"
+           title="${escapeAttr(text.t("nav.feed"))}" aria-label="${escapeAttr(text.t("nav.feed"))}">${icons.feed(16)}</a>
+        <a class="button" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/roadmap">${escapeHTML(text.t("nav.roadmap"))}</a>
+        <a class="button primary with-icon" href="${report}">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>
       </div>
     </header>
     <div class="controls">
       <div class="tabs">${tabs}</div>
       <div class="sorts">${sorts}</div>
-      <input class="search" type="search" value="${escapeAttr(filters.query)}"
-             placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
+      <label class="search-wrap">
+        ${icons.search(16)}
+        <input class="search" type="search" value="${escapeAttr(filters.query)}"
+               placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
+      </label>
     </div>
-    ${list}`;
+    ${list}
+  </div>`;
 }
 
 /**
  * One report in the list.
  *
- * The kind is an icon rather than a word repeated on every row: twenty rows
- * saying "Bug" is twenty words nobody reads, and the shape is faster to scan.
- * The count of votes stays a word, because a number on its own beside a title
- * is a number nobody can name.
+ * The score leads the row. On an ideas board it is what the list is sorted by
+ * and what the eye runs down the column looking for, and it used to be four
+ * grey words at the far end of the line, past the state, where nothing lined
+ * up with anything. The word stays under the number: a bare 3 beside a title is
+ * a number nobody can name, which is why every counter in this house is written
+ * as a label and a value.
+ *
+ * A bug gets the same tile with its mark in it rather than nothing, so that
+ * every title on a mixed board starts on the same vertical line. Two hundred
+ * people agreeing that something crashes does not make it crash harder, so a
+ * bug is not given a count.
  */
 function itemRow(item: ItemSummary, text: Text): string {
-  // "Votes: 3", not an icon and a bare 3. A number on its own beside a title is
-  // a number nobody can name, and the house writes counters as label-then-value
-  // for exactly that reason. Adding the icon and dropping the word was a trade
-  // that gave up the meaning for the decoration.
-  const votes =
+  const lead =
     item.kind === "idea"
-      ? `<span class="votes${item.voted ? " voted" : ""}">${escapeHTML(text.t("item.votes", { count: text.number(item.votes) }))}</span>`
-      : "";
+      ? `<span class="score${item.voted ? " voted" : ""}">
+           <span class="count">${escapeHTML(text.number(item.votes))}</span>
+           <span class="label">${escapeHTML(text.t("item.votesLabel"))}</span>
+         </span>`
+      : `<span class="score mark kind-bug" aria-hidden="true">${icons.bug(20)}</span>`;
 
   return `<li><a class="item" href="/i/${escapeAttr(item.public_id)}">
-    <span class="kind kind-${escapeAttr(item.kind)}" title="${escapeAttr(text.t(`kind.${item.kind}`))}">
-      ${item.kind === "bug" ? icons.bug(14) : icons.idea(14)}
-      <span class="kind-name">${escapeHTML(text.t(`kind.${item.kind}`))}</span>
+    ${lead}
+    <span class="item-main">
+      <span class="item-title">${escapeHTML(item.title)}</span>
+      <span class="item-meta">
+        <span class="kind kind-${escapeAttr(item.kind)}">
+          ${item.kind === "bug" ? icons.bug(13) : icons.idea(13)}
+          <span class="kind-name">${escapeHTML(text.t(`kind.${item.kind}`))}</span>
+        </span>
+        <span class="when">${escapeHTML(text.date(item.created_at))}</span>
+      </span>
     </span>
-    <span class="item-title">${escapeHTML(item.title)}</span>
     <span class="status status-${escapeAttr(item.status)}">${escapeHTML(text.t(`status.${item.status}`))}</span>
-    ${votes}
   </a></li>`;
 }
 
@@ -449,23 +557,41 @@ export function roadmap(
   columns: Array<{ column: string; items: ItemSummary[] }>,
   text: Text,
 ): string {
-  return `
-    <p class="crumb"><a href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">${escapeHTML(repo.name)}</a></p>
-    <h1>${escapeHTML(text.t("nav.roadmap"))}</h1>
-    <p class="lead">${escapeHTML(text.t("roadmap.lead"))}</p>
+  return `<div class="page">
+    <header class="page-head">
+      <div class="head-text">
+        <p class="crumb"><a href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">${escapeHTML(repo.name)}</a></p>
+        <h1>${escapeHTML(text.t("nav.roadmap"))}</h1>
+        <p class="lead">${escapeHTML(text.t("roadmap.lead"))}</p>
+      </div>
+    </header>
     <div class="roadmap">
       ${columns
         .map(
-          (c) => `<section class="column">
-            <h2>${escapeHTML(text.t(`roadmap.${c.column}`))}</h2>
+          (c) => `<section class="column column-${escapeAttr(c.column)}">
+            <header class="column-head">
+              <span class="dot" aria-hidden="true"></span>
+              <h2>${escapeHTML(text.t(`roadmap.${c.column}`))}</h2>
+              <span class="count-chip">${escapeHTML(text.number(c.items.length))}</span>
+            </header>
             ${
               c.items.length === 0
                 ? `<p class="empty">${escapeHTML(text.t("roadmap.emptyColumn"))}</p>`
                 : `<ul>${c.items
                     .map(
                       (i) => `<li><a href="/i/${escapeAttr(i.public_id)}">
-                        <span class="kind kind-${escapeAttr(i.kind)}">${escapeHTML(text.t(`kind.${i.kind}`))}</span>
                         <span class="item-title">${escapeHTML(i.title)}</span>
+                        <span class="item-meta">
+                          <span class="kind kind-${escapeAttr(i.kind)}">
+                            ${i.kind === "bug" ? icons.bug(13) : icons.idea(13)}
+                            <span class="kind-name">${escapeHTML(text.t(`kind.${i.kind}`))}</span>
+                          </span>
+                          ${
+                            i.kind === "idea"
+                              ? `<span class="when">${escapeHTML(text.t("item.votes", { count: text.number(i.votes) }))}</span>`
+                              : ""
+                          }
+                        </span>
                       </a></li>`,
                     )
                     .join("")}</ul>`
@@ -473,7 +599,8 @@ export function roadmap(
           </section>`,
         )
         .join("")}
-    </div>`;
+    </div>
+  </div>`;
 }
 
 /**
@@ -583,12 +710,16 @@ export function reportForm(
       </div>`
     : "";
 
-  return `
-    <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a>
-      <span aria-hidden="true">/</span>
-      <a href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">${escapeHTML(repo.name)}</a></p>
-    <h1>${escapeHTML(text.t("board.report"))}</h1>
-    <p class="lead">${escapeHTML(text.t("form.lead"))}</p>
+  return `<div class="page narrow">
+    <header class="page-head">
+      <div class="head-text">
+        <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a>
+          <span aria-hidden="true">${icons.chevron(12)}</span>
+          <a href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">${escapeHTML(repo.name)}</a></p>
+        <h1>${escapeHTML(text.t("board.report"))}</h1>
+        <p class="lead">${escapeHTML(text.t("form.lead"))}</p>
+      </div>
+    </header>
 
     <form class="report">
       <div class="kind-choices">${choices}</div>
@@ -651,7 +782,8 @@ export function reportForm(
         <span class="spacer"></span>
         <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
       </div>
-    </form>`;
+    </form>
+  </div>`;
 }
 
 export function similarItems(items: Array<{ public_id: string; title: string }>, text: Text): string {
@@ -663,15 +795,31 @@ export function similarItems(items: Array<{ public_id: string; title: string }>,
     <p class="hint">${escapeHTML(text.t("form.similarHelp"))}</p>`;
 }
 
+/**
+ * Sent, and the link back to it.
+ *
+ * The link is the whole page: it is the only way the person who just wrote a
+ * report — with no account, by design — ever reaches it again. So it sits in a
+ * card of its own with the copy button beside it, rather than as the fourth
+ * paragraph of a page of prose.
+ */
 export function submitted(link: string, text: Text): string {
-  return `
-    <h1>${escapeHTML(text.t("sent.title"))}</h1>
-    <p>${escapeHTML(text.t("sent.waiting"))}</p>
-    <p class="keep">${escapeHTML(text.t("sent.keepLink"))}</p>
-    <div class="follow-link">
-      <input readonly value="${escapeAttr(link)}" aria-label="${escapeAttr(text.t("sent.copy"))}" />
-      <button class="button" data-copy>${escapeHTML(text.t("sent.copy"))}</button>
-    </div>`;
+  return `<div class="page narrow">
+    <header class="page-head">
+      <div class="head-text">
+        <p class="crumb">${icons.check(14)}<span>${escapeHTML(text.t("sent.title"))}</span></p>
+        <h1>${escapeHTML(text.t("sent.waiting"))}</h1>
+      </div>
+    </header>
+    <section class="bento-card">
+      <div class="card-head">${icons.copy()}<h3>${escapeHTML(text.t("sent.copy"))}</h3></div>
+      <span class="card-sub">${escapeHTML(text.t("sent.keepLink"))}</span>
+      <div class="follow-link">
+        <input readonly value="${escapeAttr(link)}" aria-label="${escapeAttr(text.t("sent.copy"))}" />
+        <button class="button" data-copy>${escapeHTML(text.t("sent.copy"))}</button>
+      </div>
+    </section>
+  </div>`;
 }
 
 /**
@@ -733,7 +881,9 @@ export function itemView(item: ItemDetail, text: Text): string {
   const org = board?.organization;
   const crumb = board
     ? `<p class="crumb">${
-        org ? `<a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a> <span aria-hidden="true">/</span> ` : ""
+        org
+          ? `<a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a> <span aria-hidden="true">${icons.chevron(12)}</span> `
+          : ""
       }<a href="/${escapeAttr(org?.slug ?? "")}/${escapeAttr(board.slug)}">${escapeHTML(board.name)}</a></p>`
     : "";
 
@@ -794,7 +944,7 @@ export function itemView(item: ItemDetail, text: Text): string {
 
   const thread =
     item.comments.length === 0
-      ? `<p class="empty">${escapeHTML(text.t("item.threadEmpty"))}</p>`
+      ? `${emptyState(text.t("item.threadEmpty"), icons.people(28))}`
       : `<ul class="comments">${item.comments
           .map((c) => {
             const who = c.name || text.t(`comment.${c.author}`);
@@ -810,7 +960,7 @@ export function itemView(item: ItemDetail, text: Text): string {
           })
           .join("")}</ul>`;
 
-  return `
+  return `<div class="page">
     ${crumb}${merged}${waiting}
     <article class="detail">
       <div class="detail-main">
@@ -860,7 +1010,8 @@ export function itemView(item: ItemDetail, text: Text): string {
           <p class="comment-sent" role="status" hidden>${escapeHTML(text.t("item.commentWaiting"))}</p>
         </div>
       </form>
-    </section>`;
+    </section>
+  </div>`;
 }
 
 /**
@@ -1567,14 +1718,8 @@ export function brandMark(logo: string | undefined, size = 24): string {
 
 /** Initials when there is no picture, which is most of the time. */
 export function avatar(name: string, src?: string, big = false): string {
-  const initials = (name || "?")
-    .split(/[\s._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => [...part][0]?.toUpperCase() ?? "")
-    .join("");
   return `<span class="avatar${big ? " big" : ""}" aria-hidden="true">${
-    src ? `<img src="${escapeAttr(src)}" alt="" />` : escapeHTML(initials)
+    src ? `<img src="${escapeAttr(src)}" alt="" />` : escapeHTML(initials(name))
   }</span>`;
 }
 
@@ -1912,7 +2057,7 @@ export function organizationsScreen(
       ${may.canAdd ? actionButton("add", text.t("panel.newOrganization"), 'data-add-org data-open-modal="org-modal"', "primary") : ""}
     </div>
     <p class="lead">${escapeHTML(text.t("organizations.lead"))}</p>
-    ${orgs.length === 0 ? `<p class="empty">${escapeHTML(text.t("panel.firstStep"))}</p>` : `<ul class="bento">${cards}</ul>`}`;
+    ${orgs.length === 0 ? `${emptyState(text.t("panel.firstStep"), icons.organization(28))}` : `<ul class="bento">${cards}</ul>`}`;
 }
 
 /** One organisation: its repositories, and what can be done to it. */
@@ -1958,7 +2103,7 @@ export function organizationScreen(
     <p class="lead"><span class="tag">/${escapeHTML(org.slug)}</span>
       ${org.forge && org.forge !== "none" ? `<span class="tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>
 
-    ${repos.length === 0 ? `<p class="empty">${escapeHTML(text.t("organizations.noRepositories"))}</p>` : `<ul class="bento repositories">${cards}</ul>`}`;
+    ${repos.length === 0 ? `${emptyState(text.t("organizations.noRepositories"), icons.repository(28))}` : `<ul class="bento repositories">${cards}</ul>`}`;
 }
 
 /** Who may act here, what each of them is, and where. */

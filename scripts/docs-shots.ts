@@ -201,6 +201,25 @@ await shoot("update");
 await go("/panel/organizations");
 await shoot("organizations");
 
+// The three a stranger sees, taken as a stranger sees them: signed out, with
+// the bar offering the way in rather than the way to the panel. Taken with a
+// session, the front page of the product was documented wearing an
+// administrator's navigation, which nobody outside the team ever gets.
+await evaluate(`
+  const csrf = () => document.cookie.split(";").map(c => c.trim())
+    .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+  await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+`);
+
+await go("/");
+await shoot("landing");
+
+await go("/acme");
+await shoot("organization");
+
+await go("/sign-in");
+await shoot("sign-in");
+
 page.close();
 console.log("\nlook at the images. A tick above says a file was written, nothing more.");
 export {};

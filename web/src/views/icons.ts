@@ -19,6 +19,14 @@ function stroke(paths: string, size = 16): string {
 
 export const icons = {
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
+  /* The arrow on anything that leads somewhere. It points along the line, and
+     the line runs the other way in three of the twenty languages: the flip is
+     done in the stylesheet with --rtl-flip rather than by drawing it twice. */
+  chevron: (s?: number) => stroke(`<path d="m9 6 6 6-6 6"/>`, s),
+  search: (s?: number) => stroke(`<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>`, s),
+  feed: (s?: number) =>
+    stroke(`<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.2"/>`, s),
+  clock: (s?: number) => stroke(`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`, s),
   edit: (s?: number) =>
     stroke(
       `<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>

@@ -360,6 +360,49 @@ async function main() {
   const afterApproval = await evaluate(`return document.querySelectorAll(".items li").length`);
   check("it is on the public board", afterApproval === 1, `rows=${afterApproval}`);
 
+  // 8a. The board, as a piece of design rather than as a list of strings.
+  //
+  //     Two things measured, both invisible in the markup. The bar carries the
+  //     name of the installation and the page under it carries its first word,
+  //     and if the two do not start on the same vertical line the screen reads
+  //     as unaligned however correct it is — which is what a full-width bar
+  //     over a centred column looked like. And every row leads with a tile of
+  //     the same width, so the titles line up whatever kind they are: a score
+  //     on an idea, a mark on a bug, nothing at all and the column staggers.
+  //     Measured in a window wide enough for the page to be narrower than it.
+  //     The browser opens at 800px, where a column capped at 70rem never
+  //     reaches its cap and a bar pinned to the window starts at the same
+  //     twenty pixels as the text — so the check passed with the bug in place.
+  //     A probe that gives the same answer either way measures nothing.
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: 1280, height: 900, deviceScaleFactor: 1, mobile: false,
+  });
+  await sleep(300);
+  const grid = await evaluate(`
+    const brand = document.querySelector("body > nav .brand").getBoundingClientRect();
+    const heading = document.querySelector("h1").getBoundingClientRect();
+    const rows = [...document.querySelectorAll(".item")];
+    const leads = rows.map(r => Math.round(r.firstElementChild.getBoundingClientRect().width));
+    const titles = rows.map(r => Math.round(r.querySelector(".item-title").getBoundingClientRect().left));
+    return {
+      offset: Math.round(Math.abs(brand.left - heading.left)),
+      leads: [...new Set(leads)],
+      titles: [...new Set(titles)],
+    };
+  `);
+  check(
+    "the bar starts where the page starts",
+    grid.offset <= 1,
+    `${grid.offset}px apart`,
+  );
+  check(
+    "and every row leads with the same tile, so the titles line up",
+    grid.leads.length === 1 && grid.titles.length === 1,
+    `leads=${JSON.stringify(grid.leads)} titles=${JSON.stringify(grid.titles)}`,
+  );
+  await page.send("Emulation.clearDeviceMetricsOverride");
+  await sleep(300);
+
   const href = await evaluate(`return document.querySelector(".items a")?.getAttribute("href") ?? ""`);
   await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(600);
@@ -459,6 +502,13 @@ async function main() {
   `);
   check("the roadmap draws all three columns", roadmap.columns === 3, `columns=${roadmap.columns}`);
   check("what was just planned is on it", roadmap.planned === 1, `planned=${roadmap.planned}`);
+  // Three columns of the same height. Left to their contents they step down
+  // like a bar chart, and a quiet board reads as a broken one.
+  const columnHeights = await evaluate(`
+    return [...new Set([...document.querySelectorAll(".roadmap .column")]
+      .map(c => Math.round(c.getBoundingClientRect().height)))];
+  `);
+  check("and all three are the same height", columnHeights.length === 1, JSON.stringify(columnHeights));
 
   // 10. The bridge control. There is no forge connected in this run, so what
   //     is checked is that the control is there for the team and that asking
@@ -604,6 +654,49 @@ async function main() {
 
   const wayOut = await evaluate(`return !!document.querySelector(".side-public");`);
   check("and there is a way to the public side from the panel", wayOut === true);
+
+  // The bars on the overview, measured rather than looked at.
+  //
+  // They were spans with a width in a style attribute and no display, so every
+  // fill on every card was zero pixels wide: the panel drew a row of empty grey
+  // tracks and looked like a chart of nothing. On a screenshot an empty track
+  // and a full one at low contrast are the same picture, which is why this
+  // measures the box.
+  const bars = await evaluate(`
+    const fills = [...document.querySelectorAll(".bar-fill")];
+    return { count: fills.length, drawn: fills.filter(f => f.getBoundingClientRect().width > 1).length };
+  `);
+  check(
+    "the bars on the overview are actually drawn",
+    bars.count > 0 && bars.drawn === bars.count,
+    `${bars.drawn} of ${bars.count} have width`,
+  );
+
+  // The front door. It is the page a stranger arrives on, and what it announces
+  // is the installation — its name and its mark — rather than the name of the
+  // software running it, which is on the About screen where an operator looks
+  // for it.
+  await evaluate(`history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1100);
+  const front = await evaluate(`
+    const mark = document.querySelector(".hero-mark img");
+    return {
+      title: document.querySelector(".hero h1")?.textContent?.trim() ?? "",
+      mark: mark ? Math.round(mark.getBoundingClientRect().width) : 0,
+      points: document.querySelectorAll(".points > li").length,
+      boards: document.querySelectorAll(".cards .card").length,
+    };
+  `);
+  check(
+    "the front page announces the installation, not the software",
+    front.title === "CodigoSH" && front.mark > 30 && front.points === 3 && front.boards === 1,
+    JSON.stringify(front),
+  );
+
+  // Back to the panel: what follows reads the sidebar, and a check that leaves
+  // the walk on another screen breaks the next one rather than its own.
+  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(900);
 
   const sidebar = await evaluate(`
     return {

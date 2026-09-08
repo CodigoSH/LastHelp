@@ -25,6 +25,7 @@ import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
 import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
+import { icons } from "./views/icons";
 
 const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
@@ -100,16 +101,21 @@ function renderNav(): void {
       // third thing on that screen saying the same word.
       location.pathname === "/sign-in"
       ? ""
-      : `<a href="/sign-in">${escapeHTML(i18n.t("nav.signIn"))}</a>`;
+      : `<a class="button small" href="/sign-in">${escapeHTML(i18n.t("nav.signIn"))}</a>`;
 
   // The name the operator chose, on the public side too. Personalising an
   // installation and then seeing "LastHelp" on the page everybody else opens is
   // a setting that did not take.
-  nav.innerHTML = `<a class="brand" href="/">
-      ${views.brandMark(instanceLogo)}
-      <span>${escapeHTML(instanceName || i18n.t("app.name"))}</span>
-    </a>
-    <div class="nav-right">${account}</div>`;
+  // The bar's contents share the measure of the page under it. Pinned to the
+  // window's own edges, the brand floated a long way from the first word of the
+  // page it names, which is most of what made these screens read as unaligned.
+  nav.innerHTML = `<div class="nav-inner">
+      <a class="brand" href="/">
+        ${views.brandMark(instanceLogo)}
+        <span>${escapeHTML(instanceName || i18n.t("app.name"))}</span>
+      </a>
+      <div class="nav-right">${account}</div>
+    </div>`;
 
   nav.querySelector<HTMLButtonElement>("[data-signout]")?.addEventListener("click", async () => {
     await api.del("/api/session").catch(() => undefined);
@@ -420,7 +426,7 @@ async function showPeople(): Promise<void> {
     .get<{ people: Parameters<typeof views.peopleScreen>[0] }>("/api/people")
     .catch(() => null);
   if (!body) {
-    await showInShell(`<p class="empty">${escapeHTML(i18n.t("error.forbidden"))}</p>`, "/panel/people");
+    await showInShell(views.emptyState(i18n.t("error.forbidden"), icons.warning(28)), "/panel/people");
     return;
   }
 
@@ -637,7 +643,7 @@ async function showAbout(): Promise<void> {
 /** A page that could not be loaded. The screen has nothing else to show. */
 function fail(err: unknown): void {
   const key = err instanceof ApiError ? err.key : "error.internal";
-  show(`<p class="empty">${escapeHTML(i18n.t(key))}</p>`);
+  show(views.emptyState(i18n.t(key), icons.warning(28)));
 }
 
 /**
@@ -710,7 +716,7 @@ async function render(): Promise<void> {
     if (parts.length === 3 && parts[2] === "roadmap" && parts[0] && parts[1]) {
       return await showRoadmap(parts[0], parts[1]);
     }
-    show(`<p class="empty">${escapeHTML(i18n.t("error.not_found"))}</p>`);
+    show(views.emptyState(i18n.t("error.not_found"), icons.warning(28)));
   } catch (err) {
     fail(err);
   }
@@ -729,7 +735,12 @@ async function showOrganizations(): Promise<void> {
   // the way out of it; a visitor gets told plainly, rather than being sent to a
   // form that would refuse them.
   if (!me) me = await api.get<Me>("/api/me").catch(() => null);
-  show(views.landing(organizations ?? [], me?.admin === true, text));
+  show(
+    views.landing(organizations ?? [], me?.admin === true, text, {
+      name: instanceName,
+      logo: instanceLogo,
+    }),
+  );
 }
 
 async function showRepositories(orgSlug: string): Promise<void> {
@@ -1239,6 +1250,11 @@ function showSetupStep(step: 1 | 2 | 3): void {
           logo: draft.logo,
           accent: "",
         });
+        // Read again, the way every other screen that writes this does. It is
+        // held for the life of the page, so without this the bar and the front
+        // page went on saying LastHelp for the whole session after somebody had
+        // just named their installation — a setting that did not take.
+        instanceLoaded = false;
         go("/setup/done");
       } catch (err) {
         showFormError(err);
@@ -1683,7 +1699,7 @@ async function showUpdates(): Promise<void> {
       ? `<h1>${escapeHTML(i18n.t("shell.updates"))}</h1>
          <ul class="bento">${views.channelSwitch(beta, text)}</ul>
          ${views.updatePanel(status, text)}`
-      : `<p class="empty">${escapeHTML(i18n.t("error.forbidden"))}</p>`,
+      : views.emptyState(i18n.t("error.forbidden"), icons.warning(28)),
     "/panel/updates",
   );
 
