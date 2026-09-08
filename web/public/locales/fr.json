@@ -218,7 +218,7 @@
   "status.done": "Fait",
   "status.in_forge": "Suivi",
   "status.in_progress": "En cours",
-  "status.new": "Nouveau",
+  "status.new": "Ouvert",
   "status.not_reproducible": "Non reproductible",
   "status.planned": "Prévu",
   "toast.issueAttached": "Ticket rattaché",

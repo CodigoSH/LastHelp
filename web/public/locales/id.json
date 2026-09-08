@@ -218,7 +218,7 @@
   "status.done": "Selesai",
   "status.in_forge": "Dilacak",
   "status.in_progress": "Sedang dikerjakan",
-  "status.new": "Baru",
+  "status.new": "Terbuka",
   "status.not_reproducible": "Tidak bisa direproduksi",
   "status.planned": "Direncanakan",
   "toast.issueAttached": "Isu ditautkan",

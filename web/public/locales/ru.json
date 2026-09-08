@@ -218,7 +218,7 @@
   "status.done": "Готово",
   "status.in_forge": "В отслеживании",
   "status.in_progress": "В работе",
-  "status.new": "Новое",
+  "status.new": "Открыт",
   "status.not_reproducible": "Не воспроизводится",
   "status.planned": "Запланировано",
   "toast.issueAttached": "Задача привязана",

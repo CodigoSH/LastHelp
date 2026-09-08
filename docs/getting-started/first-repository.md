@@ -69,10 +69,10 @@ They are asked different things and treated differently, on purpose:
   every extra box on a public form is somebody deciding not to bother.
 - **A bug is not voted.** Two hundred people agreeing that something crashes
   does not make it crash harder; what it needs is somebody able to reproduce it.
-  Its statuses are *new, confirmed, tracked, closed, not reproducible*.
+  Its statuses are *open, confirmed, tracked, closed, not reproducible*.
 - **An idea is voted, and its value is not reaching your issue tracker yet.**
   That is what stops the tracker turning into a wishlist with a thousand open
-  entries. Its statuses are *new, planned, in progress, done, declined*.
+  entries. Its statuses are *open, planned, in progress, done, declined*.
 
 Both land on the same three roadmap columns, because to somebody reading it a
 confirmed bug and a planned idea are the same news.

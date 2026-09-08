@@ -218,7 +218,7 @@
   "status.done": "تم",
   "status.in_forge": "قيد المتابعة",
   "status.in_progress": "قيد التنفيذ",
-  "status.new": "جديد",
+  "status.new": "مفتوح",
   "status.not_reproducible": "تعذّر تكراره",
   "status.planned": "مُخطط له",
   "toast.issueAttached": "تم ربط المسألة",

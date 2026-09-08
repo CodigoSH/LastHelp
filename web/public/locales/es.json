@@ -328,7 +328,7 @@
   "status.done": "Hecho",
   "status.in_forge": "En seguimiento",
   "status.in_progress": "En curso",
-  "status.new": "Nuevo",
+  "status.new": "Abierto",
   "status.not_reproducible": "No reproducible",
   "status.planned": "Planeado",
   "toast.issueAttached": "Incidencia enlazada",

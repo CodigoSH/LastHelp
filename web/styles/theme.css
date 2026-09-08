@@ -3367,3 +3367,8 @@ a.stat:hover .stat-go {
 /* The ring and its legend sit in the middle of the card rather than at the top
    of a box sized by whatever is beside it. */
 .dash-card:has(.donut-row) { display: grid; align-content: center; }
+
+/* Inside a .page the thread is a child like any other and the page already
+   sets the distance between children: its own top margin on top of that left a
+   hand's width of nothing between the team's tools and the first comment. */
+.page > .thread { margin-block-start: 0; }

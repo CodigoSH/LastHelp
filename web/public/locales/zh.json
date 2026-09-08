@@ -218,7 +218,7 @@
   "status.done": "已完成",
   "status.in_forge": "已登记",
   "status.in_progress": "进行中",
-  "status.new": "新",
+  "status.new": "开放",
   "status.not_reproducible": "无法复现",
   "status.planned": "已计划",
   "toast.issueAttached": "已关联议题",

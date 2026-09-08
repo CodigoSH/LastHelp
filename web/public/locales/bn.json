@@ -218,7 +218,7 @@
   "status.done": "সম্পন্ন",
   "status.in_forge": "নজরে রাখা হয়েছে",
   "status.in_progress": "চলছে",
-  "status.new": "নতুন",
+  "status.new": "খোলা",
   "status.not_reproducible": "পুনরায় ঘটানো যায়নি",
   "status.planned": "পরিকল্পিত",
   "toast.issueAttached": "ইস্যু যুক্ত হয়েছে",

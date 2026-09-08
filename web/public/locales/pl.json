@@ -218,7 +218,7 @@
   "status.done": "Gotowe",
   "status.in_forge": "Śledzone",
   "status.in_progress": "W trakcie",
-  "status.new": "Nowe",
+  "status.new": "Otwarte",
   "status.not_reproducible": "Nie do odtworzenia",
   "status.planned": "Zaplanowane",
   "toast.issueAttached": "Powiązano zgłoszenie",

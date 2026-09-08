@@ -463,6 +463,28 @@ async function main() {
     JSON.stringify(detail.crumb),
   );
   check("its status wears the colour the board uses", detail.status.includes("status-"), detail.status);
+
+  // 8c. And for the team, the report keeps the panel around it.
+  //
+  //     The address is the public one and a stranger must not be shown an
+  //     application, but for the team this is where the work is done — and
+  //     opening one from the listing used to drop them out of the panel: no
+  //     navigation, no way back to what they were working through. Measured on
+  //     a cold load of the address, not a click inside the running page, which
+  //     is how a report reaches somebody from a chat or a bookmark.
+  const inPanel = await evaluate(`
+    return {
+      sidebar: !!document.querySelector(".side"),
+      current: document.querySelector('.side-item[aria-current="page"]')?.textContent?.trim() ?? "",
+      publicNav: getComputedStyle(document.querySelector("body > nav")).display,
+      tools: document.querySelector(".team-tools") ? !document.querySelector(".team-tools").hidden : false,
+    };
+  `);
+  check(
+    "and the team keeps their panel around it",
+    inPanel.sidebar === true && inPanel.publicNav === "none" && inPanel.tools === true,
+    JSON.stringify(inPanel),
+  );
   check("the vote is a count and a verb", detail.vote === "count+label", detail.vote);
   check(
     "the team's controls are not inside the report card",
@@ -1136,6 +1158,30 @@ async function main() {
     "a collaborator's listing holds their board and nothing else",
     theirs.rows > 0 && theirs.boards.length === 1 && theirs.boards[0] === "Lastboard" && theirs.boardPicker === false,
     JSON.stringify(theirs),
+  );
+
+  // 13. And a stranger, on the same address, is shown a page rather than an
+  //     application. The panel around a report is for whoever has a role in it;
+  //     dropping the sidebar in front of a visitor would be showing them the
+  //     controls of a building they are visiting.
+  await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+    location.href = ${JSON.stringify(String(href))};
+  `);
+  await sleep(2000);
+  const visitor = await evaluate(`
+    return {
+      sidebar: !!document.querySelector(".side"),
+      publicNav: getComputedStyle(document.querySelector("body > nav")).display,
+      report: !!document.querySelector("article.detail"),
+    };
+  `);
+  check(
+    "a visitor on the same address gets the page, not the application",
+    visitor.sidebar === false && visitor.publicNav !== "none" && visitor.report === true,
+    JSON.stringify(visitor),
   );
 
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));

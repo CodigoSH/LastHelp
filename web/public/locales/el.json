@@ -218,7 +218,7 @@
   "status.done": "Έγινε",
   "status.in_forge": "Καταγράφηκε",
   "status.in_progress": "Σε εξέλιξη",
-  "status.new": "Νέο",
+  "status.new": "Ανοιχτό",
   "status.not_reproducible": "Δεν αναπαράγεται",
   "status.planned": "Προγραμματισμένο",
   "toast.issueAttached": "Το ζήτημα συνδέθηκε",

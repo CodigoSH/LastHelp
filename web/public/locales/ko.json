@@ -218,7 +218,7 @@
   "status.done": "완료",
   "status.in_forge": "추적 중",
   "status.in_progress": "진행 중",
-  "status.new": "신규",
+  "status.new": "열림",
   "status.not_reproducible": "재현 불가",
   "status.planned": "예정",
   "toast.issueAttached": "이슈를 연결했습니다",

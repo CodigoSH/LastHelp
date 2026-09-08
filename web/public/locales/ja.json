@@ -218,7 +218,7 @@
   "status.done": "完了",
   "status.in_forge": "追跡中",
   "status.in_progress": "進行中",
-  "status.new": "新規",
+  "status.new": "オープン",
   "status.not_reproducible": "再現できず",
   "status.planned": "予定",
   "toast.issueAttached": "課題を紐づけました",

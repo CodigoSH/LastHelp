@@ -218,7 +218,7 @@
   "status.done": "Klaar",
   "status.in_forge": "Opgevolgd",
   "status.in_progress": "Bezig",
-  "status.new": "Nieuw",
+  "status.new": "Open",
   "status.not_reproducible": "Niet reproduceerbaar",
   "status.planned": "Gepland",
   "toast.issueAttached": "Issue gekoppeld",

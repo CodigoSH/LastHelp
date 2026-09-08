@@ -218,7 +218,7 @@
   "status.done": "हो गया",
   "status.in_forge": "दर्ज है",
   "status.in_progress": "चल रहा है",
-  "status.new": "नया",
+  "status.new": "खुला",
   "status.not_reproducible": "दोहराया नहीं जा सका",
   "status.planned": "योजना में",
   "toast.issueAttached": "इशू जोड़ा गया",

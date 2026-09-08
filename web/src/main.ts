@@ -920,7 +920,21 @@ async function showItem(publicID: string): Promise<void> {
   const path = `/api/items/${encodeURIComponent(publicID)}${token ? `?k=${encodeURIComponent(token)}` : ""}`;
   const item = await api.get<ItemDetail>(path);
 
-  show(views.itemView(item, text));
+  // Somebody with a role keeps their panel around the report.
+  //
+  // The address is the public one — this is the page that travels, and a
+  // stranger opening it must not be shown an application — but for the team it
+  // is where the work is done, and arriving at it from the listing used to drop
+  // them out of the panel entirely: no navigation, no way back to what they
+  // were working through except the browser's own button.
+  const staff = me !== null && (me.admin === true || (me.memberships ?? []).length > 0);
+  if (staff) {
+    // Under Reports in the sidebar, because that is the screen this was
+    // reached from and the one to go back to.
+    await showInShell(views.itemView(item, text), "/panel/reports");
+  } else {
+    show(views.itemView(item, text));
+  }
 
   root?.querySelector<HTMLButtonElement>("[data-vote]")?.addEventListener("click", async (event) => {
     const button = event.currentTarget as HTMLButtonElement;

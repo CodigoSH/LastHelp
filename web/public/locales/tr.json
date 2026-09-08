@@ -218,7 +218,7 @@
   "status.done": "Tamam",
   "status.in_forge": "Takipte",
   "status.in_progress": "Devam ediyor",
-  "status.new": "Yeni",
+  "status.new": "Açık",
   "status.not_reproducible": "Yeniden üretilemedi",
   "status.planned": "Planlandı",
   "toast.issueAttached": "Konu bağlandı",
