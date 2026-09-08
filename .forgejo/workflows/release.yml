@@ -110,10 +110,20 @@ jobs:
           notes="CHANGELOG.md"
           body=$(awk "/^## \\[${TAG#v}\\]/{flag=1; next} /^## \\[/{flag=0} flag" "$notes")
 
+          # A beta has to be published AS a beta. The forge decides what
+          # /releases/latest answers from this flag, and that endpoint is the
+          # one the stable channel asks — so a beta published without it is
+          # offered to every installation that chose not to run betas, which is
+          # the whole reason there are two channels.
+          case "$TAG" in
+            *-Beta.*|*-RC.*) pre=true ;;
+            *)               pre=false ;;
+          esac
+
           # python3, not jq: jq is in neither the bullseye nor the bookworm
           # image, and this step had never run — the first release would have
           # died on `jq: command not found` with the tag already pushed.
-          payload=$(TAG="$TAG" BODY="$body" python3 -c 'import json, os; print(json.dumps({"tag_name": os.environ["TAG"], "name": os.environ["TAG"], "body": os.environ["BODY"], "draft": True}))')
+          payload=$(TAG="$TAG" BODY="$body" PRE="$pre" python3 -c 'import json, os; print(json.dumps({"tag_name": os.environ["TAG"], "name": os.environ["TAG"], "body": os.environ["BODY"], "draft": True, "prerelease": os.environ["PRE"] == "true"}))')
 
           release=$(curl -sf -X POST \
             "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases" \
@@ -138,3 +148,32 @@ jobs:
             -H "Authorization: token ${CI_TOKEN}" \
             -H 'Content-Type: application/json' \
             -d '{"draft": false}' > /dev/null
+
+      # Asked of the forge rather than trusted from the payload we sent.
+      #
+      # The first beta was published without the prerelease flag and everything
+      # reported success: the assets were there, the signature verified, the
+      # release page looked right. What was wrong was invisible from here —
+      # /releases/latest, which is the endpoint the stable channel asks,
+      # answered with the beta. Nobody who chose not to run betas would have
+      # found out except by being offered one.
+      - name: a beta is not offered on the stable channel
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$TAG" in
+            *-Beta.*|*-RC.*) ;;
+            *) echo "a stable release; nothing to check here."; exit 0 ;;
+          esac
+
+          # A 404 is the right answer when every release so far is a beta:
+          # there is no latest stable, which is exactly what should happen.
+          latest=$(curl -sf "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases/latest" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name",""))' 2>/dev/null || true)
+
+          if [ "$latest" = "$TAG" ]; then
+            echo "$TAG is what /releases/latest answers, and that is what the" >&2
+            echo "stable channel asks. It was published without the prerelease flag." >&2
+            exit 1
+          fi
+          echo "the stable channel sees: ${latest:-no stable release yet}"
