@@ -1213,8 +1213,10 @@ export function setupWizard(
       {
         step: 1,
         names,
+        // No supporting sentence. The title says what the step is, and a
+        // settings screen that introduces itself is a screen explaining that
+        // it exists.
         title: text.t("setup.languageTitle"),
-        lead: text.t("setup.languageLead"),
         body: preferenceFields(text, prefs.languages, prefs.language, prefs.theme),
         submit: text.t("wizard.continue"),
         formClass: "setup-preferences",
