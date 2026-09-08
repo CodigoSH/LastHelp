@@ -490,6 +490,36 @@ async function main() {
   `);
   check("the panel says what version is running", updates.hasSection === true);
 
+  // 11a. Signing in through the form, which nothing here did.
+  //
+  // Every sign-in in this walk was a fetch with a payload written by hand, so
+  // the form could send whatever it liked. It sent `email` — the name from
+  // before the field was renamed to `username` — and every real sign-in was
+  // answered "a username is needed", on a form where it was plainly filled in.
+  // A hand-written payload tests the endpoint; this tests the page.
+  await evaluate(`
+    const csrf = () => document.cookie.split("; ").find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+  `);
+  await evaluate(`history.pushState({}, "", "/sign-in"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(900);
+  await evaluate(`
+    const f = document.querySelector("form.auth");
+    f.querySelector('[name=username]').value = "alex";
+    f.querySelector('[name=password]').value = "una contraseña larga de verdad";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  `);
+  await sleep(1400);
+  const signedIn = await evaluate(`
+    const line = document.querySelector(".form-error");
+    return { path: location.pathname, said: line && !line.hidden ? line.textContent.trim() : "" };
+  `);
+  check(
+    "signing in through the form works",
+    signedIn.path === "/panel" && signedIn.said === "",
+    `${signedIn.path} ${signedIn.said}`,
+  );
+
   // 11b. About, which is the page somebody keeping a server running opens.
   await evaluate(`history.pushState({}, "", "/panel/about"); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(900);

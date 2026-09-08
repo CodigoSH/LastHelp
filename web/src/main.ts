@@ -1349,16 +1349,21 @@ async function showSignIn(): Promise<void> {
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(form);
+    // `username`, which is what the field is called. It read `email` — the name
+    // from before the rename — so every sign-in sent an empty username and was
+    // told one was needed, on a form where it was plainly filled in. The two
+    // sides of a rename, and only one of them moved.
     const payload = {
-      email: String(data.get("email") ?? ""),
+      username: String(data.get("username") ?? ""),
       password: String(data.get("password") ?? ""),
     };
     try {
-      await api.post(status.needs_setup ? "/api/setup" : "/api/session", payload);
+      // Not /api/setup: a fresh instance was sent to the wizard above, so that
+      // branch could never be taken. A branch nothing can reach is a branch
+      // nobody tests.
+      await api.post("/api/session", payload);
       me = await api.get<Me>("/api/me");
-      // A fresh instance goes on to the rest of the wizard rather than dropping
-      // somebody on an empty panel with a form and no order.
-      go(status.needs_setup ? "/setup/organization" : "/panel");
+      go("/panel");
     } catch (err) {
       if (errorLine) {
         errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
