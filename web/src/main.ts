@@ -20,7 +20,7 @@ import type {
 import { i18n } from "./services/i18n";
 import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
-import { escapeHTML } from "./escape";
+import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
 import { attachPasswordToggles } from "./services/password";
@@ -94,9 +94,15 @@ function renderNav(): void {
   // reading their browser's language, and somebody who wants a different one
   // sets it once — in the wizard on the first run, or under Appearance — rather
   // than being offered a list of twenty on every page of the product.
+  // Two controls rather than two words: the panel is somewhere to go, so it is
+  // a button, and leaving is a single well-known mark with its name on it for
+  // anybody who cannot see the shape. Side by side as plain links they read as
+  // the leftovers of a page that was styled once and then again.
   const account = me
-    ? `<a href="/panel">${escapeHTML(i18n.t("nav.panel"))}</a>
-       <button class="link" data-signout>${escapeHTML(i18n.t("nav.signOut"))}</button>`
+    ? `<a class="button small with-icon" href="/panel">${icons.overview(14)}<span>${escapeHTML(i18n.t("nav.panel"))}</span></a>
+       <button class="icon-button sign-out" data-signout
+               title="${escapeAttr(i18n.t("nav.signOut"))}"
+               aria-label="${escapeAttr(i18n.t("nav.signOut"))}">${icons.signOut(16)}</button>`
     : // Not on the sign-in page itself: a link to where you already are is the
       // third thing on that screen saying the same word.
       location.pathname === "/sign-in"
@@ -643,7 +649,7 @@ async function showAbout(): Promise<void> {
 /** A page that could not be loaded. The screen has nothing else to show. */
 function fail(err: unknown): void {
   const key = err instanceof ApiError ? err.key : "error.internal";
-  show(views.emptyState(i18n.t(key), icons.warning(28)));
+  show(views.failureScreen(i18n.t(key), text));
 }
 
 /**
@@ -717,7 +723,7 @@ async function render(): Promise<void> {
     if (parts.length === 3 && parts[2] === "roadmap" && parts[0] && parts[1]) {
       return await showRoadmap(parts[0], parts[1]);
     }
-    show(views.emptyState(i18n.t("error.not_found"), icons.warning(28)));
+    show(views.failureScreen(i18n.t("error.not_found"), text));
   } catch (err) {
     fail(err);
   }
@@ -975,6 +981,26 @@ async function showItem(publicID: string): Promise<void> {
     if (allowed) {
       const tools = root?.querySelector<HTMLElement>(".team-tools");
       if (tools) tools.hidden = false;
+
+      // What is still waiting is decided here rather than back in a list: the
+      // reason somebody opens a waiting report is to read it before deciding,
+      // and the decision was one screen away from the reading.
+      if (item.moderation && item.moderation !== "published") {
+        tools?.querySelector(".tools")?.insertAdjacentHTML("beforeend", views.moderationControl(text));
+        tools?.querySelectorAll<HTMLButtonElement>("[data-moderate]").forEach((button) =>
+          button.addEventListener("click", async () => {
+            try {
+              await api.post(`/api/items/${encodeURIComponent(publicID)}/moderation`, {
+                state: button.dataset.moderate,
+              });
+              await render();
+            } catch (err) {
+              report(err);
+            }
+          }),
+        );
+      }
+
       tools
         ?.querySelector(".tools")
         ?.insertAdjacentHTML("beforeend", views.statusControl(allowed.current, allowed.statuses, text));
@@ -1680,8 +1706,7 @@ async function showUpdates(): Promise<void> {
   await showInShell(
     status
       ? `<h1>${escapeHTML(i18n.t("shell.updates"))}</h1>
-         <ul class="bento">${views.channelSwitch(beta, text)}</ul>
-         ${views.updatePanel(status, text)}`
+         <ul class="bento">${views.updatePanel(status, text)}${views.channelSwitch(beta, text)}</ul>`
       : views.emptyState(i18n.t("error.forbidden"), icons.warning(28)),
     "/panel/updates",
   );

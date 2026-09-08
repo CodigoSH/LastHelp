@@ -437,7 +437,11 @@ h2 {
 }
 
 .empty .icon { color: var(--border-strong); }
-.empty .button { margin-block-start: 0.35rem; }
+
+/* Under the middle of the panel, like everything else in it: .button plants
+   itself at the start of the line by default, which left the way onward hanging
+   off to one side of a centred box. */
+.empty .button { margin-block-start: 0.35rem; justify-self: center; }
 
 ul { list-style: none; margin: 0; padding: 0; }
 
@@ -1033,12 +1037,15 @@ summary:focus-visible,
   box-shadow: var(--shadow-2), var(--hairline);
 }
 
-.roadmap .empty {
-  padding: 1.5rem 0.5rem;
-  font-size: 0.85rem;
+/* A column with nothing in it is quiet, not broken: a short dashed line with a
+   short sentence, rather than a hand-sized grey box saying so. */
+.roadmap .column-empty {
+  padding: 0.9rem 0.5rem;
+  font-size: 0.8rem;
   border-style: dashed;
   border-color: var(--border);
   background: transparent;
+  color: var(--text-muted);
 }
 
 /* ----------------------------------------------------------- panel pieces */
@@ -1775,6 +1782,8 @@ body.admin-view > main {
    a screen with three cards and one with nine use the same word. */
 .bento {
   display: grid;
+  /* auto-fit, so the only card on a screen takes the row instead of sitting a
+     quarter of the way across it with three columns of nothing beside it. */
   grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   gap: 0.9rem;
   margin: 1.25rem 0 2rem;
@@ -2075,7 +2084,7 @@ a.stat:hover {
 }
 
 .bento.wide {
-  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
 }
 
 .person-head {
@@ -3372,3 +3381,77 @@ a.stat:hover .stat-go {
    sets the distance between children: its own top margin on top of that left a
    hand's width of nothing between the team's tools and the first comment. */
 .page > .thread { margin-block-start: 0; }
+
+/* The decision on a waiting report, at the top of the team's tools. */
+.moderation-control { display: grid; gap: 0.5rem; }
+.moderation-control .hint { margin: 0; }
+.moderation-control .actions { margin: 0; }
+
+/* Leaving, in the bar. The mark points at the door and the door is at the end
+   of the line, which is the other end in Arabic. */
+.nav-right .sign-out .icon { transform: scaleX(var(--rtl-flip)); }
+
+.nav-right .icon-button {
+  inline-size: 2.1rem;
+  block-size: 2.1rem;
+  border-radius: var(--radius);
+}
+
+/* A page that could not be shown. Centred, because there is one thing on it. */
+.failure {
+  justify-items: center;
+  text-align: center;
+  padding-block-start: clamp(2rem, 12vh, 6rem);
+}
+
+.failure .hero-mark {
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  color: var(--text-muted);
+}
+
+.failure h1 { margin: 0; }
+
+/* A chip in the house accent: a role, a connection, anything named rather than
+   counted. The monospaced .tag it replaced is for identifiers only — a
+   username, an address, a webhook path — which is what a code font is for. */
+.chip.accent {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent-alt);
+}
+
+/* The one thing on a page that could not be shown sits under the middle of it,
+   button included: .button plants itself at the start of the line by default,
+   which left it hanging off to one side of a centred page. */
+.failure .button { justify-self: center; }
+
+/* Cards in a row take the height of what is in them. Stretched to match the
+   tallest, a short one puts its action in the middle of a field of nothing. */
+.bento { align-items: start; }
+
+/* The theme's three buttons wear the same segmented control as every other
+   set of three in the product. They were a square-cornered box from before
+   there was one, which is how a screen ends up looking like a different
+   product's settings page. */
+.theme-choice {
+  gap: 0.15rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.theme-choice button {
+  border-radius: 999px;
+  padding: 0.32rem 0.8rem;
+  font-weight: 600;
+  transition: color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.theme-choice button:hover { color: var(--text); }
+
+.theme-choice button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent-alt);
+  box-shadow: var(--shadow-1);
+}

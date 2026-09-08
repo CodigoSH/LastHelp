@@ -372,8 +372,15 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if it.Moderation != item.Published && !mine {
-		// Not "it is waiting for review": an unauthenticated caller learns
+	// Who may see it before it is published: the person who wrote it, holding
+	// their follow link, and whoever has to decide about it.
+	//
+	// The second half was missing, and it made the queue undecidable: a report
+	// waiting for review is exactly the one somebody needs to read before
+	// publishing it, and opening it from the panel answered "not here". Asked
+	// of authz per board, so it is the same rule the triage endpoints use.
+	if it.Moderation != item.Published && !mine && !s.mayTriageItem(r, it) {
+		// Not "it is waiting for review": a caller who may not see it learns
 		// nothing about what exists and is not public yet.
 		writeError(w, http.StatusNotFound, "error.not_found")
 		return
@@ -618,4 +625,21 @@ func keyForGuardError(err error) string {
 	default:
 		return "error.bad_request"
 	}
+}
+
+// mayTriageItem answers whether whoever is asking may act on this report.
+//
+// It writes nothing: the caller decides what a "no" looks like, which on the
+// public page is a plain "not here" rather than a refusal that admits the
+// report exists.
+func (s *Server) mayTriageItem(r *http.Request, it item.Item) bool {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		return false
+	}
+	repo, err := s.orgs().RepositoryByID(it.RepoID)
+	if err != nil {
+		return false
+	}
+	return actor.Can(authz.Triage, authz.Repository(repo.ID, repo.OrgID))
 }

@@ -1010,3 +1010,38 @@ func TestAFailureLeavesALine(t *testing.T) {
 		t.Errorf("a 400 wrote to the error log: %q", written.String())
 	}
 }
+
+// TestTheTeamCanReadWhatTheyHaveToDecideAbout.
+//
+// A report waiting for review is exactly the one somebody has to read before
+// publishing it, and the public page answered "not here" to everybody who was
+// not its author — the team included. The queue could be worked through only by
+// trusting the title.
+//
+// The other half of the check matters as much: a stranger still gets "not
+// here", and nothing about it says the report exists.
+func TestTheTeamCanReadWhatTheyHaveToDecideAbout(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submit("codigosh", "lastboard", "bug", "crashes on import")
+
+	resp := team.do(http.MethodGet, "/api/items/"+id, nil)
+	body := decode(t, resp)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the team asking for a report waiting for review got %d: %v", resp.StatusCode, body)
+	}
+	if body["moderation"] != "pending" || body["title"] != "crashes on import" {
+		t.Errorf("what came back was %v", body)
+	}
+
+	stranger := team.anonymous()
+	resp = stranger.do(http.MethodGet, "/api/items/"+id, nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("a stranger asking for the same report got %d", resp.StatusCode)
+	}
+}

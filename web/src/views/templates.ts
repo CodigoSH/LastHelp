@@ -92,6 +92,22 @@ export function landing(
 }
 
 /**
+ * A page that could not be shown, as a page.
+ *
+ * It was the bare grey panel used for an empty list, dropped into the middle of
+ * an otherwise blank screen with no title and nowhere to go — which reads as a
+ * page that failed to load rather than as an answer. What somebody needs here
+ * is what happened and one way onward.
+ */
+export function failureScreen(message: string, text: Text): string {
+  return `<div class="page narrow failure">
+    <span class="hero-mark">${icons.warning(28)}</span>
+    <h1>${escapeHTML(message)}</h1>
+    <a class="button primary" href="/">${escapeHTML(text.t("nav.home"))}</a>
+  </div>`;
+}
+
+/**
  * Nothing here, said as a place rather than as a missing thing.
  *
  * One function, because there are seven of these across the product and they
@@ -221,7 +237,7 @@ export function memberHome(
       return `<li class="bento-card">
         <a class="card-link" href="${escapeAttr(href)}">
           <div class="card-head">${m.repository ? icons.repository() : icons.organization()}<h3>${escapeHTML(m.name ?? "")}</h3></div>
-          <span class="card-sub"><span class="tag">${escapeHTML(text.t(`role.${m.role}`))}</span></span>
+          <span class="card-sub"><span class="chip">${escapeHTML(text.t(`role.${m.role}`))}</span></span>
         </a>
       </li>`;
     })
@@ -257,7 +273,7 @@ export function channelSwitch(beta: boolean, text: Text): string {
   return `<li class="bento-card">
     <div class="card-head">${icons.update()}<h3>${escapeHTML(text.t("update.channel"))}</h3></div>
     <span class="card-sub">${escapeHTML(text.t("update.channelHelp"))}</span>
-    <label class="switch">
+    <label class="check">
       <input type="checkbox" data-beta ${beta ? "checked" : ""} />
       <span>${escapeHTML(text.t("update.beta"))}</span>
     </label>
@@ -274,23 +290,23 @@ export function updatePanel(
   },
   text: Text,
 ): string {
-  const running = `<p class="running">${escapeHTML(text.t("update.running", { version: status.current }))}</p>`;
+  // A card like every other card, rather than three loose paragraphs under one.
+  // What is running is the number somebody came for, so it is the number: the
+  // version at the size of a fact, and under it what there is to do about it.
+  const state = status.reason
+    ? `<p class="notice">${icons.info()}<span>${escapeHTML(text.t(status.reason))}</span></p>`
+    : status.available
+      ? `<p class="available">${escapeHTML(text.t("update.available", { version: status.latest ?? "" }))}</p>
+         ${status.notes ? `<pre class="notes">${escapeHTML(status.notes)}</pre>` : ""}
+         <button class="button primary with-icon" data-update>${icons.download()}<span>${escapeHTML(text.t("update.install"))}</span></button>
+         <p class="update-note" role="status" hidden></p>`
+      : `<p class="hint">${icons.check(14)} ${escapeHTML(text.t("update.upToDate"))}</p>`;
 
-  if (status.reason) {
-    return `${running}
-      <p class="notice">${escapeHTML(text.t(status.reason))}</p>`;
-  }
-
-  if (!status.available) {
-    return `${running}
-      <p class="hint">${escapeHTML(text.t("update.upToDate"))}</p>`;
-  }
-
-  return `${running}
-    <p class="available">${escapeHTML(text.t("update.available", { version: status.latest ?? "" }))}</p>
-    ${status.notes ? `<pre class="notes">${escapeHTML(status.notes)}</pre>` : ""}
-    <button class="button primary" data-update>${escapeHTML(text.t("update.install"))}</button>
-    <p class="update-note" role="status" hidden></p>`;
+  return `<li class="bento-card">
+    <div class="card-head">${icons.info()}<h3>${escapeHTML(text.t("about.version"))}</h3></div>
+    <p class="running fact">${escapeHTML(status.current)}</p>
+    ${state}
+  </li>`;
 }
 
 /** One organisation in the panel: its boards, and a form to add another. */
@@ -577,7 +593,7 @@ export function roadmap(
             </header>
             ${
               c.items.length === 0
-                ? `<p class="empty">${escapeHTML(text.t("roadmap.emptyColumn"))}</p>`
+                ? `<p class="empty column-empty">${escapeHTML(text.t("overview.nothingYet"))}</p>`
                 : `<ul>${c.items
                     .map(
                       (i) => `<li><a href="/i/${escapeAttr(i.public_id)}">
@@ -628,6 +644,24 @@ export function issueControl(
              aria-label="${escapeAttr(text.t("panel.attachIssue"))}" />
       <button class="button" type="submit">${escapeHTML(text.t("panel.attachIssue"))}</button>
     </form>
+  </div>`;
+}
+
+/**
+ * The decision, on the report itself.
+ *
+ * It existed only in the queue, so somebody who opened a waiting report to read
+ * it properly — which is the whole point of opening it — then had to go back to
+ * a list to act on what they had just read.
+ */
+export function moderationControl(text: Text): string {
+  return `<div class="moderation-control">
+    <p class="hint">${escapeHTML(text.t("item.waiting"))}</p>
+    <div class="actions">
+      <button class="button primary with-icon" data-moderate="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+      <button class="button with-icon" data-moderate="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+      <button class="button danger with-icon" data-moderate="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
+    </div>
   </div>`;
 }
 
@@ -909,12 +943,13 @@ export function itemView(item: ItemDetail, text: Text): string {
     ? `<p class="notice">${icons.info()}<a href="/i/${escapeAttr(item.merged_into)}">${escapeHTML(text.t("item.merged"))}</a></p>`
     : "";
 
-  // Only the reporter is ever on this page before it is published, and the
-  // notice is for exactly that moment. It used to be drawn for anybody holding
-  // a follow link, which meant a published report told its own author, forever,
-  // that it was still waiting to be read.
+  // Waiting to be read, said to whoever is looking at it before it is
+  // published — its author holding their follow link, or somebody on the team
+  // who has to decide about it. Both need to know; nobody else can be here.
+  // It used to be drawn for anybody holding a follow link, which meant a
+  // published report told its own author, forever, that it was still waiting.
   const waiting =
-    item.mine && item.moderation && item.moderation !== "published"
+    item.moderation && item.moderation !== "published"
       ? `<p class="notice">${icons.queue()}<span>${escapeHTML(text.t("item.waiting"))}</span></p>`
       : "";
 
@@ -1104,11 +1139,14 @@ export function queueScreen(
       <a class="button ghost with-icon" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">
         ${icons.open()}<span>${escapeHTML(text.t("shell.publicBoard"))}</span></a>
     </div>
-    <p class="lead">${escapeHTML(
+    ${
+      // Said once. With nothing waiting the empty state below says so, and a
+      // lead saying it too is the same sentence twice on a page with one line
+      // of text on it.
       items.length === 0 && comments.length === 0
-        ? text.t("queue.empty")
-        : text.t("queue.lead", { count: items.length }),
-    )}</p>`;
+        ? ""
+        : `<p class="lead">${escapeHTML(text.t("queue.lead", { count: items.length }))}</p>`
+    }`;
 
   // The comments waiting, which is a second queue on the same board and not a
   // second screen: somebody triaging works through what has arrived, and what
@@ -1135,7 +1173,18 @@ export function queueScreen(
           )
           .join("")}</ul>`;
 
-  if (items.length === 0) return `${header}${commentQueue}`;
+  if (items.length === 0) {
+    return `${header}${commentQueue}
+      ${
+        comments.length === 0
+          ? emptyState(
+              text.t("queue.empty"),
+              icons.check(28),
+              `<a class="button" href="/panel/reports?board=${escapeAttr(`${org.slug}/${repo.slug}`)}">${escapeHTML(text.t("shell.reports"))}</a>`,
+            )
+          : ""
+      }`;
+  }
 
   return `${header}
     <ul class="queue">${items
@@ -2190,7 +2239,7 @@ export function profileScreen(
         <div class="name">${escapeHTML(me.name || me.username)}</div>
         <div class="card-sub">
           <span class="tag">${escapeHTML(me.username)}</span>
-          ${me.admin ? `<span class="tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+          ${me.admin ? `<span class="chip accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
         </div>
       </div>
     </div>
@@ -2375,7 +2424,7 @@ export function organizationScreen(
       ${canManage ? actionButton("add", text.t("panel.newRepository"), 'data-add-repo data-open-modal="repo-modal"', "primary") : ""}
     </div>
     <p class="lead"><span class="tag">/${escapeHTML(org.slug)}</span>
-      ${org.forge && org.forge !== "none" ? `<span class="tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>
+      ${org.forge && org.forge !== "none" ? `<span class="chip accent">${escapeHTML(org.forge)}</span>` : ""}</p>
 
     ${repos.length === 0 ? `${emptyState(text.t("organizations.noRepositories"), icons.repository(28))}` : `<ul class="bento repositories">${cards}</ul>`}`;
 }
@@ -2404,15 +2453,15 @@ export function peopleScreen(
           </div>
         </div>
         <div class="person-tags">
-          ${p.admin ? `<span class="tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
-          ${p.disabled ? `<span class="tag">${escapeHTML(text.t("people.disabled"))}</span>` : ""}
+          ${p.admin ? `<span class="chip accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+          ${p.disabled ? `<span class="chip">${escapeHTML(text.t("people.disabled"))}</span>` : ""}
           ${
             p.grants.length === 0 && !p.admin
-              ? `<span class="tag">${escapeHTML(text.t("people.noRoles"))}</span>`
+              ? `<span class="chip">${escapeHTML(text.t("people.noRoles"))}</span>`
               : p.grants
                   .map(
                     (g) =>
-                      `<span class="tag">${escapeHTML(text.t(`role.${g.role}`))} · ${escapeHTML(g.where ?? "")}</span>`,
+                      `<span class="chip">${escapeHTML(text.t(`role.${g.role}`))} · ${escapeHTML(g.where ?? "")}</span>`,
                   )
                   .join("")
           }
@@ -2572,7 +2621,7 @@ export function rolesModalBody(
       : `<ul class="grants">${grants
           .map(
             (g) => `<li>
-              <span class="tag">${escapeHTML(text.t(`role.${g.role}`))}</span>
+              <span class="chip">${escapeHTML(text.t(`role.${g.role}`))}</span>
               <span>${escapeHTML(g.where ?? "")}</span>
               ${iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke data-organization="${escapeAttr(g.organization ?? "")}" data-repository="${escapeAttr(g.repository ?? "")}"`)}
             </li>`,

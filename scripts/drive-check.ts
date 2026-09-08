@@ -1040,6 +1040,30 @@ async function main() {
     `${narrowed.search} → ${narrowed.rows} rows`,
   );
 
+  // Reading it before deciding about it, which is the whole point of opening
+  // one. The public page answered "not here" to everybody who was not its
+  // author — the team included — so a waiting report could only be triaged by
+  // trusting its title. And the decision is on the report now, not one screen
+  // away from the reading.
+  await evaluate(`document.querySelector(".report a.item").click()`);
+  await sleep(1400);
+  const reading = await evaluate(`
+    return {
+      title: document.querySelector(".detail h1")?.textContent?.trim() ?? "",
+      waiting: !!document.querySelector(".notice"),
+      decide: document.querySelectorAll("[data-moderate]").length,
+      answers: document.querySelectorAll(".answers dd").length,
+    };
+  `);
+  check(
+    "a report waiting for review can be read, and decided where it is read",
+    reading.title === "search ignores accents" && reading.waiting === true &&
+      reading.decide === 3 && reading.answers === 2,
+    JSON.stringify(reading),
+  );
+
+  await evaluate(`history.pushState({}, "", "/panel/reports?moderation=pending"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1300);
   await evaluate(`document.querySelector('.report [data-act="published"]').click()`);
   await sleep(1400);
   const triaged = await evaluate(`
