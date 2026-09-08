@@ -226,6 +226,13 @@ func (s *Server) handleChangeAvatar(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxAvatarBytes+(8<<10))
 	var in avatarChange
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		// Same as the logo: a body cut off at the bound is an oversized
+		// picture, and saying "the request was not understood" sends somebody
+		// looking for a problem with their browser.
+		if tooLarge(err) {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "error.bad_request")
 		return
 	}

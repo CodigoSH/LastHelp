@@ -243,6 +243,17 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 //
 // The server does not know what language the reader has chosen, and a message
 // composed here would be the one string on the screen that stayed English.
+// tooLarge says whether a decode failed because the body ran past its bound.
+//
+// It matters because the answer is different. A request that is malformed is
+// "the request was not understood"; a request cut off at the reader is "that
+// image is too large", and the check that would have said so never runs —
+// MaxBytesReader stops the body before the field it is about is ever decoded.
+func tooLarge(err error) bool {
+	var limit *http.MaxBytesError
+	return errors.As(err, &limit)
+}
+
 func writeError(w http.ResponseWriter, status int, key string) {
 	writeJSON(w, status, map[string]string{"error": key})
 }

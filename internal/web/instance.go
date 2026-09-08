@@ -63,9 +63,21 @@ func (s *Server) handleSetInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	// Large enough for the logo it is allowed to carry, plus the rest of the
+	// object. It was panelBodyLimit — 16 KiB — while a logo may be 96, so the
+	// body was cut off mid-JSON and the decode failed: finishing the wizard
+	// with any logo over about 12 KB answered "the request was not understood",
+	// which is true and useless. Two bounds on the same value, in two files,
+	// disagreeing.
+	r.Body = http.MaxBytesReader(w, r.Body, maxLogoBytes+(8<<10))
 	var in instanceSettings
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		// A body that ran past the bound is an oversized logo, not a malformed
+		// request: the only thing in here that can be large is the image.
+		if tooLarge(err) {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "error.bad_request")
 		return
 	}

@@ -933,3 +933,42 @@ func TestTheServerFactsAreForWhoeverRunsIt(t *testing.T) {
 		t.Errorf("the free space on the operator's disk is public: %d", resp.StatusCode)
 	}
 }
+
+// TestALogoTheSizeItIsAllowedToBeGoesThrough.
+//
+// The endpoint bounds the logo at 96 KiB and bounded the request body at 16,
+// so anything over about twelve was cut off before it could be measured and
+// came back "the request was not understood" — a true answer to a question
+// nobody asked. Two bounds on the same value, in two files, disagreeing.
+//
+// The sizes here are the real ones on purpose: a test with a 1 KB logo passes
+// on both sides of the bug.
+func TestALogoTheSizeItIsAllowedToBeGoesThrough(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+
+	logo := func(kb int) string {
+		return "data:image/png;base64," + strings.Repeat("A", kb*1024)
+	}
+
+	resp := team.do(http.MethodPost, "/api/instance",
+		map[string]string{"name": "Acme", "logo": logo(80), "accent": ""})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("a logo of 80 KiB, under the 96 the endpoint allows, returned %d", resp.StatusCode)
+	}
+
+	resp = team.do(http.MethodGet, "/api/instance", nil)
+	if got, _ := decode(t, resp)["logo"].(string); len(got) < 80*1024 {
+		t.Errorf("the logo came back %d bytes shorter than it went in", 80*1024-len(got))
+	}
+
+	// And one that really is too large says so, rather than being cut off and
+	// reported as unreadable.
+	resp = team.do(http.MethodPost, "/api/instance",
+		map[string]string{"name": "Acme", "logo": logo(120), "accent": ""})
+	body := decode(t, resp)
+	if resp.StatusCode != http.StatusBadRequest || body["error"] != "error.image_too_big" {
+		t.Errorf("an oversized logo answered %d %v, not that it is too big", resp.StatusCode, body)
+	}
+}
