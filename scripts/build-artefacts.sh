@@ -45,8 +45,33 @@ build() {
 
 build linux amd64
 build linux arm64
-build darwin amd64
-build darwin arm64
+
+# Linux, and only Linux, because that is all this product installs onto: the
+# installer sets up a systemd unit and refuses anything else, and the container
+# image is built for the same two architectures. A macOS binary was built and
+# published here for one release — nothing asked for it, nothing tested it, and
+# a binary on a downloads page is a promise of support whether or not anybody
+# meant it as one.
+#
+# So the list is checked against the installer rather than kept in step by hand.
+# The names install.sh can fetch are `lasthelp-linux-<arch>` for the
+# architectures it accepts from uname; anything built that it cannot ask for is
+# an asset nobody can install, and anything it asks for that is missing is a
+# release that dies on a 404 in front of whoever ran the command.
+echo "==> what the installer can fetch is what was built"
+installable=$(grep -o 'ARCH=[a-z0-9]\{1,\}' install.sh | cut -d= -f2 | sort -u)
+[ -n "$installable" ] || { echo "install.sh no longer states its architectures the way this reads them" >&2; exit 1; }
+for arch in $installable; do
+    [ -f "${OUT}/lasthelp-linux-${arch}" ] || {
+        echo "install.sh downloads lasthelp-linux-${arch} and nothing built it" >&2; exit 1; }
+done
+for built in "${OUT}"/lasthelp-*; do
+    name=$(basename "$built")
+    case " $(for a in $installable; do printf 'lasthelp-linux-%s ' "$a"; done)" in
+        *" ${name} "*) ;;
+        *) echo "${name} was built and no installer can ask for it" >&2; exit 1 ;;
+    esac
+done
 
 # In the format sha256sum already writes, so anybody can check it with the tools
 # already on their machine rather than one of ours.
