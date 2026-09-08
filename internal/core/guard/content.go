@@ -41,7 +41,7 @@ var linkPattern = regexp.MustCompile(`(?i)\bhttps?://`)
 //  2. Too many links. Spam is links; that is what it is for.
 //  3. Words the operator listed. Their board, their vocabulary — a word that
 //     means nothing here is somebody else's daily traffic.
-func (g Guard) Inspect(repoID int64, title, body string, stoplist []string, now time.Time) (Verdict, error) {
+func (g Guard) Inspect(repoID int64, title, body, answers string, stoplist []string, now time.Time) (Verdict, error) {
 	hash := item.BodyHash(title, body)
 
 	var seen int
@@ -54,11 +54,21 @@ func (g Guard) Inspect(repoID int64, title, body string, stoplist []string, now 
 		return Verdict{Reason: "error.already_sent", Layer: "duplicate"}, nil
 	}
 
-	if links := len(linkPattern.FindAllString(title+" "+body, -1)); links > MaxLinks {
+	// The answers to the form count as what was written, because they are: they
+	// are free text a stranger typed, they go on the public page and into the
+	// forge issue, and a limit that reads only the title and the body is a
+	// limit with a box beside it that nobody checks.
+	//
+	// The duplicate hash above deliberately does not include them. It is stored
+	// on the row and compared against every earlier one, so widening it would
+	// mean nothing older could ever match again.
+	written := title + " " + body + " " + answers
+
+	if links := len(linkPattern.FindAllString(written, -1)); links > MaxLinks {
 		return Verdict{Reason: "error.too_many_links", Layer: "links"}, nil
 	}
 
-	haystack := strings.ToLower(title + " " + body)
+	haystack := strings.ToLower(written)
 	for _, word := range stoplist {
 		word = strings.TrimSpace(strings.ToLower(word))
 		if word == "" {

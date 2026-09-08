@@ -6,14 +6,20 @@
  * singleton drags in fetch and localStorage and the whole file stops counting
  * as testable.
  */
-import type { ItemDetail, ItemSummary, OrganizationSummary, RepositorySummary } from "../api";
+import type {
+  ItemDetail,
+  ItemSummary,
+  OrganizationSummary,
+  ReportField,
+  RepositorySummary,
+} from "../api";
 import { escapeAttr, escapeHTML } from "../escape";
 import { icons } from "./icons";
 import { actionButton, iconButton } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
-export { field, choiceField } from "./wizard";
-import { choiceField, exampleFor, field, wizard } from "./wizard";
+export { field, choiceField, areaField } from "./wizard";
+import { areaField, choiceField, exampleFor, field, wizard } from "./wizard";
 
 /** Everything a template needs to say something. */
 export interface Text {
@@ -515,17 +521,76 @@ export function statusControl(
   </div>`;
 }
 
-export function reportForm(repo: RepositorySummary, kind: string, text: Text): string {
-  const choice = (value: string, label: string) =>
-    `<button type="button" class="choice${kind === value ? " on" : ""}" data-choice="${escapeAttr(value)}">${escapeHTML(label)}</button>`;
+/**
+ * The form somebody reports through.
+ *
+ * It is the narrowest point of the whole product: everything downstream — the
+ * queue, the board, the forge issue — is fed by what a stranger is willing to
+ * type here once. So it says where it is going and what will happen next, and
+ * it asks a bug the two questions that decide whether the report is information
+ * or homework: which version, and how to see it.
+ *
+ * Those two existed everywhere except here. The table stored them, the export
+ * carried them, the forge issue printed them under a comment explaining that a
+ * bug with no version and no steps is work rather than information — and the
+ * form never asked, so every one of them was empty in every report ever made.
+ */
+export function reportForm(
+  org: OrganizationSummary,
+  repo: RepositorySummary,
+  kind: string,
+  text: Text,
+): string {
+  // A card each, not two words in a row: the choice decides which questions
+  // come next, and it is the first thing anybody touches on this page.
+  const choice = (value: string, label: string, help: string, icon: string) =>
+    `<button type="button" class="choice-card${kind === value ? " on" : ""}" data-choice="${escapeAttr(value)}"
+       aria-pressed="${kind === value ? "true" : "false"}">
+      ${icon}
+      <span class="choice-title">${escapeHTML(label)}</span>
+      <span class="choice-sub">${escapeHTML(help)}</span>
+    </button>`;
+
+  const choices = [
+    repo.accepts_bugs ? choice("bug", text.t("form.kindBug"), text.t("form.kindBugHelp"), icons.bug(20)) : "",
+    repo.accepts_ideas ? choice("idea", text.t("form.kindIdea"), text.t("form.kindIdeaHelp"), icons.idea(20)) : "",
+  ].join("");
+
+  // Only a bug is asked these, and the block is drawn once and hidden rather
+  // than rebuilt on every choice: rebuilding it would throw away whatever had
+  // already been typed in it.
+  const bugFields = repo.accepts_bugs
+    ? `<div class="kind-fields" data-for="bug"${kind === "bug" ? "" : " hidden"}>
+        ${field(
+          {
+            id: "report-version",
+            name: "version",
+            label: text.t("form.version"),
+            hint: text.t("form.versionHelp"),
+            example: "1.4.2",
+          },
+          text,
+        )}
+        ${areaField({
+          id: "report-steps",
+          name: "steps",
+          label: text.t("form.steps"),
+          hint: text.t("form.stepsHelp"),
+          example: text.t("form.stepsPlaceholder"),
+          rows: 4,
+        })}
+      </div>`
+    : "";
 
   return `
+    <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a>
+      <span aria-hidden="true">/</span>
+      <a href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">${escapeHTML(repo.name)}</a></p>
     <h1>${escapeHTML(text.t("board.report"))}</h1>
+    <p class="lead">${escapeHTML(text.t("form.lead"))}</p>
+
     <form class="report">
-      <div class="choices">
-        ${repo.accepts_bugs ? choice("bug", text.t("form.kindBug")) : ""}
-        ${repo.accepts_ideas ? choice("idea", text.t("form.kindIdea")) : ""}
-      </div>
+      <div class="choices">${choices}</div>
 
       <!--
         The honeypot. Hidden from people by CSS and from assistive technology by
@@ -537,28 +602,54 @@ export function reportForm(repo: RepositorySummary, kind: string, text: Text): s
         <input id="report-website" name="website" type="text" tabindex="-1" autocomplete="off" />
       </div>
 
-      <label for="report-title">${escapeHTML(text.t("form.title"))}</label>
-      <input id="report-title" name="title" maxlength="200" required
-             placeholder="${escapeAttr(text.t("form.titlePlaceholder"))}" />
+      <div class="wizard-card">
+        ${field(
+          {
+            id: "report-title",
+            name: "title",
+            label: text.t("form.title"),
+            required: true,
+            example: text.t("form.titlePlaceholder"),
+          },
+          undefined,
+        )}
 
-      <div class="similar" hidden></div>
+        <div class="similar" hidden></div>
 
-      <label for="report-body">${escapeHTML(text.t("form.body"))}</label>
-      <textarea id="report-body" name="body" rows="6"
-                placeholder="${escapeAttr(text.t("form.bodyPlaceholder"))}"></textarea>
+        ${areaField({
+          id: "report-body",
+          name: "body",
+          label: text.t("form.body"),
+          example: text.t("form.bodyPlaceholder"),
+          rows: 6,
+        })}
 
-      ${
-        // Only when there is a relay to notify with. Asking for an address the
-        // server cannot use is collecting personal data for nothing.
-        repo.can_notify
-          ? `<label for="report-email">${escapeHTML(text.t("form.email"))}</label>
-             <input id="report-email" name="email" type="email" />
-             <p class="hint">${escapeHTML(text.t("form.emailHelp"))}</p>`
-          : ""
-      }
+        ${bugFields}
+
+        ${
+          // Only when there is a relay to notify with. Asking for an address the
+          // server cannot use is collecting personal data for nothing.
+          repo.can_notify
+            ? field(
+                {
+                  id: "report-email",
+                  name: "email",
+                  label: text.t("form.email"),
+                  type: "email",
+                  hint: text.t("form.emailHelp"),
+                  autocomplete: "email",
+                },
+                undefined,
+              )
+            : ""
+        }
+      </div>
 
       <p class="form-error" role="alert" hidden></p>
-      <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
+      <div class="wizard-actions">
+        <span class="spacer"></span>
+        <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
+      </div>
     </form>`;
 }
 
@@ -580,6 +671,30 @@ export function submitted(link: string, text: Text): string {
       <input readonly value="${escapeAttr(link)}" aria-label="${escapeAttr(text.t("sent.copy"))}" />
       <button class="button" data-copy>${escapeHTML(text.t("sent.copy"))}</button>
     </div>`;
+}
+
+/**
+ * The answers to the form, drawn where the report is.
+ *
+ * The label comes from the answer rather than from the current form: a question
+ * reworded next month must not reword what somebody sent last month.
+ */
+function answers(fields: ReportField[], text: Text): string {
+  if (fields.length === 0) return "";
+  // The heading sits outside the list. A <dl> may only hold dt/dd pairs, or
+  // divs wrapping them — a loose div of text in there is markup that renders
+  // and does not parse.
+  return `<section class="answers">
+    <p class="answers-head">${escapeHTML(text.t("item.answers"))}</p>
+    <dl>${fields
+      .map(
+        (f) => `<div>
+          <dt>${escapeHTML(f.label)}</dt>
+          <dd>${escapeHTML(f.value)}</dd>
+        </div>`,
+      )
+      .join("")}</dl>
+  </section>`;
 }
 
 /**
@@ -693,6 +808,7 @@ export function itemView(item: ItemDetail, text: Text): string {
         </p>
         <h1>${escapeHTML(item.title)}</h1>
         <div class="body">${body}</div>
+        ${answers(item.fields ?? [], text)}
       </div>
       ${vote}
     </article>
@@ -781,6 +897,7 @@ export function queueScreen(
   repo: RepositorySummary,
   items: ItemSummary[],
   bodies: Map<string, string>,
+  fields: Map<string, ReportField[]>,
   comments: WaitingComment[],
   text: Text,
 ): string {
@@ -833,6 +950,7 @@ export function queueScreen(
           </p>
           <h3>${escapeHTML(i.title)}</h3>
           <p class="body">${escapeHTML(bodies.get(i.public_id) ?? "")}</p>
+          ${answers(fields.get(i.public_id) ?? [], text)}
           <div class="actions">
             <button class="button primary with-icon" data-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
             <button class="button ghost with-icon" data-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>

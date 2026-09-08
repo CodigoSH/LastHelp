@@ -42,7 +42,16 @@ error.not_a_backup
 error.password_wrong
 error.username_required
 error.username_taken
+form.kindBugHelp
+form.kindIdeaHelp
+form.lead
+form.steps
+form.stepsHelp
+form.stepsPlaceholder
+form.version
+form.versionHelp
 item.addComment
+item.answers
 item.commentHint
 item.threadEmpty
 item.trackedAs

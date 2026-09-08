@@ -140,11 +140,22 @@ func (s *Server) handleQueue(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
+	// In one query rather than one per row: a listing that loads its answers
+	// item by item is fifty queries to draw one screen.
+	if list, err = s.items().WithFields(list); err != nil {
+		slog.Error("reading the queue", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
 
 	out := make([]map[string]any, 0, len(list))
 	for _, it := range list {
 		entry := s.describeItem(it, "")
 		entry["body"] = it.Body
+		// Whoever triages decides from what is in front of them. A bug whose
+		// version and steps are only visible one click away is a bug triaged
+		// without them.
+		entry["fields"] = describeFields(it.Fields)
 		out = append(out, entry)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": out, "state": string(state)})

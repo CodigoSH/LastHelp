@@ -263,18 +263,8 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	verdict, err := s.guard().Inspect(repo.ID, in.Title, in.Body, s.stoplist(), s.now())
-	if err != nil {
-		slog.Error("inspecting a submission", "error", err)
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	if !verdict.OK {
-		s.refused(repo.ID, verdict.Layer)
-		writeError(w, http.StatusBadRequest, verdict.Reason)
-		return
-	}
-
+	// The kind first, because it decides which questions this report was asked,
+	// and the answers are part of what the next layer inspects.
 	kind := item.Kind(in.Kind)
 	switch {
 	case kind == item.Bug && !repo.AcceptsBugs, kind == item.Idea && !repo.AcceptsIdeas:
@@ -285,9 +275,33 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only the questions this kind is actually asked, in the order it asks
+	// them, with the labels the domain owns. Anything else in the request is
+	// dropped: the label travels with the answer into the forge issue, and a
+	// label the sender chose is a sentence they got the team to print.
 	fields := make([]item.Field, 0, len(in.Fields))
-	for key, value := range in.Fields {
-		fields = append(fields, item.Field{Key: key, Label: key, Value: value})
+	answers := make([]string, 0, len(in.Fields))
+	for _, spec := range item.FieldsFor(kind) {
+		value := strings.TrimSpace(in.Fields[spec.Key])
+		if value == "" {
+			continue
+		}
+		spec.Value = value
+		fields = append(fields, spec)
+		answers = append(answers, value)
+	}
+
+	verdict, err := s.guard().Inspect(repo.ID, in.Title, in.Body,
+		strings.Join(answers, " "), s.stoplist(), s.now())
+	if err != nil {
+		slog.Error("inspecting a submission", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if !verdict.OK {
+		s.refused(repo.ID, verdict.Layer)
+		writeError(w, http.StatusBadRequest, verdict.Reason)
+		return
 	}
 
 	// Everything waits for a human unless the repository says otherwise. The
@@ -384,6 +398,7 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 
 	body := s.describeItem(it, s.voterID(w, r))
 	body["body"] = it.Body
+	body["fields"] = describeFields(it.Fields)
 	body["comments"] = thread
 	body["mine"] = mine
 	// Where this came from. A report is the one page of this product that
@@ -550,6 +565,18 @@ func describeRepository(r org.Repository, mailConfigured bool) map[string]any {
 		// does not ask for an address rather than collecting one it cannot use.
 		"can_notify": mailConfigured,
 	}
+}
+
+// describeFields is the answers to the form, ready to draw.
+//
+// The stored label goes out with them so a report sent under a question that
+// has since been reworded still reads the way it was sent.
+func describeFields(fields []item.Field) []map[string]any {
+	out := make([]map[string]any, 0, len(fields))
+	for _, f := range fields {
+		out = append(out, map[string]any{"key": f.Key, "label": f.Label, "value": f.Value})
+	}
+	return out
 }
 
 func (s *Server) describeItem(it item.Item, voter string) map[string]any {

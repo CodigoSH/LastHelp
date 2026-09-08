@@ -12,6 +12,7 @@ import type {
   ItemSummary,
   Me,
   OrganizationSummary,
+  ReportField,
   RepositorySummary,
   Status,
   Submitted,
@@ -747,17 +748,25 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
     return;
   }
 
-  show(views.reportForm(repo, kind, text));
+  show(views.reportForm(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, kind, text));
 
   const form = root?.querySelector<HTMLFormElement>("form.report");
   const similar = root?.querySelector<HTMLDivElement>(".similar");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
 
-  root?.querySelectorAll<HTMLButtonElement>(".choice").forEach((button) =>
+  root?.querySelectorAll<HTMLButtonElement>(".choice-card").forEach((button) =>
     button.addEventListener("click", () => {
       kind = button.dataset.choice ?? kind;
-      root?.querySelectorAll(".choice").forEach((b) => b.classList.remove("on"));
-      button.classList.add("on");
+      root?.querySelectorAll(".choice-card").forEach((b) => {
+        b.classList.toggle("on", b === button);
+        b.setAttribute("aria-pressed", b === button ? "true" : "false");
+      });
+      // The questions that belong to this kind, shown and hidden rather than
+      // drawn and thrown away: rebuilding the block would lose whatever had
+      // already been typed into it.
+      root?.querySelectorAll<HTMLElement>(".kind-fields").forEach((block) => {
+        block.hidden = block.dataset.for !== kind;
+      });
     }),
   );
 
@@ -792,6 +801,14 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
         body: String(data.get("body") ?? ""),
         email: String(data.get("email") ?? ""),
         website: String(data.get("website") ?? ""),
+        // The answers to the questions this kind was asked. Sent whatever the
+        // kind is: the server keeps the ones that belong to it and drops the
+        // rest, so somebody who typed steps and then changed their mind and
+        // called it an idea does not send them.
+        fields: {
+          version: String(data.get("version") ?? ""),
+          steps: String(data.get("steps") ?? ""),
+        },
         token: ticket.token,
       });
       const link = `${location.origin}/i/${sent.public_id}?k=${sent.follow_token}`;
@@ -1708,9 +1725,12 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
   if (!me) return go("/sign-in");
 
   const base = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}`;
-  const body = await api.get<{ items: Array<ItemSummary & { body: string }> }>(`${base}/queue`);
+  const body = await api.get<{ items: Array<ItemSummary & { body: string; fields?: ReportField[] }> }>(
+    `${base}/queue`,
+  );
   const items = body.items ?? [];
   const bodies = new Map(items.map((i) => [i.public_id, i.body]));
+  const fields = new Map(items.map((i) => [i.public_id, i.fields ?? []]));
 
   // The comments waiting on this board. Failing softly rather than taking the
   // screen down with it: the reports are what somebody came here for.
@@ -1725,6 +1745,7 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
       repo,
       items,
       bodies,
+      fields,
       waiting.comments ?? [],
       text,
     ),

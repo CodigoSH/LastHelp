@@ -119,6 +119,31 @@ export function field(spec: FieldSpec, text?: Text): string {
   </div>`;
 }
 
+/**
+ * The same field, when the answer is more than a line.
+ *
+ * Its own function rather than a flag on `field`, because the two differ in
+ * more than a tag: a textarea has no `value` attribute and no `placeholder`
+ * that survives, and half of `field`'s attribute list means nothing here.
+ */
+export function areaField(
+  spec: Omit<FieldSpec, "type" | "pattern" | "autocomplete"> & { rows?: number },
+  text?: Text,
+): string {
+  const example =
+    spec.example && text
+      ? ` ${escapeHTML(text.t("wizard.example"))} <code class="example">${escapeHTML(spec.example)}</code>`
+      : "";
+
+  return `<div class="field">
+    <label for="${escapeAttr(spec.id)}">${escapeHTML(spec.label)}</label>
+    <textarea id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}" rows="${spec.rows ?? 5}"
+      ${spec.required ? "required" : ""}
+      ${spec.example ? `placeholder="${escapeAttr(spec.example)}"` : ""}>${escapeHTML(spec.value ?? "")}</textarea>
+    ${spec.hint || example ? `<p class="hint">${escapeHTML(spec.hint ?? "")}${example}</p>` : ""}
+  </div>`;
+}
+
 /** A labelled <select>, with the same shape as a field so a form reads evenly. */
 export function choiceField(
   spec: Omit<FieldSpec, "example"> & { options: [string, string][]; selected?: string },

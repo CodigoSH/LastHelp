@@ -1780,3 +1780,66 @@ body > nav .brand {
 .team-tools .tools h2 { font-size: 1rem; margin: 0.5rem 0 0; }
 .team-tools .triage { margin: 0; }
 .team-tools .status-control { margin: 0; }
+
+/* ------------------------------------------------------- reporting something */
+
+/* The kind, as two cards rather than two words in a row. It decides which
+   questions come next, and it is the first thing anybody touches on the page —
+   a pair of pills gave it the weight of a filter tab. */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.choice-card {
+  display: grid;
+  justify-items: start;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.choice-card:hover { border-color: rgba(var(--accent-rgb), 0.55); }
+.choice-card .icon { color: var(--text-muted); margin-block-end: 0.15rem; }
+.choice-card .choice-title { font-weight: 600; }
+.choice-card .choice-sub { color: var(--text-muted); font-size: 0.875rem; }
+
+.choice-card.on {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.choice-card.on .icon,
+.choice-card.on .choice-title { color: var(--accent-alt); }
+
+/* The questions that belong to one kind. Separated by a rule rather than by a
+   heading: they are part of the same form, not a second one. */
+.kind-fields {
+  display: grid;
+  gap: 0.75rem;
+  padding-block-start: 0.75rem;
+  border-block-start: 1px dashed var(--border);
+}
+
+/* The answers, on the report and in the queue. A definition list, because that
+   is what it is: a question and what somebody answered. */
+.answers {
+  margin: 0.9rem 0 0;
+  padding-block-start: 0.75rem;
+  border-block-start: 1px dashed var(--border);
+}
+
+.answers-head { margin: 0 0 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.answers dl { display: grid; gap: 0.5rem; margin: 0; }
+.answers dl > div { display: grid; gap: 0.1rem; }
+.answers dt { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.answers dd { margin: 0; white-space: pre-wrap; }

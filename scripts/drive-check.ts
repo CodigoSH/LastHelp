@@ -233,6 +233,30 @@ async function main() {
   const formThere = await evaluate(`return !!document.querySelector("form.report")`);
   check("the report form is on screen", formThere === true);
 
+  // The form is the narrowest point of the product: everything downstream is
+  // fed by what a stranger is willing to type here once. So it has to say
+  // where the report is going, and ask a bug the two questions that decide
+  // whether it arrives as information or as homework.
+  const form = await evaluate(`
+    document.querySelector('[data-choice="bug"]').click();
+    const asked = [...document.querySelectorAll('.kind-fields[data-for="bug"] label')].map(l => l.textContent.trim());
+    document.querySelector('[data-choice="idea"]').click();
+    return {
+      crumb: [...document.querySelectorAll(".crumb a")].map(a => a.getAttribute("href")).join(","),
+      cards: document.querySelectorAll(".choice-card").length,
+      asked,
+      hiddenForIdeas: document.querySelector('.kind-fields[data-for="bug"]').hidden,
+    };
+  `);
+  check("it says where the report is going", form.crumb === "/codigosh,/codigosh/lastboard", form.crumb);
+  check("the kind is a choice of two cards", form.cards === 2, String(form.cards));
+  check(
+    "a bug is asked what makes it usable",
+    JSON.stringify(form.asked) === '["Which version","How to see it happen"]',
+    JSON.stringify(form.asked),
+  );
+  check("and an idea is not asked it", form.hiddenForIdeas === true);
+
   const fillIn = async () =>
     evaluate(`
       // An idea, not a bug: only ideas are voted, so this is what exercises the

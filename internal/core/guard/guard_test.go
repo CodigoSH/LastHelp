@@ -126,7 +126,7 @@ func TestTheSameParagraphAgainIsCaught(t *testing.T) {
 	g := guard(t)
 	seed(t, g, "Buy cheap watches", "visit our site", epoch)
 
-	verdict, err := g.Inspect(1, "buy   CHEAP watches", "visit\nour site", nil, epoch.Add(time.Minute))
+	verdict, err := g.Inspect(1, "buy   CHEAP watches", "visit\nour site", "", nil, epoch.Add(time.Minute))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestTheSameParagraphAgainIsCaught(t *testing.T) {
 func TestSomethingGenuineGetsThrough(t *testing.T) {
 	g := guard(t)
 	verdict, err := g.Inspect(1, "crash on import",
-		"it closes when I import photos, log at https://paste.example.com/abc", nil, epoch)
+		"it closes when I import photos, log at https://paste.example.com/abc", "1.4.2", nil, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +153,7 @@ func TestSomethingGenuineGetsThrough(t *testing.T) {
 func TestAnAdvertIsCaught(t *testing.T) {
 	g := guard(t)
 	body := strings.Repeat("visit https://example.com now ", 6)
-	verdict, err := g.Inspect(1, "great deals", body, nil, epoch)
+	verdict, err := g.Inspect(1, "great deals", body, "", nil, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestAnAdvertIsCaught(t *testing.T) {
 
 func TestTheOperatorsOwnWordList(t *testing.T) {
 	g := guard(t)
-	verdict, err := g.Inspect(1, "cheap CRYPTO offers", "", []string{"crypto", "casino"}, epoch)
+	verdict, err := g.Inspect(1, "cheap CRYPTO offers", "", "", []string{"crypto", "casino"}, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestTheOperatorsOwnWordList(t *testing.T) {
 	}
 
 	// And a board where that word is ordinary traffic keeps working.
-	verdict, err = g.Inspect(1, "cheap CRYPTO offers", "", nil, epoch)
+	verdict, err = g.Inspect(1, "cheap CRYPTO offers", "", "", nil, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,5 +240,34 @@ func seed(t *testing.T, g Guard, title, body string, at time.Time) {
 		VALUES (?, 1, 'bug', ?, ?, 'new', 'pending', ?, 'x', ?)`,
 		title+body, title, body, hash, at.Unix()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestTheAnswersAreReadToo.
+//
+// The form asks a bug for its version and its steps, and both are free text a
+// stranger types. A limit that reads only the title and the body is a limit
+// with a box beside it that nobody checks: the same links and the same words
+// would go on the public page and into the forge issue, through the answers.
+func TestTheAnswersAreReadToo(t *testing.T) {
+	g := guard(t)
+
+	verdict, err := g.Inspect(1, "crash on import", "it closes",
+		"cheap CRYPTO offers", []string{"crypto"}, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verdict.OK || verdict.Layer != "stoplist" {
+		t.Errorf("the stoplist does not read the answers: %+v", verdict)
+	}
+
+	links := "https://a.example https://b.example https://c.example https://d.example " +
+		"https://e.example https://f.example https://g.example https://h.example"
+	verdict, err = g.Inspect(1, "crash on import", "it closes", links, nil, epoch.Add(time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if verdict.OK || verdict.Layer != "links" {
+		t.Errorf("the link limit does not read the answers: %+v", verdict)
 	}
 }

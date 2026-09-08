@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"strings"
 	"testing"
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/bridge"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 )
 
@@ -58,6 +60,28 @@ func (i *instance) submit(orgSlug, repoSlug, kind, title string) (publicID, toke
 	resp := i.do(http.MethodPost, base+"/items",
 		map[string]any{"kind": kind, "title": title, "body": "what happened for " + title,
 			"token": formToken})
+	body := decode(i.t, resp)
+	if resp.StatusCode != http.StatusCreated {
+		i.t.Fatalf("submitting returned %d: %v", resp.StatusCode, body)
+	}
+	id, _ := body["public_id"].(string)
+	tok, _ := body["follow_token"].(string)
+	return id, tok
+}
+
+// submitWith is submit, with answers to the questions the form asks.
+func (i *instance) submitWith(orgSlug, repoSlug, kind, title string, fields map[string]string) (publicID, token string) {
+	i.t.Helper()
+	base := "/api/orgs/" + orgSlug + "/repos/" + repoSlug
+
+	formResp := i.do(http.MethodGet, base+"/form", nil)
+	form := decode(i.t, formResp)
+	formToken, _ := form["token"].(string)
+	i.tick.advance(5 * time.Second)
+
+	resp := i.do(http.MethodPost, base+"/items",
+		map[string]any{"kind": kind, "title": title, "body": "what happened for " + title,
+			"fields": fields, "token": formToken})
 	body := decode(i.t, resp)
 	if resp.StatusCode != http.StatusCreated {
 		i.t.Fatalf("submitting returned %d: %v", resp.StatusCode, body)
@@ -688,5 +712,113 @@ func TestAReportSaysWhereItCameFrom(t *testing.T) {
 	org, _ := repo["organization"].(map[string]any)
 	if org["slug"] != "codigosh" {
 		t.Errorf("the report does not name the organisation: %v", repo)
+	}
+}
+
+// TestABugIsAskedWhatMakesItUsable.
+//
+// The version and the steps existed everywhere except where somebody could
+// type them: the table stored them, the export carried them, the forge issue
+// printed them under a comment saying a bug without them is work rather than
+// information — and the form never asked, so every one was empty in every
+// report ever made.
+//
+// What is checked here is the half that is not the form: what the endpoint
+// keeps. The questions belong to the kind, their order is the order they were
+// asked in, and the labels are the domain's — the submission used to build a
+// field out of every key it was sent and use that key as the label, so the
+// sender chose the question as well as the answer.
+func TestABugIsAskedWhatMakesItUsable(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submitWith("codigosh", "lastboard", "bug", "crash on import", map[string]string{
+		// Sent in the other order, and with a question nobody asked.
+		"steps":           "1. open it\n2. import\n3. it closes",
+		"version":         "1.4.2",
+		"**Pay me here**": "https://not.a.real.place",
+	})
+	resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+
+	resp = public.do(http.MethodGet, "/api/items/"+id, nil)
+	fields, _ := decode(t, resp)["fields"].([]any)
+	if len(fields) != 2 {
+		t.Fatalf("the report kept %d answers, not the two it was asked: %v", len(fields), fields)
+	}
+
+	first, _ := fields[0].(map[string]any)
+	second, _ := fields[1].(map[string]any)
+	if first["key"] != "version" || first["label"] != "Version" || first["value"] != "1.4.2" {
+		t.Errorf("the first answer is not the first question: %v", first)
+	}
+	if second["key"] != "steps" || second["label"] != "Steps to reproduce" {
+		t.Errorf("the second answer is not the second question: %v", second)
+	}
+	for _, raw := range fields {
+		f, _ := raw.(map[string]any)
+		if label, _ := f["label"].(string); strings.Contains(label, "Pay me") {
+			t.Errorf("a question the sender wrote was kept: %v", f)
+		}
+	}
+}
+
+// TestAnIdeaIsNotAskedThem.
+//
+// An idea is the sentence somebody wrote. Asking it which version it happened
+// in is a box that means nothing, and every box on a public form is somebody
+// deciding not to bother — so the endpoint drops them even when they arrive.
+func TestAnIdeaIsNotAskedThem(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submitWith("codigosh", "lastboard", "idea", "dark mode", map[string]string{
+		"version": "1.4.2", "steps": "1. open it",
+	})
+	resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+
+	resp = public.do(http.MethodGet, "/api/items/"+id, nil)
+	if fields, _ := decode(t, resp)["fields"].([]any); len(fields) != 0 {
+		t.Errorf("an idea was asked a bug's questions: %v", fields)
+	}
+}
+
+// TestTheAnswersReachTheForge is the point of asking at all.
+//
+// A bug arrives on the forge with its version and its steps under the
+// description, in the order they were asked — which is what makes it something
+// somebody can pick up rather than a sentence they have to go and ask about.
+func TestTheAnswersReachTheForge(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submitWith("codigosh", "lastboard", "bug", "crash on import", map[string]string{
+		"version": "1.4.2", "steps": "1. open it\n2. import",
+	})
+
+	it, err := (item.Store{DB: team.db()}).ByPublicID(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body := bridge.IssueBody(it)
+	if !strings.Contains(body, "**Version:** 1.4.2") {
+		t.Errorf("the issue does not carry the version:\n%s", body)
+	}
+	if !strings.Contains(body, "**Steps to reproduce:** 1. open it") {
+		t.Errorf("the issue does not carry the steps:\n%s", body)
+	}
+	if strings.Index(body, "**Version:**") > strings.Index(body, "**Steps to reproduce:**") {
+		t.Errorf("the answers arrive in the wrong order:\n%s", body)
 	}
 }

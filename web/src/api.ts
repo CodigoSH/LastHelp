@@ -125,6 +125,14 @@ export interface ItemSummary {
   created_at: number;
 }
 
+/** One answer to one question of the report form, with the label it was asked
+ *  under: a form reworded later must not reword what somebody already sent. */
+export interface ReportField {
+  key: string;
+  label: string;
+  value: string;
+}
+
 export interface ItemDetail extends ItemSummary {
   body: string;
   mine: boolean;
@@ -134,6 +142,8 @@ export interface ItemDetail extends ItemSummary {
   /** Whether it is on the board yet. Only the reporter is ever here before it
    *  is, and only they are told so. */
   moderation?: string;
+  /** The answers to the questions this kind was asked, in the order asked. */
+  fields?: ReportField[];
   merged_into?: string;
   issue?: { number: number; url: string };
   comments: Array<{ author: string; name: string; body: string; created_at: number }>;

@@ -59,8 +59,14 @@ offering buttons that fail.
 
 ## Bugs and ideas are two different journeys
 
-They look the same on the form and are treated differently on purpose:
+They are asked different things and treated differently, on purpose:
 
+- **A bug is asked which version and how to see it happen.** Two optional
+  boxes, and they are the difference between a report somebody can pick up and
+  one they have to go and ask about. They travel with it: onto the public page,
+  into the export, and into the forge issue under the description.
+- **An idea is asked neither.** An idea is the sentence somebody wrote, and
+  every extra box on a public form is somebody deciding not to bother.
 - **A bug is not voted.** Two hundred people agreeing that something crashes
   does not make it crash harder; what it needs is somebody able to reproduce it.
   Its statuses are *new, confirmed, tracked, closed, not reproducible*.

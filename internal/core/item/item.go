@@ -117,6 +117,33 @@ type Field struct {
 	Position int
 }
 
+// FieldsFor is the whole set of questions a kind may be asked, in the order
+// they are asked in.
+//
+// Fixed here rather than taken from whatever the browser sends. The submission
+// endpoint used to build a field out of every key in the request and use the
+// key as the label, which meant the public chose both — a report could arrive
+// with any question it liked written on it, and go on to the forge that way.
+// A map has no order either, so two identical submissions could reach the team
+// with their answers the other way round.
+//
+// Only a bug has any. An idea is the sentence somebody wrote; asking it which
+// version it happened in is a box that means nothing, and every box on a public
+// form is somebody deciding not to bother.
+func FieldsFor(k Kind) []Field {
+	if k != Bug {
+		return nil
+	}
+	// The labels are English and stay English: they are stored with the answer
+	// and printed into the forge issue, which the team reads — not necessarily
+	// in the language the reporter's browser happened to be in. The page
+	// translates them for the person filling them in.
+	return []Field{
+		{Key: "version", Label: "Version", Position: 0},
+		{Key: "steps", Label: "Steps to reproduce", Position: 1},
+	}
+}
+
 // Item is a report or an idea.
 type Item struct {
 	ID         int64
@@ -413,6 +440,53 @@ func (s Store) withFields(it Item) (Item, error) {
 		it.Fields = append(it.Fields, f)
 	}
 	return it, rows.Err()
+}
+
+// WithFields fills in the answers for a whole listing, in one query.
+//
+// List does not load them — it reads the item table and nothing else — so a
+// caller that lists and then reads .Fields gets an empty slice from every row
+// and no error anywhere. The triage queue did exactly that for as long as it
+// took to notice: a screen quietly showing nothing is the same shape as a
+// screen with nothing to show.
+func (s Store) WithFields(items []Item) ([]Item, error) {
+	if len(items) == 0 {
+		return items, nil
+	}
+
+	placeholders := make([]string, len(items))
+	args := make([]any, len(items))
+	for i, it := range items {
+		placeholders[i] = "?"
+		args[i] = it.ID
+	}
+
+	rows, err := s.DB.Query(`SELECT item_id, key, label, value, position FROM item_field
+		WHERE item_id IN (`+strings.Join(placeholders, ",")+`) ORDER BY item_id, position`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("reading the answers: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	byItem := make(map[int64][]Field, len(items))
+	for rows.Next() {
+		var (
+			id int64
+			f  Field
+		)
+		if err := rows.Scan(&id, &f.Key, &f.Label, &f.Value, &f.Position); err != nil {
+			return nil, fmt.Errorf("reading the answers: %w", err)
+		}
+		byItem[id] = append(byItem[id], f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("reading the answers: %w", err)
+	}
+
+	for i := range items {
+		items[i].Fields = byItem[items[i].ID]
+	}
+	return items, nil
 }
 
 func newPublicID() (string, error) {
