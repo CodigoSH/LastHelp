@@ -803,7 +803,10 @@ export function similarItems(items: Array<{ public_id: string; title: string }>,
  * card of its own with the copy button beside it, rather than as the fourth
  * paragraph of a page of prose.
  */
-export function submitted(link: string, text: Text): string {
+export function submitted(
+  sent: { link: string; path: string; org: string; repo: string; board: string },
+  text: Text,
+): string {
   return `<div class="page narrow">
     <header class="page-head">
       <div class="head-text">
@@ -815,10 +818,16 @@ export function submitted(link: string, text: Text): string {
       <div class="card-head">${icons.copy()}<h3>${escapeHTML(text.t("sent.copy"))}</h3></div>
       <span class="card-sub">${escapeHTML(text.t("sent.keepLink"))}</span>
       <div class="follow-link">
-        <input readonly value="${escapeAttr(link)}" aria-label="${escapeAttr(text.t("sent.copy"))}" />
+        <input readonly value="${escapeAttr(sent.link)}" aria-label="${escapeAttr(text.t("sent.copy"))}" />
         <button class="button" data-copy>${escapeHTML(text.t("sent.copy"))}</button>
       </div>
     </section>
+    <div class="head-actions">
+      <a class="button primary" href="${escapeAttr(sent.path)}">${escapeHTML(text.t("sent.open"))}</a>
+      <a class="button with-icon back" href="/${escapeAttr(sent.org)}/${escapeAttr(sent.repo)}">
+        ${icons.chevron(14)}<span>${escapeHTML(sent.board)}</span>
+      </a>
+    </div>
   </div>`;
 }
 

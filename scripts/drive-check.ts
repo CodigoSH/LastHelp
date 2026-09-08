@@ -337,6 +337,35 @@ async function main() {
   const followLink = await evaluate(`return document.querySelector(".follow-link input")?.value ?? ""`);
   check("the follow link is shown once", String(followLink).includes("?k="), String(followLink).slice(0, 48));
 
+  // 5b. And the page after sending is not a dead end.
+  //
+  //     It said "it will appear once reviewed", offered an address to copy and
+  //     nothing else: somebody who had just written a report was left on a
+  //     screen with no way to their own report and no way back to the board.
+  //     Both are checked by following one of them.
+  const onward = await evaluate(`
+    const links = [...document.querySelectorAll(".page .head-actions a")].map(a => a.getAttribute("href"));
+    return { links };
+  `);
+  check(
+    "and the page after sending leads somewhere",
+    onward.links.length === 2 &&
+      onward.links.some((h: string) => h.startsWith("/i/") && h.includes("?k=")) &&
+      onward.links.includes("/codigosh/lastboard"),
+    JSON.stringify(onward.links),
+  );
+
+  await evaluate(`document.querySelector(".head-actions a.button.primary").click()`);
+  await sleep(900);
+  const landed = await evaluate(`
+    return { path: location.pathname, title: document.querySelector(".detail h1")?.textContent?.trim() ?? "" };
+  `);
+  check(
+    "and the report itself opens from it",
+    landed.path.startsWith("/i/") && landed.title === "dark mode for the dashboard",
+    JSON.stringify(landed),
+  );
+
   // 6. Nothing waiting is on the public board.
   await evaluate(`history.pushState({}, "", "/codigosh/lastboard"); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(500);

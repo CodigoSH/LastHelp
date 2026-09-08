@@ -875,8 +875,23 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
         },
         token: ticket.token,
       });
-      const link = `${location.origin}/i/${sent.public_id}?k=${sent.follow_token}`;
-      show(views.submitted(link, text));
+      // The address to keep, and the path to walk. The first is absolute
+      // because it is going into somebody's notes; the second is what this
+      // page's own button follows, and the router only takes a path.
+      const path = `/i/${sent.public_id}?k=${sent.follow_token}`;
+      const link = `${location.origin}${path}`;
+      show(
+        views.submitted(
+          {
+            link,
+            path,
+            org: orgSlug,
+            repo: repoSlug,
+            board: repo.name,
+          },
+          text,
+        ),
+      );
       root?.querySelector<HTMLButtonElement>("[data-copy]")?.addEventListener("click", async (e) => {
         await navigator.clipboard?.writeText(link).catch(() => undefined);
         (e.currentTarget as HTMLButtonElement).textContent = i18n.t("sent.copied");

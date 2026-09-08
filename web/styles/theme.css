@@ -3111,3 +3111,9 @@ a.bento-card:hover,
 .team-tools .team-reply textarea { inline-size: 100%; }
 .team-tools .status-control,
 .team-tools .issue-control { margin-block-start: 0; padding-block-start: 0; border-block-start: 0; }
+
+/* The way back carries the chevron pointing back — the same drawing mirrored,
+   and mirrored once more in Arabic, where back is the other way. */
+.button.back .icon {
+  transform: scaleX(calc(-1 * var(--rtl-flip)));
+}
