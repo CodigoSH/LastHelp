@@ -26,7 +26,7 @@ export const icons = {
   /* Leaving. It points at the door, so it is flipped where the line runs the
      other way — the stylesheet does that with --rtl-flip. */
   signOut: (s?: number) =>
-    stroke(`<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>`, s),
+    stroke(`<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14l5-5-5-5m5 5H9"/>`, s),
   search: (s?: number) => stroke(`<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>`, s),
   feed: (s?: number) =>
     stroke(`<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.2"/>`, s),

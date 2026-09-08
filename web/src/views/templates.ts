@@ -1770,7 +1770,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
           ${avatar(spec.who, spec.avatar)}
           <span class="who">${escapeHTML(spec.who)}</span>
         </div>
-        <button class="link" data-signout>${escapeHTML(text.t("nav.signOut"))}</button>
+        <button class="link with-icon" data-signout>${icons.signOut(16)}<span>${escapeHTML(text.t("nav.signOut"))}</span></button>
       </div>
     </aside>
     <main class="admin-main">${spec.content}</main>

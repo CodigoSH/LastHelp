@@ -1479,17 +1479,25 @@ body.admin-view > main {
   background: rgba(127, 127, 127, 0.12);
 }
 
-/* The current page, marked with aria-current in the markup as well: a colour
-   and a bar are not something a screen reader can hear. */
+/*
+ * The current page, wearing what the house wears: a wash of the accent, a bar
+ * of it on the leading edge, and the mark in accent — but the words in the
+ * ordinary text colour and the ordinary weight.
+ *
+ * It used to be accent all through, which made the chosen item the loudest
+ * thing on the screen and every other one look switched off. This is
+ * Lastboard's, in logical properties so the bar changes sides on its own.
+ *
+ * aria-current is on it in the markup as well: a colour and a bar are not
+ * something a screen reader can hear.
+ */
 .side-item[aria-current="page"] {
-  background: rgba(var(--accent-rgb), 0.14);
-  color: var(--accent-alt);
-  font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-:root[dir="rtl"] .side-item[aria-current="page"] {
-  box-shadow: inset -2px 0 0 var(--accent);
+  /* The house's strength for a chosen row: a little more of it in the dark,
+     where a nine-per-cent wash disappears into the surface. */
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--text);
+  border-inline-start: 2px solid var(--accent);
+  padding-inline-start: calc(0.6rem - 2px);
 }
 
 .side-item.sub {
@@ -1499,7 +1507,17 @@ body.admin-view > main {
 }
 
 .side-item.sub[aria-current="page"] {
-  color: var(--accent-alt);
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .side-item[aria-current="page"] {
+    background: rgba(var(--accent-rgb), 0.2);
+  }
+}
+
+:root[data-theme="dark"] .side-item[aria-current="page"] {
+  background: rgba(var(--accent-rgb), 0.2);
 }
 
 .side-foot {
@@ -1582,7 +1600,9 @@ body.admin-view > main {
   }
 
   .side-item[aria-current="page"] {
-    box-shadow: inset 0 -2px 0 var(--accent);
+    border-inline-start: 0;
+    border-block-end: 2px solid var(--accent);
+    padding-inline-start: 0.6rem;
   }
 
   .side-foot {
@@ -2954,10 +2974,6 @@ a.bento-card:hover,
 
 .side .brand { font-size: 1.05rem; }
 
-.side-item[aria-current="page"] {
-  background: var(--accent-wash);
-}
-
 .admin-main > h1 { margin-block-end: 0.35rem; }
 
 /* The dialog title bar and the card heads pick up the section-title weight
@@ -3079,6 +3095,9 @@ a.bento-card:hover,
 /* Signing out of the panel: the same quiet control as the bar's, at the foot of
    the sidebar rather than an underlined sentence in the middle of it. */
 .side-foot .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   justify-self: start;
   padding: 0.35rem 0.6rem;
   border-radius: var(--radius-sm);
