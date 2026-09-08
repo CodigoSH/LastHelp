@@ -26,6 +26,10 @@ export interface Text {
   t(key: string, params?: Record<string, string | number>): string;
   date(value: number): string;
   number(value: number): string;
+  /** A size, at a scale a person reads, with the unit named in their language. */
+  bytes(value: number): string;
+  /** How long ago, in the largest unit that still says something. */
+  since(seconds: number): string;
 }
 
 /**
@@ -590,7 +594,7 @@ export function reportForm(
     <p class="lead">${escapeHTML(text.t("form.lead"))}</p>
 
     <form class="report">
-      <div class="choices">${choices}</div>
+      <div class="kind-choices">${choices}</div>
 
       <!--
         The honeypot. Hidden from people by CSS and from assistive technology by
@@ -1152,12 +1156,22 @@ export function repositoryFields(text: Text, forge: string, hasForge: boolean): 
 /** What a board takes. Both on by default: a board that accepts nothing is
  *  refused by the server, and defaulting to off makes that the common mistake. */
 export function acceptsFields(text: Text): string {
+  // Two checkboxes that say what they turn on, not two pills reading "Bug" and
+  // "Idea". This is a settings form: the control people know here is a
+  // checkbox with a sentence beside it, and the words are what somebody
+  // reporting will be offered rather than the internal name of a kind.
+  const box = (name: string, label: string) =>
+    `<label class="check">
+      <input type="checkbox" name="${escapeAttr(name)}" checked />
+      <span>${escapeHTML(label)}</span>
+    </label>`;
+
   return `<div class="field">
     <label>${escapeHTML(text.t("repo.accepts"))}</label>
-    <p class="choices">
-      <label class="choice"><input type="checkbox" name="accepts_bugs" checked /> ${escapeHTML(text.t("kind.bug"))}</label>
-      <label class="choice"><input type="checkbox" name="accepts_ideas" checked /> ${escapeHTML(text.t("kind.idea"))}</label>
-    </p>
+    <div class="checks">
+      ${box("accepts_bugs", text.t("repo.acceptsBugs"))}
+      ${box("accepts_ideas", text.t("repo.acceptsIdeas"))}
+    </div>
     <p class="hint">${escapeHTML(text.t("repo.acceptsHelp"))}</p>
   </div>`;
 }
@@ -1932,26 +1946,93 @@ export function backupScreen(text: Text): string {
 }
 
 /** What is running, where it came from, and whether there is more of it. */
-export function aboutScreen(
-  version: { current: string; commit?: string; schema?: number },
-  instance: string,
-  text: Text,
-): string {
-  const fact = (label: string, value: string, icon: string) =>
+export interface ServerFacts {
+  version?: string;
+  go?: string;
+  os?: string;
+  uptime_seconds?: number;
+  started_at?: number;
+  database_bytes?: number;
+  disk_free_bytes?: number;
+  disk_total_bytes?: number;
+  memory_bytes?: number;
+  schema?: number;
+}
+
+/**
+ * About: what the server is doing, for the person who has to keep it running.
+ *
+ * It used to show the version, the commit hash, the schema number and the name
+ * of the installation. The name is a setting and lives on the Personalization
+ * screen; the commit answers a question nobody was asking on this page. What an
+ * operator opens this for is whether the thing is healthy — how long it has
+ * been up, how big the database has grown, whether the disk under it is
+ * filling, what it costs in memory.
+ *
+ * The schema number stays, at the bottom and quietly: it is the one number that
+ * matters when a backup will not restore.
+ */
+export function aboutScreen(facts: ServerFacts, text: Text): string {
+  const card = (label: string, value: string, icon: string, sub = "") =>
     `<li class="bento-card">
       <div class="card-head">${icon}<h3>${escapeHTML(label)}</h3></div>
-      <code class="fact-value">${escapeHTML(value)}</code>
+      <strong class="fact">${escapeHTML(value)}</strong>
+      ${sub ? `<span class="card-sub">${escapeHTML(sub)}</span>` : ""}
     </li>`;
+
+  const cards: string[] = [];
+
+  cards.push(
+    card(
+      text.t("about.version"),
+      facts.version || "—",
+      icons.info(),
+      facts.os ? `${facts.os} · ${facts.go ?? ""}`.trim() : "",
+    ),
+  );
+
+  if (facts.uptime_seconds !== undefined) {
+    cards.push(
+      card(
+        text.t("about.uptime"),
+        text.since(facts.uptime_seconds),
+        icons.queue(),
+        facts.started_at !== undefined ? text.date(facts.started_at) : "",
+      ),
+    );
+  }
+
+  if (facts.database_bytes !== undefined) {
+    cards.push(card(text.t("about.database"), text.bytes(facts.database_bytes), icons.backup()));
+  }
+
+  if (facts.disk_free_bytes !== undefined) {
+    // Free first, and the total underneath: the number that decides whether to
+    // do something today is how much is left, not how big the disk is.
+    cards.push(
+      card(
+        text.t("about.disk"),
+        text.bytes(facts.disk_free_bytes),
+        icons.download(),
+        facts.disk_total_bytes !== undefined
+          ? text.t("about.diskOf", { total: text.bytes(facts.disk_total_bytes) })
+          : "",
+      ),
+    );
+  }
+
+  if (facts.memory_bytes !== undefined) {
+    cards.push(card(text.t("about.memory"), text.bytes(facts.memory_bytes), icons.overview()));
+  }
 
   return `<h1>${escapeHTML(text.t("shell.about"))}</h1>
     <p class="lead">${escapeHTML(text.t("about.lead"))}</p>
-    <ul class="bento">
-      ${fact(text.t("about.version"), version.current || "—", icons.info())}
-      ${version.commit ? fact(text.t("about.commit"), version.commit, icons.repository()) : ""}
-      ${version.schema !== undefined ? fact(text.t("about.schema"), String(version.schema), icons.backup()) : ""}
-      ${fact(text.t("setup.instanceName"), instance, icons.organization())}
-    </ul>
-    <p class="hint">${escapeHTML(text.t("about.source"))}</p>`;
+    <ul class="bento">${cards.join("")}</ul>
+    <p class="hint">${escapeHTML(text.t("about.source"))}${
+      facts.schema !== undefined
+        ? ` ${escapeHTML(text.t("about.schemaIs", { version: text.number(facts.schema) }))}`
+        : ""
+    }</p>`;
 }
 
 /**

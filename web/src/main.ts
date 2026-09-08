@@ -27,6 +27,8 @@ const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
   date: (value) => i18n.date(value),
   number: (value) => i18n.number(value),
+  bytes: (value) => i18n.bytes(value),
+  since: (seconds) => i18n.since(seconds),
 };
 
 const root = document.getElementById("app");
@@ -84,13 +86,10 @@ window.addEventListener("popstate", () => void render());
 function renderNav(): void {
   if (!nav) return;
 
-  const picker = `<select class="lang" aria-label="Language">${availableLocales
-    .map(
-      (l) =>
-        `<option value="${escapeAttr(l.code)}"${l.code === i18n.current ? " selected" : ""}>${escapeHTML(l.name)}</option>`,
-    )
-    .join("")}</select>`;
-
+  // No language picker here. A visitor who has not chosen one is already
+  // reading their browser's language, and somebody who wants a different one
+  // sets it once — in the wizard on the first run, or under Appearance — rather
+  // than being offered a list of twenty on every page of the product.
   const account = me
     ? `<a href="/panel">${escapeHTML(i18n.t("nav.panel"))}</a>
        <button class="link" data-signout>${escapeHTML(i18n.t("nav.signOut"))}</button>`
@@ -103,11 +102,8 @@ function renderNav(): void {
       ${instanceLogo ? `<img class="brand-logo" src="${escapeAttr(instanceLogo)}" alt="" />` : ""}
       <span>${escapeHTML(instanceName || i18n.t("app.name"))}</span>
     </a>
-    <div class="nav-right">${account}${picker}</div>`;
+    <div class="nav-right">${account}</div>`;
 
-  nav.querySelector<HTMLSelectElement>(".lang")?.addEventListener("change", (e) => {
-    void i18n.setLanguage((e.target as HTMLSelectElement).value).then(() => void render());
-  });
   nav.querySelector<HTMLButtonElement>("[data-signout]")?.addEventListener("click", async () => {
     await api.del("/api/session").catch(() => undefined);
     me = null;
@@ -591,11 +587,12 @@ async function showBackups(): Promise<void> {
 
 async function showAbout(): Promise<void> {
   if (!(await requirePanel())) return;
-  const status = await api
-    .get<{ current: string; commit?: string; schema?: number }>("/api/update")
-    .catch(() => ({ current: "" }));
+  // Asked of the server rather than assembled from what the page happens to
+  // know: uptime, disk and memory are facts about the machine, and the browser
+  // has none of them.
+  const facts = await api.get<views.ServerFacts>("/api/server").catch(() => ({}) as views.ServerFacts);
   await showInShell(
-    views.aboutScreen(status, instanceName || i18n.t("app.name"), text),
+    views.aboutScreen(facts, text),
     "/panel/about",
   );
 }

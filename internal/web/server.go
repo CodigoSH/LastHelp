@@ -84,6 +84,11 @@ type Server struct {
 	// Clock is the one source of time in the HTTP layer, replaceable so a test
 	// can place a session in the past without sleeping.
 	Clock func() time.Time
+
+	// startedAt is when this process came up, for the one screen that reports
+	// how long it has been running. Taken from the clock like everything else,
+	// so a test can say what it is.
+	startedAt time.Time
 }
 
 // New wires the routes and returns a server ready to be handed to net/http.
@@ -100,6 +105,7 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 		assets: assets,
 		Clock:  time.Now,
 	}
+	s.startedAt = s.now()
 
 	// Generated on the first ever start and kept. Regenerating it would
 	// invalidate every voter identity at once — everybody could vote again on
@@ -199,6 +205,7 @@ func (s *Server) routes() {
 	private("POST /api/organizations", s.handleCreateOrganization)
 	private("POST /api/orgs/{org}/repositories", s.handleCreateRepository)
 	private("GET /api/orgs/{org}/repos/{repo}/queue", s.handleQueue)
+	private("GET /api/server", s.handleServerInfo)
 	private("GET /api/orgs/{org}/repos/{repo}/comments", s.handleCommentQueue)
 	private("GET /api/orgs/{org}/repos/{repo}/export", s.handleExport)
 

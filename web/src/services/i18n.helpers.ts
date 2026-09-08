@@ -72,6 +72,8 @@ export function resolveLanguage(
  */
 const dateFormatters = new Map<string, Intl.DateTimeFormat>();
 const numberFormatters = new Map<string, Intl.NumberFormat>();
+const byteFormatters = new Map<string, Intl.NumberFormat>();
+const durationFormatters = new Map<string, Intl.NumberFormat>();
 
 /**
  * Format in the language the reader chose, not the browser's.
@@ -101,6 +103,69 @@ export function formatNumber(code: string, value: number): string {
     numberFormatters.set(code, formatter);
   }
   return formatter.format(value);
+}
+
+/**
+ * A size in bytes, in the reader's language and at a scale a person can read.
+ *
+ * Intl knows the unit names in every language this ships in, so "1,2 GB" and
+ * "1.2 GB" and "١٫٢ غيغابايت" come out right without a table of our own. The
+ * scale is chosen here because Intl formats a number, not a magnitude.
+ */
+const byteUnits: Array<[number, string]> = [
+  [1024 ** 3, "gigabyte"],
+  [1024 ** 2, "megabyte"],
+  [1024, "kilobyte"],
+  [1, "byte"],
+];
+
+export function formatBytes(code: string, value: number): string {
+  const [scale, unit] = byteUnits.find(([s]) => value >= s) ?? byteUnits[byteUnits.length - 1]!;
+  const scaled = value / scale;
+  const cacheKey = `${code}|${unit}`;
+  let formatter = byteFormatters.get(cacheKey);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(code, {
+      style: "unit",
+      unit,
+      unitDisplay: "short",
+      maximumFractionDigits: unit === "byte" ? 0 : 1,
+    });
+    byteFormatters.set(cacheKey, formatter);
+  }
+  return formatter.format(scaled);
+}
+
+/**
+ * How long something has lasted, in the largest unit that still says something.
+ *
+ * "3 days" rather than "4,320 minutes": the question this answers is whether a
+ * server has been up since this morning or since March, and every extra digit
+ * makes that harder to see rather than easier.
+ *
+ * A duration, not a relative time. RelativeTimeFormat was the obvious reach and
+ * the wrong one: it renders "3 seconds ago", so under the label "Running for"
+ * the screen read "Running for 3 seconds ago". It compiled, it translated, and
+ * it was only wrong once somebody read the sentence.
+ */
+const durationUnits: Array<[number, string]> = [
+  [86400 * 365, "year"],
+  [86400 * 30, "month"],
+  [86400, "day"],
+  [3600, "hour"],
+  [60, "minute"],
+  [1, "second"],
+];
+
+export function formatDuration(code: string, seconds: number): string {
+  const [scale, unit] = durationUnits.find(([s]) => seconds >= s) ?? durationUnits[durationUnits.length - 1]!;
+  const cacheKey = `${code}|${unit}`;
+  let formatter = durationFormatters.get(cacheKey);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(code, { style: "unit", unit, unitDisplay: "long" });
+    durationFormatters.set(cacheKey, formatter);
+  }
+  return formatter.format(Math.floor(seconds / scale));
 }
 
 /**

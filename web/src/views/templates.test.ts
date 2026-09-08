@@ -12,6 +12,8 @@ const text: Text = {
     params ? `[${key} ${JSON.stringify(params)}]` : `[${key}]`,
   date: () => "a date",
   number: (value) => String(value),
+  bytes: (value) => `${value} bytes`,
+  since: (seconds) => `${seconds}s ago`,
 };
 
 function report(over: Partial<ItemDetail> = {}): ItemDetail {

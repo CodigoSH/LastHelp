@@ -1786,7 +1786,7 @@ body > nav .brand {
 /* The kind, as two cards rather than two words in a row. It decides which
    questions come next, and it is the first thing anybody touches on the page —
    a pair of pills gave it the weight of a filter tab. */
-.choices {
+.kind-choices {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   gap: 0.75rem;
@@ -1843,3 +1843,48 @@ body > nav .brand {
 .answers dl > div { display: grid; gap: 0.1rem; }
 .answers dt { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
 .answers dd { margin: 0; white-space: pre-wrap; }
+
+/* Checkboxes in a settings form. They were a row of pills reading "Bug" and
+   "Idea", which is the vocabulary of a filter tab rather than of a setting —
+   and they broke outright when the public form's cards took the class they
+   shared. Two things sharing one class name is one rename away from this. */
+.checks {
+  display: grid;
+  gap: 0.4rem;
+  margin-block: 0.35rem;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.check:hover { border-color: rgba(var(--accent-rgb), 0.55); }
+
+.check input {
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.check:has(input:checked) {
+  border-color: rgba(var(--accent-rgb), 0.55);
+  background: rgba(var(--accent-rgb), 0.07);
+}
+
+/* A fact on the About screen: the number is the point, the qualifier is not. */
+.fact {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}

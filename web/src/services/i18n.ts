@@ -1,5 +1,12 @@
 import { availableLocales, directionOf } from "../locales/metadata";
-import { formatDate, formatNumber, resolveLanguage, translate } from "./i18n.helpers";
+import {
+  formatBytes,
+  formatDate,
+  formatNumber,
+  formatDuration,
+  resolveLanguage,
+  translate,
+} from "./i18n.helpers";
 
 declare const __BUILD_STAMP__: string;
 
@@ -80,6 +87,14 @@ class I18n {
 
   number(value: number): string {
     return formatNumber(this.language, value);
+  }
+
+  bytes(value: number): string {
+    return formatBytes(this.language, value);
+  }
+
+  since(seconds: number): string {
+    return formatDuration(this.language, seconds);
   }
 
   subscribe(listener: () => void): () => void {
