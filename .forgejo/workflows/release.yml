@@ -43,16 +43,30 @@ jobs:
 
       # The suite before anything is published. A tag can be deleted; a release
       # people have already downloaded cannot.
+      #
+      # `bun run build` comes before anything that compiles Go, and the order is
+      # load-bearing. The binary embeds internal/web/dist, which is build output
+      # and therefore not in the repository, so on a fresh checkout `go vet`
+      # fails with "pattern all:dist: no matching files found" — a message about
+      # embedding that reads like a broken build. Locally it never happens,
+      # because the directory is left over from the last build.
+      #
+      # ci.yml learned this and was fixed; this file kept the old order and
+      # nothing noticed, because nothing here runs until a tag is pushed. The
+      # first release died on it twenty-three seconds in, with the tag already
+      # public. The same list written twice is how one of them drifts.
       - name: preflight
         run: |
           bun install --frozen-lockfile
           test -z "$(gofmt -l ./cmd ./internal)"
+          bun run build
           go vet ./...
           go test -count=1 ./internal/arch/
-          bun run build
           go test -count=1 -race ./...
           bun run typecheck
+          bun test
           bun run i18n:sync
+          bun run i18n:scan
 
       - name: build
         env:
