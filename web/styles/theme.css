@@ -635,6 +635,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   letter-spacing: 0.02em;
 }
 
+/* Centred, under a centred stepper. A heading hard against the left edge of a
+   card that is itself centred on an empty page reads as a fragment of a wider
+   layout that is not there. */
+.wizard-head {
+  text-align: center;
+}
+
 .wizard-head h1 {
   margin: 0 0 0.5rem;
   font-size: clamp(1.5rem, 3.5vw, 2rem);
@@ -644,6 +651,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 .wizard-head .lead {
   color: var(--text-muted);
   margin: 0 0 1.75rem;
+}
+
+/* The fields inside the card keep reading from the start of the line: centring
+   a form is centring the text somebody is trying to type into. */
+.wizard-card {
+  text-align: start;
 }
 
 .wizard-card {
@@ -2026,3 +2039,47 @@ body > nav .brand {
 @media (prefers-reduced-motion: no-preference) {
   .dash-ghost { transition: none; }
 }
+
+/* The picture, as one control: the circle is the button.
+ *
+ * Lastboard's, and the same on purpose — a label, a separate upload button and
+ * a sentence saying a picture is optional is three pieces of furniture for
+ * something somebody either clicks or ignores. */
+.picture-field { display: flex; justify-content: center; }
+
+.avatar-pick {
+  position: relative;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  line-height: 0;
+}
+
+.avatar-pick .avatar {
+  transition: box-shadow 0.15s ease;
+}
+
+.avatar-pick:hover .avatar,
+.avatar-pick:focus-visible .avatar {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.avatar-pick-badge {
+  position: absolute;
+  inset-block-end: -2px;
+  inset-inline-end: -2px;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 0.6rem;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.avatar-pick:hover .avatar-pick-badge { color: var(--text); }

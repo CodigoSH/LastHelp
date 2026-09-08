@@ -989,27 +989,40 @@ export function queueScreen(
  * The field helpers live in wizard.ts and carry a real example each.
  */
 
+/**
+ * The picture, as one control: the circle is the button.
+ *
+ * Lastboard's, and deliberately the same — a label, a separate upload button
+ * and a sentence explaining that a picture is optional is three pieces of
+ * furniture for something somebody either clicks or ignores. The badge on the
+ * corner is what says it can be changed, and it says it in two words.
+ *
+ * Shared on purpose across the two products: somebody who has set up one
+ * should recognise this.
+ */
+function pictureField(text: Text, picture = ""): string {
+  // The file input is a sibling, not a child. A button may not contain
+  // interactive content, and an input inside it would receive the click the
+  // button forwards to it — which bubbles back to the button, forever.
+  return `<button type="button" class="avatar-pick" data-pick-avatar
+      aria-label="${escapeAttr(text.t("profile.picture"))}">
+      ${avatar("?", picture, true)}
+      <span class="avatar-pick-badge">${escapeHTML(text.t("action.change"))}</span>
+    </button>
+    <input type="file" accept="image/*" id="avatar-file" hidden />`;
+}
+
 function accountFields(text: Text, picture = ""): string {
   return (
     // The picture first, because it is the one optional thing here and putting
     // it after two required fields makes it look like a third.
-    `<div class="field">
-      <label>${escapeHTML(text.t("profile.picture"))}</label>
-      <div class="identity" style="margin:0">
-        ${avatar("?", picture)}
-        ${actionButton("upload", text.t("setup.choosePicture"), "data-pick-avatar")}
-        <input type="file" accept="image/*" id="avatar-file" hidden />
-      </div>
-      <p class="hint">${escapeHTML(text.t("setup.pictureHelp"))}</p>
-    </div>` +
+    `<div class="field picture-field">${pictureField(text, picture)}</div>` +
     field({
       id: "username",
       name: "username",
       label: text.t("auth.username"),
       required: true,
       autocomplete: "username",
-      hint: text.t("auth.usernameHelp"),
-      example: "alex",
     }, text) +
     field({
       id: "password",
@@ -1231,7 +1244,6 @@ export function setupWizard(
         step: 2,
         names,
         title: text.t("auth.setupTitle"),
-        lead: text.t("auth.setupHelp"),
           body: accountFields(text, prefs.picture ?? ""),
         submit: text.t("wizard.continue"),
         back: { href: "/setup", label: text.t("wizard.back") },
@@ -1245,28 +1257,31 @@ export function setupWizard(
     {
       step: 3,
       names,
+      // The same yardstick as the other two steps: the title says what the
+      // step is, the hint says the one thing that would otherwise be found out
+      // by getting it wrong, and there is nothing else.
       title: text.t("setup.instanceTitle"),
-      lead: text.t("setup.instanceLead"),
       body:
+        // The logo first, and as one control, exactly like the picture on the
+        // step before. Two identical jobs on two consecutive screens should
+        // not be two different arrangements.
+        `<div class="field picture-field">
+          <button type="button" class="avatar-pick" data-pick-logo
+            aria-label="${escapeAttr(text.t("personalization.logo"))}">
+            ${prefs.logo ? `<img class="logo-preview" src="${escapeAttr(prefs.logo)}" alt="" />` : avatar("L", "", true)}
+            <span class="avatar-pick-badge">${escapeHTML(text.t("action.change"))}</span>
+          </button>
+          <input type="file" accept="image/*" id="logo-file" hidden />
+        </div>` +
         field(
           {
             id: "instance-name",
             name: "name",
             label: text.t("setup.instanceName"),
             hint: text.t("setup.instanceNameHelp"),
-            example: "Acme",
           },
           text,
-        ) +
-        `<div class="field">
-          <label>${escapeHTML(text.t("personalization.logo"))}</label>
-          <div class="identity" style="margin:0">
-            ${prefs.logo ? `<img class="logo-preview" src="${escapeAttr(prefs.logo)}" alt="" />` : avatar("L")}
-            ${actionButton("upload", text.t("personalization.chooseLogo"), "data-pick-logo")}
-            <input type="file" accept="image/*" id="logo-file" hidden />
-          </div>
-          <p class="hint">${escapeHTML(text.t("personalization.logoHelp"))}</p>
-        </div>`,
+        ),
       submit: text.t("wizard.finish"),
       back: { href: "/setup/account", label: text.t("wizard.back") },
       formClass: "setup-instance",

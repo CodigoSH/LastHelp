@@ -10,9 +10,10 @@
 # Nothing here ships. The list has to be empty before a release.
 about.lead
 about.source
+action.change
 appearance.lead
 auth.passwordHelp
-auth.usernameHelp
+auth.setupTitle
 backups.help
 backups.lead
 backups.restoreHelp
@@ -93,9 +94,8 @@ sent.keepLink
 sent.waiting
 setup.doneLead
 setup.doneNext
-setup.instanceLead
 setup.instanceNameHelp
+setup.instanceTitle
 setup.languageTitle
 setup.orgLead
-setup.pictureHelp
 update.channelHelp
