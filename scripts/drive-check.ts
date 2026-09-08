@@ -293,6 +293,73 @@ async function main() {
   const voteCount = await evaluate(`return document.querySelector("[data-vote] .count")?.textContent ?? ""`);
   check("voting updates the button in place", String(voteCount).trim() === "1", `count=${voteCount}`);
 
+  // 8b. The report as a link somebody was sent: it has to say what board it is
+  //     on and lead back to it, or a shared address is a dead end.
+  const detail = await evaluate(`
+    const crumb = [...document.querySelectorAll(".crumb a")].map(a => a.getAttribute("href"));
+    const vote = document.querySelector(".vote-block");
+    return {
+      crumb,
+      status: document.querySelector(".detail .status")?.className ?? "",
+      vote: vote ? [...vote.children].map(c => c.className).join("+") : "",
+      // The report card holds the report and the vote, and nothing else. The
+      // team's controls used to be appended here, which made them columns of
+      // its grid and squeezed the report into a strip a few words wide —
+      // markup that read correctly and rendered wrong.
+      cardChildren: [...document.querySelector("article.detail").children].map(c => c.classList[0]).join("+"),
+      tools: !!document.querySelector(".team-tools .tools"),
+    };
+  `);
+  check(
+    "a report says which board it is on and leads back",
+    JSON.stringify(detail.crumb) === '["/codigosh","/codigosh/lastboard"]',
+    JSON.stringify(detail.crumb),
+  );
+  check("its status wears the colour the board uses", detail.status.includes("status-"), detail.status);
+  check("the vote is a count and a verb", detail.vote === "count+label", detail.vote);
+  check(
+    "the team's controls are not inside the report card",
+    detail.cardChildren === "detail-main+vote-block" && detail.tools === true,
+    `${detail.cardChildren} tools=${detail.tools}`,
+  );
+
+  // 8c. A comment, all the way: written in public, held back until somebody
+  //     reads it, published from the queue, and only then on the page. Every
+  //     step of this existed except the middle one, so the page promised a
+  //     reading that could not happen.
+  await evaluate(`
+    const form = document.querySelector("form.comment-form");
+    form.querySelector("textarea").value = "it happens on the phone too";
+    form.requestSubmit();
+  `);
+  await sleep(700);
+  const heldBack = await evaluate(`
+    return {
+      told: !document.querySelector(".comment-sent")?.hidden,
+      shown: document.body.textContent.includes("it happens on the phone too"),
+    };
+  `);
+  check("a comment is taken and held for a person", heldBack.told === true && heldBack.shown === false,
+    JSON.stringify(heldBack));
+
+  await evaluate(`history.pushState({}, "", "/codigosh/lastboard/queue"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(800);
+  const queued2 = await evaluate(`return document.querySelectorAll("li[data-comment]").length`);
+  check("it waits in the queue beside the reports", queued2 === 1, `rows=${queued2}`);
+  await evaluate(`document.querySelector("li[data-comment] [data-comment-act='published']").click()`);
+  await sleep(700);
+
+  await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(800);
+  const published = await evaluate(`
+    return {
+      shown: document.body.textContent.includes("it happens on the phone too"),
+      counted: document.querySelector(".count-chip")?.textContent ?? "",
+    };
+  `);
+  check("and appears once a person has published it", published.shown === true && published.counted === "1",
+    JSON.stringify(published));
+
   // 9. The team's status control, and the roadmap it feeds.
   //
   //    The control is drawn only if the server says this person may use it, so

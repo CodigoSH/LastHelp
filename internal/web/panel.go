@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
@@ -250,6 +251,95 @@ func (s *Server) handleSetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"status": in.Status})
+}
+
+// handleCommentQueue lists the comments on one repository that are still
+// waiting, alongside the reports they were written on.
+//
+// The public page tells whoever writes one that a person will read it before it
+// appears. Until this existed that was not true of anything: the comment went
+// in as Pending, nothing listed it and nothing could publish it, so every
+// conversation on this product died at the first reply from outside.
+func (s *Server) handleCommentQueue(w http.ResponseWriter, r *http.Request) {
+	repo, o, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+	if !s.may(w, r, authz.Triage, authz.Repository(repo.ID, o.ID)) {
+		return
+	}
+
+	waiting, err := s.items().WaitingComments(repo.ID, intParam(r.URL.Query().Get("limit"), 50))
+	if err != nil {
+		slog.Error("reading the comment queue", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	out := make([]map[string]any, 0, len(waiting))
+	for _, c := range waiting {
+		out = append(out, map[string]any{
+			"id":         c.ID,
+			"author":     string(c.Author),
+			"body":       c.Body,
+			"created_at": c.CreatedAt.Unix(),
+			"item":       map[string]any{"public_id": c.ItemPublicID, "title": c.ItemTitle},
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"comments": out})
+}
+
+// handleModerateComment publishes one, or hides it.
+//
+// Authorised through the report it hangs on: the rules are written about
+// repositories, and a comment id on its own names nothing they can answer.
+func (s *Server) handleModerateComment(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+
+	it, err := s.items().CommentItem(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+	repo, err := s.orgs().RepositoryByID(it.RepoID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+	if !s.may(w, r, authz.Triage, authz.Repository(repo.ID, repo.OrgID)) {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	var in moderationChange
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	switch item.Moderation(in.State) {
+	case item.Published:
+		err = s.items().ApproveComment(id)
+	case item.Rejected:
+		err = s.items().RejectComment(id)
+	default:
+		writeError(w, http.StatusBadRequest, "error.unknown_state")
+		return
+	}
+	if err != nil {
+		if errors.Is(err, item.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "error.not_found")
+			return
+		}
+		slog.Error("moderating a comment", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"state": in.State})
 }
 
 type mergeRequest struct {

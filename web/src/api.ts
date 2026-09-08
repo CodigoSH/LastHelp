@@ -128,6 +128,12 @@ export interface ItemSummary {
 export interface ItemDetail extends ItemSummary {
   body: string;
   mine: boolean;
+  /** Where it was reported, so a link somebody was sent says what it is about
+   *  and leads back to the board rather than nowhere. */
+  repository?: { slug: string; name: string; organization?: { slug: string; name: string } };
+  /** Whether it is on the board yet. Only the reporter is ever here before it
+   *  is, and only they are told so. */
+  moderation?: string;
   merged_into?: string;
   issue?: { number: number; url: string };
   comments: Array<{ author: string; name: string; body: string; created_at: number }>;

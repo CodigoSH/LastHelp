@@ -42,6 +42,12 @@ error.not_a_backup
 error.password_wrong
 error.username_required
 error.username_taken
+item.addComment
+item.commentHint
+item.threadEmpty
+item.trackedAs
+item.yours
+item.yoursHelp
 moderation.pending
 moderation.published
 moderation.rejected
@@ -79,9 +85,13 @@ overview.published
 overview.recent
 overview.reports
 overview.votes
+panel.commentOn
+panel.commentsWaiting
 panel.mailTo
 panel.secretHelp
 panel.settings
+panel.teamTools
+panel.teamToolsHelp
 panel.webhookPathHelp
 people.add
 people.addHelp

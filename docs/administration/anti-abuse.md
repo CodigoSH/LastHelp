@@ -60,3 +60,9 @@ Two buttons and a third for spam. With four repositories you will see between ze
 five things a week, which is why there are no bulk actions, no saved views and
 no search here: anything that assumes scale on this side is weight you carry for
 a situation you do not have.
+
+Comments wait in the same place, listed under the reports with the report each
+one was written on. They are held for the same reason: the page tells whoever
+writes one that a person will read it before it appears, and a portal where a
+stranger can publish straight onto somebody else's report is a portal you would
+have to watch. Your own replies are not held — you are the person.

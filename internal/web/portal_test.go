@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"testing"
@@ -505,5 +506,187 @@ func makeCollaborator(t *testing.T, team, client *instance, username string) {
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("the collaborator could not sign in: %d", resp.StatusCode)
+	}
+}
+
+// TestACommentReachesThePublicPage is the second half of the promise the page
+// makes: "a person will read this before it appears".
+//
+// Until this passed, the first half happened and the second could not. A
+// visitor's comment was stored as Pending, nothing listed it, no endpoint
+// published it, and ApproveComment had no caller anywhere in the product — the
+// conversation on every report died at the first reply from outside, silently,
+// with the page still promising otherwise.
+func TestACommentReachesThePublicPage(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submit("codigosh", "lastboard", "idea", "dark mode")
+	resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+
+	resp = public.do(http.MethodPost, "/api/items/"+id+"/comments",
+		map[string]string{"body": "it happens on the phone too"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("commenting returned %d", resp.StatusCode)
+	}
+
+	// Not on the page yet: accepted is not published.
+	resp = public.do(http.MethodGet, "/api/items/"+id, nil)
+	if got := len(decode(t, resp)["comments"].([]any)); got != 0 {
+		t.Fatalf("a comment nobody has read is already public: %d", got)
+	}
+
+	// The team finds it in the queue, next to the reports.
+	resp = team.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/comments", nil)
+	waiting, _ := decode(t, resp)["comments"].([]any)
+	if len(waiting) != 1 {
+		t.Fatalf("the comment queue holds %d", len(waiting))
+	}
+	entry, _ := waiting[0].(map[string]any)
+	on, _ := entry["item"].(map[string]any)
+	if on["public_id"] != id {
+		t.Errorf("the queue does not say which report the comment is on: %v", entry)
+	}
+
+	commentID, ok := entry["id"].(float64)
+	if !ok {
+		t.Fatalf("the queue entry has no id: %v", entry)
+	}
+
+	resp = team.do(http.MethodPost, fmt.Sprintf("/api/comments/%d/moderation", int64(commentID)),
+		map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("publishing the comment returned %d", resp.StatusCode)
+	}
+
+	resp = public.do(http.MethodGet, "/api/items/"+id, nil)
+	thread, _ := decode(t, resp)["comments"].([]any)
+	if len(thread) != 1 {
+		t.Fatalf("the published comment is not on the page: %d", len(thread))
+	}
+
+	// And it is gone from the queue, rather than waiting to be decided twice.
+	resp = team.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/comments", nil)
+	if got := len(decode(t, resp)["comments"].([]any)); got != 0 {
+		t.Errorf("a published comment is still in the queue: %d", got)
+	}
+}
+
+// TestOnlySomebodyWhoTriagesCanPublishAComment.
+//
+// The comment queue is a second door into the same room, and a door added later
+// is the one left open. The rule is written about the repository the comment
+// hangs on, not about the comment — so this signs in as somebody who triages
+// the board next door and watches them be refused. The public being refused
+// proves nothing here: the route is private, so the session middleware turns
+// them away before the rule is ever consulted.
+func TestOnlySomebodyWhoTriagesCanPublishAComment(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	team.createRepo("codigosh", "lastdav")
+
+	public := team.anonymous()
+	id, _ := public.submit("codigosh", "lastboard", "idea", "dark mode")
+	resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+	resp = public.do(http.MethodPost, "/api/items/"+id+"/comments", map[string]string{"body": "me too"})
+	_ = resp.Body.Close()
+
+	// Somebody who triages the other board, and only it.
+	accounts := account.Store{DB: team.db()}
+	neighbour, err := accounts.Create("neighbour", "a good long passphrase", "Neighbour", false, team.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nextDoor int64
+	if err := team.db().QueryRow(`SELECT id FROM repository WHERE slug = 'lastdav'`).Scan(&nextDoor); err != nil {
+		t.Fatal(err)
+	}
+	if err := accounts.Grant(neighbour.ID, authz.Repository(nextDoor, 0), authz.RoleCollaborator, team.now()); err != nil {
+		t.Fatal(err)
+	}
+
+	them := team.anonymous()
+	resp = them.do(http.MethodPost, "/api/session",
+		map[string]string{"username": "neighbour", "password": "a good long passphrase"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the collaborator could not sign in: %d", resp.StatusCode)
+	}
+
+	resp = them.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/comments", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("the comment queue of the board next door is readable: %d", resp.StatusCode)
+	}
+
+	resp = team.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/comments", nil)
+	waiting, _ := decode(t, resp)["comments"].([]any)
+	entry, _ := waiting[0].(map[string]any)
+	commentID, _ := entry["id"].(float64)
+	path := fmt.Sprintf("/api/comments/%d/moderation", int64(commentID))
+
+	resp = them.do(http.MethodPost, path, map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("a comment on the board next door was published from outside it: %d", resp.StatusCode)
+	}
+
+	// And the public, who has no session at all, gets no further.
+	resp = public.do(http.MethodPost, path, map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized && resp.StatusCode != http.StatusForbidden {
+		t.Errorf("the public could publish its own comment: %d", resp.StatusCode)
+	}
+}
+
+// TestAReportSaysWhereItCameFrom.
+//
+// A report is the one page of this product that travels: it arrives in a chat
+// as a bare link, opened by somebody who has seen no other screen. It used to
+// answer with a title and nothing else — no board, no way onward.
+//
+// It also carries whether it is published, which is not decoration: the page
+// tells a reporter their submission is waiting to be read, and without this it
+// had no way to know it no longer was.
+func TestAReportSaysWhereItCameFrom(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, token := public.submit("codigosh", "lastboard", "idea", "dark mode")
+
+	resp := public.do(http.MethodGet, "/api/items/"+id+"?k="+token, nil)
+	waiting := decode(t, resp)
+	if waiting["moderation"] != string(item.Pending) {
+		t.Errorf("a report waiting to be read does not say so: %v", waiting["moderation"])
+	}
+
+	resp = team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+
+	resp = public.do(http.MethodGet, "/api/items/"+id, nil)
+	body := decode(t, resp)
+	if body["moderation"] != string(item.Published) {
+		t.Errorf("a published report still reads as waiting: %v", body["moderation"])
+	}
+
+	repo, _ := body["repository"].(map[string]any)
+	if repo["slug"] != "lastboard" {
+		t.Fatalf("the report does not name its board: %v", body["repository"])
+	}
+	org, _ := repo["organization"].(map[string]any)
+	if org["slug"] != "codigosh" {
+		t.Errorf("the report does not name the organisation: %v", repo)
 	}
 }

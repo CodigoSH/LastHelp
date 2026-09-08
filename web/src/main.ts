@@ -834,10 +834,25 @@ async function showItem(publicID: string): Promise<void> {
     // Only the button is redrawn. Replacing the page would scroll the thread
     // back to the top under whoever was reading it.
     button.classList.toggle("voted", result.voted);
-    button.firstChild!.textContent = ` ${result.voted ? i18n.t("item.voted") : i18n.t("item.vote")} `;
+    button.setAttribute("aria-pressed", result.voted ? "true" : "false");
+    const label = button.querySelector(".label");
+    if (label) label.textContent = result.voted ? i18n.t("item.voted") : i18n.t("item.vote");
     const count = button.querySelector(".count");
     if (count) count.textContent = i18n.number(result.votes);
   });
+
+  // The reporter's way back to their own report. The address is this page's,
+  // token and all, and it is filled in here rather than in the template
+  // because the template is a pure function and does not know where it is.
+  const follow = root?.querySelector<HTMLInputElement>("[data-follow-link]");
+  if (follow) {
+    follow.value = location.href;
+    root?.querySelector<HTMLButtonElement>(".yours [data-copy]")?.addEventListener("click", async (event) => {
+      await navigator.clipboard?.writeText(follow.value).catch(() => undefined);
+      const span = (event.currentTarget as HTMLElement).querySelector("span");
+      if (span) span.textContent = i18n.t("sent.copied");
+    });
+  }
 
   // The team's control, and only if the server says this person may use it.
   // Asking is the check; drawing the select is not. A page that decides for
@@ -847,8 +862,10 @@ async function showItem(publicID: string): Promise<void> {
       .get<{ current: string; statuses: string[] }>(`/api/items/${encodeURIComponent(publicID)}/statuses`)
       .catch(() => null);
     if (allowed) {
-      root
-        ?.querySelector("article.detail")
+      const tools = root?.querySelector<HTMLElement>(".team-tools");
+      if (tools) tools.hidden = false;
+      tools
+        ?.querySelector(".tools")
         ?.insertAdjacentHTML("beforeend", views.statusControl(allowed.current, allowed.statuses, text));
 
       root?.querySelector<HTMLSelectElement>("#status-select")?.addEventListener("change", async (e) => {
@@ -965,7 +982,7 @@ function wireChannel(orgSlug: string): void {
  */
 function wireIssueControl(publicID: string, linked: { number: number; url: string } | null): void {
   root
-    ?.querySelector("article.detail")
+    ?.querySelector(".team-tools .tools")
     ?.insertAdjacentHTML("beforeend", views.issueControl(linked, text));
 
   const note = root?.querySelector<HTMLParagraphElement>(".issue-note");
@@ -1000,7 +1017,7 @@ function wireIssueControl(publicID: string, linked: { number: number; url: strin
 
 /** Replying as the team, and merging a duplicate away. */
 function wireTriage(publicID: string): void {
-  root?.insertAdjacentHTML("beforeend", views.triageControls(text));
+  root?.querySelector(".team-tools .tools")?.insertAdjacentHTML("beforeend", views.triageControls(text));
 
   const note = root?.querySelector<HTMLParagraphElement>(".triage-note");
   const say = (key: string) => {
@@ -1695,6 +1712,12 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
   const items = body.items ?? [];
   const bodies = new Map(items.map((i) => [i.public_id, i.body]));
 
+  // The comments waiting on this board. Failing softly rather than taking the
+  // screen down with it: the reports are what somebody came here for.
+  const waiting = await api
+    .get<{ comments: views.WaitingComment[] }>(`${base}/comments`)
+    .catch(() => ({ comments: [] as views.WaitingComment[] }));
+
   const repo = await api.get<RepositorySummary & { organization?: OrganizationSummary }>(base);
   await showInShell(
     views.queueScreen(
@@ -1702,9 +1725,26 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
       repo,
       items,
       bodies,
+      waiting.comments ?? [],
       text,
     ),
     `/${orgSlug}/${repoSlug}/queue`,
+  );
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-comment-act]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const entry = button.closest<HTMLLIElement>("li[data-comment]");
+      const id = entry?.dataset.comment;
+      if (!id) return;
+      try {
+        await api.post(`/api/comments/${encodeURIComponent(id)}/moderation`, {
+          state: button.dataset.commentAct,
+        });
+        entry?.remove();
+      } catch (err) {
+        fail(err);
+      }
+    }),
   );
 
   root?.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((button) =>

@@ -386,6 +386,23 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	body["body"] = it.Body
 	body["comments"] = thread
 	body["mine"] = mine
+	// Where this came from. A report is the one page of this product that
+	// travels: it is pasted into a chat, mailed to a colleague, linked from an
+	// issue. Whoever arrives that way used to land on a title with no way to
+	// tell which project it belongs to and no way onward — the page named
+	// nothing and led nowhere.
+	if repo, err := s.orgs().RepositoryByID(it.RepoID); err == nil {
+		board := map[string]any{"slug": repo.Slug, "name": repo.Name}
+		if o, err := s.orgs().OrganizationByID(repo.OrgID); err == nil {
+			board["organization"] = map[string]any{"slug": o.Slug, "name": o.Name}
+		}
+		body["repository"] = board
+	}
+	// The reporter is the only one who can be here before publication, and the
+	// only one who needs to be told so. Without this the page had no way to
+	// tell the two apart, and told them their published report was still
+	// waiting to be read — for as long as they kept the link.
+	body["moderation"] = string(it.Moderation)
 	if linked, err := s.bridge().Link(it.ID); err == nil {
 		body["issue"] = map[string]any{"number": linked.Number, "url": linked.URL}
 	}

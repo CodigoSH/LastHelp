@@ -314,7 +314,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
 }
 
 .button.danger { color: var(--accent-alt); }
-.button.vote.voted { border-color: var(--accent); color: var(--accent-alt); }
 .button .count { font-variant-numeric: tabular-nums; font-weight: 600; }
 
 .link {
@@ -1611,3 +1610,173 @@ body > nav .brand {
     cursor: default;
   }
 }
+
+/* -------------------------------------------------------- one report, public */
+
+/* The page that travels: reached from a link somebody was sent, by a reader
+   who has not seen any other screen. The vote sits beside the report rather
+   than under it, because on an ideas board it is what the page is for. */
+.detail {
+  display: grid;
+  /* minmax(0,…) rather than 1fr: a long unbroken word in a title would
+     otherwise set the column's minimum and push the vote off the card. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: start;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  margin-block-start: 0.75rem;
+}
+
+.detail h1 { margin: 0.4rem 0 0.75rem; }
+.detail .meta { flex-wrap: wrap; margin: 0; }
+.detail .body { white-space: normal; }
+.detail .body p { margin: 0 0 0.7rem; }
+.detail .body p:last-child { margin-block-end: 0; }
+
+/* A vote is a number and a verb stacked, not a word with a number after it:
+   the count is what somebody scans for and the verb is what they press. */
+.vote-block {
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  min-inline-size: 4.75rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.vote-block:hover { border-color: var(--accent); }
+
+.vote-block .count {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.vote-block .label { font-size: 0.8rem; color: var(--text-muted); }
+
+.vote-block.voted {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+.vote-block.voted .count,
+.vote-block.voted .label { color: var(--accent-alt); }
+
+/* The forge issue, when there is one. It is a link off this site, so it says
+   so with the same arrow every other outbound link here uses. */
+.tracked {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--accent-alt);
+  text-decoration: none;
+}
+
+.tracked:hover { text-decoration: underline; }
+
+/* The reporter's own copy of the link. Only they ever see this card. */
+.yours { margin-block-start: 1rem; }
+
+.thread { margin-block-start: 1.75rem; }
+
+.thread h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* The number beside a heading, which is the heading's own word made countable.
+   It is never alone: the label is the h2 it sits in. */
+.count-chip {
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.comment .who {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+}
+
+.comment .avatar {
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  font-size: 0.7rem;
+}
+
+.comment .who-name { color: var(--text); font-weight: 600; }
+
+/* Who is answering matters more here than anywhere else in the product: a
+   reply from the team is the reason somebody opened the page again. */
+.who-badge {
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--accent-alt);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.comment .when { margin-inline-start: auto; }
+
+.comment-form { margin-block-start: 1rem; gap: 0.5rem; }
+.comment-form .hint { margin: 0; }
+
+.comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.comment-sent { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
+
+/* Narrow: the vote goes under the report rather than squeezing the title into
+   a column two words wide. */
+@media (max-width: 34rem) {
+  .detail { grid-template-columns: 1fr; }
+  .vote-block { justify-self: start; }
+}
+
+/* The comment queue sits under the reports on the same screen, so it needs a
+   heading of its own — two lists with one title reads as one list. */
+.queue-head { margin: 2rem 0 0; }
+
+.queue .on {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: start;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.queue .on:hover { color: var(--accent-alt); }
+
+/* The team's tools on a public report: their own card, under it. Inside the
+   report's own grid they became a second column and squeezed it to a strip. */
+.team-tools { margin-block-start: 1rem; }
+.team-tools .tools { display: grid; gap: 0.75rem; }
+.team-tools .tools h2 { font-size: 1rem; margin: 0.5rem 0 0; }
+.team-tools .triage { margin: 0; }
+.team-tools .status-control { margin: 0; }

@@ -103,6 +103,67 @@ func (s Store) Comments(itemID int64, moderation Moderation) ([]Comment, error) 
 	return out, rows.Err()
 }
 
+// Waiting is every comment on a repository that a person has still to look at,
+// newest first, each carrying the report it was written on.
+//
+// It exists because the rest of this file did not add up to anything: a
+// visitor's comment was stored as Pending and ApproveComment had no caller, so
+// the queue was write-only. The public page said "a person will read this
+// before it appears" and no person could — the promise was in the interface
+// and the way to keep it was missing.
+type Waiting struct {
+	Comment
+	ItemPublicID string
+	ItemTitle    string
+}
+
+func (s Store) WaitingComments(repoID int64, limit int) ([]Waiting, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, c.author_ref, c.body,
+		c.moderation_state, c.created_at, i.public_id, i.title
+		FROM comment c
+		JOIN item i ON i.id = c.item_id
+		WHERE i.repo_id = ? AND c.moderation_state = ?
+		ORDER BY c.created_at DESC, c.id DESC LIMIT ?`,
+		repoID, string(Pending), limit)
+	if err != nil {
+		return nil, fmt.Errorf("reading the comment queue: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Waiting
+	for rows.Next() {
+		var (
+			w       Waiting
+			author  string
+			mod     string
+			created int64
+		)
+		if err := rows.Scan(&w.ID, &w.ItemID, &author, &w.AuthorRef, &w.Body, &mod, &created,
+			&w.ItemPublicID, &w.ItemTitle); err != nil {
+			return nil, fmt.Errorf("reading the comment queue: %w", err)
+		}
+		w.Author = Author(author)
+		w.Moderation = Moderation(mod)
+		w.CreatedAt = time.Unix(created, 0)
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}
+
+// CommentItem is which report a comment belongs to, which is what authorising
+// a decision about it needs: the rules are written about repositories, and a
+// comment id on its own names nothing they can answer about.
+func (s Store) CommentItem(commentID int64) (Item, error) {
+	var itemID int64
+	if err := s.DB.QueryRow(`SELECT item_id FROM comment WHERE id = ?`, commentID).Scan(&itemID); err != nil {
+		return Item{}, ErrNotFound
+	}
+	return s.ByID(itemID)
+}
+
 // ApproveComment publishes one that was waiting.
 func (s Store) ApproveComment(id int64) error {
 	res, err := s.DB.Exec(`UPDATE comment SET moderation_state = ? WHERE id = ?`, string(Published), id)

@@ -582,52 +582,150 @@ export function submitted(link: string, text: Text): string {
     </div>`;
 }
 
+/**
+ * One report, in public.
+ *
+ * This is the page that travels. Every other screen is reached by walking the
+ * product; this one arrives in somebody's chat as a bare link, and whoever
+ * opens it has never seen the rest. So it says three things the old one did
+ * not: which board it belongs to, and a way back to it; what state it is in,
+ * in the colour the board uses rather than as one more grey word; and, for a
+ * reporter following their own submission, whether it is on the board yet.
+ *
+ * The vote is a block rather than a button in a row. On an ideas board it is
+ * the whole point of the page, and it was a grey rectangle the same weight as
+ * "Send".
+ */
 export function itemView(item: ItemDetail, text: Text): string {
-  const merged = item.merged_into
-    ? `<p class="notice"><a href="/i/${escapeAttr(item.merged_into)}">${escapeHTML(text.t("item.merged"))}</a></p>`
+  const board = item.repository;
+  const org = board?.organization;
+  const crumb = board
+    ? `<p class="crumb">${
+        org ? `<a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a> <span aria-hidden="true">/</span> ` : ""
+      }<a href="/${escapeAttr(org?.slug ?? "")}/${escapeAttr(board.slug)}">${escapeHTML(board.name)}</a></p>`
     : "";
 
-  // Only the reporter ever sees an item that is still waiting, and they should
-  // be told why it is not on the board rather than left wondering.
-  const waiting = item.mine ? `<p class="notice">${escapeHTML(text.t("item.waiting"))}</p>` : "";
+  const merged = item.merged_into
+    ? `<p class="notice">${icons.info()}<a href="/i/${escapeAttr(item.merged_into)}">${escapeHTML(text.t("item.merged"))}</a></p>`
+    : "";
+
+  // Only the reporter is ever on this page before it is published, and the
+  // notice is for exactly that moment. It used to be drawn for anybody holding
+  // a follow link, which meant a published report told its own author, forever,
+  // that it was still waiting to be read.
+  const waiting =
+    item.mine && item.moderation && item.moderation !== "published"
+      ? `<p class="notice">${icons.queue()}<span>${escapeHTML(text.t("item.waiting"))}</span></p>`
+      : "";
+
+  // The way back to their own report, for the person who has it. The link they
+  // were given at submission time is this page's address plus the token, and
+  // this is the one place they can find it again without a browser history.
+  const yours = item.mine
+    ? `<section class="bento-card yours">
+        <div class="card-head">${icons.person()}<h3>${escapeHTML(text.t("item.yours"))}</h3></div>
+        <span class="card-sub">${escapeHTML(text.t("item.yoursHelp"))}</span>
+        <div class="follow-link">
+          <input readonly data-follow-link value="" aria-label="${escapeAttr(text.t("sent.copy"))}" />
+          ${actionButton("copy", text.t("sent.copy"), "data-copy")}
+        </div>
+      </section>`
+    : "";
 
   const vote =
     item.kind === "idea"
-      ? `<button class="button vote${item.voted ? " voted" : ""}" data-vote>
-           ${escapeHTML(item.voted ? text.t("item.voted") : text.t("item.vote"))}
+      ? `<button class="vote-block${item.voted ? " voted" : ""}" data-vote
+           aria-pressed="${item.voted ? "true" : "false"}">
            <span class="count">${escapeHTML(text.number(item.votes))}</span>
+           <span class="label">${escapeHTML(item.voted ? text.t("item.voted") : text.t("item.vote"))}</span>
          </button>`
       : "";
 
-  const thread = item.comments
-    .map(
-      (c) => `<li class="comment comment-${escapeAttr(c.author)}">
-        <p class="who">${escapeHTML(c.name || text.t(`comment.${c.author}`))} · ${escapeHTML(text.date(c.created_at))}</p>
-        <p class="what">${escapeHTML(c.body)}</p>
-      </li>`,
-    )
+  // The forge issue, when the team has bridged this one. It is what a reporter
+  // came to find out — whether anybody is actually working on it — and it was
+  // already in the payload, drawn only for signed-in staff.
+  const issue = item.issue
+    ? `<a class="tracked" href="${escapeAttr(item.issue.url)}" target="_blank" rel="noopener">
+         ${icons.open(14)}<span>${escapeHTML(text.t("item.trackedAs", { number: text.number(item.issue.number) }))}</span>
+       </a>`
+    : "";
+
+  // Blank lines are how people write a report: what happened, then what they
+  // expected, then their version. Rendered as one run-on paragraph, a careful
+  // report reads like a worse one than it is.
+  const body = item.body
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `<p>${escapeHTML(part)}</p>`)
     .join("");
 
+  const thread =
+    item.comments.length === 0
+      ? `<p class="empty">${escapeHTML(text.t("item.threadEmpty"))}</p>`
+      : `<ul class="comments">${item.comments
+          .map((c) => {
+            const who = c.name || text.t(`comment.${c.author}`);
+            return `<li class="comment comment-${escapeAttr(c.author)}">
+              <p class="who">
+                ${avatar(who)}
+                <span class="who-name">${escapeHTML(who)}</span>
+                ${c.author === "team" ? `<span class="who-badge">${escapeHTML(text.t("comment.team"))}</span>` : ""}
+                <span class="when">${escapeHTML(text.date(c.created_at))}</span>
+              </p>
+              <p class="what">${escapeHTML(c.body)}</p>
+            </li>`;
+          })
+          .join("")}</ul>`;
+
   return `
-    ${merged}${waiting}
+    ${crumb}${merged}${waiting}
     <article class="detail">
-      <p class="meta">
-        <span class="kind kind-${escapeAttr(item.kind)}">${escapeHTML(text.t(`kind.${item.kind}`))}</span>
-        <span class="status">${escapeHTML(text.t(`status.${item.status}`))}</span>
-        <span class="when">${escapeHTML(text.date(item.created_at))}</span>
-      </p>
-      <h1>${escapeHTML(item.title)}</h1>
-      <p class="body">${escapeHTML(item.body)}</p>
+      <div class="detail-main">
+        <p class="meta">
+          <span class="kind kind-${escapeAttr(item.kind)}">
+            ${item.kind === "bug" ? icons.bug(14) : icons.idea(14)}
+            <span>${escapeHTML(text.t(`kind.${item.kind}`))}</span>
+          </span>
+          <span class="status status-${escapeAttr(item.status)}">${escapeHTML(text.t(`status.${item.status}`))}</span>
+          <span class="when">${escapeHTML(text.date(item.created_at))}</span>
+          ${issue}
+        </p>
+        <h1>${escapeHTML(item.title)}</h1>
+        <div class="body">${body}</div>
+      </div>
       ${vote}
     </article>
 
+    <!--
+      The team's tools have a container of their own, and it is not inside the
+      report. They used to be appended to the article, which made them children
+      of its grid: the status select and the attach-an-issue form became a
+      second column, and the report itself was squeezed into a strip a few
+      words wide. Nothing in the markup looked wrong — it was two correct
+      pieces meeting badly, and it only showed up in a screenshot.
+    -->
+    <section class="bento-card team-tools" hidden>
+      <div class="card-head">${icons.people()}<h3>${escapeHTML(text.t("panel.teamTools"))}</h3></div>
+      <span class="card-sub">${escapeHTML(text.t("panel.teamToolsHelp"))}</span>
+      <div class="tools"></div>
+    </section>
+
+    ${yours}
+
     <section class="thread">
-      <h2>${escapeHTML(text.t("item.comments"))}</h2>
-      <ul class="comments">${thread}</ul>
-      <form class="comment-form">
-        <textarea name="body" rows="3" placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
-        <button class="button" type="submit">${escapeHTML(text.t("form.send"))}</button>
-        <p class="comment-sent" role="status" hidden>${escapeHTML(text.t("item.commentWaiting"))}</p>
+      <h2>${escapeHTML(text.t("item.comments"))}
+        <span class="count-chip">${escapeHTML(text.number(item.comments.length))}</span></h2>
+      ${thread}
+      <form class="comment-form bento-card">
+        <label for="comment-body">${escapeHTML(text.t("item.addComment"))}</label>
+        <textarea id="comment-body" name="body" rows="3"
+                  placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
+        <p class="hint">${escapeHTML(text.t("item.commentHint"))}</p>
+        <div class="comment-actions">
+          <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
+          <p class="comment-sent" role="status" hidden>${escapeHTML(text.t("item.commentWaiting"))}</p>
+        </div>
       </form>
     </section>`;
 }
@@ -670,11 +768,20 @@ export function signInForm(text: Text): string {
  * one that happens most and is the primary, spam is destructive and reads as
  * it, rejecting sits between them.
  */
+export interface WaitingComment {
+  id: number;
+  author: string;
+  body: string;
+  created_at: number;
+  item: { public_id: string; title: string };
+}
+
 export function queueScreen(
   org: OrganizationSummary,
   repo: RepositorySummary,
   items: ItemSummary[],
   bodies: Map<string, string>,
+  comments: WaitingComment[],
   text: Text,
 ): string {
   const header = `<p class="crumb"><a href="/panel/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
@@ -684,10 +791,37 @@ export function queueScreen(
         ${icons.open()}<span>${escapeHTML(text.t("shell.publicBoard"))}</span></a>
     </div>
     <p class="lead">${escapeHTML(
-      items.length === 0 ? text.t("queue.empty") : text.t("queue.lead", { count: items.length }),
+      items.length === 0 && comments.length === 0
+        ? text.t("queue.empty")
+        : text.t("queue.lead", { count: items.length }),
     )}</p>`;
 
-  if (items.length === 0) return header;
+  // The comments waiting, which is a second queue on the same board and not a
+  // second screen: somebody triaging works through what has arrived, and what
+  // has arrived is both kinds.
+  const commentQueue =
+    comments.length === 0
+      ? ""
+      : `<h2 class="queue-head">${escapeHTML(text.t("panel.commentsWaiting", { count: comments.length }))}</h2>
+        <ul class="queue">${comments
+          .map(
+            (c) => `<li class="bento-card" data-comment="${escapeAttr(String(c.id))}">
+              <p class="meta">
+                <span class="who-badge">${escapeHTML(text.t(`comment.${c.author}`))}</span>
+                <span class="when">${escapeHTML(text.date(c.created_at))}</span>
+              </p>
+              <p class="body">${escapeHTML(c.body)}</p>
+              <a class="on" href="/i/${escapeAttr(c.item.public_id)}"
+                 title="${escapeAttr(text.t("panel.commentOn"))}">${icons.open(14)}<span>${escapeHTML(c.item.title)}</span></a>
+              <div class="actions">
+                <button class="button primary with-icon" data-comment-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+                <button class="button ghost with-icon" data-comment-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+              </div>
+            </li>`,
+          )
+          .join("")}</ul>`;
+
+  if (items.length === 0) return `${header}${commentQueue}`;
 
   return `${header}
     <ul class="queue">${items
@@ -706,7 +840,8 @@ export function queueScreen(
           </div>
         </li>`,
       )
-      .join("")}</ul>`;
+      .join("")}</ul>
+    ${commentQueue}`;
 }
 
 /* ------------------------------------------------------------------ wizards

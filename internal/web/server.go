@@ -199,9 +199,11 @@ func (s *Server) routes() {
 	private("POST /api/organizations", s.handleCreateOrganization)
 	private("POST /api/orgs/{org}/repositories", s.handleCreateRepository)
 	private("GET /api/orgs/{org}/repos/{repo}/queue", s.handleQueue)
+	private("GET /api/orgs/{org}/repos/{repo}/comments", s.handleCommentQueue)
 	private("GET /api/orgs/{org}/repos/{repo}/export", s.handleExport)
 
 	private("POST /api/items/{id}/moderation", s.handleModerate)
+	private("POST /api/comments/{id}/moderation", s.handleModerateComment)
 	private("GET /api/items/{id}/statuses", s.handleStatuses)
 	private("POST /api/items/{id}/status", s.handleSetStatus)
 	private("POST /api/items/{id}/merge", s.handleMerge)
