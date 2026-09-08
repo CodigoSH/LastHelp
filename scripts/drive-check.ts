@@ -149,7 +149,7 @@ async function main() {
   // nobody can sign into: there is no reset here.
   const mismatch = await evaluate(`
     const f = document.querySelector("form.setup-account");
-    f.querySelector('[name=username]').value = "k4wit0";
+    f.querySelector('[name=username]').value = "alex";
     f.querySelector('[name=password]').value = "una contraseña larga de verdad";
     f.querySelector('[name=password_again]').value = "otra cosa completamente";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
@@ -715,7 +715,7 @@ async function main() {
     // Back to the administrator: the previous block left an owner signed in,
     // and creating an account is not an owner's to do.
     await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
-    await post("/api/session", { username: "k4wit0", password: "una contraseña larga de verdad" });
+    await post("/api/session", { username: "alex", password: "una contraseña larga de verdad" });
 
     await post("/api/people", { username: "ana", display_name: "Ana", password: "una contraseña larga de verdad" });
     const people = await fetch("/api/people").then(r => r.json());

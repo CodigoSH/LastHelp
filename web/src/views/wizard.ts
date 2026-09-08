@@ -19,9 +19,10 @@ import type { Text } from "./templates";
  * machine values: translating them would invent accounts that do not exist, and
  * the point of an example is that the reader can recognise the shape.
  *
- * They are also real. `git.codigosh.com/CodigoSH/LastHelp` is this project;
- * showing `example.com/my-org/my-repo` teaches nothing about what a forge owner
- * actually looks like.
+ * They are also real projects rather than `example.com/my-org/my-repo`, which
+ * teaches nothing about what a forge owner actually looks like. Real, and
+ * somebody else's: an example is a shape to recognise, not an invitation to
+ * read whoever runs this installation.
  */
 export interface ForgeExample {
   url: string;
@@ -56,9 +57,9 @@ export const forgeExamples: Record<string, ForgeExample> = {
     where: "Settings → Applications → Access tokens",
   },
   forgejo: {
-    url: "https://git.codigosh.com",
-    owner: "CodigoSH",
-    repo: "LastHelp",
+    url: "https://codeberg.org",
+    owner: "forgejo",
+    repo: "forgejo",
     scope: "write:issue",
     where: "Settings → Applications → Access tokens",
   },

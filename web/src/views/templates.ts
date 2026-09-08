@@ -308,11 +308,11 @@ export function connectionForms(
               options: kinds.map(([v, l]) => [v ?? "", l ?? ""] as [string, string]),
             })}
             <div class="channel-fields" hidden>
-              ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/lasthelp" }, text)}
+              ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/acme-feedback" }, text)}
               ${field({ id: "chan-token", name: "token", label: text.t("panel.token"), type: "password" }, text)}
             </div>
             <div class="channel-mail" hidden>
-              ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "equipo@codigosh.com" }, text)}
+              ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "team@example.com" }, text)}
             </div>
             <p class="form-error" role="alert" hidden></p>
             <div class="wizard-actions"><span class="spacer"></span>
@@ -992,7 +992,7 @@ function accountFields(text: Text, picture = ""): string {
       required: true,
       autocomplete: "username",
       hint: text.t("auth.usernameHelp"),
-      example: "k4wit0",
+      example: "alex",
     }, text) +
     field({
       id: "password",
@@ -1062,7 +1062,7 @@ export function organizationFields(text: Text, forge: string): string {
       name: "name",
       label: text.t("panel.name"),
       hint: text.t("panel.nameHelp"),
-      example: "CodigoSH",
+      example: "Acme",
       required: true,
     }, text) +
     field({
@@ -1070,7 +1070,7 @@ export function organizationFields(text: Text, forge: string): string {
       name: "slug",
       label: text.t("panel.address"),
       hint: text.t("panel.addressHelp"),
-      example: "codigosh",
+      example: "acme",
       required: true,
       pattern: "[a-z0-9]+(-[a-z0-9]+)*",
     }, text) +
@@ -1225,7 +1225,7 @@ export function setupWizard(
             name: "name",
             label: text.t("setup.instanceName"),
             hint: text.t("setup.instanceNameHelp"),
-            example: "CodigoSH",
+            example: "Acme",
           },
           text,
         ) +
@@ -1650,7 +1650,7 @@ export function profileScreen(
         <div class="card-head">${icons.person()}<h3>${escapeHTML(text.t("profile.name"))}</h3></div>
         <span class="card-sub">${escapeHTML(text.t("profile.nameHelp"))}</span>
         <form class="profile-name">
-          ${field({ id: "display-name", name: "display_name", label: text.t("profile.name"), value: me.name ?? "", example: "k4wit0" }, text)}
+          ${field({ id: "display-name", name: "display_name", label: text.t("profile.name"), value: me.name ?? "", example: "Alex" }, text)}
           <p class="form-error" role="alert" hidden></p>
           <div class="wizard-actions"><span class="spacer"></span>
             <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
@@ -1725,7 +1725,7 @@ export function personalizationScreen(
 
     <form class="instance-settings">
       <div class="wizard-card">
-        ${field({ id: "instance-name", name: "name", label: text.t("setup.instanceName"), hint: text.t("setup.instanceNameHelp"), value: instance.name, example: "CodigoSH" }, text)}
+        ${field({ id: "instance-name", name: "name", label: text.t("setup.instanceName"), hint: text.t("setup.instanceNameHelp"), value: instance.name, example: "Acme" }, text)}
 
         <div class="field">
           <label>${escapeHTML(text.t("personalization.logo"))}</label>

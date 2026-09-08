@@ -36,19 +36,19 @@ curl -X POST "$BASE/api/organizations" \
   -H 'Content-Type: application/json' \
   -H "X-CSRF-Token: $CSRF" -H 'Sec-Fetch-Site: same-origin' \
   -b cookies.txt -c cookies.txt \
-  -d '{"slug":"codigosh","name":"CodigoSH","forge":"forgejo",
-       "base_url":"https://git.example.com","forge_owner":"CodigoSH"}'
+  -d '{"slug":"acme","name":"Acme","forge":"forgejo",
+       "base_url":"https://git.example.com","forge_owner":"acme"}'
 
-curl -X POST "$BASE/api/orgs/codigosh/repositories" \
+curl -X POST "$BASE/api/orgs/acme/repositories" \
   -H 'Content-Type: application/json' \
   -H "X-CSRF-Token: $CSRF" -H 'Sec-Fetch-Site: same-origin' \
   -b cookies.txt -c cookies.txt \
-  -d '{"slug":"lastboard","name":"Lastboard","accepts_bugs":true,"accepts_ideas":true}'
+  -d '{"slug":"atlas","name":"Atlas","accepts_bugs":true,"accepts_ideas":true}'
 ```
 
-The repository is then at `/codigosh/lastboard`, its roadmap at
-`/codigosh/lastboard/roadmap`, and its feed at
-`/feed/codigosh/lastboard/atom.xml`.
+The repository is then at `/acme/atlas`, its roadmap at
+`/acme/atlas/roadmap`, and its feed at
+`/feed/acme/atlas/atom.xml`.
 
 `forge` may be `github`, `gitlab`, `gitea`, `forgejo` or `none`. **`none` is a
 supported way to run**, not a placeholder: everything except turning an item into

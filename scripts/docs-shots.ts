@@ -124,31 +124,41 @@ const seeded = await evaluate(`
   // taking. Nothing checked the answer, so setup failed, everything after it
   // ran with no session, and the images were of an unclaimed instance — with a
   // tick printed for each one.
-  const claimed = await post("/api/setup", { username: "k4wit0", password: "a good long passphrase" });
+  const claimed = await post("/api/setup", { username: "alex", password: "a good long passphrase" });
   if (claimed !== 201) throw new Error("could not claim the instance: HTTP " + claimed);
 
-  await post("/api/instance", { name: "CodigoSH", logo: "", accent: "" });
-  await post("/api/organizations", { slug: "codigosh", name: "CodigoSH", forge: "forgejo" });
-  await post("/api/orgs/codigosh/repositories", {
-    slug: "lastboard", name: "Lastboard", accepts_bugs: true, accepts_ideas: true,
+  await post("/api/instance", { name: "Acme", logo: "", accent: "" });
+  await post("/api/organizations", { slug: "acme", name: "Acme", forge: "forgejo" });
+  await post("/api/orgs/acme/repositories", {
+    slug: "atlas", name: "Atlas", accepts_bugs: true, accepts_ideas: true,
   });
 
-  const submit = async (kind, title, body) => {
-    const form = await fetch("/api/orgs/codigosh/repos/lastboard/form").then(r => r.json());
+  const submit = async (kind, title, body, fields = {}) => {
+    const form = await fetch("/api/orgs/acme/repos/atlas/form").then(r => r.json());
     // The form token refuses anything faster than a person types.
     await new Promise(r => setTimeout(r, 2200));
-    const res = await fetch("/api/orgs/codigosh/repos/lastboard/items", {
+    const res = await fetch("/api/orgs/acme/repos/atlas/items", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ kind, title, body, token: form.token }),
+      body: JSON.stringify({ kind, title, body, fields, token: form.token }),
     });
     return (await res.json()).public_id;
   };
 
   const ids = [];
   ids.push(await submit("idea", "Dark mode for the dashboard", "The white is bright at night."));
-  ids.push(await submit("bug", "Crashes when importing a folder", "It closes with no message."));
   ids.push(await submit("idea", "Export the reports to CSV", "For a monthly report."));
+  // Last, so it is the one left waiting: the picture of the queue is there to
+  // show what a triage decision looks like, and a bug with its version and its
+  // steps is the decision. An idea with one sentence shows nothing.
+  ids.push(
+    await submit("bug", "Crashes when importing a folder", "It closes with no message.", {
+      // The two the form asks a bug, so the pictures of the queue and of a
+      // report show what a usable one looks like rather than a bare sentence.
+      version: "1.4.2",
+      steps: "1. Open a board\\n2. Import a folder of photos\\n3. It closes",
+    }),
+  );
 
   // All but the last, so the queue screenshot has something in it. Publishing
   // everything left that page showing "nothing waiting" — a picture of the
@@ -158,7 +168,7 @@ const seeded = await evaluate(`
     await post("/api/items/" + id + "/moderation", { state: "published" });
   }
   await post("/api/items/" + ids[0] + "/status", { status: "planned" });
-  await post("/api/items/" + ids[1] + "/status", { status: "confirmed" });
+  await post("/api/items/" + ids[1] + "/status", { status: "in_progress" });
   await post("/api/items/" + ids[0] + "/votes", {});
   return ids;
 `);
@@ -167,16 +177,16 @@ if (!Array.isArray(seeded) || seeded.length !== 3) {
   process.exit(1);
 }
 
-await go("/codigosh/lastboard");
+await go("/acme/atlas");
 await shoot("board");
 
-await go("/codigosh/lastboard/new");
+await go("/acme/atlas/new");
 await shoot("report");
 
-await go("/codigosh/lastboard/roadmap");
+await go("/acme/atlas/roadmap");
 await shoot("roadmap");
 
-await go("/codigosh/lastboard/queue");
+await go("/acme/atlas/queue");
 await shoot("queue");
 
 await go(`/i/${seeded[0]}`);

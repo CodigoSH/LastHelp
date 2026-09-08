@@ -47,7 +47,7 @@ to read it through the panel.
 Over the API, which is what the panel calls:
 
 ```sh
-curl -X POST "$BASE/api/orgs/codigosh/credentials" \
+curl -X POST "$BASE/api/orgs/acme/credentials" \
   -H 'Content-Type: application/json' \
   -H "X-CSRF-Token: $CSRF" -H 'Sec-Fetch-Site: same-origin' \
   -b cookies.txt \

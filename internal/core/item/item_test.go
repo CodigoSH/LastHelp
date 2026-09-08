@@ -332,7 +332,7 @@ func TestTheThreadWaitsForAHumanExceptForTheTeam(t *testing.T) {
 	s := store(t)
 	it, _ := report(t, s, Idea, "dark mode", "")
 
-	fromTeam, err := s.Comment(it.ID, AuthorTeam, "k4wit0", "looking at it", epoch)
+	fromTeam, err := s.Comment(it.ID, AuthorTeam, "alex", "looking at it", epoch)
 	if err != nil {
 		t.Fatal(err)
 	}

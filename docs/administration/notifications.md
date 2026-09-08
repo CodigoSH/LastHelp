@@ -18,7 +18,7 @@ channel, and it asks only for what that channel needs.
 Or over the API, which is what the panel calls:
 
 ```sh
-curl -X POST "$BASE/api/orgs/codigosh/repos/lastboard/channel" \
+curl -X POST "$BASE/api/orgs/acme/repos/atlas/channel" \
   -H 'Content-Type: application/json' \
   -H "X-CSRF-Token: $CSRF" -H 'Sec-Fetch-Site: same-origin' -b cookies.txt \
   -d '{"kind":"ntfy","url":"https://ntfy.sh/your-private-topic"}'
@@ -45,7 +45,7 @@ is the one place the moderation queue exists to keep it out of.
 account, and stores nothing about whoever subscribes:
 
 ```
-https://help.example.com/feed/codigosh/lastboard/atom.xml
+https://help.example.com/feed/acme/atlas/atom.xml
 ```
 
 It carries published items only, through the same listing the public page uses,
