@@ -15,6 +15,9 @@
 const PORT = Number(process.env.PORT ?? 8099);
 const CDP = Number(process.env.CDP ?? 9222);
 const OUT = process.env.OUT ?? "docs/images";
+// The two images the repository itself shows. Generated like the rest: a mark
+// somebody exported by hand once is a mark nobody can reproduce when it changes.
+const ASSETS = process.env.ASSETS ?? "assets";
 const BASE = `http://127.0.0.1:${PORT}`;
 
 const WIDTH = 1280;
@@ -54,6 +57,7 @@ function open(url: string) {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 await Bun.$`mkdir -p ${OUT}`.quiet();
+await Bun.$`mkdir -p ${ASSETS}`.quiet();
 
 const page = await open((await target("about:blank")).webSocketDebuggerUrl);
 await page.send("Page.enable");
@@ -219,6 +223,59 @@ await shoot("organization");
 
 await go("/sign-in");
 await shoot("sign-in");
+
+// --- what the repository itself shows ---------------------------------------
+
+// The mark, rasterised on a transparent ground for the places that will not
+// render an SVG.
+//
+// The file's own text is put into the page rather than pointed at over HTTP: a
+// data: document cannot fetch from another origin, and the first version of
+// this wrote a 320px picture of a broken-image icon — with a tick beside it
+// saying the file had been written, which is exactly what a tick means and no
+// more.
+const svg = await Bun.file("web/public/logo.svg").text();
+await page.send("Emulation.setDeviceMetricsOverride", {
+  width: 320, height: 320, deviceScaleFactor: 2, mobile: false,
+});
+await page.send("Emulation.setDefaultBackgroundColorOverride", { color: { r: 0, g: 0, b: 0, a: 0 } });
+await page.send("Page.navigate", {
+  url: "data:text/html," + encodeURIComponent(
+    `<body style="margin:0"><div style="width:320px;height:320px">${svg}</div></body>`),
+});
+await sleep(900);
+const drawn = await evaluate(`
+  const box = document.querySelector("svg")?.getBoundingClientRect();
+  return box ? Math.round(box.width) : 0;
+`);
+if (Number(drawn) < 300) throw new Error("the mark did not render: " + drawn + "px");
+const mark = await page.send("Page.captureScreenshot", {
+  format: "png", clip: { x: 0, y: 0, width: 320, height: 320, scale: 1 },
+});
+await Bun.write(`${ASSETS}/logo.png`, Buffer.from(mark.data, "base64"));
+console.log(`  wrote ${ASSETS}/logo.png (320x320)`);
+await page.send("Emulation.setDefaultBackgroundColorOverride");
+
+// And the picture at the top of the README: a board as everybody else sees it,
+// which is what this product is for.
+await page.send("Emulation.setDeviceMetricsOverride", {
+  width: 1440, height: 900, deviceScaleFactor: 2, mobile: false,
+});
+await go("/acme/atlas");
+// Down to the last row rather than to the bottom of the page: main carries a
+// hand's width of padding under it, which in a picture is a hand's width of
+// nothing.
+const hero = await evaluate(`
+  const rows = [...document.querySelectorAll(".items li")];
+  const last = rows[rows.length - 1] ?? document.querySelector("main");
+  return Math.min(Math.ceil(last.getBoundingClientRect().bottom) + 40, 900);
+`);
+const shot = await page.send("Page.captureScreenshot", {
+  format: "png", captureBeyondViewport: true,
+  clip: { x: 0, y: 0, width: 1440, height: Number(hero), scale: 2 },
+});
+await Bun.write(`${ASSETS}/mockup.png`, Buffer.from(shot.data, "base64"));
+console.log(`  wrote ${ASSETS}/mockup.png (1440x${hero})`);
 
 page.close();
 console.log("\nlook at the images. A tick above says a file was written, nothing more.");
