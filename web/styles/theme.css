@@ -3124,3 +3124,307 @@ a.bento-card:hover,
 .page > .wizard-actions {
   margin-block-start: 0;
 }
+
+/* ------------------------------------------------------------ the overview
+ *
+ * A number on its own answers "how many" and nothing else. What follows is for
+ * the three things it cannot say — whether it is getting busier, what people
+ * are actually asking for, and which board the work is in — and for the fact
+ * that every tile is now a way into the listing it counts.
+ */
+
+/* A card that takes the whole row, whatever the row is. The chart is read
+   across: at a quarter of the window it is a smear. */
+.dash-card.full {
+  grid-column: 1 / -1;
+}
+
+.dash-card > h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 1.1rem 0.5rem;
+}
+
+.stat-go {
+  position: absolute;
+  inset-block-start: 0.9rem;
+  inset-inline-end: 0.9rem;
+  color: var(--border-strong);
+  transform: scaleX(var(--rtl-flip));
+  transition: color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+a.stat:hover .stat-go {
+  color: var(--accent);
+  transform: scaleX(var(--rtl-flip)) translateX(2px);
+}
+
+.dash-card:has(a.stat):hover {
+  border-color: var(--accent-line);
+  box-shadow: var(--shadow-2), var(--hairline);
+}
+
+/* --------------------------------------------------------------- the chart */
+
+.chart-wrap {
+  margin: 0 1.1rem 1rem;
+}
+
+.chart {
+  display: block;
+  inline-size: 100%;
+  block-size: clamp(6rem, 14vw, 9rem);
+  overflow: visible;
+}
+
+/* The gradient stops are coloured here rather than in the markup, which is what
+   lets an operator's own accent reach the chart. */
+.chart-stop-top { stop-color: rgba(var(--accent-rgb), 0.45); }
+.chart-stop-bottom { stop-color: rgba(var(--accent-rgb), 0); }
+
+.chart-line {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-last {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ---------------------------------------------------------------- the ring */
+
+.donut-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin: 0 1.1rem 1.1rem;
+  flex-wrap: wrap;
+}
+
+.donut {
+  position: relative;
+  inline-size: 7rem;
+  flex: none;
+}
+
+.donut svg { display: block; inline-size: 100%; }
+
+.donut-middle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.donut-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.arc-track { stroke: var(--surface-2); }
+.arc-idea { stroke: var(--accent); }
+.arc-bug { stroke: var(--hue-open); }
+
+.legend {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  min-inline-size: 8rem;
+}
+
+.legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend .count {
+  margin-inline-start: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.swatch {
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+  border-radius: 3px;
+  flex: none;
+}
+
+.swatch-idea { background: var(--accent); }
+.swatch-bug { background: var(--hue-open); }
+
+/*
+ * The hue of a state, in one place for every shape that carries it.
+ *
+ * The chip sets it and so does a bar and so does a dot, so the mapping is
+ * written once against both class families rather than copied into each.
+ */
+.status-new, .status-confirmed, .hue-new, .hue-confirmed { --hue: var(--hue-open); }
+.status-planned, .hue-planned, .hue-pending { --hue: var(--hue-hold); }
+.status-in_progress, .status-in_forge, .hue-in_progress, .hue-in_forge { --hue: var(--hue-work); }
+.status-done, .hue-done, .hue-published { --hue: var(--hue-done); }
+.status-closed, .status-declined, .status-not_reproducible,
+.hue-closed, .hue-declined, .hue-not_reproducible, .hue-rejected, .hue-spam { --hue: var(--hue-off); }
+.hue-bug { --hue: var(--accent); }
+.hue-idea { --hue: var(--hue-open); }
+
+/* A bar takes the colour of what it counts. A chart in one grey is a chart you
+   have to read the labels of. */
+.bar-row .bar-fill {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--hue, var(--accent)) 70%, transparent), var(--hue, var(--accent)));
+}
+
+/* ------------------------------------------------------------- brief lists */
+
+.briefs, .board-rows {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0 1.1rem 1.1rem;
+}
+
+.brief, .board-rows a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid transparent;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.brief:hover, .board-rows a:hover {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+.brief-title {
+  flex: 1;
+  min-inline-size: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The mark of a kind, in the tile shape the rest of the product uses. */
+.kind-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--hue-open);
+}
+
+.kind-mark.kind-bug { color: var(--accent); }
+
+.score.small {
+  min-inline-size: 2.4rem;
+  padding: 0.25rem 0.4rem;
+}
+
+.score.small .count { font-size: 0.95rem; }
+
+/* The lead tile of a row that carries a mark rather than a number. */
+.score.mark {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.board-name { display: grid; min-inline-size: 0; }
+.board-name .card-sub { font-size: 0.75rem; }
+
+.board-counts {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-inline-start: auto;
+}
+
+.board-counts .count { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/* --------------------------------------------------------- the listing --- */
+
+.reports { margin-block-start: 1rem; }
+
+.report {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* The decision, under the thing to decide about, and only on what is waiting. */
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-inline-start: 4.3rem;
+}
+
+.chip.waiting {
+  border-color: color-mix(in srgb, var(--hue-hold) 40%, transparent);
+  background: color-mix(in srgb, var(--hue-hold) 12%, transparent);
+  color: var(--hue-hold);
+}
+
+.chip.waiting .icon { color: inherit; }
+
+/* The controls of a listing sit on their own line on a narrow window rather
+   than squeezing the search into three characters. */
+.controls select {
+  padding: 0.4rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.tabs .count-chip {
+  margin-inline-start: 0.4rem;
+  padding: 0 0.35rem;
+  background: transparent;
+  border-color: transparent;
+  font-size: 0.75rem;
+}
+
+.tab.on .count-chip {
+  background: var(--accent-wash);
+  border-color: var(--accent-line);
+  color: var(--accent-alt);
+}
+
+/* The chart reads across, not down: a tall box of mostly empty air says the
+   month was empty when it was only quiet. */
+.chart { block-size: clamp(4.5rem, 9vw, 6.5rem); }
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The ring and its legend sit in the middle of the card rather than at the top
+   of a box sized by whatever is beside it. */
+.dash-card:has(.donut-row) { display: grid; align-content: center; }

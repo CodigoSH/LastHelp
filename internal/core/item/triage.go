@@ -103,14 +103,25 @@ func (s Store) Merge(duplicateID, survivorID int64, now time.Time) error {
 
 // Filter narrows a listing.
 type Filter struct {
-	RepoID     int64
+	RepoID int64
+	// RepoIDs is several boards at once, which is what the panel's own listing
+	// needs: somebody who triages four repositories wants one screen, not four.
+	// When it is set RepoID is ignored; when both are empty nothing matches,
+	// which is the direction a mistake here should fail in.
+	RepoIDs    []int64
 	Kind       Kind       // empty for both
 	Status     Status     // empty for any
 	Moderation Moderation // empty for published only
-	Search     string     // empty for everything
-	SortByVote bool
-	Limit      int
-	Offset     int
+	// AnyModeration returns every state, including what is still waiting for a
+	// person. It has to be asked for by name: the public listing leaves the
+	// zero value alone and therefore cannot show something unreviewed by
+	// accident, which is the whole reason the default is "published" and not
+	// "everything".
+	AnyModeration bool
+	Search        string // empty for everything
+	SortByVote    bool
+	Limit         int
+	Offset        int
 }
 
 // List returns what matches, newest or most-wanted first.
@@ -119,13 +130,26 @@ type Filter struct {
 // it by name, which means the public listing cannot accidentally include
 // something waiting for a human.
 func (s Store) List(f Filter) ([]Item, error) {
-	where := []string{"repo_id = ?", "merged_into IS NULL"}
-	args := []any{f.RepoID}
+	where := []string{"merged_into IS NULL"}
+	var args []any
 
-	if f.Moderation == "" {
+	if len(f.RepoIDs) > 0 {
+		where = append(where, "repo_id IN ("+placeholders(len(f.RepoIDs))+")")
+		for _, id := range f.RepoIDs {
+			args = append(args, id)
+		}
+	} else {
+		where = append(where, "repo_id = ?")
+		args = append(args, f.RepoID)
+	}
+
+	switch {
+	case f.AnyModeration:
+		// Every state, asked for by name.
+	case f.Moderation == "":
 		where = append(where, "moderation_state = ?")
 		args = append(args, string(Published))
-	} else {
+	default:
 		where = append(where, "moderation_state = ?")
 		args = append(args, string(f.Moderation))
 	}
@@ -218,4 +242,57 @@ func ftsQuery(input string) string {
 		return `""`
 	}
 	return strings.Join(quoted, " OR ")
+}
+
+// placeholders is the "?, ?, ?" for an IN clause of a known length.
+//
+// The values are still bound; only the number of slots is built by hand, which
+// is the one thing a parameter cannot carry.
+func placeholders(n int) string {
+	return strings.TrimSuffix(strings.Repeat("?, ", n), ", ")
+}
+
+// countable is the set of columns Counts may group by.
+//
+// A whitelist rather than a quoted identifier: the column name goes into the
+// query as text, and the only safe way to put a caller's string there is to not
+// put a caller's string there.
+var countable = map[string]bool{"status": true, "kind": true, "moderation_state": true}
+
+// Counts groups the items of these boards by one column.
+//
+// It is what lets a listing say how many are waiting before anybody clicks the
+// tab that shows them — and it counts in the database, so a portal that has
+// been useful for two years opens as fast as one installed this morning.
+func (s Store) Counts(repoIDs []int64, column string) (map[string]int, error) {
+	out := map[string]int{}
+	if len(repoIDs) == 0 {
+		return out, nil
+	}
+	if !countable[column] {
+		return nil, fmt.Errorf("counting by %q is not something this counts by", column)
+	}
+
+	args := make([]any, 0, len(repoIDs))
+	for _, id := range repoIDs {
+		args = append(args, id)
+	}
+	rows, err := s.DB.Query(
+		`SELECT `+column+`, count(*) FROM item
+		  WHERE merged_into IS NULL AND repo_id IN (`+placeholders(len(repoIDs))+`)
+		  GROUP BY `+column, args...)
+	if err != nil {
+		return nil, fmt.Errorf("counting items: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var key string
+		var n int
+		if err := rows.Scan(&key, &n); err != nil {
+			return nil, err
+		}
+		out[key] = n
+	}
+	return out, rows.Err()
 }

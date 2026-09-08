@@ -683,6 +683,7 @@ async function render(): Promise<void> {
     if (path === "/setup/instance") return showSetupStep(3);
     if (path === "/setup/done") return showSetupDone();
     if (path === "/panel") return await showPanel();
+    if (path === "/panel/reports") return await showReports();
     if (path === "/panel/updates") return await showUpdates();
     if (path === "/panel/account") return await showProfile();
     if (path === "/panel/appearance") return await showAppearance();
@@ -1436,13 +1437,135 @@ async function showPanel(): Promise<void> {
   // The order this account arranged, or the one the screen ships with. A saved
   // layout is filtered against what exists, so a card removed in a later
   // version disappears instead of leaving a hole.
-  const saved = await api.get<{ cards: string[] | null }>("/api/me/dashboard").catch(() => null);
-  const layout = (saved?.cards ?? views.overviewCards).filter((name): name is views.OverviewCard =>
-    (views.overviewCards as readonly string[]).includes(name),
-  );
+  const saved = await api
+    .get<{ cards: string[] | null; known?: string[] }>("/api/me/dashboard")
+    .catch(() => null);
+  const layout = mergeDashboard(saved?.cards ?? null, saved?.known);
 
   await showInShell(views.overviewScreen(data, layout, arrangingDashboard, text), "/panel");
   wireDashboard(layout);
+}
+
+/**
+ * Every card that existed before the dashboard grew charts.
+ *
+ * It is a marker of a moment, not a list to keep up to date: a layout saved
+ * before this shipped carries no record of what existed when it was saved, so
+ * this is what it knew about. Anything outside it is a card that did not exist
+ * yet, which is why it is appended rather than treated as one somebody hid.
+ */
+const cardsKnownBeforeTheCharts = [
+  "reports",
+  "waiting",
+  "published",
+  "votes",
+  "organizations",
+  "repositories",
+  "people",
+  "kinds",
+  "statuses",
+  "moderation",
+  "recent",
+];
+
+/**
+ * What to draw: what this account arranged, plus what did not exist when they
+ * arranged it.
+ *
+ * The distinction is the whole point. A card missing from a saved layout is
+ * either one somebody hid on purpose — which must stay hidden — or one that
+ * shipped afterwards, which has to appear or the new work never reaches anybody
+ * who has ever touched the arrange button. Telling them apart is what `known`
+ * is stored for.
+ */
+function mergeDashboard(saved: string[] | null, known?: string[]): views.OverviewCard[] {
+  const exists = (name: string): name is views.OverviewCard =>
+    (views.overviewCards as readonly string[]).includes(name);
+
+  if (!saved) return [...views.overviewCards];
+
+  const seen = known ?? cardsKnownBeforeTheCharts;
+  const appended = views.overviewCards.filter((name) => !seen.includes(name) && !saved.includes(name));
+  return [...saved.filter(exists), ...appended];
+}
+
+/**
+ * The panel's own listing of reports.
+ *
+ * The filters live in the address rather than in a variable: a view somebody
+ * has narrowed down is then something they can bookmark, reload and send to
+ * whoever else looks after that board. Every control writes the address and
+ * the screen redraws from it, so there is one source of truth for what is on
+ * screen instead of two that drift.
+ */
+async function showReports(): Promise<void> {
+  me = await api.get<Me>("/api/me").catch(() => null);
+  if (!me) return go("/sign-in");
+
+  const query = new URLSearchParams(location.search);
+  const filters: views.ReportFilters = {
+    moderation: query.get("moderation") ?? "",
+    kind: query.get("kind") ?? "",
+    status: query.get("status") ?? "",
+    board: query.get("board") ?? "",
+    sort: query.get("sort") ?? "",
+    q: query.get("q") ?? "",
+  };
+
+  const data = await api
+    .get<views.ReportsData>(`/api/reports?${new URLSearchParams({ ...filters }).toString()}`)
+    .catch(() => null);
+  if (!data) {
+    await showInShell(views.emptyState(i18n.t("error.forbidden"), icons.warning(28)), "/panel/reports");
+    return;
+  }
+
+  await showInShell(views.reportsScreen(data, filters, text), "/panel/reports");
+
+  // One place that turns "what is on screen" into an address, so a control
+  // added later cannot forget half of it.
+  const narrow = (change: Partial<views.ReportFilters>) => {
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries({ ...filters, ...change })) {
+      if (value) next.set(key, String(value));
+    }
+    const search = next.toString();
+    go(`/panel/reports${search ? `?${search}` : ""}`);
+  };
+
+  for (const attr of ["moderation", "kind"] as const) {
+    root?.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`).forEach((button) =>
+      button.addEventListener("click", () => narrow({ [attr]: button.dataset[attr] ?? "" })),
+    );
+  }
+  root?.querySelector<HTMLSelectElement>("[data-status]")?.addEventListener("change", (event) =>
+    narrow({ status: (event.currentTarget as HTMLSelectElement).value }),
+  );
+  root?.querySelector<HTMLSelectElement>("[data-board]")?.addEventListener("change", (event) =>
+    narrow({ board: (event.currentTarget as HTMLSelectElement).value }),
+  );
+
+  const search = root?.querySelector<HTMLInputElement>("[data-q]");
+  search?.addEventListener(
+    "input",
+    debounce(() => narrow({ q: search.value }), 350),
+  );
+
+  // Triage from the list. The screen is redrawn rather than the row removed:
+  // under "everything" a published report stays, wearing its new state, and a
+  // row that vanished would read as a report that was deleted.
+  root?.querySelectorAll<HTMLButtonElement>(".report [data-act]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const id = button.closest<HTMLLIElement>("li[data-id]")?.dataset.id;
+      if (!id) return;
+      try {
+        await api.post(`/api/items/${encodeURIComponent(id)}/moderation`, { state: button.dataset.act });
+        await render();
+      } catch (err) {
+        report(err);
+      }
+    }),
+  );
 }
 
 /** True while the dashboard is being rearranged rather than read. */
@@ -1459,7 +1582,12 @@ let arrangingDashboard = false;
  */
 function wireDashboard(layout: views.OverviewCard[]): void {
   const save = async (cards: string[]) => {
-    await api.post("/api/me/dashboard", { cards }).catch(showFormError);
+    // What is visible, and what existed when it was decided. The second is what
+    // lets the next version tell a card somebody hid from one that had not been
+    // written yet.
+    await api
+      .post("/api/me/dashboard", { cards, known: [...views.overviewCards] })
+      .catch(showFormError);
     await render();
   };
 

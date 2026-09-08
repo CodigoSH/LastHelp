@@ -1,7 +1,10 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
+	"strconv"
+	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 )
@@ -25,6 +28,46 @@ type overview struct {
 	// LastReport is when the most recent report arrived, in seconds. Zero means
 	// none ever has — which is a state worth showing rather than a blank.
 	LastReport int64 `json:"last_report"`
+
+	// What the numbers above cannot say: whether it is getting busier, what
+	// people are actually asking for, and which board the work is in.
+	Series []dayCount   `json:"series"`
+	Top    []itemBrief  `json:"top"`
+	Recent []itemBrief  `json:"recent"`
+	Boards []boardCount `json:"boards"`
+}
+
+// dayCount is one day of the activity chart.
+//
+// Day is the start of a UTC day, and the browser labels it in the reader's own
+// locale. Bucketing by UTC means a report made late in the evening west of
+// Greenwich counts towards the next day; for a thirty-day trend that is a
+// rounding error, and the alternative is storing everybody's offset.
+type dayCount struct {
+	Day     int64 `json:"day"`
+	Reports int   `json:"reports"`
+}
+
+// itemBrief is a report as a line in a list: enough to recognise it and to go
+// to it, and nothing else.
+type itemBrief struct {
+	PublicID  string `json:"public_id"`
+	Title     string `json:"title"`
+	Kind      string `json:"kind"`
+	Status    string `json:"status"`
+	Votes     int    `json:"votes"`
+	CreatedAt int64  `json:"created_at"`
+}
+
+// boardCount is one repository with the size of its work on it.
+type boardCount struct {
+	Org          string `json:"org"`
+	Repo         string `json:"repo"`
+	Name         string `json:"name"`
+	Organization string `json:"organization"`
+	Published    int    `json:"published"`
+	Pending      int    `json:"pending"`
+	Votes        int    `json:"votes"`
 }
 
 // handleOverview counts what this installation holds.
@@ -91,5 +134,125 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var err error
+	if out.Series, err = s.activity(30); err != nil {
+		slog.Error("reading the activity", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if out.Top, err = s.briefs(`kind = 'idea' AND moderation_state = 'published'`, `vote_count DESC, created_at DESC`, 5); err != nil {
+		slog.Error("reading the most wanted", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if out.Recent, err = s.briefs(`1 = 1`, `created_at DESC`, 6); err != nil {
+		slog.Error("reading the newest", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if out.Boards, err = s.boardCounts(8); err != nil {
+		slog.Error("counting the boards", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
 	writeJSON(w, http.StatusOK, out)
+}
+
+// activity is how many reports arrived on each of the last n days.
+//
+// Every day is in the answer, including the empty ones: a chart drawn only from
+// the days something happened has no gaps in it, and therefore says a quiet
+// month was a busy one.
+func (s *Server) activity(days int) ([]dayCount, error) {
+	const day = int64(86400)
+	today := time.Now().UTC().Unix() / day * day
+	from := today - int64(days-1)*day
+
+	counted := map[int64]int{}
+	rows, err := s.db.Query(
+		`SELECT created_at / 86400 * 86400 AS day, count(*)
+		   FROM item WHERE merged_into IS NULL AND created_at >= ?
+		  GROUP BY day`, from)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var at int64
+		var n int
+		if err := rows.Scan(&at, &n); err != nil {
+			return nil, err
+		}
+		counted[at] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]dayCount, 0, days)
+	for at := from; at <= today; at += day {
+		out = append(out, dayCount{Day: at, Reports: counted[at]})
+	}
+	return out, nil
+}
+
+// briefs is a short list of reports, chosen and ordered by the caller.
+//
+// The two fragments are written here in this file and never come from a
+// request: they are a `where` and an `order by` that the callers below spell
+// out in full, not something a query string can reach.
+func (s *Server) briefs(where, order string, limit int) ([]itemBrief, error) {
+	rows, err := s.db.Query(
+		`SELECT public_id, title, kind, status, vote_count, created_at
+		   FROM item WHERE merged_into IS NULL AND (` + where + `)
+		  ORDER BY ` + order + ` LIMIT ` + strconv.Itoa(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := []itemBrief{}
+	for rows.Next() {
+		var b itemBrief
+		if err := rows.Scan(&b.PublicID, &b.Title, &b.Kind, &b.Status, &b.Votes, &b.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// boardCounts is the work per repository, busiest first.
+//
+// A LEFT JOIN, so a board with nothing on it is still a row: a repository
+// missing from this list because nobody has reported anything is exactly the
+// one somebody needs to be reminded of.
+func (s *Server) boardCounts(limit int) ([]boardCount, error) {
+	rows, err := s.db.Query(
+		`SELECT o.slug, r.slug, r.name, o.name,
+		        COALESCE(SUM(i.moderation_state = 'published'), 0),
+		        COALESCE(SUM(i.moderation_state = 'pending'), 0),
+		        COALESCE(SUM(i.vote_count), 0)
+		   FROM repository r
+		   JOIN organization o ON o.id = r.org_id
+		   LEFT JOIN item i ON i.repo_id = r.id AND i.merged_into IS NULL
+		  GROUP BY r.id
+		  ORDER BY 6 DESC, 5 DESC, r.name
+		  LIMIT ` + strconv.Itoa(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := []boardCount{}
+	for rows.Next() {
+		var b boardCount
+		if err := rows.Scan(&b.Org, &b.Repo, &b.Name, &b.Organization,
+			&b.Published, &b.Pending, &b.Votes); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
 }

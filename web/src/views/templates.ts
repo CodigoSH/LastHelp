@@ -14,6 +14,7 @@ import type {
   RepositorySummary,
 } from "../api";
 import { escapeAttr, escapeHTML } from "../escape";
+import { areaChart, donut } from "./charts";
 import { icons } from "./icons";
 import { actionButton, iconButton } from "./modal";
 
@@ -1678,6 +1679,10 @@ export function adminShell(spec: ShellSpec, text: Text): string {
         ${group(
           text.t("shell.groupWork"),
           item("/panel", text.t("shell.overview"), icons.overview()) +
+            // The daily work, and the screen this panel did not have: what is
+            // waiting, what is open and what was closed, across every board
+            // this account has a role in.
+            item("/panel/reports", text.t("shell.reports"), icons.queue()) +
             item("/panel/organizations", text.t("shell.organizations"), icons.organization()),
         )}
         ${group(
@@ -1755,21 +1760,42 @@ export function avatar(name: string, src?: string, big = false): string {
  * format, and reordering the default would silently rearrange everybody's
  * saved dashboard.
  */
+/**
+ * Every card the overview can show, in the order it shows them by default.
+ *
+ * Named rather than numbered, because the layout an account saves is a list of
+ * these names: a number would mean the order in this array is part of the wire
+ * format, and reordering the default would silently rearrange everybody's
+ * saved dashboard.
+ */
 export const overviewCards = [
   "reports",
   "waiting",
   "published",
   "votes",
+  "activity",
+  "kinds",
+  "statuses",
+  "top",
+  "recent",
+  "boards",
   "organizations",
   "repositories",
   "people",
-  "kinds",
-  "statuses",
   "moderation",
-  "recent",
 ] as const;
 
 export type OverviewCard = (typeof overviewCards)[number];
+
+/** One report as a line in a list: enough to recognise it and to go to it. */
+export interface Brief {
+  public_id: string;
+  title: string;
+  kind: string;
+  status: string;
+  votes: number;
+  created_at: number;
+}
 
 export interface OverviewData {
   organizations: number;
@@ -1782,10 +1808,49 @@ export interface OverviewData {
   statuses: Record<string, number>;
   moderation: Record<string, number>;
   last_report: number;
+  series: { day: number; reports: number }[];
+  top: Brief[];
+  recent: Brief[];
+  boards: {
+    org: string;
+    repo: string;
+    name: string;
+    organization: string;
+    published: number;
+    pending: number;
+    votes: number;
+  }[];
+}
+
+/** The mark of a kind, in the tile the rest of the product uses for it. */
+function kindMark(kind: string, size = 16): string {
+  return `<span class="kind-mark kind-${escapeAttr(kind)}" aria-hidden="true">${
+    kind === "bug" ? icons.bug(size) : icons.idea(size)
+  }</span>`;
+}
+
+/** One report as a row of a list on the dashboard. */
+function briefRow(b: Brief, text: Text, showVotes = false): string {
+  return `<li><a class="brief" href="/i/${escapeAttr(b.public_id)}">
+    ${
+      showVotes
+        ? `<span class="score small"><span class="count">${escapeHTML(text.number(b.votes))}</span></span>`
+        : kindMark(b.kind)
+    }
+    <span class="brief-title">${escapeHTML(b.title)}</span>
+    <span class="status status-${escapeAttr(b.status)}">${escapeHTML(text.t(`status.${b.status}`))}</span>
+  </a></li>`;
 }
 
 /**
  * The front page of the panel, arranged by whoever is looking at it.
+ *
+ * It was a wall of tiles each holding one number, and a number on its own
+ * answers "how many" and nothing else: not whether it is getting busier, not
+ * what people are actually asking for, not which board the work is in, and not
+ * where to go next. Every tile is now a way into the listing it counts, and
+ * beside them are the three things the numbers cannot say — the last thirty
+ * days, the most wanted ideas, and the newest reports.
  *
  * The cards are dragged with the browser's own drag and drop rather than with
  * pointer maths, which is what this house already does elsewhere: it carries
@@ -1808,7 +1873,7 @@ export function overviewScreen(
     return card(
       id,
       href && !editing
-        ? `<a class="stat" href="${escapeAttr(href)}">${inner}</a>`
+        ? `<a class="stat" href="${escapeAttr(href)}">${inner}<span class="stat-go" aria-hidden="true">${icons.chevron(14)}</span></a>`
         : `<div class="stat">${inner}</div>`,
       "narrow",
     );
@@ -1823,7 +1888,7 @@ export function overviewScreen(
             .sort((a, b) => b[1] - a[1])
             .map(([key, n]) => {
               const most = Math.max(...entries.map(([, count]) => count));
-              return `<div class="bar-row">
+              return `<div class="bar-row hue-${escapeAttr(key)}">
                 <span>${escapeHTML(label(key))}</span>
                 <span class="bar-track"><span class="bar-fill" style="inline-size: ${Math.round((n / most) * 100)}%"></span></span>
                 <span class="count">${number(n)}</span>
@@ -1848,26 +1913,111 @@ export function overviewScreen(
   }
 
   const total = Object.values(data.kinds).reduce((a, b) => a + b, 0);
+  const series = data.series ?? [];
+  const arrived = series.reduce((sum, day) => sum + day.reports, 0);
+
+  // The chart: thirty days, ends included, with the first and the last day
+  // named under it. An empty installation gets a flat line rather than an empty
+  // box — the shape of "nothing yet" is still the shape of the chart.
+  const activity = card(
+    "activity",
+    `<h3>${escapeHTML(text.t("overview.activity"))}
+       <span class="count-chip">${number(arrived)}</span></h3>
+     <div class="chart-wrap">
+       ${areaChart(
+         series.map((day) => day.reports),
+         {
+           width: 640,
+           height: 120,
+           from: series.length > 0 ? text.date(series[0]!.day) : "",
+           to: series.length > 0 ? text.date(series[series.length - 1]!.day) : "",
+         },
+       )}
+     </div>`,
+    "full",
+  );
+
+  const kinds = card(
+    "kinds",
+    `<h3>${escapeHTML(text.t("overview.byKind"))}</h3>
+     <div class="donut-row">
+       ${donut(
+         [
+           { value: data.kinds.idea ?? 0, className: "arc-idea" },
+           { value: data.kinds.bug ?? 0, className: "arc-bug" },
+         ],
+         `<span class="donut-value">${number(total)}</span>`,
+       )}
+       <ul class="legend">
+         <li><span class="swatch swatch-idea"></span>${escapeHTML(text.t("kind.idea"))}
+           <span class="count">${number(data.kinds.idea ?? 0)}</span></li>
+         <li><span class="swatch swatch-bug"></span>${escapeHTML(text.t("kind.bug"))}
+           <span class="count">${number(data.kinds.bug ?? 0)}</span></li>
+       </ul>
+     </div>`,
+    "wide",
+  );
+
+  const list = (id: string, title: string, rows: Brief[], votes: boolean) =>
+    card(
+      id,
+      `<h3>${escapeHTML(title)}</h3>
+       ${
+         rows.length === 0
+           ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
+           : `<ul class="briefs">${rows.map((b) => briefRow(b, text, votes)).join("")}</ul>`
+       }`,
+      "wide",
+    );
+
+  // The boards, busiest first, each a way into its own share of the work. What
+  // is waiting is the number somebody acts on, so it wears the colour of a
+  // thing that is waiting rather than being the third grey number in a row.
+  const boards = card(
+    "boards",
+    `<h3>${escapeHTML(text.t("portal.boards"))}</h3>
+     ${
+       (data.boards ?? []).length === 0
+         ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
+         : `<ul class="board-rows">${data.boards
+             .map(
+               (b) => `<li><a href="/panel/reports?board=${escapeAttr(`${b.org}/${b.repo}`)}">
+                 <span class="board-name">
+                   <span class="card-title">${escapeHTML(b.name)}</span>
+                   <span class="card-sub">${escapeHTML(b.organization)}</span>
+                 </span>
+                 <span class="board-counts">
+                   ${
+                     b.pending > 0
+                       ? `<span class="status status-planned">${escapeHTML(text.t("panel.queue"))}
+                            <span class="count">${number(b.pending)}</span></span>`
+                       : ""
+                   }
+                   <span class="chip">${icons.check(12)}<span>${number(b.published)}</span></span>
+                   <span class="chip">${icons.idea(12)}<span>${number(b.votes)}</span></span>
+                 </span>
+               </a></li>`,
+             )
+             .join("")}</ul>`
+     }`,
+    "wide",
+  );
 
   const all: Record<OverviewCard, string> = {
-    reports: stat("reports", total, text.t("overview.reports"), icons.repository()),
-    waiting: stat("waiting", data.pending, text.t("panel.queue"), icons.queue()),
-    published: stat("published", data.published, text.t("overview.published"), icons.check()),
-    votes: stat("votes", data.votes, text.t("overview.votes"), icons.idea()),
+    reports: stat("reports", total, text.t("overview.reports"), icons.repository(), "/panel/reports"),
+    waiting: stat("waiting", data.pending, text.t("panel.queue"), icons.queue(), "/panel/reports?moderation=pending"),
+    published: stat("published", data.published, text.t("overview.published"), icons.check(), "/panel/reports?moderation=published"),
+    votes: stat("votes", data.votes, text.t("overview.votes"), icons.idea(), "/panel/reports?kind=idea&sort=votes"),
     organizations: stat("organizations", data.organizations, text.t("shell.organizations"), icons.organization(), "/panel/organizations"),
     repositories: stat("repositories", data.repositories, text.t("portal.boards"), icons.repository(), "/panel/organizations"),
     people: stat("people", data.people, text.t("shell.people"), icons.people(), "/panel/people"),
-    kinds: bars("kinds", text.t("overview.byKind"), data.kinds, (k) => text.t(`kind.${k}`)),
+    activity,
+    kinds,
     statuses: bars("statuses", text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`)),
     moderation: bars("moderation", text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`)),
-    recent: card(
-      "recent",
-      `<h3>${escapeHTML(text.t("overview.recent"))}</h3>
-       <p class="lead">${escapeHTML(
-         data.last_report > 0 ? text.date(data.last_report) : text.t("overview.nothingYet"),
-       )}</p>`,
-      "narrow",
-    ),
+    top: list("top", text.t("board.sortVotes"), data.top ?? [], true),
+    recent: list("recent", text.t("overview.recent"), data.recent ?? [], false),
+    boards,
   };
 
   const hidden = overviewCards.filter((name) => !layout.includes(name));
@@ -1880,13 +2030,13 @@ export function overviewScreen(
           : actionButton("edit", text.t("overview.arrange"), "data-edit-dash")
       }
     </div>
-    <p class="lead">${escapeHTML(
-      editing
-        ? text.t("overview.arrangeHelp")
-        : total === 0
-          ? text.t("overview.emptyLead")
-          : text.t("overview.lead"),
-    )}</p>
+    ${
+      editing || total === 0
+        ? `<p class="lead">${escapeHTML(
+            editing ? text.t("overview.arrangeHelp") : text.t("overview.emptyLead"),
+          )}</p>`
+        : ""
+    }
 
     <ul class="dashboard${editing ? " editing" : ""}">
       ${layout.map((name) => all[name]).join("")}
@@ -1906,12 +2056,173 @@ export function overviewScreen(
 }
 
 /**
- * Your own account.
+ * Everything this account may triage, wherever it lives.
  *
- * Identity first — the picture, the name, what you are — then the two things
- * that can be changed. The old version was three stacked forms with a heading
- * each, which reads as a settings file rather than as a page about a person.
+ * The panel had a queue per board and a public page per board, and nothing
+ * else: somebody looking after four repositories had no screen that answered
+ * "what is waiting for me", and no way to find a report that had already been
+ * published — which is most of them, and the ones people write in asking about.
+ *
+ * What it shows is decided by the server from the roles this account holds, so
+ * a collaborator with one repository sees one repository here. The filters are
+ * in the address, which is what makes a filtered view something you can send to
+ * somebody else.
  */
+export interface ReportRow extends Brief {
+  moderation: string;
+  board?: { org: string; repo: string; name: string; organization: string };
+}
+
+export interface ReportsData {
+  items: ReportRow[];
+  boards: { org: string; repo: string; name: string; organization: string }[];
+  counts: {
+    moderation: Record<string, number>;
+    status: Record<string, number>;
+    kind: Record<string, number>;
+  };
+}
+
+export interface ReportFilters {
+  moderation: string;
+  kind: string;
+  status: string;
+  board: string;
+  sort: string;
+  q: string;
+}
+
+/** Every status either kind can be in, in the order the work goes through. */
+const everyStatus = [
+  "new",
+  "confirmed",
+  "planned",
+  "in_progress",
+  "in_forge",
+  "done",
+  "closed",
+  "declined",
+  "not_reproducible",
+];
+
+export function reportsScreen(data: ReportsData, filters: ReportFilters, text: Text): string {
+  const counts = data.counts ?? { moderation: {}, status: {}, kind: {} };
+  const totalOf = (of: Record<string, number>) => Object.values(of).reduce((a, b) => a + b, 0);
+
+  // A tab carries its own number. The point of this screen is knowing there are
+  // three things waiting without having to go and look.
+  const tab = (attr: string, value: string, label: string, count?: number) =>
+    `<button class="tab${(filters as unknown as Record<string, string>)[attr] === value ? " on" : ""}"
+       data-${escapeAttr(attr)}="${escapeAttr(value)}">${escapeHTML(label)}${
+       count === undefined ? "" : `<span class="count-chip">${escapeHTML(text.number(count))}</span>`
+     }</button>`;
+
+  const moderationTabs = [
+    tab("moderation", "", text.t("board.all"), totalOf(counts.moderation)),
+    tab("moderation", "pending", text.t("panel.queue"), counts.moderation.pending ?? 0),
+    tab("moderation", "published", text.t("moderation.published"), counts.moderation.published ?? 0),
+    tab("moderation", "rejected", text.t("moderation.rejected"), counts.moderation.rejected ?? 0),
+    tab("moderation", "spam", text.t("panel.spam"), counts.moderation.spam ?? 0),
+  ].join("");
+
+  const kindTabs = [
+    tab("kind", "", text.t("board.all")),
+    tab("kind", "bug", text.t("kind.bug"), counts.kind.bug ?? 0),
+    tab("kind", "idea", text.t("kind.idea"), counts.kind.idea ?? 0),
+  ].join("");
+
+  const option = (value: string, label: string, selected: boolean) =>
+    `<option value="${escapeAttr(value)}"${selected ? " selected" : ""}>${escapeHTML(label)}</option>`;
+
+  const statusSelect = `<select data-status aria-label="${escapeAttr(text.t("panel.status"))}">
+    ${option("", text.t("panel.status"), filters.status === "")}
+    ${everyStatus
+      .filter((s) => (counts.status[s] ?? 0) > 0 || filters.status === s)
+      .map((s) => option(s, text.t(`status.${s}`), filters.status === s))
+      .join("")}
+  </select>`;
+
+  const boardSelect =
+    data.boards.length < 2
+      ? ""
+      : `<select data-board aria-label="${escapeAttr(text.t("portal.boards"))}">
+          ${option("", text.t("portal.boards"), filters.board === "")}
+          ${data.boards
+            .map((b) =>
+              option(`${b.org}/${b.repo}`, `${b.organization} / ${b.name}`, filters.board === `${b.org}/${b.repo}`),
+            )
+            .join("")}
+        </select>`;
+
+  const row = (r: ReportRow) => {
+    const board = r.board
+      ? `<span class="chip">${icons.repository(12)}<span>${escapeHTML(r.board.name)}</span></span>`
+      : "";
+    const waiting =
+      r.moderation === "pending"
+        ? `<span class="chip waiting">${icons.queue(12)}<span>${escapeHTML(text.t("panel.queue"))}</span></span>`
+        : r.moderation === "published"
+          ? ""
+          : `<span class="chip">${escapeHTML(text.t(`moderation.${r.moderation}`))}</span>`;
+
+    return `<li class="report" data-id="${escapeAttr(r.public_id)}">
+      <a class="item" href="/i/${escapeAttr(r.public_id)}">
+        ${
+          r.kind === "idea"
+            ? `<span class="score"><span class="count">${escapeHTML(text.number(r.votes))}</span>
+                 <span class="label">${escapeHTML(text.t("item.votesLabel"))}</span></span>`
+            : `<span class="score mark kind-bug" aria-hidden="true">${icons.bug(20)}</span>`
+        }
+        <span class="item-main">
+          <span class="item-title">${escapeHTML(r.title)}</span>
+          <span class="item-meta">
+            ${board}
+            <span class="kind kind-${escapeAttr(r.kind)}">
+              ${r.kind === "bug" ? icons.bug(13) : icons.idea(13)}
+              <span class="kind-name">${escapeHTML(text.t(`kind.${r.kind}`))}</span>
+            </span>
+            <span class="when">${escapeHTML(text.date(r.created_at))}</span>
+            ${waiting}
+          </span>
+        </span>
+        <span class="status status-${escapeAttr(r.status)}">${escapeHTML(text.t(`status.${r.status}`))}</span>
+      </a>
+      ${
+        // The decision, where the thing to decide about is. Only on what is
+        // actually waiting: three buttons on a report published last March are
+        // three ways to undo somebody's work by mistake.
+        r.moderation === "pending"
+          ? `<div class="row-actions">
+               <button class="button primary with-icon" data-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+               <button class="button with-icon" data-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+               <button class="button danger with-icon" data-act="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
+             </div>`
+          : ""
+      }
+    </li>`;
+  };
+
+  return `<div class="screen-head">
+      <h1>${escapeHTML(text.t("shell.reports"))}</h1>
+    </div>
+    <div class="controls">
+      <div class="tabs">${moderationTabs}</div>
+      <div class="tabs">${kindTabs}</div>
+      ${statusSelect}
+      ${boardSelect}
+      <label class="search-wrap">
+        ${icons.search(16)}
+        <input class="search" type="search" data-q value="${escapeAttr(filters.q)}"
+               placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
+      </label>
+    </div>
+    ${
+      data.items.length === 0
+        ? emptyState(text.t("reports.empty"), icons.queue(28))
+        : `<ul class="items reports">${data.items.map(row).join("")}</ul>`
+    }`;
+}
+
 export function profileScreen(
   me: { username: string; name?: string; avatar?: string; admin: boolean },
   text: Text,

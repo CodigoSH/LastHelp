@@ -378,3 +378,96 @@ func TestAReportForNoRepositoryIsRefused(t *testing.T) {
 		t.Errorf("got %v, want ErrNotFound", err)
 	}
 }
+
+// TestListingSeveralBoardsStillHidesWhatIsWaiting.
+//
+// The panel's own listing crosses boards, which meant a second way into this
+// query. The dangerous half is not the join: it is that "every state" and "the
+// public list" are one boolean apart, and the zero value has to be the safe
+// one. A caller that asks for four boards and forgets to think about moderation
+// must get what the public gets.
+func TestListingSeveralBoardsStillHidesWhatIsWaiting(t *testing.T) {
+	s := store(t)
+	if _, err := s.DB.Exec(`INSERT INTO repository (id, org_id, slug, name, forge_repo, created_at)
+		VALUES (2, 1, 'lastdav', 'LastDAV', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+
+	shown, _ := report(t, s, Idea, "published here", "")
+	if err := s.Approve(shown.ID, epoch); err != nil {
+		t.Fatal(err)
+	}
+	waiting, _, err := s.Create(New{RepoID: 2, Kind: Bug, Title: "waiting there", Body: ""}, Pending, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	both := []int64{1, 2}
+
+	public, err := s.List(Filter{RepoIDs: both})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(public) != 1 || public[0].ID != shown.ID {
+		t.Fatalf("listing two boards returned %d items; %s is still waiting for a human",
+			len(public), waiting.PublicID)
+	}
+
+	everything, err := s.List(Filter{RepoIDs: both, AnyModeration: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(everything) != 2 {
+		t.Errorf("asking for every state across both boards returned %d items, want 2", len(everything))
+	}
+
+	// And no board means no rows rather than every row: a caller that forgets
+	// to say which boards must not be handed the whole installation.
+	none, err := s.List(Filter{AnyModeration: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(none) != 0 {
+		t.Errorf("a listing with no board returned %d items", len(none))
+	}
+}
+
+// TestCountsGroupWhatTheListingWouldShow.
+//
+// The numbers on the tabs come from here rather than from counting the rows on
+// screen, which is a page that says "3 waiting" because three fit on the first
+// page.
+func TestCountsGroupWhatTheListingWouldShow(t *testing.T) {
+	s := store(t)
+	first, _ := report(t, s, Idea, "one", "")
+	report(t, s, Bug, "two", "")
+	if err := s.Approve(first.ID, epoch); err != nil {
+		t.Fatal(err)
+	}
+
+	byState, err := s.Counts([]int64{1}, "moderation_state")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if byState["published"] != 1 || byState["pending"] != 1 {
+		t.Errorf("counted %v", byState)
+	}
+
+	byKind, err := s.Counts([]int64{1}, "kind")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if byKind["idea"] != 1 || byKind["bug"] != 1 {
+		t.Errorf("counted %v", byKind)
+	}
+
+	// A column nobody wrote a screen for is refused rather than concatenated
+	// into the query: the column name is the one thing a parameter cannot carry.
+	// Refused by the whitelist, not by SQLite's parser further down: a syntax
+	// error is what a badly built query happens to produce today, and asserting
+	// on "some error" would go on passing with the whitelist deleted.
+	_, err = s.Counts([]int64{1}, "title FROM item WHERE 1=1 --")
+	if err == nil || !strings.Contains(err.Error(), "is not something this counts by") {
+		t.Errorf("counting by an arbitrary column was refused with %v", err)
+	}
+}

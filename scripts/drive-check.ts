@@ -969,6 +969,143 @@ async function main() {
     `${dashboard.saved.length} → ${hidden.length}`,
   );
 
+  // 11c-bis. A dashboard arranged before the charts existed still gets them.
+  //
+  //          This is the house rule that a new feature has to reach the people
+  //          who were already here: a saved layout is the list of visible
+  //          cards, so a card added later is missing from it and would never
+  //          be drawn again for anybody who had ever pressed Arrange. The
+  //          payload below is what one of those layouts looks like — no record
+  //          of what existed when it was saved — and the new cards have to
+  //          appear at the end of it without the hidden one coming back.
+  const inherited = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/me/dashboard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ cards: ["reports", "waiting", "published", "votes", "kinds", "statuses", "recent"] }),
+    });
+    history.pushState({}, "", "/panel");
+    dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1400));
+    return [...document.querySelectorAll("[data-card]")].map(c => c.dataset.card);
+  `);
+  check(
+    "a dashboard arranged before the charts existed still gets them",
+    inherited.includes("activity") && inherited.includes("top") && inherited.includes("boards") &&
+      !inherited.includes("moderation") && inherited[0] === "reports",
+    JSON.stringify(inherited),
+  );
+
+  // 11d. The chart. A number says how many; only this says whether it is
+  //      getting busier, and it is drawn by hand from the series the server
+  //      sends — so what is checked is that there is a line with a point per
+  //      day on it, not that a box is on screen.
+  const chart = await evaluate(`
+    const line = document.querySelector('[data-card="activity"] .chart-line');
+    const d = line?.getAttribute("d") ?? "";
+    return { points: (d.match(/[ML]/g) ?? []).length, comma: d.includes(","), axis: !!document.querySelector(".chart-axis") };
+  `);
+  check(
+    "the overview draws thirty days rather than one more number",
+    chart.points === 30 && chart.comma === false && chart.axis === true,
+    JSON.stringify(chart),
+  );
+
+  // 11e. Every number leads to the list it counts. A dashboard whose tiles are
+  //      not links is a dashboard that answers "how many" and then leaves you
+  //      to find them yourself.
+  // Out of arranging first: while the dashboard is being rearranged the tiles
+  // are deliberately not links, because a card you meant to drag should not
+  // navigate. Reading the href without leaving that mode measures the mode.
+  // Out of arranging first: while the dashboard is being rearranged the tiles
+  // are deliberately not links, because a card you meant to drag should not
+  // navigate. Reading the href without leaving that mode measures the mode.
+  //
+  // And read as a set rather than by name: the checks above dragged one card to
+  // the end and hid whichever was first, so naming a card here would be
+  // asserting the result of the previous test.
+  const tiles = await evaluate(`
+    document.querySelector("[data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 900));
+    const cards = [...document.querySelectorAll('.dash-card:has(.stat)')];
+    return {
+      stats: cards.length,
+      links: cards.map(c => c.querySelector("a.stat")?.getAttribute("href") ?? ""),
+    };
+  `);
+  check(
+    "and every number on it leads to the list it counts",
+    tiles.stats > 0 &&
+      tiles.links.every((href: string) => href.length > 0) &&
+      tiles.links.filter((href: string) => href.startsWith("/panel/reports")).length >= 2,
+    JSON.stringify(tiles.links),
+  );
+
+  // 11f. The listing itself: everything this account may triage, wherever it
+  //      lives. The panel had a queue per board and nothing else, so somebody
+  //      looking after four repositories had no screen that answered "what is
+  //      waiting for me".
+  await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const form = await fetch("/api/orgs/codigosh/repos/lastboard/form").then(r => r.json());
+    // The form token refuses anything faster than a person types.
+    await new Promise(r => setTimeout(r, 2400));
+    await fetch("/api/orgs/codigosh/repos/lastboard/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ kind: "bug", title: "search ignores accents",
+        body: "searching for a word with an accent returns nothing",
+        fields: { version: "1.4.2", steps: "1. search for a word with an accent" }, token: form.token }),
+    });
+  `);
+  await evaluate(`history.pushState({}, "", "/panel/reports"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1400);
+
+  const listing = await evaluate(`
+    return {
+      rows: document.querySelectorAll(".report").length,
+      waiting: document.querySelector('[data-moderation="pending"] .count-chip')?.textContent?.trim() ?? "",
+      decisions: document.querySelectorAll(".report .row-actions").length,
+      boards: [...new Set([...document.querySelectorAll(".report .chip")].map(c => c.textContent.trim()))],
+    };
+  `);
+  check(
+    "the panel lists every report it may triage, published ones included",
+    listing.rows >= 2 && listing.waiting === "1",
+    JSON.stringify(listing),
+  );
+  check(
+    "and offers a decision only on what is actually waiting",
+    listing.decisions === 1,
+    `${listing.decisions} of ${listing.rows} rows carry the buttons`,
+  );
+
+  await evaluate(`document.querySelector('[data-moderation="pending"]').click()`);
+  await sleep(1200);
+  const narrowed = await evaluate(`
+    return { search: location.search, rows: document.querySelectorAll(".report").length };
+  `);
+  check(
+    "narrowing it goes into the address, so a view can be sent to somebody",
+    narrowed.search.includes("moderation=pending") && narrowed.rows === 1,
+    `${narrowed.search} → ${narrowed.rows} rows`,
+  );
+
+  await evaluate(`document.querySelector('.report [data-act="published"]').click()`);
+  await sleep(1400);
+  const triaged = await evaluate(`
+    return { rows: document.querySelectorAll(".report").length,
+             waiting: document.querySelector('[data-moderation="pending"] .count-chip')?.textContent?.trim() ?? "" };
+  `);
+  check(
+    "and publishing from the row empties what was waiting",
+    triaged.rows === 0 && triaged.waiting === "0",
+    JSON.stringify(triaged),
+  );
+
   // 11c. The owner, who is the role the panel used to get wrong. It asked
   //      whether you were an administrator, which is stricter than the rules:
   //      an owner may add repositories to their organisation, rename it and
@@ -1055,6 +1192,26 @@ async function main() {
     "and offers nothing they would be refused",
     collaborator.groups.length === 2 && collaborator.offersToAdd === false,
     `${collaborator.groups.join(" · ")} — ${collaborator.items.join(", ")}`,
+  );
+
+  // 12b. And their listing is theirs. The screen is the same one the
+  //      administrator uses, and the whole question is whether what it shows
+  //      comes from the roles this account holds rather than from the address
+  //      it was asked for.
+  await evaluate(`history.pushState({}, "", "/panel/reports"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1400);
+  const theirs = await evaluate(`
+    return {
+      rows: document.querySelectorAll(".report").length,
+      boards: [...new Set([...document.querySelectorAll(".report .chip")].map(c => c.textContent.trim()))],
+      // One board, so there is nothing to choose between and no control for it.
+      boardPicker: !!document.querySelector("[data-board]"),
+    };
+  `);
+  check(
+    "a collaborator's listing holds their board and nothing else",
+    theirs.rows > 0 && theirs.boards.length === 1 && theirs.boards[0] === "Lastboard" && theirs.boardPicker === false,
+    JSON.stringify(theirs),
   );
 
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));

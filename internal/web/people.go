@@ -137,6 +137,15 @@ type dashboardChange struct {
 	// needs both sides to agree on what exists, and the two sides are a browser
 	// and a server that ship separately.
 	Cards []string `json:"cards"`
+
+	// Known is every card that existed when this layout was saved.
+	//
+	// Without it there is no way to tell a card somebody hid from a card that
+	// did not exist yet, and the two want opposite treatment: the first stays
+	// hidden, the second has to appear, or a new card on the dashboard never
+	// reaches anybody who has ever arranged theirs. The server stores it and
+	// has no opinion about the names in it.
+	Known []string `json:"known,omitempty"`
 }
 
 // handleGetDashboard answers with the layout this account arranged.
@@ -183,11 +192,11 @@ func (s *Server) handleSetDashboard(w http.ResponseWriter, r *http.Request) {
 	// Stored as it arrived, after being parsed: the names are the browser's own
 	// vocabulary and the server has no opinion about which cards exist. What it
 	// does have an opinion about is the size and the shape.
-	if len(in.Cards) > 64 {
+	if len(in.Cards) > 64 || len(in.Known) > 64 {
 		writeError(w, http.StatusBadRequest, "error.bad_request")
 		return
 	}
-	for _, card := range in.Cards {
+	for _, card := range append(append([]string{}, in.Cards...), in.Known...) {
 		if len(card) > 40 {
 			writeError(w, http.StatusBadRequest, "error.bad_request")
 			return

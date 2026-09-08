@@ -228,6 +228,7 @@ func (s *Server) routes() {
 	private("POST /api/me/dashboard", s.handleSetDashboard)
 
 	private("GET /api/overview", s.handleOverview)
+	private("GET /api/reports", s.handleReports)
 
 	private("PATCH /api/orgs/{org}", s.handleRenameOrganization)
 	private("DELETE /api/orgs/{org}", s.handleDeleteOrganization)
