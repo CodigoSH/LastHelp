@@ -151,11 +151,25 @@ func (s *Server) handleListPeople(w http.ResponseWriter, r *http.Request) {
 		}
 		grants := make([]map[string]any, 0, len(memberships))
 		for _, m := range memberships {
-			grants = append(grants, map[string]any{
-				"scope": string(m.Scope.Kind),
-				"id":    m.Scope.ID,
-				"role":  string(m.Role),
-			})
+			// The place, spelled the way the screen spells it. A row number
+			// would make the browser look it up again, and it has no way to.
+			grant := map[string]any{"scope": string(m.Scope.Kind), "role": string(m.Role)}
+			switch m.Scope.Kind {
+			case authz.ScopeOrganization:
+				if o, err := s.orgs().OrganizationByID(m.Scope.ID); err == nil {
+					grant["organization"] = o.Slug
+					grant["where"] = o.Name
+				}
+			case authz.ScopeRepository:
+				if repo, err := s.orgs().RepositoryByID(m.Scope.ID); err == nil {
+					grant["repository"] = repo.Slug
+					grant["where"] = repo.Name
+					if o, err := s.orgs().OrganizationByID(m.Scope.OrgID); err == nil {
+						grant["organization"] = o.Slug
+					}
+				}
+			}
+			grants = append(grants, grant)
 		}
 		out = append(out, map[string]any{
 			"id":       u.ID,
@@ -212,10 +226,15 @@ func (s *Server) handleCreatePerson(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"id": user.ID, "username": user.Username})
 }
 
+// grantChange names a place the way every other endpoint names it: by slug.
+//
+// Not by identifier. The rest of this API addresses an organisation as
+// "codigosh" and a repository as "codigosh/lasthelp", and an endpoint that took
+// a row number instead would be the one place the browser had to know what a
+// row number is.
 type grantChange struct {
-	Scope string `json:"scope"`
-	ID    int64  `json:"id"`
-	OrgID int64  `json:"org_id"`
+	Organization string `json:"organization"`
+	Repository   string `json:"repository"`
 	// An empty role means take it away, which is one endpoint rather than two
 	// that could disagree about what a scope is.
 	Role string `json:"role"`
@@ -240,10 +259,20 @@ func (s *Server) handleGrant(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	scope, ok := authz.ScopeFrom(in.Scope, in.ID, in.OrgID)
-	if !ok {
-		writeError(w, http.StatusBadRequest, "error.bad_request")
+	organization, err := s.orgs().OrganizationBySlug(in.Organization)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
 		return
+	}
+
+	scope := authz.Organization(organization.ID)
+	if in.Repository != "" {
+		repository, err := s.orgs().RepositoryBySlugs(in.Organization, in.Repository)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "error.not_found")
+			return
+		}
+		scope = authz.Repository(repository.ID, organization.ID)
 	}
 
 	if in.Role == "" {

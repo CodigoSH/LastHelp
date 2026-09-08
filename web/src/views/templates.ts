@@ -642,8 +642,19 @@ export function queueView(items: ItemSummary[], bodies: Map<string, string>, tex
  * The field helpers live in wizard.ts and carry a real example each.
  */
 
-function accountFields(text: Text): string {
+function accountFields(text: Text, picture = ""): string {
   return (
+    // The picture first, because it is the one optional thing here and putting
+    // it after two required fields makes it look like a third.
+    `<div class="field">
+      <label>${escapeHTML(text.t("profile.picture"))}</label>
+      <div class="identity" style="margin:0">
+        ${avatar("?", picture)}
+        ${actionButton("upload", text.t("setup.choosePicture"), "data-pick-avatar")}
+        <input type="file" accept="image/*" id="avatar-file" hidden />
+      </div>
+      <p class="hint">${escapeHTML(text.t("setup.pictureHelp"))}</p>
+    </div>` +
     field({
       id: "username",
       name: "username",
@@ -822,7 +833,13 @@ export function acceptsFields(text: Text): string {
 export function setupWizard(
   step: number,
   text: Text,
-  prefs: { languages: { code: string; name: string }[]; language: string; theme: string } = {
+  prefs: {
+    languages: { code: string; name: string }[];
+    language: string;
+    theme: string;
+    picture?: string;
+    logo?: string;
+  } = {
     languages: [],
     language: "en",
     theme: "system",
@@ -856,7 +873,7 @@ export function setupWizard(
         names,
         title: text.t("auth.setupTitle"),
         lead: text.t("auth.setupHelp"),
-        body: accountFields(text),
+          body: accountFields(text, prefs.picture ?? ""),
         submit: text.t("wizard.continue"),
         back: { href: "/setup", label: text.t("wizard.back") },
         formClass: "setup-account",
@@ -871,16 +888,26 @@ export function setupWizard(
       names,
       title: text.t("setup.instanceTitle"),
       lead: text.t("setup.instanceLead"),
-      body: field(
-        {
-          id: "instance-name",
-          name: "name",
-          label: text.t("setup.instanceName"),
-          hint: text.t("setup.instanceNameHelp"),
-          example: "CodigoSH",
-        },
-        text,
-      ),
+      body:
+        field(
+          {
+            id: "instance-name",
+            name: "name",
+            label: text.t("setup.instanceName"),
+            hint: text.t("setup.instanceNameHelp"),
+            example: "CodigoSH",
+          },
+          text,
+        ) +
+        `<div class="field">
+          <label>${escapeHTML(text.t("personalization.logo"))}</label>
+          <div class="identity" style="margin:0">
+            ${prefs.logo ? `<img class="logo-preview" src="${escapeAttr(prefs.logo)}" alt="" />` : avatar("L")}
+            ${actionButton("upload", text.t("personalization.chooseLogo"), "data-pick-logo")}
+            <input type="file" accept="image/*" id="logo-file" hidden />
+          </div>
+          <p class="hint">${escapeHTML(text.t("personalization.logoHelp"))}</p>
+        </div>`,
       submit: text.t("wizard.finish"),
       back: { href: "/setup/account", label: text.t("wizard.back") },
       formClass: "setup-instance",
@@ -1391,7 +1418,7 @@ export function peopleScreen(
     avatar?: string;
     admin: boolean;
     disabled: boolean;
-    grants: { scope: string; id: number; role: string }[];
+    grants: { scope: string; role: string; where?: string; organization?: string; repository?: string }[];
   }[],
   text: Text,
 ): string {
@@ -1414,12 +1441,13 @@ export function peopleScreen(
               : p.grants
                   .map(
                     (g) =>
-                      `<span class="tag">${escapeHTML(text.t(`role.${g.role}`))} · ${escapeHTML(text.t(`scope.${g.scope}`))}</span>`,
+                      `<span class="tag">${escapeHTML(text.t(`role.${g.role}`))} · ${escapeHTML(g.where ?? "")}</span>`,
                   )
                   .join("")
           }
         </div>
         <div class="card-actions">
+          ${iconButton("person", text.t("people.roles"), `data-roles-person="${p.id}" data-username="${escapeAttr(p.username)}"`)}
           ${iconButton("edit", text.t("action.edit"), `data-edit-person="${p.id}" data-name="${escapeAttr(p.name)}" data-username="${escapeAttr(p.username)}"`)}
           ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-person="${p.id}" data-name="${escapeAttr(p.username)}"`)}
         </div>
@@ -1485,4 +1513,56 @@ export function aboutScreen(
       ${fact(text.t("setup.instanceName"), instance, icons.organization())}
     </ul>
     <p class="hint">${escapeHTML(text.t("about.source"))}</p>`;
+}
+
+/**
+ * Where somebody may act, and as what.
+ *
+ * Roles are granted per place rather than globally: an organisation has owners,
+ * a repository has collaborators, and somebody who helps with one repository
+ * has no business in the one next door. The list is the current grants with a
+ * way to take each one back, and one row to add another.
+ */
+export function rolesModalBody(
+  grants: { role: string; where?: string; organization?: string; repository?: string }[],
+  places: { organization: string; repository?: string; label: string }[],
+  text: Text,
+): string {
+  const current =
+    grants.length === 0
+      ? `<p class="hint">${escapeHTML(text.t("people.noRoles"))}</p>`
+      : `<ul class="grants">${grants
+          .map(
+            (g) => `<li>
+              <span class="tag">${escapeHTML(text.t(`role.${g.role}`))}</span>
+              <span>${escapeHTML(g.where ?? "")}</span>
+              ${iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke data-organization="${escapeAttr(g.organization ?? "")}" data-repository="${escapeAttr(g.repository ?? "")}"`)}
+            </li>`,
+          )
+          .join("")}</ul>`;
+
+  return `${current}
+    <h3 class="grants-title">${escapeHTML(text.t("people.grantRole"))}</h3>
+    ${choiceField({
+      id: "grant-where",
+      name: "where",
+      label: text.t("people.where"),
+      options: places.map((p) => [
+        `${p.organization}${p.repository ? "/" + p.repository : ""}`,
+        p.label,
+      ]),
+    })}
+    ${choiceField({
+      id: "grant-role",
+      name: "role",
+      label: text.t("people.role"),
+      // Owner runs an organisation; collaborator triages one repository. The
+      // pairing is not enforced here — authz decides what a role means — but
+      // the order puts the likely one first for each kind of place.
+      options: [
+        ["collaborator", text.t("role.collaborator")],
+        ["owner", text.t("role.owner")],
+      ],
+      hint: text.t("people.roleHelp"),
+    })}`;
 }

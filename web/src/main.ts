@@ -369,6 +369,22 @@ async function showPeople(): Promise<void> {
     return;
   }
 
+  // Every place a role can be granted in, named the way the rest of the API
+  // names them. Fetched once for the screen rather than per person.
+  const { organizations } = await api
+    .get<{ organizations: OrganizationSummary[] }>("/api/orgs")
+    .catch(() => ({ organizations: [] as OrganizationSummary[] }));
+  const places: { organization: string; repository?: string; label: string }[] = [];
+  for (const org of organizations ?? []) {
+    places.push({ organization: org.slug, label: org.name });
+    const repos = await api
+      .get<{ repositories: RepositorySummary[] }>(`/api/orgs/${encodeURIComponent(org.slug)}/repos`)
+      .catch(() => ({ repositories: [] as RepositorySummary[] }));
+    for (const repo of repos.repositories ?? []) {
+      places.push({ organization: org.slug, repository: repo.slug, label: `${org.name} / ${repo.name}` });
+    }
+  }
+
   await showInShell(
     views.peopleScreen(body.people ?? [], text) +
       views.modal(
@@ -382,6 +398,17 @@ async function showPeople(): Promise<void> {
             views.field({ id: "person-password", name: "password", label: text.t("auth.password"), type: "password", required: true, hint: text.t("auth.passwordHelp") }, text),
           submit: text.t("auth.create"),
           formClass: "person-form",
+        },
+        text,
+      ) +
+      views.modal(
+        {
+          id: "person-roles",
+          title: text.t("people.roles"),
+          lead: text.t("people.rolesHelp"),
+          body: "",
+          submit: text.t("people.grant"),
+          formClass: "person-roles-form",
         },
         text,
       ) +
@@ -429,6 +456,48 @@ async function showPeople(): Promise<void> {
     if (name) payload.display_name = name;
     if (pass) payload.password = pass;
     await api.patch(`/api/people/${editing}`, payload);
+    await render();
+  });
+
+  // Roles, in a modal of their own. Cramming them into the edit form would put
+  // "change this person's name" and "let this person into an organisation" one
+  // above the other, which is two different weights of decision on one button.
+  let granting = 0;
+  root?.querySelectorAll<HTMLButtonElement>("[data-roles-person]").forEach((button) =>
+    button.addEventListener("click", () => {
+      granting = Number(button.dataset.rolesPerson ?? 0);
+      const person = (body.people ?? []).find((p) => p.id === granting);
+      const holder = root?.querySelector<HTMLDivElement>("#person-roles .modal-body");
+      if (holder && person) holder.innerHTML = views.rolesModalBody(person.grants, places, text);
+      wireRevoke();
+      openModal("person-roles");
+    }),
+  );
+
+  const wireRevoke = () => {
+    root?.querySelectorAll<HTMLButtonElement>("[data-revoke]").forEach((button) =>
+      button.addEventListener("click", async () => {
+        try {
+          await api.post(`/api/people/${granting}/grants`, {
+            organization: button.dataset.organization ?? "",
+            repository: button.dataset.repository ?? "",
+            role: "",
+          });
+          await render();
+        } catch (err) {
+          showFormError(err);
+        }
+      }),
+    );
+  };
+
+  onSubmit("form.person-roles-form", async (data) => {
+    const [organization, repository] = String(data.get("where") ?? "").split("/");
+    await api.post(`/api/people/${granting}/grants`, {
+      organization: organization ?? "",
+      repository: repository ?? "",
+      role: String(data.get("role") ?? ""),
+    });
     await render();
   });
 
@@ -949,10 +1018,13 @@ function wireTriage(publicID: string): void {
  * in a database, and a reload landing on step three of a form whose first two
  * steps no longer exist is worse than starting again.
  */
-const draft: { forge: string; orgSlug: string; repoSlug: string } = {
+const draft: { forge: string; orgSlug: string; repoSlug: string; picture: string; logo: string } = {
   forge: "none",
   orgSlug: "",
   repoSlug: "",
+  // Chosen before the account exists, so held here and sent the moment it does.
+  picture: "",
+  logo: "",
 };
 
 /** The error line under a wizard card, which every step has one of. */
@@ -982,6 +1054,8 @@ function showSetupStep(step: 1 | 2 | 3): void {
       languages: availableLocales.map((l) => ({ code: l.code, name: l.name })),
       language: i18n.current,
       theme: currentTheme(),
+      picture: draft.picture,
+      logo: draft.logo,
     }),
   );
 
@@ -1005,6 +1079,16 @@ function showSetupStep(step: 1 | 2 | 3): void {
   }
 
   if (step === 2) {
+    const avatarFile = root?.querySelector<HTMLInputElement>("#avatar-file");
+    root?.querySelector<HTMLButtonElement>("[data-pick-avatar]")?.addEventListener("click", () => avatarFile?.click());
+    avatarFile?.addEventListener("change", async () => {
+      const picked = await readAsDataURL(avatarFile.files?.[0]);
+      if (picked === null) return;
+      // Kept until the account exists: there is nobody to attach it to yet.
+      draft.picture = picked;
+      showSetupStep(2);
+    });
+
     root?.querySelector<HTMLFormElement>("form.setup-account")?.addEventListener(
       "submit",
       async (event) => {
@@ -1020,6 +1104,7 @@ function showSetupStep(step: 1 | 2 | 3): void {
         }
         try {
           await api.post("/api/setup", { username: String(data.get("username") ?? ""), password });
+          if (draft.picture) await api.post("/api/me/avatar", { avatar: draft.picture }).catch(() => undefined);
           me = await api.get<Me>("/api/me");
           go("/setup/instance");
         } catch (err) {
@@ -1030,13 +1115,26 @@ function showSetupStep(step: 1 | 2 | 3): void {
     return;
   }
 
+  const logoFile = root?.querySelector<HTMLInputElement>("#logo-file");
+  root?.querySelector<HTMLButtonElement>("[data-pick-logo]")?.addEventListener("click", () => logoFile?.click());
+  logoFile?.addEventListener("change", async () => {
+    const picked = await readAsDataURL(logoFile.files?.[0]);
+    if (picked === null) return;
+    draft.logo = picked;
+    showSetupStep(3);
+  });
+
   root?.querySelector<HTMLFormElement>("form.setup-instance")?.addEventListener(
     "submit",
     async (event) => {
       event.preventDefault();
       const data = new FormData(event.currentTarget as HTMLFormElement);
       try {
-        await api.post("/api/instance", { name: String(data.get("name") ?? "") });
+        await api.post("/api/instance", {
+          name: String(data.get("name") ?? ""),
+          logo: draft.logo,
+          accent: "",
+        });
         go("/setup/done");
       } catch (err) {
         showFormError(err);

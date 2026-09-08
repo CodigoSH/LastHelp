@@ -1450,3 +1450,30 @@ a.stat:hover {
   accent-color: var(--accent);
   cursor: pointer;
 }
+
+/* The roles somebody holds, one per row with the way to take it back. */
+.grants {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.grants li {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.grants li span:nth-child(2) {
+  flex: 1;
+}
+
+.grants-title {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.95rem;
+}
