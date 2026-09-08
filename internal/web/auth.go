@@ -91,7 +91,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"id": user.ID, "username": user.Username})
 }
 
-// handleSignIn exchanges an email and password for a session.
+// handleSignIn exchanges a username and password for a session.
 func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	in, ok := readCredentials(w, r)
 	if !ok {

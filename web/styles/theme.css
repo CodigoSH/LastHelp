@@ -852,9 +852,32 @@ body.admin-view > main {
   font-size: 0.9rem;
 }
 
+/* The panel uses the window it is given.
+ *
+ * It was clamped to 52rem, so on any screen wider than about 900px everything
+ * sat in a column on the left with the rest of the page empty — cards half the
+ * size they could be, three to a row where nine would fit. A measure that long
+ * is right for a paragraph and wrong for a dashboard.
+ *
+ * The cap that remains is for very wide screens, where a grid stretched across
+ * two metres of monitor stops being a layout and becomes a spreadsheet. */
 .admin-main {
   padding: clamp(1.25rem, 3vw, 2.25rem);
-  max-inline-size: 52rem;
+  max-inline-size: 100rem;
+}
+
+/* Prose still gets a measure. A settings screen that is one form does not want
+   the width of a dashboard: a line of help two thousand pixels long is a line
+   nobody reads to the end of. */
+.admin-main > .lead,
+.admin-main > .hint,
+.admin-main > p {
+  max-inline-size: 46rem;
+}
+
+/* A form on its own screen keeps a sane width rather than stretching. */
+.admin-main form:not(.dashboard-form) > .wizard-card {
+  max-inline-size: 46rem;
 }
 
 /* Narrow: the sidebar becomes a strip across the top that scrolls sideways.
@@ -1097,7 +1120,7 @@ body.admin-view > main {
    a screen with three cards and one with nine use the same word. */
 .bento {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   gap: 0.9rem;
   margin: 1.25rem 0 2rem;
   padding: 0;
@@ -1531,14 +1554,32 @@ body > nav .brand {
 
 /* ------------------------------------------------------------- the dashboard */
 
+/* A fixed number of columns per width, not a track size.
+ *
+ * With auto-fit the column width came from the widest card, so a tile showing
+ * "0" and a chart spanning three of them never lined up and every row started
+ * somewhere different. A dashboard is read down as well as across: the columns
+ * have to be the same on every row, which is what a fixed count gives.
+ *
+ * dense, so a one-column tile fills the gap a three-column chart leaves at the
+ * end of a row instead of leaving a hole and starting a new one. */
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row dense;
   gap: 0.85rem;
   margin: 1.25rem 0 2rem;
   padding: 0;
   list-style: none;
-  align-items: start;
+  align-items: stretch;
+}
+
+@media (min-width: 48rem) {
+  .dashboard { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 80rem) {
+  .dashboard { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
 .dash-card {
@@ -1554,7 +1595,7 @@ body > nav .brand {
   grid-column: span 2;
 }
 
-@media (min-width: 60rem) {
+@media (min-width: 80rem) {
   .dash-card.wide {
     grid-column: span 3;
   }
@@ -2083,3 +2124,50 @@ body > nav .brand {
 }
 
 .avatar-pick:hover .avatar-pick-badge { color: var(--text); }
+
+/* The picker, and the cross that clears it.
+ *
+ * A cross on the corner rather than a "Remove" button beside it: the button was
+ * a second control the width of a sentence for something that only makes sense
+ * while there is an image, and it appeared and disappeared next to the one that
+ * chooses. The cross sits on the thing it removes and is drawn only when there
+ * is something to remove. */
+.picker {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.picker-clear {
+  position: absolute;
+  inset-block-start: -4px;
+  inset-inline-end: -4px;
+  display: grid;
+  place-items: center;
+  inline-size: 1.35rem;
+  block-size: 1.35rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 1;
+}
+
+.picker-clear:hover {
+  color: #fff;
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+/* The way out to the public side, kept apart from the sections of the panel:
+   it is not one of them, it leaves. */
+.side-public {
+  margin-block-start: 1rem;
+  border-block-start: 1px solid var(--border);
+  padding-block-start: 0.9rem;
+  color: var(--text-muted);
+}
+
+.side-public:hover { color: var(--text); }

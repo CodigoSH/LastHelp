@@ -81,7 +81,7 @@ func (s Store) Create(username, plainPassword, displayName string, administrator
 	}, nil
 }
 
-// Authenticate checks an email and password and returns the account.
+// Authenticate checks a username and password and returns the account.
 //
 // A missing account and a wrong password come back as the same error, and both
 // paths do the same work: answering faster for an address that does not exist

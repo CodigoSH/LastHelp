@@ -350,3 +350,43 @@ func TestEveryErrorTheServerSendsHasWords(t *testing.T) {
 			len(missing), strings.Join(sorted(missing), "\n  "))
 	}
 }
+
+// TestNothingSaysEmailWhereItMeansUsername.
+//
+// Signing in used to take an email. It takes a username, and has since the
+// column was renamed — but the words lagged behind in places nobody walks
+// through often: the failure message said "that email and password do not
+// match" on a form whose field is called Username, and two doc comments still
+// described the old flow.
+//
+// The exceptions are the places where mail really is mail: the address a
+// reporter may leave to be told about their report, and the mail channel a team
+// is notified on. Those are listed rather than guessed at, so adding a third
+// one is a decision somebody writes down.
+func TestNothingSaysEmailWhereItMeansUsername(t *testing.T) {
+	aboutMail := map[string]bool{
+		"form.email":     true, // the reporter's optional address
+		"form.emailHelp": true,
+		"panel.mailTo":   true, // where a mail channel delivers
+	}
+
+	master, ok := catalogues(t)["en"]
+	if !ok {
+		t.Fatal("there is no en.json")
+	}
+
+	var wrong []string
+	for key, value := range master {
+		if aboutMail[key] {
+			continue
+		}
+		if strings.Contains(strings.ToLower(value), "email") {
+			wrong = append(wrong, key+": "+value)
+		}
+	}
+	if len(wrong) > 0 {
+		t.Errorf("%d string(s) say email where this product means username:\n  %s\n\n"+
+			"Sign-in takes a username. If one of these really is about mail, add it to the list above.",
+			len(wrong), strings.Join(sorted(wrong), "\n  "))
+	}
+}

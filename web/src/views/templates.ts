@@ -1000,16 +1000,63 @@ export function queueScreen(
  * Shared on purpose across the two products: somebody who has set up one
  * should recognise this.
  */
-function pictureField(text: Text, picture = ""): string {
-  // The file input is a sibling, not a child. A button may not contain
-  // interactive content, and an input inside it would receive the click the
-  // button forwards to it — which bubbles back to the button, forever.
-  return `<button type="button" class="avatar-pick" data-pick-avatar
-      aria-label="${escapeAttr(text.t("profile.picture"))}">
-      ${avatar("?", picture, true)}
+export interface PickerSpec {
+  /** Where the click and the clear are wired: "avatar" or "logo". */
+  what: "avatar" | "logo";
+  /** The current image as a data URL, or empty. */
+  current?: string;
+  /** The initials to draw when there is none. */
+  initials?: string;
+  label: string;
+  /** Drawn at the size the setup uses, which is bigger than a row's. */
+  big?: boolean;
+}
+
+/**
+ * Choosing an image, everywhere it is chosen.
+ *
+ * The circle is the button, a badge on the corner says it can be changed, and a
+ * small cross clears it — the cross only when there is something to clear,
+ * because a control that does nothing is a control somebody presses once and
+ * distrusts afterwards.
+ *
+ * One function for all four places: the account and the installation in the
+ * wizard, the profile and the personalisation screen. Three of them used to be
+ * a label, an upload button and a remove button in a row; the setup had this;
+ * and the difference was invisible until somebody used both.
+ */
+export function imagePicker(spec: PickerSpec, text: Text): string {
+  const id = spec.what === "avatar" ? "avatar-file" : "logo-file";
+  const preview =
+    spec.current && spec.what === "logo"
+      ? `<img class="logo-preview" src="${escapeAttr(spec.current)}" alt="" />`
+      : avatar(spec.initials ?? "?", spec.current ?? "", spec.big);
+
+  return `<div class="picker">
+    <button type="button" class="avatar-pick" data-pick-${spec.what}
+      aria-label="${escapeAttr(spec.label)}">
+      ${preview}
       <span class="avatar-pick-badge">${escapeHTML(text.t("action.change"))}</span>
     </button>
-    <input type="file" accept="image/*" id="avatar-file" hidden />`;
+    ${
+      spec.current
+        ? `<button type="button" class="picker-clear" data-clear-${spec.what}
+             title="${escapeAttr(text.t("action.remove"))}"
+             aria-label="${escapeAttr(text.t("action.remove"))}">${icons.close(12)}</button>`
+        : ""
+    }
+    <!-- A sibling of the button, not a child: a button may not contain
+         interactive content, and an input inside it takes the click the button
+         forwards, which bubbles back to the button, forever. -->
+    <input type="file" accept="image/*" id="${id}" hidden />
+  </div>`;
+}
+
+function pictureField(text: Text, picture = ""): string {
+  return imagePicker(
+    { what: "avatar", current: picture, label: text.t("profile.picture"), big: true },
+    text,
+  );
 }
 
 function accountFields(text: Text, picture = ""): string {
@@ -1265,14 +1312,10 @@ export function setupWizard(
         // The logo first, and as one control, exactly like the picture on the
         // step before. Two identical jobs on two consecutive screens should
         // not be two different arrangements.
-        `<div class="field picture-field">
-          <button type="button" class="avatar-pick" data-pick-logo
-            aria-label="${escapeAttr(text.t("personalization.logo"))}">
-            ${prefs.logo ? `<img class="logo-preview" src="${escapeAttr(prefs.logo)}" alt="" />` : avatar("L", "", true)}
-            <span class="avatar-pick-badge">${escapeHTML(text.t("action.change"))}</span>
-          </button>
-          <input type="file" accept="image/*" id="logo-file" hidden />
-        </div>` +
+        `<div class="field picture-field">${imagePicker(
+          { what: "logo", current: prefs.logo, initials: "L", label: text.t("personalization.logo"), big: true },
+          text,
+        )}</div>` +
         field(
           {
             id: "instance-name",
@@ -1471,6 +1514,14 @@ export function adminShell(spec: ShellSpec, text: Text): string {
             : "",
         )}
       </nav>
+      <!--
+        The way out to what everybody else sees. There was none anywhere in the
+        panel: somebody administering this had no link to the pages they were
+        administering, and the only route was typing the address.
+      -->
+      <a class="side-item side-public" href="/">
+        ${icons.open()}<span>${escapeHTML(text.t("shell.publicSite"))}</span>
+      </a>
       <div class="side-foot">
         <div class="side-who">
           ${avatar(spec.who, spec.avatar)}
@@ -1675,7 +1726,16 @@ export function profileScreen(
   return `<h1>${escapeHTML(text.t("shell.profile"))}</h1>
 
     <div class="identity">
-      ${avatar(me.name || me.username, me.avatar, true)}
+      ${imagePicker(
+        {
+          what: "avatar",
+          current: me.avatar,
+          initials: me.name || me.username,
+          label: text.t("profile.picture"),
+          big: true,
+        },
+        text,
+      )}
       <div>
         <div class="name">${escapeHTML(me.name || me.username)}</div>
         <div class="card-sub">
@@ -1683,10 +1743,6 @@ export function profileScreen(
           ${me.admin ? `<span class="tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
         </div>
       </div>
-      <span class="spacer"></span>
-      ${actionButton("upload", text.t("profile.picture"), 'data-pick-avatar')}
-      ${me.avatar ? actionButton("remove", text.t("profile.pictureClear"), "data-clear-avatar") : ""}
-      <input type="file" accept="image/*" id="avatar-file" hidden />
     </div>
 
     <ul class="bento">
@@ -1773,12 +1829,10 @@ export function personalizationScreen(
 
         <div class="field">
           <label>${escapeHTML(text.t("personalization.logo"))}</label>
-          <div class="identity" style="margin:0">
-            ${instance.logo ? `<img class="logo-preview" src="${escapeAttr(instance.logo)}" alt="" />` : avatar(instance.name || "L")}
-            ${actionButton("upload", text.t("personalization.chooseLogo"), "data-pick-logo")}
-            ${instance.logo ? actionButton("remove", text.t("personalization.clearLogo"), "data-clear-logo") : ""}
-            <input type="file" accept="image/*" id="logo-file" hidden />
-          </div>
+          ${imagePicker(
+            { what: "logo", current: instance.logo, initials: instance.name || "L", label: text.t("personalization.logo") },
+            text,
+          )}
           <p class="hint">${escapeHTML(text.t("personalization.logoHelp"))}</p>
         </div>
 

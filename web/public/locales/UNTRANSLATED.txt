@@ -11,6 +11,7 @@
 about.lead
 about.source
 action.change
+action.remove
 appearance.lead
 auth.passwordHelp
 auth.setupTitle
@@ -25,6 +26,7 @@ comment.team
 comment.visitor
 error.address_taken
 error.already_set_up
+error.bad_credentials
 error.bad_request
 error.bad_signature
 error.board_closed
@@ -115,4 +117,5 @@ setup.instanceNameHelp
 setup.instanceTitle
 setup.languageTitle
 setup.orgLead
+shell.publicSite
 update.channelHelp

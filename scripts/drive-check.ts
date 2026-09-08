@@ -172,13 +172,18 @@ async function main() {
       // A button may not contain interactive content, and an input inside it
       // takes the click the button forwards, which bubbles back, forever.
       inputInside: !!document.querySelector(".avatar-pick input"),
+      // Every screen that picks an image uses this one control. Three of them
+      // were a label, an upload button and a remove button in a row, because
+      // it was written for the wizard and copied nowhere.
+      oldButtons: [...document.querySelectorAll("button")]
+        .filter(b => /Elige|Choose|Quitar|Remove/.test(b.textContent)).length,
       hints: document.querySelectorAll(".wizard-card .hint").length,
       lead: !!document.querySelector(".wizard-head .lead"),
     };
   `);
   check(
     "the picture is one control, with no furniture around it",
-    picture.pick && picture.badge && !picture.inputInside && picture.hints === 1,
+    picture.pick && picture.badge && !picture.inputInside && picture.hints === 1 && picture.oldButtons === 0,
     JSON.stringify(picture),
   );
   check("and the step does not introduce itself", picture.lead === false);
@@ -539,8 +544,41 @@ async function main() {
     JSON.stringify(about.facts),
   );
 
-  const picker = await evaluate(`return !!document.querySelector("body > nav select");`);
-  check("no language picker rides along in the top bar", picker === false);
+  const langPicker = await evaluate(`return !!document.querySelector("body > nav select");`);
+  check("no language picker rides along in the top bar", langPicker === false);
+
+  // The same control on the screens that are not the wizard, which is the half
+  // that kept being forgotten: a change made in one place and nowhere else is
+  // work handed back to whoever has to find the other three.
+  for (const [name, path] of [["profile", "/panel/account"], ["personalisation", "/panel/personalization"]]) {
+    await evaluate(`history.pushState({}, "", ${JSON.stringify(path)}); dispatchEvent(new PopStateEvent("popstate"));`);
+    await sleep(900);
+    const same = await evaluate(`
+      return {
+        pick: !!document.querySelector(".avatar-pick"),
+        old: [...document.querySelectorAll("button")]
+          .filter(b => /Elige|Choose|Quitar|Remove/.test(b.textContent)).length,
+      };
+    `);
+    check(`${name} picks an image the same way the wizard does`, same.pick === true && same.old === 0,
+      JSON.stringify(same));
+  }
+
+  // The panel uses the window rather than a column on the left of it.
+  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(900);
+  const room = await evaluate(`
+    const main = document.querySelector(".admin-main");
+    const cards = [...document.querySelectorAll(".dash-card")].map(c => c.getBoundingClientRect());
+    const box = main.getBoundingClientRect();
+    return { width: Math.round(box.width),
+             used: cards.length ? Math.round(Math.max(...cards.map(c => c.right)) - box.left) : 0 };
+  `);
+  check("the dashboard fills the width it is given", room.used > room.width * 0.9,
+    `${room.used} of ${room.width}`);
+
+  const wayOut = await evaluate(`return !!document.querySelector(".side-public");`);
+  check("and there is a way to the public side from the panel", wayOut === true);
 
   const sidebar = await evaluate(`
     return {
