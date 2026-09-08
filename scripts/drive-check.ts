@@ -344,7 +344,7 @@ async function main() {
   //     screen with no way to their own report and no way back to the board.
   //     Both are checked by following one of them.
   const onward = await evaluate(`
-    const links = [...document.querySelectorAll(".page .head-actions a")].map(a => a.getAttribute("href"));
+    const links = [...document.querySelectorAll(".page .wizard-actions a")].map(a => a.getAttribute("href"));
     return { links };
   `);
   check(
@@ -355,7 +355,7 @@ async function main() {
     JSON.stringify(onward.links),
   );
 
-  await evaluate(`document.querySelector(".head-actions a.button.primary").click()`);
+  await evaluate(`document.querySelector(".wizard-actions a.button.primary").click()`);
   await sleep(900);
   const landed = await evaluate(`
     return { path: location.pathname, title: document.querySelector(".detail h1")?.textContent?.trim() ?? "" };

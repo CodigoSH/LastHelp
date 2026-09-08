@@ -3117,3 +3117,10 @@ a.bento-card:hover,
 .button.back .icon {
   transform: scaleX(calc(-1 * var(--rtl-flip)));
 }
+
+/* Inside a .page the row of actions is a child like any other, and the page
+   already sets the distance between children: its own top margin on top of
+   that is a gap and a half. */
+.page > .wizard-actions {
+  margin-block-start: 0;
+}

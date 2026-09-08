@@ -822,11 +822,19 @@ export function submitted(
         <button class="button" data-copy>${escapeHTML(text.t("sent.copy"))}</button>
       </div>
     </section>
-    <div class="head-actions">
-      <a class="button primary" href="${escapeAttr(sent.path)}">${escapeHTML(text.t("sent.open"))}</a>
+    <!--
+      The same row the wizard and the form use: the way back on the end the eye
+      starts from, the way on at the other one, and the width of the page
+      between them. Two buttons side by side at the start of the line give the
+      same weight to going back and to going on, and read as one control that
+      was cut in half.
+    -->
+    <div class="wizard-actions">
       <a class="button with-icon back" href="/${escapeAttr(sent.org)}/${escapeAttr(sent.repo)}">
         ${icons.chevron(14)}<span>${escapeHTML(sent.board)}</span>
       </a>
+      <span class="spacer"></span>
+      <a class="button primary" href="${escapeAttr(sent.path)}">${escapeHTML(text.t("sent.open"))}</a>
     </div>
   </div>`;
 }
