@@ -1029,7 +1029,7 @@ export function itemView(item: ItemDetail, text: Text): string {
             ${item.kind === "bug" ? icons.bug(14) : icons.idea(14)}
             <span>${escapeHTML(text.t(`kind.${item.kind}`))}</span>
           </span>
-          <span class="status status-${escapeAttr(item.status)}">${escapeHTML(text.t(`status.${item.status}`))}</span>
+          ${stateChip(item, text)}
           <span class="when">${escapeHTML(text.date(item.created_at))}</span>
           ${issue}
         </p>
@@ -1817,15 +1817,14 @@ export const overviewCards = [
   "waiting",
   "published",
   "votes",
+  "organizations",
+  "people",
   "activity",
   "kinds",
   "statuses",
   "top",
   "recent",
   "boards",
-  "organizations",
-  "repositories",
-  "people",
   "moderation",
 ] as const;
 
@@ -1837,6 +1836,8 @@ export interface Brief {
   title: string;
   kind: string;
   status: string;
+  /** Absent means published: only the panel's lists carry anything else. */
+  moderation?: string;
   votes: number;
   created_at: number;
 }
@@ -1866,6 +1867,25 @@ export interface OverviewData {
   }[];
 }
 
+/**
+ * The state of a report as one chip: what it is waiting for, or what it is.
+ *
+ * A report that has not been published is not open — nobody outside the team
+ * can see it — and showing its status there said "Open" beside a row that was
+ * sitting in the queue. Until it is published the state is the moderation
+ * state; after that it is the status, which is the thing the roadmap and the
+ * board are built from.
+ */
+export function stateChip(
+  of: { status: string; moderation?: string },
+  text: Text,
+): string {
+  const waiting = of.moderation !== undefined && of.moderation !== "published";
+  const name = waiting ? String(of.moderation) : of.status;
+  const label = text.t(waiting ? `moderation.${name}` : `status.${name}`);
+  return `<span class="status status-${escapeAttr(name)}">${escapeHTML(label)}</span>`;
+}
+
 /** The mark of a kind, in the tile the rest of the product uses for it. */
 function kindMark(kind: string, size = 16): string {
   return `<span class="kind-mark kind-${escapeAttr(kind)}" aria-hidden="true">${
@@ -1882,7 +1902,7 @@ function briefRow(b: Brief, text: Text, showVotes = false): string {
         : kindMark(b.kind)
     }
     <span class="brief-title">${escapeHTML(b.title)}</span>
-    <span class="status status-${escapeAttr(b.status)}">${escapeHTML(text.t(`status.${b.status}`))}</span>
+    ${stateChip(b, text)}
   </a></li>`;
 }
 
@@ -2002,7 +2022,8 @@ export function overviewScreen(data: OverviewData, text: Text): string {
   // thing that is waiting rather than being the third grey number in a row.
   const boards = card(
     "boards",
-    `<h3>${escapeHTML(text.t("portal.boards"))}</h3>
+    `<h3>${escapeHTML(text.t("portal.boards"))}
+       <span class="count-chip">${number(data.repositories)}</span></h3>
      ${
        (data.boards ?? []).length === 0
          ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
@@ -2036,7 +2057,6 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     published: stat("published", data.published, text.t("overview.published"), icons.check(), "/panel/reports?moderation=published"),
     votes: stat("votes", data.votes, text.t("overview.votes"), icons.idea(), "/panel/reports?kind=idea&sort=votes"),
     organizations: stat("organizations", data.organizations, text.t("shell.organizations"), icons.organization(), "/panel/organizations"),
-    repositories: stat("repositories", data.repositories, text.t("portal.boards"), icons.repository(), "/panel/organizations"),
     people: stat("people", data.people, text.t("shell.people"), icons.people(), "/panel/people"),
     activity,
     kinds,
@@ -2121,7 +2141,7 @@ export function reportsScreen(data: ReportsData, filters: ReportFilters, text: T
 
   const moderationTabs = [
     tab("moderation", "", text.t("board.all"), totalOf(counts.moderation)),
-    tab("moderation", "pending", text.t("panel.queue"), counts.moderation.pending ?? 0),
+    tab("moderation", "pending", text.t("moderation.pending"), counts.moderation.pending ?? 0),
     tab("moderation", "published", text.t("moderation.published"), counts.moderation.published ?? 0),
     tab("moderation", "rejected", text.t("moderation.rejected"), counts.moderation.rejected ?? 0),
     tab("moderation", "spam", text.t("panel.spam"), counts.moderation.spam ?? 0),
@@ -2160,13 +2180,6 @@ export function reportsScreen(data: ReportsData, filters: ReportFilters, text: T
     const board = r.board
       ? `<span class="chip">${icons.repository(12)}<span>${escapeHTML(r.board.name)}</span></span>`
       : "";
-    const waiting =
-      r.moderation === "pending"
-        ? `<span class="chip waiting">${icons.queue(12)}<span>${escapeHTML(text.t("panel.queue"))}</span></span>`
-        : r.moderation === "published"
-          ? ""
-          : `<span class="chip">${escapeHTML(text.t(`moderation.${r.moderation}`))}</span>`;
-
     return `<li class="report" data-id="${escapeAttr(r.public_id)}">
       <a class="item" href="/i/${escapeAttr(r.public_id)}">
         ${
@@ -2184,10 +2197,9 @@ export function reportsScreen(data: ReportsData, filters: ReportFilters, text: T
               <span class="kind-name">${escapeHTML(text.t(`kind.${r.kind}`))}</span>
             </span>
             <span class="when">${escapeHTML(text.date(r.created_at))}</span>
-            ${waiting}
           </span>
         </span>
-        <span class="status status-${escapeAttr(r.status)}">${escapeHTML(text.t(`status.${r.status}`))}</span>
+        ${stateChip(r, text)}
       </a>
       ${
         // The decision, where the thing to decide about is. Only on what is

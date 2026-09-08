@@ -149,7 +149,7 @@
   "landing.pointForge": "Reports can become issues in your forge and follow their state.",
   "landing.pointNoAccount": "Reporting requires no account.",
   "landing.pointVotes": "Ideas collect votes, which shows what is most requested.",
-  "moderation.pending": "Waiting to be triaged",
+  "moderation.pending": "Waiting",
   "moderation.published": "Published",
   "moderation.rejected": "Rejected",
   "moderation.spam": "Spam",

@@ -941,7 +941,7 @@ async function main() {
   `);
   check(
     "the overview is one screen, the same for everybody",
-    overview.cards === 14 && overview.draggable === 0 && overview.arrange === false,
+    overview.cards === 13 && overview.draggable === 0 && overview.arrange === false,
     JSON.stringify(overview),
   );
   check(
@@ -1027,6 +1027,23 @@ async function main() {
     "and offers a decision only on what is actually waiting",
     listing.decisions === 1,
     `${listing.decisions} of ${listing.rows} rows carry the buttons`,
+  );
+
+  // A report nobody outside the team can see is not open, and its chip used to
+  // say so: the status is what a published report is in, and until then the
+  // state is what it is waiting for.
+  const states = await evaluate(`
+    return [...document.querySelectorAll(".report")].map(r => ({
+      decide: !!r.querySelector("[data-act]"),
+      state: r.querySelector(".status")?.className ?? "",
+    }));
+  `);
+  check(
+    "and nothing waiting for review is called open",
+    states.length > 1 &&
+      states.every((r: { decide: boolean; state: string }) =>
+        r.decide ? r.state.includes("status-pending") : !r.state.includes("status-pending")),
+    JSON.stringify(states),
   );
 
   await evaluate(`document.querySelector('[data-moderation="pending"]').click()`);

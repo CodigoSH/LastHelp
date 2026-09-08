@@ -3239,6 +3239,10 @@ a.stat:hover .stat-go {
 .status-done, .hue-done, .hue-published { --hue: var(--hue-done); }
 .status-closed, .status-declined, .status-not_reproducible,
 .hue-closed, .hue-declined, .hue-not_reproducible, .hue-rejected, .hue-spam { --hue: var(--hue-off); }
+/* A report that has not been published is not open. Its chip says what it is
+   waiting for, in the colour waiting wears everywhere else. */
+.status-pending { --hue: var(--hue-hold); }
+.status-rejected, .status-spam { --hue: var(--hue-off); }
 .hue-bug { --hue: var(--accent); }
 .hue-idea { --hue: var(--hue-open); }
 

@@ -51,12 +51,15 @@ type dayCount struct {
 // itemBrief is a report as a line in a list: enough to recognise it and to go
 // to it, and nothing else.
 type itemBrief struct {
-	PublicID  string `json:"public_id"`
-	Title     string `json:"title"`
-	Kind      string `json:"kind"`
-	Status    string `json:"status"`
-	Votes     int    `json:"votes"`
-	CreatedAt int64  `json:"created_at"`
+	PublicID string `json:"public_id"`
+	Title    string `json:"title"`
+	Kind     string `json:"kind"`
+	Status   string `json:"status"`
+	// Moderation travels with it because a report that is not published is not
+	// open, and a list that shows only the status says it is.
+	Moderation string `json:"moderation"`
+	Votes      int    `json:"votes"`
+	CreatedAt  int64  `json:"created_at"`
 }
 
 // boardCount is one repository with the size of its work on it.
@@ -204,7 +207,7 @@ func (s *Server) activity(days int) ([]dayCount, error) {
 // out in full, not something a query string can reach.
 func (s *Server) briefs(where, order string, limit int) ([]itemBrief, error) {
 	rows, err := s.db.Query(
-		`SELECT public_id, title, kind, status, vote_count, created_at
+		`SELECT public_id, title, kind, status, moderation_state, vote_count, created_at
 		   FROM item WHERE merged_into IS NULL AND (` + where + `)
 		  ORDER BY ` + order + ` LIMIT ` + strconv.Itoa(limit))
 	if err != nil {
@@ -215,7 +218,8 @@ func (s *Server) briefs(where, order string, limit int) ([]itemBrief, error) {
 	out := []itemBrief{}
 	for rows.Next() {
 		var b itemBrief
-		if err := rows.Scan(&b.PublicID, &b.Title, &b.Kind, &b.Status, &b.Votes, &b.CreatedAt); err != nil {
+		if err := rows.Scan(&b.PublicID, &b.Title, &b.Kind, &b.Status, &b.Moderation,
+			&b.Votes, &b.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, b)

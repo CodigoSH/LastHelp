@@ -91,7 +91,7 @@
   "item.yours": "C'est votre signalement",
   "kind.bug": "Bug",
   "kind.idea": "Idée",
-  "moderation.pending": "En attente de tri",
+  "moderation.pending": "En attente",
   "moderation.published": "Publié",
   "moderation.rejected": "Rejeté",
   "moderation.spam": "Indésirable",

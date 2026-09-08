@@ -91,7 +91,7 @@
   "item.yours": "이것은 여러분의 제보입니다",
   "kind.bug": "버그",
   "kind.idea": "아이디어",
-  "moderation.pending": "확인 대기",
+  "moderation.pending": "대기 중",
   "moderation.published": "공개됨",
   "moderation.rejected": "거절됨",
   "moderation.spam": "스팸",

@@ -91,7 +91,7 @@
   "item.yours": "这是你提交的反馈",
   "kind.bug": "问题",
   "kind.idea": "想法",
-  "moderation.pending": "等待处理",
+  "moderation.pending": "待处理",
   "moderation.published": "已发布",
   "moderation.rejected": "已拒绝",
   "moderation.spam": "垃圾内容",
