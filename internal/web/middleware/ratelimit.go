@@ -106,7 +106,7 @@ func RateLimit(exact, block *Limiter, addressOf func(*http.Request) (string, str
 			address, group := addressOf(r)
 			if !exact.Allow(address) || !block.Allow(group) {
 				w.Header().Set("Retry-After", "60")
-				http.Error(w, "error.too_many", http.StatusTooManyRequests)
+				Refuse(w, http.StatusTooManyRequests, "error.too_many")
 				return
 			}
 			next.ServeHTTP(w, r)

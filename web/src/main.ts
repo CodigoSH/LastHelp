@@ -22,7 +22,7 @@ import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
-import { shrink } from "./services/image";
+import { shrink, TooLarge } from "./services/image";
 import * as views from "./views/templates";
 
 const text: views.Text = {
@@ -206,8 +206,11 @@ async function readAsDataURL(file: File | undefined): Promise<string | null> {
     // a phone takes is over the limit, and telling the person setting up a
     // server to go and find a smaller picture is not a feature.
     return await shrink(file);
-  } catch {
-    showFormError(new ApiError(400, "error.image_too_big"));
+  } catch (err) {
+    // A file this browser cannot decode — an HEIC from an iPhone, say — is not
+    // a file that is too large, and saying so sends somebody off to shrink an
+    // image that was never the problem.
+    showFormError(new ApiError(400, err instanceof TooLarge ? "error.image_too_big" : "error.image_unreadable"));
     return null;
   }
 }

@@ -64,6 +64,7 @@
   "error.forge_denied": "The forge refused the credentials.",
   "error.form_stale": "This form went stale. Reload the page and send it again.",
   "error.image_too_big": "That image is too large. Under 96 KB, please.",
+  "error.image_unreadable": "That file is not an image this browser can read. Try a PNG or a JPEG.",
   "error.internal": "Something went wrong here. Try again.",
   "error.invalid_address": "That address is not valid. Lowercase letters, digits and dashes.",
   "error.invalid_comment": "That comment could not be accepted.",

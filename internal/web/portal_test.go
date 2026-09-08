@@ -1,9 +1,12 @@
 package web
 
 import (
+	"bytes"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -970,5 +973,40 @@ func TestALogoTheSizeItIsAllowedToBeGoesThrough(t *testing.T) {
 	body := decode(t, resp)
 	if resp.StatusCode != http.StatusBadRequest || body["error"] != "error.image_too_big" {
 		t.Errorf("an oversized logo answered %d %v, not that it is too big", resp.StatusCode, body)
+	}
+}
+
+// TestAFailureLeavesALine.
+//
+// Forty-six of the seventy-five places that answer "error.internal" logged
+// nothing, so a failure gave an operator one sentence on screen — "something
+// went wrong here" — and an empty log to send with the report. This is the
+// difference between a bug that can be diagnosed and one that has to be
+// guessed at, and it was noticed because a real report could not be traced.
+func TestAFailureLeavesALine(t *testing.T) {
+	var written bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&written, &slog.HandlerOptions{Level: slog.LevelError})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	recorder := httptest.NewRecorder()
+	writeError(recorder, http.StatusInternalServerError, "error.internal")
+
+	line := written.String()
+	if !strings.Contains(line, "error.internal") {
+		t.Errorf("a 500 wrote no line naming the key: %q", line)
+	}
+	// The caller's file and line, which is the whole point: "something failed"
+	// with no location is the state this replaced.
+	if !strings.Contains(line, "portal_test.go:") {
+		t.Errorf("the line does not say where the failure came from: %q", line)
+	}
+
+	// A refusal is not a failure. Logging every 400 would bury the ones that
+	// matter under everything a bad request can do.
+	written.Reset()
+	writeError(httptest.NewRecorder(), http.StatusBadRequest, "error.bad_request")
+	if written.Len() != 0 {
+		t.Errorf("a 400 wrote to the error log: %q", written.String())
 	}
 }

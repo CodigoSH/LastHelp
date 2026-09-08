@@ -108,5 +108,8 @@ export async function shrink(file: File): Promise<string> {
     if (!smallest || url.length < smallest.length) smallest = url;
   }
 
-  throw new Error("that image cannot be made small enough");
+  throw new TooLarge("that image cannot be made small enough");
 }
+
+/** Distinguishable from a file the browser could not decode at all. */
+export class TooLarge extends Error {}

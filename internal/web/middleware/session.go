@@ -42,7 +42,7 @@ func (a Authenticator) Attach(next http.Handler) http.Handler {
 			// An invalid session is not an error to shout about — expiry is
 			// normal — but a broken query is, and Resolve keeps them apart.
 			if !errors.Is(err, session.ErrInvalid) {
-				http.Error(w, "error.internal", http.StatusInternalServerError)
+				Refuse(w, http.StatusInternalServerError, "error.internal")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -67,7 +67,7 @@ func (a Authenticator) Attach(next http.Handler) http.Handler {
 func RequireActor(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := ActorFrom(r); !ok {
-			http.Error(w, "error.unauthorized", http.StatusUnauthorized)
+			Refuse(w, http.StatusUnauthorized, "error.unauthorized")
 			return
 		}
 		next.ServeHTTP(w, r)

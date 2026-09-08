@@ -44,7 +44,25 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (res.status === 204) return undefined as T;
 
   const text = await res.text();
-  const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+
+  // Parsed defensively rather than assumed. A refusal that arrives as anything
+  // but JSON used to throw a SyntaxError here, which is not an ApiError, so
+  // the screen fell back to "something went wrong here" — the message for a
+  // failure with no known cause — and hid the one the server had sent.
+  //
+  // The middleware answers JSON now. This stays because a proxy in front of
+  // this server answers with whatever it likes, and a gateway's HTML error
+  // page should not read as an internal fault of ours.
+  let payload: Record<string, unknown> = {};
+  if (text) {
+    try {
+      payload = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      // A bare key is what the middleware used to send, and what something in
+      // front of us might still forward.
+      if (/^error\.[a-z_]+$/.test(text.trim())) payload = { error: text.trim() };
+    }
+  }
 
   if (!res.ok) {
     const key = typeof payload.error === "string" ? payload.error : "error.internal";

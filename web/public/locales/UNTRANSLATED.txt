@@ -32,6 +32,7 @@ error.cannot_merge
 error.cross_site
 error.csrf
 error.different_repository
+error.image_unreadable
 error.invalid_address
 error.invalid_comment
 error.invalid_report

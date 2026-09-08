@@ -32,7 +32,7 @@ func Recover(next http.Handler) http.Handler {
 			}
 			slog.Error("panic serving a request",
 				"error", rec, "method", r.Method, "path", r.URL.Path)
-			http.Error(w, "error.internal", http.StatusInternalServerError)
+			Refuse(w, http.StatusInternalServerError, "error.internal")
 		}()
 		next.ServeHTTP(w, r)
 	})
@@ -71,7 +71,7 @@ func CrossSite(next http.Handler) http.Handler {
 			// "none" is a user typing the address or opening a bookmark.
 			next.ServeHTTP(w, r)
 		default:
-			http.Error(w, "error.cross_site", http.StatusForbidden)
+			Refuse(w, http.StatusForbidden, "error.cross_site")
 		}
 	})
 }
@@ -82,4 +82,23 @@ func safeMethod(method string) bool {
 		return true
 	}
 	return false
+}
+
+// Refuse answers a request the way the rest of this API answers everything.
+//
+// It was http.Error, which writes text/plain. The page parses every response as
+// JSON, so a refusal from here threw a SyntaxError on the way in — and what
+// somebody saw was not "the security token expired, reload the page" but
+// "something went wrong here", the message for a failure with no known cause.
+//
+// It cost a real report: a browser tab older than a server restart holds a
+// stale CSRF token, which is exactly this path, and the screen said nothing
+// that pointed at reloading.
+func Refuse(w http.ResponseWriter, status int, key string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(status)
+	// Hand-written rather than encoded: the key is ours and has no quotes in
+	// it, and this runs on the path that answers when everything else failed.
+	_, _ = w.Write([]byte(`{"error":"` + key + `"}`))
 }

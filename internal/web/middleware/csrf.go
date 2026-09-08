@@ -29,7 +29,7 @@ func CSRF(secure bool) func(http.Handler) http.Handler {
 			if err != nil || cookie.Value == "" {
 				token, genErr := newToken()
 				if genErr != nil {
-					http.Error(w, "error.internal", http.StatusInternalServerError)
+					Refuse(w, http.StatusInternalServerError, "error.internal")
 					return
 				}
 				cookie = &http.Cookie{
@@ -51,7 +51,7 @@ func CSRF(secure bool) func(http.Handler) http.Handler {
 
 			sent := r.Header.Get(CSRFHeader)
 			if sent == "" || subtle.ConstantTimeCompare([]byte(sent), []byte(cookie.Value)) != 1 {
-				http.Error(w, "error.csrf", http.StatusForbidden)
+				Refuse(w, http.StatusForbidden, "error.csrf")
 				return
 			}
 			next.ServeHTTP(w, r)

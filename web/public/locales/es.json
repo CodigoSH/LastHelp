@@ -64,6 +64,7 @@
   "error.forge_denied": "La forja ha rechazado las credenciales.",
   "error.form_stale": "Este formulario ha caducado. Recarga la página y vuelve a enviarlo.",
   "error.image_too_big": "Esa imagen es demasiado grande. Menos de 96 KB, por favor.",
+  "error.image_unreadable": "Ese archivo no es una imagen que este navegador pueda leer. Prueba con un PNG o un JPEG.",
   "error.internal": "Algo ha fallado por aquí. Inténtalo otra vez.",
   "error.invalid_address": "Esa dirección no es válida. Letras minúsculas, dígitos y guiones.",
   "error.invalid_comment": "No se ha podido aceptar ese comentario.",

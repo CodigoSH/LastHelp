@@ -5,6 +5,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
@@ -255,5 +258,22 @@ func tooLarge(err error) bool {
 }
 
 func writeError(w http.ResponseWriter, status int, key string) {
+	// Every 5xx leaves a line, and the line says where.
+	//
+	// Forty-six of the seventy-five places that answer "error.internal" logged
+	// nothing at all, so an operator whose server failed had one sentence on
+	// screen — "something went wrong here" — and an empty log to send with the
+	// report. Diagnosing it meant guessing which of forty-six it was.
+	//
+	// runtime.Caller rather than a new argument: the alternative was changing
+	// the signature at seventy-five call sites to pass something every one of
+	// them already knows by being where it is.
+	if status >= http.StatusInternalServerError {
+		where := "unknown"
+		if _, file, line, ok := runtime.Caller(1); ok {
+			where = filepath.Base(file) + ":" + strconv.Itoa(line)
+		}
+		slog.Error("the request failed", "status", status, "key", key, "at", where)
+	}
 	writeJSON(w, status, map[string]string{"error": key})
 }
