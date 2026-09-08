@@ -101,7 +101,7 @@
   "nav.panel": "面板",
   "nav.roadmap": "路线图",
   "nav.signIn": "登录",
-  "nav.signOut": "退出",
+  "nav.signOut": "退出登录",
   "org.stepForge": "代码托管",
   "org.stepIdentity": "资料",
   "org.tokenWhere": "在该服务中：{where}，权限范围 {scope}。",

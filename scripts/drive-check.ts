@@ -1048,17 +1048,26 @@ async function main() {
   await evaluate(`document.querySelector(".report a.item").click()`);
   await sleep(1400);
   const reading = await evaluate(`
+    const decide = document.querySelector(".decide");
     return {
       title: document.querySelector(".detail h1")?.textContent?.trim() ?? "",
-      waiting: !!document.querySelector(".notice"),
+      // The decision is a card of its own, above the team's tools rather than
+      // stacked in with the status select and the issue form: it is the one
+      // thing on this screen the screen cannot undo.
+      state: decide?.querySelector("h3")?.textContent?.trim() ?? "",
+      apart: decide ? !decide.closest(".team-tools") : false,
       decide: document.querySelectorAll("[data-moderate]").length,
+      // And said once: the notice above is for the reporter, who is told by it
+      // what this card tells the team.
+      notices: document.querySelectorAll(".notice").length,
       answers: document.querySelectorAll(".answers dd").length,
     };
   `);
   check(
     "a report waiting for review can be read, and decided where it is read",
-    reading.title === "search ignores accents" && reading.waiting === true &&
-      reading.decide === 3 && reading.answers === 2,
+    reading.title === "search ignores accents" && reading.state.length > 0 &&
+      reading.apart === true && reading.decide === 3 && reading.notices === 0 &&
+      reading.answers === 2,
     JSON.stringify(reading),
   );
 

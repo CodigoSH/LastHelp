@@ -986,8 +986,10 @@ async function showItem(publicID: string): Promise<void> {
       // reason somebody opens a waiting report is to read it before deciding,
       // and the decision was one screen away from the reading.
       if (item.moderation && item.moderation !== "published") {
-        tools?.querySelector(".tools")?.insertAdjacentHTML("beforeend", views.moderationControl(text));
-        tools?.querySelectorAll<HTMLButtonElement>("[data-moderate]").forEach((button) =>
+        // Above the tools and outside them: it is the one decision on this
+        // screen that the screen cannot undo.
+        tools?.insertAdjacentHTML("beforebegin", views.moderationCard(text));
+        root?.querySelectorAll<HTMLButtonElement>("[data-moderate]").forEach((button) =>
           button.addEventListener("click", async () => {
             try {
               await api.post(`/api/items/${encodeURIComponent(publicID)}/moderation`, {

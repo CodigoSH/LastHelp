@@ -3382,10 +3382,11 @@ a.stat:hover .stat-go {
    hand's width of nothing between the team's tools and the first comment. */
 .page > .thread { margin-block-start: 0; }
 
-/* The decision on a waiting report, at the top of the team's tools. */
-.moderation-control { display: grid; gap: 0.5rem; }
-.moderation-control .hint { margin: 0; }
-.moderation-control .actions { margin: 0; }
+/* The decision on a waiting report: its own card, above the team's tools and
+   apart from them. Its head carries the state, so nothing else has to. */
+.decide { margin-block-start: 0; }
+.decide .card-head { color: var(--hue-hold); }
+.decide .actions { margin-block-start: 0.35rem; }
 
 /* Leaving, in the bar. The mark points at the door and the door is at the end
    of the line, which is the other end in Arabic. */

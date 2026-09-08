@@ -101,7 +101,7 @@
   "nav.panel": "پنل",
   "nav.roadmap": "نقشهٔ راه",
   "nav.signIn": "ورود",
-  "nav.signOut": "خروج",
+  "nav.signOut": "خروج از حساب",
   "org.stepForge": "فورج",
   "org.stepIdentity": "مشخصات",
   "org.tokenWhere": "در آن فورج: {where}، با دامنهٔ {scope}.",

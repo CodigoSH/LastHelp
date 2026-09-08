@@ -648,21 +648,28 @@ export function issueControl(
 }
 
 /**
- * The decision, on the report itself.
+ * The decision, on the report itself and in a card of its own.
  *
  * It existed only in the queue, so somebody who opened a waiting report to read
  * it properly — which is the whole point of opening it — then had to go back to
  * a list to act on what they had just read.
+ *
+ * Its own card rather than three more buttons at the top of the team's tools:
+ * this is the one thing on the screen that is not reversible from the same
+ * screen, and stacked in with the status select and the issue form it read as
+ * one heap of controls. The card's title is the state it is in, which is why
+ * the notice above is drawn for the reporter only — the same sentence twice on
+ * one page is the sentence nobody reads.
  */
-export function moderationControl(text: Text): string {
-  return `<div class="moderation-control">
-    <p class="hint">${escapeHTML(text.t("item.waiting"))}</p>
+export function moderationCard(text: Text): string {
+  return `<section class="bento-card decide">
+    <div class="card-head">${icons.queue()}<h3>${escapeHTML(text.t("item.waiting"))}</h3></div>
     <div class="actions">
       <button class="button primary with-icon" data-moderate="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
       <button class="button with-icon" data-moderate="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
       <button class="button danger with-icon" data-moderate="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
     </div>
-  </div>`;
+  </section>`;
 }
 
 /** The team's status control, drawn only for somebody who may use it. */
@@ -943,13 +950,13 @@ export function itemView(item: ItemDetail, text: Text): string {
     ? `<p class="notice">${icons.info()}<a href="/i/${escapeAttr(item.merged_into)}">${escapeHTML(text.t("item.merged"))}</a></p>`
     : "";
 
-  // Waiting to be read, said to whoever is looking at it before it is
-  // published — its author holding their follow link, or somebody on the team
-  // who has to decide about it. Both need to know; nobody else can be here.
-  // It used to be drawn for anybody holding a follow link, which meant a
-  // published report told its own author, forever, that it was still waiting.
+  // Waiting to be read, said to the person who wrote it. Somebody on the team
+  // is told the same thing by the card carrying the decision, and saying it
+  // twice on one page is how a screen stops being read at all. It used to be
+  // drawn for anybody holding a follow link, which meant a published report
+  // told its own author, forever, that it was still waiting.
   const waiting =
-    item.moderation && item.moderation !== "published"
+    item.mine && item.moderation && item.moderation !== "published"
       ? `<p class="notice">${icons.queue()}<span>${escapeHTML(text.t("item.waiting"))}</span></p>`
       : "";
 

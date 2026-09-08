@@ -159,7 +159,7 @@
   "nav.panel": "Panel",
   "nav.roadmap": "Hoja de ruta",
   "nav.signIn": "Entrar",
-  "nav.signOut": "Salir",
+  "nav.signOut": "Cerrar sesión",
   "org.forgeLead": "El token se guarda cifrado y no se vuelve a mostrar. Basta con permiso de escritura en incidencias.",
   "org.noForgeLead": "Sin forja conectada. Los reportes se quedan solo en esta instalación.",
   "org.stepForge": "Forja",
