@@ -10,10 +10,10 @@ has to maintain.
 
 One binary, one SQLite file, no external services.
 
-![A board](images/board.png)
+![The public page of a repository](images/board.png)
 
 - [Install](getting-started/install.md)
-- [Your first board](getting-started/first-board.md)
+- [Your first repository](getting-started/first-repository.md)
 - [Connecting a forge](forges/connecting.md)
 - [Notifications](administration/notifications.md)
 - [Updating](administration/updating.md)

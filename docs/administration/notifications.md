@@ -9,10 +9,10 @@ Without this the portal dies quietly: nobody opens a moderation queue every day
 on the chance that it has something in it, so it fills, and a portal full of
 people talking to nobody reads worse from outside than no portal at all.
 
-Configured **per board**, so one board can go to one room and another somewhere
+Configured **per repository**, so one repository can go to one room and another somewhere
 else. A single global channel is a channel everybody eventually silences.
 
-Choose it in the panel, on the organisation's screen: pick a board, pick a
+Choose it in the panel, on the organisation's screen: pick a repository, pick a
 channel, and it asks only for what that channel needs.
 
 Or over the API, which is what the panel calls:

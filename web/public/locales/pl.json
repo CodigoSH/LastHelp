@@ -170,7 +170,6 @@
   "update.install": "Zainstaluj i uruchom ponownie",
   "update.installing": "Instalowanie. Ta strona wróci po ponownym uruchomieniu.",
   "update.running": "Uruchomiona: {version}",
-  "update.title": "Aktualizacje",
   "update.upToDate": "To najnowsze wydanie.",
   "wizard.continue": "Dalej",
   "wizard.example": "Na przykład:",

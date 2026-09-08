@@ -18,7 +18,7 @@ works, because a README that describes a server nobody wrote is the first thing
 that makes people stop trusting one.
 
 Working today, end to end and driven through a real browser: organisations and
-boards, reporting without an account, the secret follow link, the moderation
+repositories, reporting without an account, the secret follow link, the moderation
 queue, publishing, voting on ideas, comment threads, similar-item hints while
 you type, a public roadmap nobody maintains by hand, and the whole interface in
 twenty languages including right-to-left.
@@ -26,7 +26,7 @@ twenty languages including right-to-left.
 Also working: the anti-abuse layers — a signed single-use form token, a timing
 window, a honeypot, rate limits keyed on the address a caller cannot choose,
 duplicate and link heuristics, an operator word list, and a circuit breaker that
-closes a board rather than hand somebody a queue they will not open. Every
+closes a repository rather than hand somebody a queue they will not open. Every
 refusal is counted by layer, because a filter nobody can measure is a filter
 quietly turning away people who never complain.
 
@@ -37,9 +37,9 @@ actually needs — and when that issue is closed or reopened, the item follows.
 That is what makes the roadmap something nobody has to maintain.
 
 Notifications work in both directions they need to. The team is told something
-arrived — ntfy, Gotify, a generic webhook, or mail — configured per board, so a
-group can send one board to one room and another somewhere else. Whoever
-reported something can follow the board's Atom feed, which needs no address, no
+arrived — ntfy, Gotify, a generic webhook, or mail — configured per repository, so a
+group can send one repository to one room and another somewhere else. Whoever
+reported something can follow the repository's Atom feed, which needs no address, no
 account and no configuration at all, or leave an email if a relay is set up:
 that address is stored encrypted, is visible only to the team, and is deleted
 when the item closes.
@@ -93,7 +93,7 @@ check that yourself.
 
 ## Documentation
 
-[docs/](docs/) — installing, your first board, connecting a forge, notifications,
+[docs/](docs/) — installing, your first repository, connecting a forge, notifications,
 and keeping the queue readable.
 
 ## License

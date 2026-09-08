@@ -104,7 +104,12 @@ const shoot = async (name: string) => {
   console.log(`  wrote ${OUT}/${name}.png (${WIDTH}x${height})`);
 };
 
-// --- seed, through the API, so the images show a board with something in it --
+// The wizard, before anything is claimed. It has to be first: the moment the
+// instance has an administrator this screen cannot be reached again.
+await go("/setup");
+await shoot("setup");
+
+// --- seed, through the API, so the images show a repository with something in it
 await go("/");
 const seeded = await evaluate(`
   const csrf = () => document.cookie.split(";").map(c => c.trim())
@@ -115,9 +120,18 @@ const seeded = await evaluate(`
     body: JSON.stringify(body),
   }).then(r => r.status);
 
-  await post("/api/setup", { email: "you@example.com", password: "a good long passphrase" });
+  // Refused silently for a while: this said "email", which the API stopped
+  // taking. Nothing checked the answer, so setup failed, everything after it
+  // ran with no session, and the images were of an unclaimed instance — with a
+  // tick printed for each one.
+  const claimed = await post("/api/setup", { username: "k4wit0", password: "a good long passphrase" });
+  if (claimed !== 201) throw new Error("could not claim the instance: HTTP " + claimed);
+
+  await post("/api/instance", { name: "CodigoSH", logo: "", accent: "" });
   await post("/api/organizations", { slug: "codigosh", name: "CodigoSH", forge: "forgejo" });
-  await post("/api/orgs/codigosh/repositories", { slug: "lastboard", name: "Lastboard" });
+  await post("/api/orgs/codigosh/repositories", {
+    slug: "lastboard", name: "Lastboard", accepts_bugs: true, accepts_ideas: true,
+  });
 
   const submit = async (kind, title, body) => {
     const form = await fetch("/api/orgs/codigosh/repos/lastboard/form").then(r => r.json());
@@ -134,9 +148,13 @@ const seeded = await evaluate(`
   const ids = [];
   ids.push(await submit("idea", "Dark mode for the dashboard", "The white is bright at night."));
   ids.push(await submit("bug", "Crashes when importing a folder", "It closes with no message."));
-  ids.push(await submit("idea", "Export the board to CSV", "For a monthly report."));
+  ids.push(await submit("idea", "Export the reports to CSV", "For a monthly report."));
 
-  for (const id of ids) {
+  // All but the last, so the queue screenshot has something in it. Publishing
+  // everything left that page showing "nothing waiting" — a picture of the
+  // triage screen with no triage on it, which is the one thing that page is
+  // there to show.
+  for (const id of ids.slice(0, -1)) {
     await post("/api/items/" + id + "/moderation", { state: "published" });
   }
   await post("/api/items/" + ids[0] + "/status", { status: "planned" });
@@ -165,7 +183,13 @@ await go(`/i/${seeded[0]}`);
 await shoot("item");
 
 await go("/panel");
+await shoot("panel");
+
+await go("/panel/updates");
 await shoot("update");
+
+await go("/panel/organizations");
+await shoot("organizations");
 
 page.close();
 console.log("\nlook at the images. A tick above says a file was written, nothing more.");

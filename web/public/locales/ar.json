@@ -170,7 +170,6 @@
   "update.install": "التثبيت وإعادة التشغيل",
   "update.installing": "جارٍ التثبيت. ستعود هذه الصفحة بعد إعادة التشغيل.",
   "update.running": "قيد التشغيل: {version}",
-  "update.title": "التحديثات",
   "update.upToDate": "هذه أحدث نسخة.",
   "wizard.continue": "متابعة",
   "wizard.example": "مثال:",

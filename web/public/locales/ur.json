@@ -170,7 +170,6 @@
   "update.install": "انسٹال کر کے دوبارہ شروع کریں",
   "update.installing": "انسٹال ہو رہا ہے۔ دوبارہ شروع ہونے پر یہ صفحہ واپس آ جائے گا۔",
   "update.running": "چل رہا ہے: {version}",
-  "update.title": "اپ ڈیٹس",
   "update.upToDate": "یہ تازہ ترین ورژن ہے۔",
   "wizard.continue": "جاری رکھیں",
   "wizard.example": "مثلاً:",

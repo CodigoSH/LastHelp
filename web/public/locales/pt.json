@@ -170,7 +170,6 @@
   "update.install": "Instalar e reiniciar",
   "update.installing": "A instalar. Esta página volta quando reiniciar.",
   "update.running": "Em execução: {version}",
-  "update.title": "Atualizações",
   "update.upToDate": "É a versão mais recente.",
   "wizard.continue": "Continuar",
   "wizard.example": "Por exemplo:",

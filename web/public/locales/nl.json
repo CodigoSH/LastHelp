@@ -170,7 +170,6 @@
   "update.install": "Installeren en herstarten",
   "update.installing": "Bezig met installeren. Deze pagina komt terug na de herstart.",
   "update.running": "Actief: {version}",
-  "update.title": "Updates",
   "update.upToDate": "Dit is de nieuwste versie.",
   "wizard.continue": "Doorgaan",
   "wizard.example": "Bijvoorbeeld:",

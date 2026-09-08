@@ -170,7 +170,6 @@
   "update.install": "설치하고 다시 시작",
   "update.installing": "설치 중입니다. 다시 시작되면 이 페이지가 돌아옵니다.",
   "update.running": "실행 중: {version}",
-  "update.title": "업데이트",
   "update.upToDate": "최신 버전입니다.",
   "wizard.continue": "계속",
   "wizard.example": "예:",

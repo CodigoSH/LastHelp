@@ -170,7 +170,6 @@
   "update.install": "Installieren und neu starten",
   "update.installing": "Wird installiert. Diese Seite kommt nach dem Neustart zurück.",
   "update.running": "Läuft: {version}",
-  "update.title": "Aktualisierungen",
   "update.upToDate": "Das ist die neueste Version.",
   "wizard.continue": "Weiter",
   "wizard.example": "Zum Beispiel:",

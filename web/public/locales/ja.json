@@ -170,7 +170,6 @@
   "update.install": "インストールして再起動",
   "update.installing": "インストール中です。再起動すればこのページは戻ります。",
   "update.running": "実行中：{version}",
-  "update.title": "更新",
   "update.upToDate": "これが最新版です。",
   "wizard.continue": "続ける",
   "wizard.example": "例：",

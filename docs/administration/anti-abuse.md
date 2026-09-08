@@ -23,8 +23,8 @@ model — what people write in your portal reaches your database and nowhere els
    addresses, so limiting per exact address is limiting per attempt.
 5. **Content heuristics**: the same text again (a flood is one paragraph over
    and over), too many links, and a word list you control — a word that means
-   nothing on your board is somebody else's daily traffic.
-6. **A circuit breaker.** Past sixty submissions in an hour a board stops taking
+   nothing on your repository is somebody else's daily traffic.
+6. **A circuit breaker.** Past sixty submissions in an hour a repository stops taking
    them for a while. Refusing for an hour beats handing you a queue you will not
    open.
 7. **The moderation queue**, which catches what the rest did not.
@@ -33,7 +33,7 @@ model — what people write in your portal reaches your database and nowhere els
 
 A queue that holds everything is right on day one and a daily chore the day your
 project gets popular. That is the real cost of not asking people for accounts,
-and the lever is per board: hold everything, or hold only the first thing from
+and the lever is per repository: hold everything, or hold only the first thing from
 each visitor.
 
 ## Knowing whether any of it works
@@ -56,7 +56,7 @@ Anyone claiming a spam filter stops a determined human is selling something.
 
 ![The moderation queue](../images/queue.png)
 
-Two buttons and a third for spam. With four boards you will see between zero and
+Two buttons and a third for spam. With four repositories you will see between zero and
 five things a week, which is why there are no bulk actions, no saved views and
 no search here: anything that assumes scale on this side is weight you carry for
 a situation you do not have.

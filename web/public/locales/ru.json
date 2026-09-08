@@ -170,7 +170,6 @@
   "update.install": "Установить и перезапустить",
   "update.installing": "Устанавливается. Страница вернётся после перезапуска.",
   "update.running": "Работает: {version}",
-  "update.title": "Обновления",
   "update.upToDate": "Это последняя версия.",
   "wizard.continue": "Продолжить",
   "wizard.example": "Например:",

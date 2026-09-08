@@ -170,7 +170,6 @@
   "update.install": "نصب و راه‌اندازی دوباره",
   "update.installing": "در حال نصب. این صفحه پس از راه‌اندازی دوباره بازمی‌گردد.",
   "update.running": "در حال اجرا: {version}",
-  "update.title": "به‌روزرسانی‌ها",
   "update.upToDate": "این آخرین نسخه است.",
   "wizard.continue": "ادامه",
   "wizard.example": "برای نمونه:",

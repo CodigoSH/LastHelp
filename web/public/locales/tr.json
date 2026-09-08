@@ -170,7 +170,6 @@
   "update.install": "Kur ve yeniden başlat",
   "update.installing": "Kuruluyor. Bu sayfa yeniden başladığında dönecek.",
   "update.running": "Çalışan: {version}",
-  "update.title": "Güncellemeler",
   "update.upToDate": "Bu en son sürüm.",
   "wizard.continue": "Devam",
   "wizard.example": "Örneğin:",

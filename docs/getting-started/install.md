@@ -43,10 +43,19 @@ Or with the compose file in the repository:
 docker compose up -d
 ```
 
-Open `http://localhost:8080`. The first screen asks you to claim the instance —
-the first account created is the administrator, and setup then refuses to run
+Open `http://localhost:8080`. An unclaimed instance opens on the setup wizard
+rather than hiding it behind a sign-in link: three steps — the language and the
+look, the administrator account, and what this installation calls itself.
+
+![The first step](../images/setup.png)
+
+The first account created is the administrator, and setup then refuses to run
 again. Anybody who finds an unclaimed instance before you do becomes its
 administrator, so claim it before you put it on the internet.
+
+It asks for a **username**, not an email address. Nothing is ever sent to it,
+and the second password box is the one thing standing between a typo and an
+installation nobody can sign into — there is no reset here.
 
 ## From source
 
@@ -63,7 +72,7 @@ Two files, and they are not the same thing:
 
 | File | What it is |
 |---|---|
-| `lasthelp.db` | Everything: boards, reports, votes, accounts |
+| `lasthelp.db` | Everything: repositories, reports, votes, accounts |
 | `lasthelp.key` | The key that encrypts the forge tokens and reporters' email addresses |
 
 **Back up both, but not into the same place.** The key sits beside the database

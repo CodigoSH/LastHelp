@@ -210,7 +210,6 @@
   "update.install": "Installa e riavvia",
   "update.installing": "Installazione in corso. La pagina tornerà al riavvio.",
   "update.running": "In esecuzione: {version}",
-  "update.title": "Aggiornamenti",
   "update.upToDate": "È l'ultima versione.",
   "wizard.back": "Indietro",
   "wizard.continue": "Continua",

@@ -210,7 +210,6 @@
   "update.install": "Installer et redémarrer",
   "update.installing": "Installation en cours. Cette page reviendra après le redémarrage.",
   "update.running": "En cours : {version}",
-  "update.title": "Mises à jour",
   "update.upToDate": "C'est la dernière version.",
   "wizard.back": "Retour",
   "wizard.continue": "Continuer",

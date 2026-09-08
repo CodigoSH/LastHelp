@@ -29,7 +29,8 @@ not anybody wanted a second level.
 
 ## 2. Store it
 
-In the panel, open the organisation. If it has a forge, it asks for the token
+In the panel, open **Organisations** and then the organisation. If it has a
+forge, its settings ask for the token
 and a webhook secret, and answers with the address to configure:
 
 ```

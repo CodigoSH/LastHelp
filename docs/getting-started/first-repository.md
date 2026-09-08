@@ -1,12 +1,12 @@
-# Your first board
+# Your first repository
 
 The structure is two levels, and they are the ones your forge already has:
 
 - An **organisation** is a connection to a forge: its address, the owner, and
   the credentials. It is not an org chart — a token cannot span two
   organisations on any forge, so the boundary is imposed rather than invented.
-- A **repository** is a public board. You register only the ones you want
-  feedback for.
+- A **repository** is one place people report about. You register only the
+  ones you want feedback for.
 
 A project spread over twenty repositories does not have to register twenty. Most
 register one and send everything there, because somebody reporting "the video
@@ -15,8 +15,16 @@ in, and should not have to.
 
 ## Creating them
 
-From the panel: sign in, and the first screen asks for an organisation — a name,
-an address, and which forge it connects to, or none. Then a board under it.
+From the panel: **Organisations** in the sidebar, then **Add an organisation** —
+a name, an address, and which forge it connects to, or none. Open it and add a
+repository the same way.
+
+![The organisations screen](../images/organizations.png)
+
+The first run does not ask for either of them. It configures the installation —
+language, the administrator account, and what this installation calls itself —
+and stops there. Organisations and repositories are the work, made and unmade
+for years after that screen is gone.
 
 Or over the API, which is what the panel calls:
 
@@ -35,10 +43,10 @@ curl -X POST "$BASE/api/orgs/codigosh/repositories" \
   -H 'Content-Type: application/json' \
   -H "X-CSRF-Token: $CSRF" -H 'Sec-Fetch-Site: same-origin' \
   -b cookies.txt -c cookies.txt \
-  -d '{"slug":"lastboard","name":"Lastboard"}'
+  -d '{"slug":"lastboard","name":"Lastboard","accepts_bugs":true,"accepts_ideas":true}'
 ```
 
-The board is then at `/codigosh/lastboard`, its roadmap at
+The repository is then at `/codigosh/lastboard`, its roadmap at
 `/codigosh/lastboard/roadmap`, and its feed at
 `/feed/codigosh/lastboard/atom.xml`.
 
@@ -47,7 +55,7 @@ supported way to run**, not a placeholder: everything except turning an item int
 an issue works without a forge, and the screens say there is none rather than
 offering buttons that fail.
 
-![The public board](../images/board.png)
+![The public page of a repository](../images/board.png)
 
 ## Bugs and ideas are two different journeys
 
@@ -69,7 +77,7 @@ confirmed bug and a planned idea are the same news.
 |---|---|---|
 | Server | **Administrator** | Everything, and the only one who crosses organisations |
 | Organisation | **Owner** | Its connection and **its token**, its repositories |
-| Repository | **Collaborator** | Triage that board: moderate, change status, reply, create and link issues. **Never sees the token** |
+| Repository | **Collaborator** | Triage that repository: moderate, change status, reply, create and link issues. **Never sees the token** |
 
 That last line is the reason the two levels exist. Somebody trusted to triage
 one repository is not automatically somebody trusted with a credential that can
@@ -89,8 +97,8 @@ vote count as a signal of what is popular rather than as a count of people.
 
 ## Taking your data with you
 
-Every board exports as JSON, from the organisation's screen in the panel or at
-`/api/orgs/<org>/repos/<board>/export`. It carries everything the operator
+Every repository exports as JSON, from the organisation's screen in the panel or at
+`/api/orgs/<org>/repos/<repository>/export`. It carries everything the operator
 decided — the published items, the queue, the rejections, the merged duplicates,
 the comments and the issue links — because an export that showed only the
 approved half would misrepresent the record.

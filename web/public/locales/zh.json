@@ -170,7 +170,6 @@
   "update.install": "安装并重启",
   "update.installing": "正在安装，重启后本页会回来。",
   "update.running": "正在运行：{version}",
-  "update.title": "更新",
   "update.upToDate": "这已经是最新版本。",
   "wizard.continue": "继续",
   "wizard.example": "例如：",

@@ -290,7 +290,6 @@
   "update.install": "Install and restart",
   "update.installing": "Installing. This page will come back when it restarts.",
   "update.running": "Running: {version}",
-  "update.title": "Updates",
   "update.upToDate": "This is the latest release.",
   "wizard.back": "Back",
   "wizard.continue": "Continue",

@@ -170,7 +170,6 @@
   "update.install": "ইনস্টল করে চালু করুন",
   "update.installing": "ইনস্টল হচ্ছে। পুনরায় চালু হলে এই পাতা ফিরে আসবে।",
   "update.running": "চলছে: {version}",
-  "update.title": "হালনাগাদ",
   "update.upToDate": "এটিই সর্বশেষ সংস্করণ।",
   "wizard.continue": "চালিয়ে যান",
   "wizard.example": "যেমন:",

@@ -170,7 +170,6 @@
   "update.install": "Pasang dan mulai ulang",
   "update.installing": "Sedang dipasang. Halaman ini akan kembali setelah mulai ulang.",
   "update.running": "Berjalan: {version}",
-  "update.title": "Pembaruan",
   "update.upToDate": "Ini versi terbaru.",
   "wizard.continue": "Lanjut",
   "wizard.example": "Misalnya:",

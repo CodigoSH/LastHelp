@@ -170,7 +170,6 @@
   "update.install": "Εγκατάσταση και επανεκκίνηση",
   "update.installing": "Γίνεται εγκατάσταση. Η σελίδα θα επανέλθει μετά την επανεκκίνηση.",
   "update.running": "Τρέχει: {version}",
-  "update.title": "Ενημερώσεις",
   "update.upToDate": "Αυτή είναι η τελευταία έκδοση.",
   "wizard.continue": "Συνέχεια",
   "wizard.example": "Για παράδειγμα:",

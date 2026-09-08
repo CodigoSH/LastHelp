@@ -186,16 +186,16 @@ export function updatePanel(
   const running = `<p class="running">${escapeHTML(text.t("update.running", { version: status.current }))}</p>`;
 
   if (status.reason) {
-    return `<h2>${escapeHTML(text.t("update.title"))}</h2>${running}
+    return `${running}
       <p class="notice">${escapeHTML(text.t(status.reason))}</p>`;
   }
 
   if (!status.available) {
-    return `<h2>${escapeHTML(text.t("update.title"))}</h2>${running}
+    return `${running}
       <p class="hint">${escapeHTML(text.t("update.upToDate"))}</p>`;
   }
 
-  return `<h2>${escapeHTML(text.t("update.title"))}</h2>${running}
+  return `${running}
     <p class="available">${escapeHTML(text.t("update.available", { version: status.latest ?? "" }))}</p>
     ${status.notes ? `<pre class="notes">${escapeHTML(status.notes)}</pre>` : ""}
     <button class="button primary" data-update>${escapeHTML(text.t("update.install"))}</button>
@@ -1167,7 +1167,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
           text.t("shell.groupSystem"),
           spec.isAdmin
             ? item("/panel/people", text.t("shell.people"), icons.people()) +
-                item("/panel/personalization", text.t("shell.personalization"), icons.palette()) +
+                item("/panel/personalization", text.t("shell.personalization"), icons.brush()) +
                 item("/panel/backups", text.t("shell.backups"), icons.backup()) +
                 item("/panel/updates", text.t("shell.updates"), icons.update()) +
                 item("/panel/about", text.t("shell.about"), icons.info())

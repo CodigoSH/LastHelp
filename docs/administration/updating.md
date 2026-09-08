@@ -4,10 +4,14 @@ Three ways, and the right one depends on how you installed.
 
 ## From the panel
 
-Sign in as the administrator and the panel shows what is running and what is
-available. One button installs it and restarts.
+Sign in as the administrator and open **Updates** in the sidebar. It shows what
+is running and what is available, and one button installs it and restarts.
 
-![Updating from the panel](../images/update.png)
+![Updates in the panel](../images/update.png)
+
+The release channel is on the same screen. Following betas is remembered on the
+server rather than in a browser, because a checkbox that forgets itself between
+visits is one nobody trusts.
 
 What it does, in this order, and each step either proves something or stops:
 
