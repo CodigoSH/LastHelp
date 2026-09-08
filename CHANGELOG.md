@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0-Beta.02] - 2026-09-09
+
 ### Added
 
 - A content security policy on every response, with no `unsafe-inline` in it:
