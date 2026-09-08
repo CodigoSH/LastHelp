@@ -162,6 +162,37 @@ async function main() {
     String(mismatch.said),
   );
 
+  // The picture, as one control and with nothing around it. Lastboard's, and
+  // the same on purpose: a label, an upload button and a sentence saying it is
+  // optional is three pieces of furniture for something you click or ignore.
+  const picture = await evaluate(`
+    return {
+      pick: !!document.querySelector(".avatar-pick"),
+      badge: !!document.querySelector(".avatar-pick-badge"),
+      // A button may not contain interactive content, and an input inside it
+      // takes the click the button forwards, which bubbles back, forever.
+      inputInside: !!document.querySelector(".avatar-pick input"),
+      hints: document.querySelectorAll(".wizard-card .hint").length,
+      lead: !!document.querySelector(".wizard-head .lead"),
+    };
+  `);
+  check(
+    "the picture is one control, with no furniture around it",
+    picture.pick && picture.badge && !picture.inputInside && picture.hints === 1,
+    JSON.stringify(picture),
+  );
+  check("and the step does not introduce itself", picture.lead === false);
+
+  // A heading hard against the left edge of a card centred on an empty page
+  // reads as a fragment of a wider layout that is not there. Measured, because
+  // text-align can be set and change nothing.
+  const centred = await evaluate(`
+    const h = document.querySelector(".wizard-head h1").getBoundingClientRect();
+    const box = document.querySelector(".wizard").getBoundingClientRect();
+    return Math.abs((h.left - box.left) - (box.right - h.right)) < 2;
+  `);
+  check("the wizard's title is centred", centred === true);
+
   await evaluate(`
     const f = document.querySelector("form.setup-account");
     f.querySelector('[name=password_again]').value = "una contraseña larga de verdad";

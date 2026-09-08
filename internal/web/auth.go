@@ -71,7 +71,11 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	user, err := s.accounts().Create(in.Username, in.Password, in.DisplayName, true, s.now())
 	if err != nil {
 		if errors.Is(err, account.ErrNameTaken) {
-			writeError(w, http.StatusConflict, "error.email_taken")
+			// The field is a username and has been since the rename. This said
+			// "email_taken", a key nothing translated and nobody could see was
+			// stale, because it only appears on a collision during the very
+			// first setup.
+			writeError(w, http.StatusConflict, "error.username_taken")
 			return
 		}
 		slog.Error("creating the first account", "error", err)

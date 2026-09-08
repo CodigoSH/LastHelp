@@ -22,6 +22,7 @@ import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
+import { shrink } from "./services/image";
 import * as views from "./views/templates";
 
 const text: views.Text = {
@@ -191,26 +192,24 @@ function wireShell(): void {
 }
 
 /**
- * Read a chosen image as a data URL, refusing one too large to belong in a row.
+ * A chosen image, scaled and encoded into something that fits in a row.
  *
- * The bound is checked here as well as at the server, because a browser that
- * has already read six megabytes into memory before being told no is a browser
- * that stuttered for nothing.
+ * It used to measure the file and refuse it, which failed twice over: no
+ * photograph a phone takes is under the limit, and the number it compared was
+ * the file's while the server bounds the data URL — about a third longer — so a
+ * file that passed here could still be refused there.
  */
-const maxImageBytes = 96 * 1024;
-
-function readAsDataURL(file: File | undefined): Promise<string | null> {
-  if (!file) return Promise.resolve(null);
-  if (file.size > maxImageBytes) {
+async function readAsDataURL(file: File | undefined): Promise<string | null> {
+  if (!file) return null;
+  try {
+    // Scaled and re-encoded rather than measured and refused. Every photograph
+    // a phone takes is over the limit, and telling the person setting up a
+    // server to go and find a smaller picture is not a feature.
+    return await shrink(file);
+  } catch {
     showFormError(new ApiError(400, "error.image_too_big"));
-    return Promise.resolve(null);
+    return null;
   }
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-    reader.onerror = () => resolve(null);
-    reader.readAsDataURL(file);
-  });
 }
 
 /**

@@ -274,3 +274,79 @@ func TestTheUntranslatedListIsHonest(t *testing.T) {
 		}
 	}
 }
+
+// TestEveryErrorTheServerSendsHasWords.
+//
+// The server answers a refusal with a key — "error.already_set_up" — and the
+// page looks it up. When the key is not in the catalogue there is nothing to
+// look up, so the raw key is what somebody reads on the screen.
+//
+// Nothing caught this. i18n:scan reads the frontend and finds keys used there
+// that do not exist; the keys the server sends never appear in the frontend at
+// all, so seventeen of them accumulated with no text behind them, and the first
+// anyone knew was "error.already_set_up" printed in an interface.
+//
+// The two sides are matched here, where both can be read at once.
+func TestEveryErrorTheServerSendsHasWords(t *testing.T) {
+	master, ok := catalogues(t)["en"]
+	if !ok {
+		t.Fatal("there is no en.json")
+	}
+
+	root := repoRoot(t)
+	// The literal as it is written in the source. Every one of these reaches a
+	// browser: writeError sends it, and http.Error sends it for the middleware
+	// that runs before writeError exists.
+	pattern := regexp.MustCompile(`"(error\.[a-z0-9_]+)"`)
+
+	found := map[string][]string{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+		rel = filepath.ToSlash(rel)
+		if info.IsDir() {
+			if rel != "." && (rel == ".git" || rel == "node_modules" || rel == "web" || rel == "bin" || rel == "docs") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Tests say what an endpoint answered, which is not the same as an
+		// endpoint that can answer it.
+		if !strings.HasSuffix(rel, ".go") || strings.HasSuffix(rel, "_test.go") {
+			return nil
+		}
+		body, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		for _, match := range pattern.FindAllStringSubmatch(string(body), -1) {
+			found[match[1]] = append(found[match[1]], rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The guard the other rules here carry: a walk that stops matching finds
+	// nothing and reports nothing, which reads exactly like a clean result.
+	if len(found) < 10 {
+		t.Fatalf("only %d error keys found in the server: this rule is not reading the code", len(found))
+	}
+
+	var missing []string
+	for key, where := range found {
+		if strings.TrimSpace(master[key]) == "" {
+			missing = append(missing, key+" ("+where[0]+")")
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("%d error(s) the server can send have no text in en.json:\n  %s\n\n"+
+			"Somebody reading the screen sees the key. Add the words, or stop sending the key.",
+			len(missing), strings.Join(sorted(missing), "\n  "))
+	}
+}
