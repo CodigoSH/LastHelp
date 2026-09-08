@@ -95,7 +95,13 @@ function renderNav(): void {
        <button class="link" data-signout>${escapeHTML(i18n.t("nav.signOut"))}</button>`
     : `<a href="/sign-in">${escapeHTML(i18n.t("nav.signIn"))}</a>`;
 
-  nav.innerHTML = `<a class="brand" href="/">${escapeHTML(i18n.t("app.name"))}</a>
+  // The name the operator chose, on the public side too. Personalising an
+  // installation and then seeing "LastHelp" on the page everybody else opens is
+  // a setting that did not take.
+  nav.innerHTML = `<a class="brand" href="/">
+      ${instanceLogo ? `<img class="brand-logo" src="${escapeAttr(instanceLogo)}" alt="" />` : ""}
+      <span>${escapeHTML(instanceName || i18n.t("app.name"))}</span>
+    </a>
     <div class="nav-right">${account}${picker}</div>`;
 
   nav.querySelector<HTMLSelectElement>(".lang")?.addEventListener("change", (e) => {
@@ -125,16 +131,6 @@ async function showInShell(content: string, path: string): Promise<void> {
     .get<{ organizations: OrganizationSummary[] }>("/api/orgs")
     .catch(() => ({ organizations: [] as OrganizationSummary[] }));
 
-  const instance = await api
-    .get<{ name: string; logo: string; accent: string }>("/api/instance")
-    .catch(() => null);
-  if (instance) {
-    instanceName = instance.name;
-    instanceLogo = instance.logo;
-    instanceAccent = instance.accent;
-    applyAccent(instanceAccent);
-  }
-
   const orgs: views.SideOrganization[] = organizations ?? [];
   const inside = orgs.find((o) => path.startsWith(`/panel/${o.slug}`) || path.startsWith(`/${o.slug}/`));
   if (inside) {
@@ -162,6 +158,28 @@ async function showInShell(content: string, path: string): Promise<void> {
   }
   document.body.classList.add("admin-view");
   wireShell();
+}
+
+/**
+ * The name, the mark and the colour this installation wears.
+ *
+ * Read once and kept: it is on every screen, public and private, and asking on
+ * every navigation would be a request for three strings that change about once
+ * in the life of an install.
+ */
+let instanceLoaded = false;
+
+async function loadInstance(): Promise<void> {
+  if (instanceLoaded) return;
+  instanceLoaded = true;
+  const instance = await api
+    .get<{ name: string; logo: string; accent: string }>("/api/instance")
+    .catch(() => null);
+  if (!instance) return;
+  instanceName = instance.name;
+  instanceLogo = instance.logo;
+  instanceAccent = instance.accent;
+  applyAccent(instanceAccent);
 }
 
 /** The controls that live in the shell rather than in any one screen. */
@@ -570,6 +588,7 @@ function fail(err: unknown): void {
 async function render(): Promise<void> {
   restoreTheme();
   await i18n.ready;
+  await loadInstance();
   renderNav();
 
   const path = location.pathname.replace(/\/+$/, "") || "/";
@@ -840,35 +859,25 @@ async function showItem(publicID: string): Promise<void> {
 }
 
 /** Storing the forge token, and showing where the forge should deliver. */
-function wireCredentials(orgSlug: string, existingPath?: string): void {
+function wireCredentials(orgSlug: string): void {
   const form = root?.querySelector<HTMLFormElement>("form.credentials");
   if (!form) return;
 
-  const path = form.querySelector<HTMLParagraphElement>(".webhook-path");
   const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
-
-  const showPath = (value: string) => {
-    if (!path) return;
-    // The address is shown as text to copy, not as a link: it only answers
-    // POST, so a link would go to a 404 and read as broken.
-    path.textContent = `${i18n.t("panel.webhookPath")}: ${location.origin}${value}`;
-    path.hidden = false;
-  };
-  if (existingPath) showPath(existingPath);
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(form);
     try {
-      const saved = await api.post<{ webhook_path: string }>(
-        `/api/orgs/${encodeURIComponent(orgSlug)}/credentials`,
-        {
-          token: String(data.get("token") ?? ""),
-          webhook_secret: String(data.get("webhook_secret") ?? ""),
-        },
-      );
+      await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/credentials`, {
+        token: String(data.get("token") ?? ""),
+        webhook_secret: String(data.get("webhook_secret") ?? ""),
+      });
       form.reset();
-      showPath(saved.webhook_path);
+      // The address has a card of its own, and re-rendering fills it in. It
+      // used to be printed at the foot of this form as well, which meant the
+      // same value in two places on one screen.
+      await render();
     } catch (err) {
       if (errorLine) {
         errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
@@ -1391,12 +1400,12 @@ async function showPersonalization(): Promise<void> {
     if (picked === null) return;
     logo = picked;
     await api.post("/api/instance", { ...instance, logo }).catch(showFormError);
-    instanceLogo = logo;
+    instanceLoaded = false;
     await render();
   });
   root?.querySelector<HTMLButtonElement>("[data-clear-logo]")?.addEventListener("click", async () => {
     await api.post("/api/instance", { ...instance, logo: "" }).catch(showFormError);
-    instanceLogo = "";
+    instanceLoaded = false;
     await render();
   });
   root?.querySelector<HTMLButtonElement>("[data-reset-accent]")?.addEventListener("click", async () => {
@@ -1410,7 +1419,7 @@ async function showPersonalization(): Promise<void> {
       logo,
       accent: String(data.get("accent") ?? ""),
     });
-    instanceName = String(data.get("name") ?? "");
+    instanceLoaded = false;
     await render();
   });
 }
@@ -1493,7 +1502,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
 
   await showInShell(
     views.organizationScreen(body.organization, repos, canManage, text) +
-      views.connectionForms(body.organization, repos, text) +
+      views.connectionForms(body.organization, repos, location.origin, text) +
       views.modal(
         {
           id: "repo-modal",
@@ -1508,7 +1517,21 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
     `/panel/${orgSlug}`,
   );
 
-  wireCredentials(orgSlug, body.organization.webhook_path);
+  wireCredentials(orgSlug);
+
+  // The one value on this page that has to end up in another application.
+  root?.querySelector<HTMLButtonElement>("[data-copy-webhook]")?.addEventListener("click", async (event) => {
+    const address = root?.querySelector<HTMLElement>("[data-webhook]")?.textContent ?? "";
+    try {
+      await navigator.clipboard.writeText(address);
+      const button = event.currentTarget as HTMLButtonElement;
+      const label = button.querySelector("span");
+      if (label) label.textContent = i18n.t("action.copied");
+    } catch {
+      // No clipboard permission, or an insecure origin. The address is on the
+      // screen and selectable, which is the fallback that always worked.
+    }
+  });
   wireChannel(orgSlug);
   wireModalOpeners();
 
@@ -1558,10 +1581,15 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
   const items = body.items ?? [];
   const bodies = new Map(items.map((i) => [i.public_id, i.body]));
 
+  const repo = await api.get<RepositorySummary & { organization?: OrganizationSummary }>(base);
   await showInShell(
-    `<p class="crumb"><a href="/${escapeAttr(orgSlug)}/${escapeAttr(repoSlug)}">${escapeHTML(i18n.t("shell.publicBoard"))}</a></p>
-     <h1>${escapeHTML(i18n.t("panel.queue"))}</h1>
-     ${views.queueView(items, bodies, text)}`,
+    views.queueScreen(
+      repo.organization ?? { slug: orgSlug, name: orgSlug },
+      repo,
+      items,
+      bodies,
+      text,
+    ),
     `/${orgSlug}/${repoSlug}/queue`,
   );
 

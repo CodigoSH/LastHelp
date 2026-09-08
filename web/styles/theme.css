@@ -1477,3 +1477,42 @@ a.stat:hover {
   margin: 1.25rem 0 0.5rem;
   font-size: 0.95rem;
 }
+
+/* The kind, as a shape plus a word: the icon is what the eye finds in a list of
+   twenty, the word is what makes it nameable. */
+.kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.votes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status carries a colour of its own, so a closed report and one in progress
+   are not the same grey. Not colour alone — the word is always there. */
+.status-done,
+.status-closed {
+  color: #16a34a;
+}
+
+.status-in_progress,
+.status-planned,
+.status-in_forge {
+  color: var(--accent-alt);
+}
+
+.status-declined,
+.status-not_reproducible {
+  color: var(--text-muted);
+}
+
+body > nav .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}

@@ -15,6 +15,8 @@ about.source
 about.version
 action.cancel
 action.close
+action.copied
+action.copy
 action.delete
 action.edit
 action.save
@@ -61,6 +63,9 @@ overview.published
 overview.reports
 overview.votes
 panel.mailTo
+panel.secretHelp
+panel.settings
+panel.webhookPathHelp
 people.add
 people.addHelp
 people.administrator
@@ -97,6 +102,8 @@ profile.password
 profile.passwordHelp
 profile.picture
 profile.pictureClear
+queue.empty
+queue.lead
 repo.lead
 role.collaborator
 role.owner

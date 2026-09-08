@@ -253,24 +253,26 @@ export function panelOrganization(
 export function connectionForms(
   org: OrganizationSummary & { forge?: string; webhook_path?: string },
   repos: RepositorySummary[],
+  /** Where this instance answers, so the address can be shown whole. Passed in
+   *  rather than read from `location`: these templates are pure so they can be
+   *  tested without a browser, and one reach for a global ends that. */
+  origin: string,
   text: Text,
 ): string {
-  const forgeBlock =
+  const forgeCard =
     !org.forge || org.forge === "none"
       ? ""
-      : `<h2>${escapeHTML(text.t("panel.connection"))}</h2>
-         <form class="credentials">
-           <label for="cred-token">${escapeHTML(text.t("panel.token"))}</label>
-           <input id="cred-token" name="token" type="password" autocomplete="off" required />
-           <p class="hint">${escapeHTML(text.t("panel.tokenHelp"))}</p>
-
-           <label for="cred-secret">${escapeHTML(text.t("panel.webhookSecret"))}</label>
-           <input id="cred-secret" name="webhook_secret" type="password" autocomplete="off" required />
-
-           <p class="form-error" role="alert" hidden></p>
-           <button class="button primary" type="submit">${escapeHTML(text.t("auth.create"))}</button>
-           <p class="webhook-path" hidden></p>
-         </form>`;
+      : `<li class="bento-card">
+          <div class="card-head">${icons.repository()}<h3>${escapeHTML(text.t("panel.connection"))}</h3></div>
+          <span class="card-sub">${escapeHTML(text.t("panel.tokenHelp"))}</span>
+          <form class="credentials">
+            ${field({ id: "cred-token", name: "token", label: text.t("panel.token"), type: "password", required: true }, text)}
+            ${field({ id: "cred-secret", name: "webhook_secret", label: text.t("panel.webhookSecret"), type: "password", required: true, hint: text.t("panel.secretHelp") }, text)}
+            <p class="form-error" role="alert" hidden></p>
+            <div class="wizard-actions"><span class="spacer"></span>
+              <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+          </form>
+        </li>`;
 
   const kinds = [
     ["", text.t("panel.channelNone")],
@@ -280,41 +282,55 @@ export function connectionForms(
     ["smtp", "Email"],
   ];
 
-  const channelBlock =
+  const channelCard =
     repos.length === 0
       ? ""
-      : `<h2>${escapeHTML(text.t("panel.channel"))}</h2>
-         <p class="hint">${escapeHTML(text.t("panel.channelHelp"))}</p>
-         <form class="channel">
-           <label for="chan-repo">${escapeHTML(text.t("portal.boards"))}</label>
-           <select id="chan-repo" name="repo">
-             ${repos.map((r) => `<option value="${escapeAttr(r.slug)}">${escapeHTML(r.name)}</option>`).join("")}
-           </select>
+      : `<li class="bento-card">
+          <div class="card-head">${icons.warning()}<h3>${escapeHTML(text.t("panel.channel"))}</h3></div>
+          <span class="card-sub">${escapeHTML(text.t("panel.channelHelp"))}</span>
+          <form class="channel">
+            ${choiceField({
+              id: "chan-repo",
+              name: "repo",
+              label: text.t("portal.boards"),
+              options: repos.map((r) => [r.slug, r.name] as [string, string]),
+            })}
+            ${choiceField({
+              id: "chan-kind",
+              name: "kind",
+              label: text.t("panel.channel"),
+              options: kinds.map(([v, l]) => [v ?? "", l ?? ""] as [string, string]),
+            })}
+            <div class="channel-fields" hidden>
+              ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/lasthelp" }, text)}
+              ${field({ id: "chan-token", name: "token", label: text.t("panel.token"), type: "password" }, text)}
+            </div>
+            <div class="channel-mail" hidden>
+              ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "equipo@codigosh.com" }, text)}
+            </div>
+            <p class="form-error" role="alert" hidden></p>
+            <div class="wizard-actions"><span class="spacer"></span>
+              <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+            <p class="channel-note" role="status" hidden></p>
+          </form>
+        </li>`;
 
-           <label for="chan-kind">${escapeHTML(text.t("panel.channel"))}</label>
-           <select id="chan-kind" name="kind">
-             ${kinds.map(([v, l]) => `<option value="${escapeAttr(v ?? "")}">${escapeHTML(l ?? "")}</option>`).join("")}
-           </select>
+  if (forgeCard === "" && channelCard === "") return "";
 
-           <div class="channel-fields" hidden>
-             <label for="chan-url">${escapeHTML(text.t("panel.address2"))}</label>
-             <input id="chan-url" name="url" />
+  // The webhook address, which the operator has to copy into their forge. It
+  // belongs beside the connection rather than at the bottom of a form, and it
+  // is the one value on this page somebody needs on a clipboard.
+  const address = org.webhook_path
+    ? `<li class="bento-card">
+        <div class="card-head">${icons.open()}<h3>${escapeHTML(text.t("panel.webhookPath"))}</h3></div>
+        <span class="card-sub">${escapeHTML(text.t("panel.webhookPathHelp"))}</span>
+        <code class="fact-value" data-webhook>${escapeHTML(origin + org.webhook_path)}</code>
+        ${actionButton("copy", text.t("action.copy"), "data-copy-webhook")}
+      </li>`
+    : "";
 
-             <label for="chan-token">${escapeHTML(text.t("panel.token"))}</label>
-             <input id="chan-token" name="token" type="password" autocomplete="off" />
-           </div>
-
-           <div class="channel-mail" hidden>
-             <label for="chan-to">${escapeHTML(text.t("panel.mailTo"))}</label>
-             <input id="chan-to" name="to" type="email" />
-           </div>
-
-           <p class="form-error" role="alert" hidden></p>
-           <button class="button" type="submit">${escapeHTML(text.t("auth.create"))}</button>
-           <p class="channel-note" role="status" hidden></p>
-         </form>`;
-
-  return forgeBlock + channelBlock;
+  return `<h2>${escapeHTML(text.t("panel.settings"))}</h2>
+    <ul class="bento wide">${forgeCard}${address}${channelCard}</ul>`;
 }
 
 /** The team's triage controls on one item: reply, and merge a duplicate away. */
@@ -369,9 +385,9 @@ export function board(
         <h1>${escapeHTML(repo.name)}</h1>
       </div>
       <div class="head-actions">
-        <a class="button" href="/feed/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/atom.xml">${escapeHTML(text.t("nav.feed"))}</a>
-        <a class="button" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/roadmap">${escapeHTML(text.t("nav.roadmap"))}</a>
-        <a class="button primary" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new">${escapeHTML(text.t("board.report"))}</a>
+        <a class="button ghost" href="/feed/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/atom.xml">${escapeHTML(text.t("nav.feed"))}</a>
+        <a class="button ghost" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/roadmap">${escapeHTML(text.t("nav.roadmap"))}</a>
+        <a class="button primary with-icon" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>
       </div>
     </header>
     <div class="controls">
@@ -383,16 +399,31 @@ export function board(
     ${list}`;
 }
 
+/**
+ * One report in the list.
+ *
+ * The kind is an icon rather than a word repeated on every row: twenty rows
+ * saying "Bug" is twenty words nobody reads, and the shape is faster to scan.
+ * The count of votes stays a word, because a number on its own beside a title
+ * is a number nobody can name.
+ */
 function itemRow(item: ItemSummary, text: Text): string {
+  // "Votes: 3", not an icon and a bare 3. A number on its own beside a title is
+  // a number nobody can name, and the house writes counters as label-then-value
+  // for exactly that reason. Adding the icon and dropping the word was a trade
+  // that gave up the meaning for the decoration.
   const votes =
     item.kind === "idea"
       ? `<span class="votes${item.voted ? " voted" : ""}">${escapeHTML(text.t("item.votes", { count: text.number(item.votes) }))}</span>`
       : "";
 
   return `<li><a class="item" href="/i/${escapeAttr(item.public_id)}">
-    <span class="kind kind-${escapeAttr(item.kind)}">${escapeHTML(text.t(`kind.${item.kind}`))}</span>
+    <span class="kind kind-${escapeAttr(item.kind)}" title="${escapeAttr(text.t(`kind.${item.kind}`))}">
+      ${item.kind === "bug" ? icons.bug(14) : icons.idea(14)}
+      <span class="kind-name">${escapeHTML(text.t(`kind.${item.kind}`))}</span>
+    </span>
     <span class="item-title">${escapeHTML(item.title)}</span>
-    <span class="status">${escapeHTML(text.t(`status.${item.status}`))}</span>
+    <span class="status status-${escapeAttr(item.status)}">${escapeHTML(text.t(`status.${item.status}`))}</span>
     ${votes}
   </a></li>`;
 }
@@ -627,26 +658,55 @@ export function signInForm(text: Text): string {
   </section>`;
 }
 
-export function queueView(items: ItemSummary[], bodies: Map<string, string>, text: Text): string {
-  if (items.length === 0) return `<p class="empty">${escapeHTML(text.t("panel.empty"))}</p>`;
+/**
+ * The triage queue for one repository.
+ *
+ * It used to say "Waiting" and nothing else — not which repository, not how
+ * many, and with a breadcrumb that pointed at the public page without saying
+ * so. Somebody who triages three repositories had no way to tell which one they
+ * were looking at.
+ *
+ * The three actions carry icons and keep their weights apart: publishing is the
+ * one that happens most and is the primary, spam is destructive and reads as
+ * it, rejecting sits between them.
+ */
+export function queueScreen(
+  org: OrganizationSummary,
+  repo: RepositorySummary,
+  items: ItemSummary[],
+  bodies: Map<string, string>,
+  text: Text,
+): string {
+  const header = `<p class="crumb"><a href="/panel/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
+    <div class="screen-head">
+      <h1>${escapeHTML(repo.name)}</h1>
+      <a class="button ghost with-icon" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">
+        ${icons.open()}<span>${escapeHTML(text.t("shell.publicBoard"))}</span></a>
+    </div>
+    <p class="lead">${escapeHTML(
+      items.length === 0 ? text.t("queue.empty") : text.t("queue.lead", { count: items.length }),
+    )}</p>`;
 
-  return `<ul class="queue">${items
-    .map(
-      (i) => `<li data-id="${escapeAttr(i.public_id)}">
-        <p class="meta">
-          <span class="kind kind-${escapeAttr(i.kind)}">${escapeHTML(text.t(`kind.${i.kind}`))}</span>
-          <span class="when">${escapeHTML(text.date(i.created_at))}</span>
-        </p>
-        <h3>${escapeHTML(i.title)}</h3>
-        <p class="body">${escapeHTML(bodies.get(i.public_id) ?? "")}</p>
-        <div class="actions">
-          <button class="button primary" data-act="published">${escapeHTML(text.t("panel.approve"))}</button>
-          <button class="button" data-act="rejected">${escapeHTML(text.t("panel.reject"))}</button>
-          <button class="button danger" data-act="spam">${escapeHTML(text.t("panel.spam"))}</button>
-        </div>
-      </li>`,
-    )
-    .join("")}</ul>`;
+  if (items.length === 0) return header;
+
+  return `${header}
+    <ul class="queue">${items
+      .map(
+        (i) => `<li class="bento-card" data-id="${escapeAttr(i.public_id)}">
+          <p class="meta">
+            <span class="kind kind-${escapeAttr(i.kind)}">${escapeHTML(text.t(`kind.${i.kind}`))}</span>
+            <span class="when">${escapeHTML(text.date(i.created_at))}</span>
+          </p>
+          <h3>${escapeHTML(i.title)}</h3>
+          <p class="body">${escapeHTML(bodies.get(i.public_id) ?? "")}</p>
+          <div class="actions">
+            <button class="button primary with-icon" data-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+            <button class="button ghost with-icon" data-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+            <button class="button danger with-icon" data-act="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
+          </div>
+        </li>`,
+      )
+      .join("")}</ul>`;
 }
 
 /* ------------------------------------------------------------------ wizards
@@ -1427,7 +1487,7 @@ export function organizationScreen(
     <p class="lead"><span class="tag">/${escapeHTML(org.slug)}</span>
       ${org.forge && org.forge !== "none" ? `<span class="tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>
 
-    ${repos.length === 0 ? `<p class="empty">${escapeHTML(text.t("organizations.noRepositories"))}</p>` : `<ul class="bento">${cards}</ul>`}`;
+    ${repos.length === 0 ? `<p class="empty">${escapeHTML(text.t("organizations.noRepositories"))}</p>` : `<ul class="bento repositories">${cards}</ul>`}`;
 }
 
 /** Who may act here, what each of them is, and where. */

@@ -164,6 +164,9 @@ func (s *Server) routes() {
 	// cannot require being signed in, and the whole portal is public by
 	// definition: that is the product.
 	s.mux.HandleFunc("GET /api/status", s.handleStatus)
+	// The name, the mark and the colour are on every public page, so reading
+	// them is public. Changing them is not, and that is the other route.
+	s.mux.HandleFunc("GET /api/instance", s.handleGetInstance)
 	s.mux.HandleFunc("POST /api/setup", s.handleSetup)
 	s.mux.HandleFunc("POST /api/session", s.handleSignIn)
 
@@ -230,7 +233,6 @@ func (s *Server) routes() {
 
 	private("GET /api/backup", s.handleBackup)
 
-	private("GET /api/instance", s.handleGetInstance)
 	private("POST /api/instance", s.handleSetInstance)
 
 	private("GET /api/update", s.handleUpdateStatus)

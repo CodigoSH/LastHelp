@@ -219,7 +219,7 @@ async function main() {
     f.querySelector('[name=slug]').value = "lastboard";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await new Promise(r => setTimeout(r, 1100));
-    return [...document.querySelectorAll(".bento-card h3")].map(e => e.textContent.trim());
+    return [...document.querySelectorAll(".repositories h3")].map(e => e.textContent.trim());
   `);
   check(
     "a repository is added the same way",
@@ -445,7 +445,7 @@ async function main() {
     form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await new Promise(r => setTimeout(r, 900));
 
-    const path = document.querySelector(".webhook-path");
+    const path = document.querySelector("[data-webhook]");
     return {
       form: true,
       shown: path ? !path.hidden : false,
@@ -468,7 +468,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 600));
     history.pushState({}, "", "/panel/withforge"); dispatchEvent(new PopStateEvent("popstate"));
     await new Promise(r => setTimeout(r, 900));
-    const path = document.querySelector(".webhook-path");
+    const path = document.querySelector("[data-webhook]");
     return path && !path.hidden ? (path.textContent ?? "").trim() : "";
   `);
   check("and it is still there on the next visit", String(revisit).includes("/hooks/"), String(revisit).slice(0, 56));

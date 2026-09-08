@@ -55,7 +55,7 @@ export function modal(spec: ModalSpec, text: Text): string {
  * delete is the last time they trust the row of little pictures.
  */
 export function actionButton(
-  action: "add" | "edit" | "remove" | "download" | "upload" | "update",
+  action: "add" | "edit" | "remove" | "download" | "upload" | "update" | "copy",
   label: string,
   attrs = "",
   kind: "primary" | "ghost" | "danger" = "ghost",

@@ -34,12 +34,10 @@ const maxInstanceNameLength = 60
 
 // handleGetInstance answers what this installation calls itself.
 //
-// Readable by anybody who may see the panel, because the name is on every
-// screen anyway; only changing it is the administrator's.
+// Readable by anybody, because the name, the mark and the colour are on every
+// public page anyway — a visitor who could not read them would be shown a page
+// wearing somebody else's branding. Only changing them is the administrator's.
 func (s *Server) handleGetInstance(w http.ResponseWriter, r *http.Request) {
-	if !s.may(w, r, authz.ViewPanel, authz.Scope{}) {
-		return
-	}
 	store := settings.Store{DB: s.db}
 	name, err := store.Get(settings.InstanceName)
 	if err != nil {
