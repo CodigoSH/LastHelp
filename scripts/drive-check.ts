@@ -29,6 +29,14 @@ const BASE = `http://127.0.0.1:${PORT}`;
 
 const consoleErrors: string[] = [];
 
+// What the content policy refused, which is not the same list as the console's.
+//
+// A blocked script or style arrives as a Log entry from the security source,
+// never as a console API call — so "no console errors" said nothing at all
+// about the policy, and a policy that quietly breaks a screen would have walked
+// straight past this file.
+const refusedByPolicy: string[] = [];
+
 async function target(url: string) {
   const res = await fetch(`http://127.0.0.1:${CDP}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
   return (await res.json()) as { id: string; webSocketDebuggerUrl: string };
@@ -52,6 +60,12 @@ function open(url: string) {
       }
       if (msg.method === "Runtime.consoleAPICalled" && msg.params?.type === "error") {
         consoleErrors.push(msg.params.args?.map((a: any) => a.value ?? a.description).join(" ") ?? "console.error");
+      }
+      if (msg.method === "Log.entryAdded") {
+        const entry = msg.params?.entry ?? {};
+        if (entry.source === "security" || /Content Security Policy/i.test(entry.text ?? "")) {
+          refusedByPolicy.push(String(entry.text ?? "").slice(0, 160));
+        }
       }
     };
     ws.onopen = () =>
@@ -1327,6 +1341,11 @@ async function main() {
   );
 
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
+  check(
+    "and the content policy refused nothing the product needs",
+    refusedByPolicy.length === 0,
+    refusedByPolicy.slice(0, 3).join(" | "),
+  );
 
   await fetch(`http://127.0.0.1:${CDP}/json/close/${t.id}`);
   page.close();

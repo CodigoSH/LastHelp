@@ -46,6 +46,22 @@ assumptions apply, and keeping them apart is most of the design:
   that guessed from headers would let a caller choose which verification it
   faced, and one of the four paths is weaker than the others.
 
+- **The browser is told what the page may do.** Every response carries a
+  Content-Security-Policy, including the ones that refuse: `script-src 'self'`
+  and nothing else, so an injected `<script>` — inline or from anywhere but this
+  server — does not run. The shell loads one module by URL and has no inline
+  script in it, which is why there is no nonce here: a nonce guards inline
+  scripts, and there are none to guard.
+
+  `style-src` keeps `'unsafe-inline'`, and that is deliberate rather than
+  forgotten. The interface sets style attributes — the size of a mark, the width
+  of a bar, where a tooltip lands — and **there is no nonce for an attribute**.
+  Removing it would break the interface without closing anything, since the
+  directive that matters for injected code is `script-src`. `img-src` allows
+  `data:` because an avatar and an instance logo are stored that way. Everything
+  else is `'self'` or `'none'`, and the whole product has no third party to make
+  an exception for.
+
 - **The forge URL comes from the operator.** Pointing at a Gitea on
   `192.168.1.x` with a self-signed certificate is the feature, not the
   vulnerability, so private addresses are allowed there. Cloud metadata

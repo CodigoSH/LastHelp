@@ -84,7 +84,7 @@ Bitbucket is not bridged yet. Everything else above works end to end, and is che
 
 ### Security
 
-Passwords are hashed with Argon2id. Sessions are opaque tokens in an `HttpOnly`, `SameSite=Lax` cookie, marked `Secure` over HTTPS, and CSRF is a double-submit token checked alongside `Sec-Fetch-Site` — a header the browser writes from the real origins and a page cannot forge. Rate limits are keyed on the address our own proxy added rather than the first one the caller sent, because a proxy appends to `X-Forwarded-For` and reading the left-hand entry lets anybody choose their own identity. Forge tokens are stored encrypted and never shown again, request bodies are bounded per handler, and every release is signed.
+Passwords are hashed with Argon2id. Sessions are opaque tokens in an `HttpOnly`, `SameSite=Lax` cookie, marked `Secure` over HTTPS, and CSRF is a double-submit token checked alongside `Sec-Fetch-Site` — a header the browser writes from the real origins and a page cannot forge. Every response carries a Content-Security-Policy with `script-src 'self'`, so an injected script does not run, and `Referrer-Policy: no-referrer`, because the address of a report carries the token that opens it. Rate limits are keyed on the address our own proxy added rather than the first one the caller sent, because a proxy appends to `X-Forwarded-For` and reading the left-hand entry lets anybody choose their own identity. Forge tokens are stored encrypted and never shown again, request bodies are bounded per handler, and every release is signed.
 
 For a detailed breakdown, including what the threat model does **not** cover, see the [Security Policy](SECURITY.md).
 

@@ -1045,3 +1045,48 @@ func TestTheTeamCanReadWhatTheyHaveToDecideAbout(t *testing.T) {
 		t.Errorf("a stranger asking for the same report got %d", resp.StatusCode)
 	}
 }
+
+// TestEveryResponseCarriesAPolicy.
+//
+// This was in the plan for the web layer from the start — a policy on every
+// response, ported with the rest of the middleware — and it was never written.
+// Nothing said so: no document promised it, so no document was lying, and the
+// only way to notice an absent header is to ask for it.
+//
+// What it checks is the shape rather than the string: script-src exists and
+// does not allow inline, because that is the directive an injected <script>
+// runs under, and the page's own module is loaded by URL. style-src keeps
+// 'unsafe-inline' on purpose — an inline style attribute has no nonce, the
+// interface sets dozens of them, and a policy written to look strict and break
+// the product is worse than the one it replaced.
+func TestEveryResponseCarriesAPolicy(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+
+	for _, path := range []string{"/", "/api/orgs", "/healthz"} {
+		resp := team.do(http.MethodGet, path, nil)
+		policy := resp.Header.Get("Content-Security-Policy")
+		_ = resp.Body.Close()
+
+		if policy == "" {
+			t.Errorf("%s answered with no Content-Security-Policy", path)
+			continue
+		}
+		if !strings.Contains(policy, "script-src 'self'") ||
+			strings.Contains(policy, "script-src 'self' 'unsafe-inline'") {
+			t.Errorf("%s allows inline script: %q", path, policy)
+		}
+		if !strings.Contains(policy, "frame-ancestors 'none'") {
+			t.Errorf("%s can be framed: %q", path, policy)
+		}
+		if !strings.Contains(policy, "img-src 'self' data:") {
+			t.Errorf("%s forbids the data URLs avatars are stored as: %q", path, policy)
+		}
+		if resp.Header.Get("X-Content-Type-Options") != "nosniff" {
+			t.Errorf("%s lets the browser guess the type", path)
+		}
+		if resp.Header.Get("Referrer-Policy") != "no-referrer" {
+			t.Errorf("%s leaks the address — which carries a follow token — as a referrer", path)
+		}
+	}
+}
