@@ -21,6 +21,7 @@ import { i18n } from "./services/i18n";
 import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
+import { toast, toastError } from "./services/toast";
 import * as views from "./views/templates";
 
 const text: views.Text = {
@@ -577,9 +578,14 @@ async function showBackups(): Promise<void> {
     }
     try {
       const done = await api.upload<{ kept: string }>("/api/restore", form);
+      // This one keeps its line as well as toasting: it ends with "restart the
+      // server", which is an instruction, and an instruction that flies away
+      // after three seconds is one somebody will ask for again.
       if (note) note.textContent = i18n.t("backups.restored", { kept: done.kept });
+      toast(i18n.t("toast.restored"));
     } catch (err) {
       if (note) note.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+      report(err);
     }
     file.value = "";
   });
@@ -597,9 +603,21 @@ async function showAbout(): Promise<void> {
   );
 }
 
+/** A page that could not be loaded. The screen has nothing else to show. */
 function fail(err: unknown): void {
   const key = err instanceof ApiError ? err.key : "error.internal";
   show(`<p class="empty">${escapeHTML(i18n.t(key))}</p>`);
+}
+
+/**
+ * An action that did not work, said without taking the page away.
+ *
+ * This used to be `fail`, which replaces the whole screen: a status change that
+ * hit a network error left somebody looking at one grey sentence where their
+ * report had been, with everything they were reading gone.
+ */
+function report(err: unknown): void {
+  toastError(i18n.t(err instanceof ApiError ? err.key : "error.internal"));
 }
 
 // --- the views -------------------------------------------------------------
@@ -886,7 +904,8 @@ async function showItem(publicID: string): Promise<void> {
         const select = e.target as HTMLSelectElement;
         await api
           .post(`/api/items/${encodeURIComponent(publicID)}/status`, { status: select.value })
-          .catch((err) => fail(err));
+          .then(() => toast(i18n.t("toast.statusChanged")))
+          .catch((err) => report(err));
       });
 
       wireIssueControl(publicID, item.issue ?? null);
@@ -947,7 +966,6 @@ function wireChannel(orgSlug: string): void {
   const kind = form.querySelector<HTMLSelectElement>("#chan-kind");
   const fields = form.querySelector<HTMLDivElement>(".channel-fields");
   const mail = form.querySelector<HTMLDivElement>(".channel-mail");
-  const note = form.querySelector<HTMLParagraphElement>(".channel-note");
   const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
 
   // Only the fields the chosen channel needs. Asking for a URL for an email
@@ -974,15 +992,15 @@ function wireChannel(orgSlug: string): void {
           to: String(data.get("to") ?? ""),
         },
       );
-      if (note) {
-        note.textContent = i18n.t("panel.saved");
-        note.hidden = false;
-      }
+      toast(i18n.t("panel.saved"));
     } catch (err) {
+      // The failure stays beside the form as well as toasting: it is about
+      // what was typed, and the fix is in the fields somebody is looking at.
       if (errorLine) {
         errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
         errorLine.hidden = false;
       }
+      report(err);
     }
   });
 }
@@ -999,20 +1017,12 @@ function wireIssueControl(publicID: string, linked: { number: number; url: strin
     ?.querySelector(".team-tools .tools")
     ?.insertAdjacentHTML("beforeend", views.issueControl(linked, text));
 
-  const note = root?.querySelector<HTMLParagraphElement>(".issue-note");
-  const say = (key: string) => {
-    if (note) {
-      note.textContent = i18n.t(key);
-      note.hidden = false;
-    }
-  };
-
   root?.querySelector<HTMLButtonElement>("[data-create-issue]")?.addEventListener("click", async () => {
     try {
       await api.post(`/api/items/${encodeURIComponent(publicID)}/issue`);
-      say("panel.issueQueued");
+      toast(i18n.t("panel.issueQueued"));
     } catch (err) {
-      say(err instanceof ApiError ? err.key : "error.internal");
+      report(err);
     }
   });
 
@@ -1022,9 +1032,10 @@ function wireIssueControl(publicID: string, linked: { number: number; url: strin
     const value = String(new FormData(attach).get("issue") ?? "");
     try {
       await api.post(`/api/items/${encodeURIComponent(publicID)}/attach`, { issue: value });
+      toast(i18n.t("toast.issueAttached"));
       await render();
     } catch (err) {
-      say(err instanceof ApiError ? err.key : "error.internal");
+      report(err);
     }
   });
 }
@@ -1032,14 +1043,6 @@ function wireIssueControl(publicID: string, linked: { number: number; url: strin
 /** Replying as the team, and merging a duplicate away. */
 function wireTriage(publicID: string): void {
   root?.querySelector(".team-tools .tools")?.insertAdjacentHTML("beforeend", views.triageControls(text));
-
-  const note = root?.querySelector<HTMLParagraphElement>(".triage-note");
-  const say = (key: string) => {
-    if (note) {
-      note.textContent = i18n.t(key);
-      note.hidden = false;
-    }
-  };
 
   const reply = root?.querySelector<HTMLFormElement>("form.team-reply");
   reply?.addEventListener("submit", async (event) => {
@@ -1050,9 +1053,10 @@ function wireTriage(publicID: string): void {
         body: String(data.get("body") ?? ""),
       });
       reply.reset();
+      toast(i18n.t("toast.replied"));
       await render();
     } catch (err) {
-      say(err instanceof ApiError ? err.key : "error.internal");
+      report(err);
     }
   });
 
@@ -1065,9 +1069,10 @@ function wireTriage(publicID: string): void {
         into: String(data.get("into") ?? ""),
       });
       // The merged item now redirects, so the page it lands on is the survivor.
+      toast(i18n.t("toast.merged"));
       await render();
     } catch (err) {
-      say(err instanceof ApiError ? err.key : "error.internal");
+      report(err);
     }
   });
 }
@@ -1760,7 +1765,7 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
         });
         entry?.remove();
       } catch (err) {
-        fail(err);
+        report(err);
       }
     }),
   );
@@ -1785,7 +1790,7 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
           );
         }
       } catch (err) {
-        fail(err);
+        report(err);
       }
     }),
   );

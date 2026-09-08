@@ -97,8 +97,8 @@ export function repositoryList(
       (r) => `<li><a class="card" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}">
         <span class="card-title">${escapeHTML(r.name)}</span>
         <span class="card-sub">${[
-          r.accepts_bugs ? escapeHTML(text.t("kind.bug")) : "",
-          r.accepts_ideas ? escapeHTML(text.t("kind.idea")) : "",
+          r.accepts_bugs ? escapeHTML(text.t("repo.acceptsBugs")) : "",
+          r.accepts_ideas ? escapeHTML(text.t("repo.acceptsIdeas")) : "",
         ]
           .filter(Boolean)
           .join(" · ")}</span>
@@ -321,7 +321,6 @@ export function connectionForms(
             <p class="form-error" role="alert" hidden></p>
             <div class="wizard-actions"><span class="spacer"></span>
               <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
-            <p class="channel-note" role="status" hidden></p>
           </form>
         </li>`;
 
@@ -359,7 +358,6 @@ export function triageControls(text: Text): string {
         <input name="into" placeholder="${escapeAttr(text.t("panel.mergePlaceholder"))}" required />
         <button class="button" type="submit">${escapeHTML(text.t("panel.merge"))}</button>
       </form>
-      <p class="triage-note" role="status" hidden></p>
     </section>`;
 }
 
@@ -502,7 +500,6 @@ export function issueControl(
              aria-label="${escapeAttr(text.t("panel.attachIssue"))}" />
       <button class="button" type="submit">${escapeHTML(text.t("panel.attachIssue"))}</button>
     </form>
-    <p class="issue-note" role="status" hidden></p>
   </div>`;
 }
 
@@ -1832,8 +1829,8 @@ export function organizationScreen(
           <div class="card-head">${icons.repository()}<h3>${escapeHTML(r.name)}</h3></div>
           <span class="card-sub">/${escapeHTML(org.slug)}/${escapeHTML(r.slug)}</span>
           <span class="card-sub">${[
-            r.accepts_bugs ? escapeHTML(text.t("kind.bug")) : "",
-            r.accepts_ideas ? escapeHTML(text.t("kind.idea")) : "",
+            r.accepts_bugs ? escapeHTML(text.t("repo.acceptsBugs")) : "",
+            r.accepts_ideas ? escapeHTML(text.t("repo.acceptsIdeas")) : "",
           ]
             .filter(Boolean)
             .join(" · ")}</span>

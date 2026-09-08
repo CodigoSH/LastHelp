@@ -1888,3 +1888,121 @@ body > nav .brand {
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------------------------------------------------------------- toasts */
+
+/* Ported from Lastboard: bottom centre, three at a time, a bar that drains and
+   pauses under the pointer. Somebody who uses two CodigoSH products should not
+   have to learn a second set of manners. */
+.toasts {
+  position: fixed;
+  inset-block-end: 24px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  inline-size: max-content;
+  max-inline-size: min(92vw, 420px);
+  /* The empty container must not swallow clicks on the page below; each toast
+     turns pointer events back on for itself. */
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  font-size: 0.9rem;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+
+.toast-visible { opacity: 1; transform: translateY(0); }
+.toast-leaving { opacity: 0; transform: translateY(16px); }
+
+.toast-success { border-inline-start-color: #16a34a; }
+.toast-error { border-inline-start-color: #b91c1c; }
+.toast-warning { border-inline-start-color: #d97706; }
+.toast-info { border-inline-start-color: var(--accent); }
+
+.toast-message { flex: 1 1 auto; line-height: 1.35; overflow-wrap: anywhere; }
+
+.toast-action {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--accent-alt);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: calc(var(--radius) - 4px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toast-action:hover { background: rgba(var(--accent-rgb), 0.12); }
+
+.toast-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  padding: 0.2rem;
+  border-radius: 4px;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.toast-close:hover { color: var(--text); background: rgba(128, 128, 128, 0.15); }
+
+.toast-bar {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  block-size: 3px;
+  inline-size: 100%;
+  background: var(--accent);
+  opacity: 0.7;
+  /* transform-origin has no logical keyword, so the mirrored case is stated
+     below: the bar drains from the side the text starts on. */
+  transform-origin: left center;
+  animation: toast-drain var(--toast-duration, 3000ms) linear forwards;
+}
+
+.toast-bar:dir(rtl) { transform-origin: right center; }
+.toast-success .toast-bar { background: #16a34a; }
+.toast-error .toast-bar { background: #b91c1c; }
+.toast-warning .toast-bar { background: #d97706; }
+
+/* Paused with the pointer over it, in step with the timer in the script. */
+.toast:hover .toast-bar { animation-play-state: paused; }
+
+@keyframes toast-drain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The countdown bar is functional and stays; the slide is decoration. */
+  .toast, .toast-visible, .toast-leaving { transform: none; }
+  .toast { transition: opacity 120ms linear; }
+}
