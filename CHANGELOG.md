@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0-Beta.03] - 2026-09-09
+
 ### Added
 
 - The installer can undo itself: `--uninstall` removes it and keeps the
