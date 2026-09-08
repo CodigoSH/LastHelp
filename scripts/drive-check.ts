@@ -567,6 +567,48 @@ async function main() {
     `${dashboard.saved.length} → ${hidden.length}`,
   );
 
+  // 11c. The owner, who is the role the panel used to get wrong. It asked
+  //      whether you were an administrator, which is stricter than the rules:
+  //      an owner may add repositories to their organisation, rename it and
+  //      store its forge token, and the screens offered none of it.
+  await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const post = (path, body) => fetch(path, { method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify(body) }).then(r => r.json());
+
+    await post("/api/people", { username: "olivia", display_name: "Olivia", password: "una contraseña larga de verdad" });
+    const people = await fetch("/api/people").then(r => r.json());
+    const olivia = people.people.find(p => p.username === "olivia");
+    // The organisation that has a forge, so there is a token to be offered.
+    // "codigosh" was made without one, and a card asking for a credential that
+    // cannot be used would be the wrong thing to check for.
+    await post("/api/people/" + olivia.id + "/grants", { organization: "withforge", role: "owner" });
+    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+    await post("/api/session", { username: "olivia", password: "una contraseña larga de verdad" });
+  `);
+  await evaluate(`history.pushState({}, "", "/panel/withforge"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1500);
+
+  const owner = await evaluate(`
+    return {
+      groups: [...document.querySelectorAll(".side-label")].map(e => e.textContent.trim()).length,
+      addRepo: !!document.querySelector("[data-add-repo]"),
+      deleteRepo: !!document.querySelector("[data-delete-repo]"),
+      token: !!document.querySelector("form.credentials"),
+    };`);
+  check(
+    "an owner is offered what the server would allow them",
+    owner.addRepo === true && owner.token === true,
+    `add=${owner.addRepo} token=${owner.token}`,
+  );
+  check(
+    "and not what it would refuse",
+    owner.deleteRepo === false && owner.groups === 2,
+    `delete=${owner.deleteRepo}, ${owner.groups} sidebar groups`,
+  );
+
   // 12. The other account. Every check above ran as the administrator, which is
   //     the comfortable one: it can reach everything, so none of them ever saw
   //     what somebody with one role sees. A collaborator's panel is most of the
@@ -578,6 +620,11 @@ async function main() {
     const post = (path, body) => fetch(path, { method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
       body: JSON.stringify(body) }).then(r => r.json());
+
+    // Back to the administrator: the previous block left an owner signed in,
+    // and creating an account is not an owner's to do.
+    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+    await post("/api/session", { username: "k4wit0", password: "una contraseña larga de verdad" });
 
     await post("/api/people", { username: "ana", display_name: "Ana", password: "una contraseña larga de verdad" });
     const people = await fetch("/api/people").then(r => r.json());
