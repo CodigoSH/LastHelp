@@ -13,8 +13,10 @@ about.source
 action.change
 action.remove
 appearance.lead
+auth.hidePassword
 auth.passwordHelp
 auth.setupTitle
+auth.showPassword
 backups.help
 backups.lead
 backups.restoreHelp

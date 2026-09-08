@@ -20,9 +20,10 @@ import type {
 import { i18n } from "./services/i18n";
 import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
-import { escapeAttr, escapeHTML } from "./escape";
+import { escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
+import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
 
 const text: views.Text = {
@@ -95,13 +96,17 @@ function renderNav(): void {
   const account = me
     ? `<a href="/panel">${escapeHTML(i18n.t("nav.panel"))}</a>
        <button class="link" data-signout>${escapeHTML(i18n.t("nav.signOut"))}</button>`
-    : `<a href="/sign-in">${escapeHTML(i18n.t("nav.signIn"))}</a>`;
+    : // Not on the sign-in page itself: a link to where you already are is the
+      // third thing on that screen saying the same word.
+      location.pathname === "/sign-in"
+      ? ""
+      : `<a href="/sign-in">${escapeHTML(i18n.t("nav.signIn"))}</a>`;
 
   // The name the operator chose, on the public side too. Personalising an
   // installation and then seeing "LastHelp" on the page everybody else opens is
   // a setting that did not take.
   nav.innerHTML = `<a class="brand" href="/">
-      ${instanceLogo ? `<img class="brand-logo" src="${escapeAttr(instanceLogo)}" alt="" />` : ""}
+      ${views.brandMark(instanceLogo)}
       <span>${escapeHTML(instanceName || i18n.t("app.name"))}</span>
     </a>
     <div class="nav-right">${account}</div>`;
@@ -116,6 +121,9 @@ function renderNav(): void {
 function show(html: string): void {
   document.body.classList.remove("admin-view");
   if (root) root.innerHTML = html;
+  // Every password field on whatever was just drawn, rather than a toggle
+  // written into the one form somebody asked about and missing from the rest.
+  attachPasswordToggles(root);
 }
 
 /**
@@ -156,6 +164,7 @@ async function showInShell(content: string, path: string): Promise<void> {
     );
   }
   document.body.classList.add("admin-view");
+  attachPasswordToggles(root);
   wireShell();
 }
 
@@ -1344,7 +1353,7 @@ async function showSignIn(): Promise<void> {
   // A fresh instance is claimed through the wizard, which starts by asking
   // which language to say the rest of it in.
   if (status.needs_setup) return go("/setup");
-  show(views.signInForm(text));
+  show(views.signInForm(text, { name: instanceName, logo: instanceLogo }));
 
   const form = root?.querySelector<HTMLFormElement>("form.auth");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");

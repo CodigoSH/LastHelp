@@ -871,10 +871,23 @@ export function itemView(item: ItemDetail, text: Text): string {
  * as the wizard steps, because a login that looks like a different product is
  * how a page reads as bolted on.
  */
-export function signInForm(text: Text): string {
-  return `<section class="wizard">
-    <header class="wizard-head">
-      <h1>${escapeHTML(text.t("nav.signIn"))}</h1>
+/**
+ * Signing in: the first screen of the day for everybody on the team.
+ *
+ * It was a heading reading "Sign in" over two boxes and a button reading "Sign
+ * in", under a bar with a link reading "Sign in" — the same word three times
+ * and nothing else on the page. What it says now is where you are: the mark and
+ * the name of the installation, which is the thing somebody is signing in to.
+ *
+ * The card is the only thing on a plain field, centred, with the action full
+ * width under it. The eye on the password comes from the service that puts one
+ * on every password field in the product.
+ */
+export function signInForm(text: Text, instance?: { name?: string; logo?: string }): string {
+  return `<section class="signin">
+    <header class="signin-head">
+      ${brandMark(instance?.logo, 56)}
+      <h1>${escapeHTML(instance?.name || text.t("app.name"))}</h1>
     </header>
     <form class="auth">
       <div class="wizard-card">
@@ -882,9 +895,7 @@ export function signInForm(text: Text): string {
         ${field({ id: "auth-password", name: "password", label: text.t("auth.password"), type: "password", required: true, autocomplete: "current-password" }, text)}
       </div>
       <p class="form-error" role="alert" hidden></p>
-      <div class="wizard-actions">
-        <button class="button primary" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
-      </div>
+      <button class="button primary signin-go" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
     </form>
   </section>`;
 }
@@ -1273,6 +1284,7 @@ export function setupWizard(
       {
         step: 1,
         names,
+        mark: prefs.logo || "/logo.svg",
         // No supporting sentence. The title says what the step is, and a
         // settings screen that introduces itself is a screen explaining that
         // it exists.
@@ -1290,6 +1302,7 @@ export function setupWizard(
       {
         step: 2,
         names,
+        mark: prefs.logo || "/logo.svg",
         title: text.t("auth.setupTitle"),
           body: accountFields(text, prefs.picture ?? ""),
         submit: text.t("wizard.continue"),
@@ -1304,6 +1317,7 @@ export function setupWizard(
     {
       step: 3,
       names,
+      mark: prefs.logo || "/logo.svg",
       // The same yardstick as the other two steps: the title says what the
       // step is, the hint says the one thing that would otherwise be found out
       // by getting it wrong, and there is nothing else.
@@ -1489,7 +1503,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
   return `<div class="admin">
     <aside class="side">
       <a class="brand" href="/">
-        ${spec.logo ? `<img class="brand-logo" src="${escapeAttr(spec.logo)}" alt="" />` : ""}
+        ${brandMark(spec.logo, 26)}
         <span>${escapeHTML(spec.instance)}</span>
       </a>
       <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
@@ -1532,6 +1546,23 @@ export function adminShell(spec: ShellSpec, text: Text): string {
     </aside>
     <main class="admin-main">${spec.content}</main>
   </div>`;
+}
+
+/**
+ * The mark this installation wears.
+ *
+ * The operator's logo once they set one, and the product's until then — rather
+ * than nothing, which is what every screen showed before: a name in text and an
+ * empty space where a mark belongs. The default lives in web/public and is
+ * served like any other asset, so it costs one cached request and no bytes in
+ * the bundle.
+ */
+export function brandMark(logo: string | undefined, size = 24): string {
+  const src = logo && logo.trim() !== "" ? logo : "/logo.svg";
+  // The size travels as a variable: the class sets one, and a width attribute
+  // does not beat a stylesheet.
+  return `<img class="brand-logo" style="--mark-size:${size}px" src="${escapeAttr(src)}" alt=""
+    width="${size}" height="${size}" />`;
 }
 
 /** Initials when there is no picture, which is most of the time. */

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="LastHelp">
+  <title>LastHelp</title>
+  <!--
+    The mark: a speech bubble, because everything in this product starts with
+    somebody saying something, and a chevron inside it, because what they say
+    goes somewhere — onto a board and into a forge.
+
+    Two facets in the house orange, light on the left and dark on the right,
+    which is the family resemblance to Lastboard's shield rather than a copy of
+    it. Flat geometry with no gradient: it has to read at twenty pixels in a
+    sidebar and at sixty-four on a sign-in page.
+  -->
+  <path fill="#e8520e" d="M13 5h38a8 8 0 0 1 8 8v26a8 8 0 0 1-8 8H29.6L16 59V47h-3a8 8 0 0 1-8-8V13a8 8 0 0 1 8-8Z"/>
+  <path fill="#c2410c" d="M32 5h19a8 8 0 0 1 8 8v26a8 8 0 0 1-8 8H32Z"/>
+  <path fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"
+        d="m20.5 31.5 11-11 11 11"/>
+</svg>

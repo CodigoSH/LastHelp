@@ -1352,11 +1352,14 @@ a.stat:hover {
   gap: 0.55rem;
 }
 
+/* Sized by the caller through a variable rather than by the class, which used
+   to win over the width attribute and shrank the sign-in mark to the size of a
+   favicon. */
 .brand-logo {
-  inline-size: 1.5rem;
-  block-size: 1.5rem;
+  inline-size: var(--mark-size, 1.5rem);
+  block-size: var(--mark-size, 1.5rem);
   border-radius: 6px;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .logo-preview {
@@ -2171,3 +2174,74 @@ body > nav .brand {
 }
 
 .side-public:hover { color: var(--text); }
+
+/* ------------------------------------------------------------------ signing in */
+
+/* The card on a plain field, centred in the window rather than at the top of a
+   column. This is the first screen of the day for everybody on the team, and it
+   was a heading, two boxes and a button with the same word on all three. */
+.signin {
+  display: grid;
+  justify-items: center;
+  gap: 1.25rem;
+  max-inline-size: 24rem;
+  margin-inline: auto;
+  padding-block-start: clamp(1rem, 8vh, 5rem);
+}
+
+.signin-head {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.signin-head h1 { margin: 0.4rem 0 0; font-size: 1.5rem; }
+.signin-head .lead { margin: 0; color: var(--text-muted); }
+
+.signin form { inline-size: 100%; margin: 0; }
+.signin .wizard-card { inline-size: 100%; box-sizing: border-box; }
+
+/* Full width: there is one thing to do on this page. */
+.signin-go {
+  inline-size: 100%;
+  justify-content: center;
+  margin-block-start: 1rem;
+  padding-block: 0.65rem;
+  font-weight: 600;
+}
+
+/* The mark above the steps of the wizard, and above the sign-in card. */
+.wizard-mark {
+  display: block;
+  margin: 0 auto 1.5rem;
+}
+
+/* The eye on a password field. Put there by a service that walks every screen,
+   so the five password fields in this product all have one. */
+.pw-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pw-wrap input {
+  inline-size: 100%;
+  padding-inline-end: 2.5rem;
+}
+
+.pw-toggle {
+  position: absolute;
+  inset-inline-end: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  padding: 0.25rem;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pw-toggle:hover { color: var(--text); }

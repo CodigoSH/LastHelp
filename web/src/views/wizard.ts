@@ -178,6 +178,8 @@ export interface WizardSpec {
   back?: { href: string; label: string };
   /** Extra class on the form, so main.ts can find it. */
   formClass: string;
+  /** Drawn above the steps when given: the first run, and nowhere else. */
+  mark?: string;
 }
 
 /**
@@ -201,6 +203,14 @@ export function wizard(spec: WizardSpec, text: Text): string {
     .join("");
 
   return `<section class="wizard">
+    <!-- The mark, above the steps, on the first run only. A wizard inside the
+         panel is already under a sidebar wearing it; a second one in the middle
+         of the page is the same logo twice on one screen. -->
+    ${
+      spec.mark
+        ? `<img class="wizard-mark brand-logo" style="--mark-size:52px" src="${escapeAttr(spec.mark)}" alt="" width="52" height="52" />`
+        : ""
+    }
     <ol class="steps" aria-label="${escapeAttr(text.t("wizard.progress", { step: spec.step, total }))}">
       ${dots}
     </ol>

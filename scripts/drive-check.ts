@@ -120,6 +120,14 @@ async function main() {
       current: document.querySelector('.steps [aria-current="step"] .step-name')?.textContent?.trim(),
       theme: !!document.querySelector("[data-theme-choice]"),
     };`);
+  // The mark, on the first screen anybody ever sees of this. There was none
+  // anywhere in the product: a name in text and an empty space beside it.
+  const mark = await evaluate(`
+    const el = document.querySelector(".wizard-mark");
+    return el ? { src: el.getAttribute("src"), drawn: Math.round(el.getBoundingClientRect().width) } : null;
+  `);
+  check("the wizard wears the mark", mark?.src === "/logo.svg" && mark.drawn > 40, JSON.stringify(mark));
+
   check(
     "a fresh instance opens on the wizard, asking language first",
     firstStep.path === "/setup" && firstStep.prefs === true && firstStep.dots === 3 && firstStep.theme === true,
@@ -508,6 +516,23 @@ async function main() {
   `);
   await evaluate(`history.pushState({}, "", "/sign-in"); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(900);
+
+  // One action, one word for it, the mark above it, and an eye on the password.
+  // It was a heading, a button and a link in the bar all reading "Sign in".
+  const signIn = await evaluate(`
+    const word = document.querySelector(".signin-go").textContent.trim();
+    return {
+      times: (document.body.innerText.match(new RegExp(word, "g")) ?? []).length,
+      mark: !!document.querySelector(".signin-head .brand-logo"),
+      eye: !!document.querySelector(".pw-toggle"),
+      navLink: !!document.querySelector("body > nav a[href='/sign-in']"),
+      lead: !!document.querySelector(".signin-head .lead"),
+    };
+  `);
+  check("the sign-in page says its one word once", signIn.times === 1 && !signIn.navLink && !signIn.lead,
+    JSON.stringify(signIn));
+  check("and carries the mark and an eye on the password", signIn.mark && signIn.eye, JSON.stringify(signIn));
+
   await evaluate(`
     const f = document.querySelector("form.auth");
     f.querySelector('[name=username]').value = "alex";
