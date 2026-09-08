@@ -1,6 +1,9 @@
 package middleware
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // SecurityHeaders puts the same headers on every response.
 //
@@ -39,10 +42,53 @@ const contentSecurityPolicy = "default-src 'none'; " +
 	"base-uri 'none'; " +
 	"object-src 'none'"
 
-func SecurityHeaders(next http.Handler) http.Handler {
+// Secure says whether this request reached us over TLS, directly or through a
+// proxy the operator told us to trust. It is the server's own check, passed in
+// rather than reimplemented here: the cookie's Secure flag and this header must
+// never disagree about what "over HTTPS" means.
+type Secure func(*http.Request) bool
+
+// hidden is what a crawler must not put in an index.
+//
+// Everything under the panel, the two screens that lead into it, and — the one
+// that matters most here — any address carrying a follow token, which is the
+// key to somebody's own report. A published board and a published report are
+// public on purpose and stay indexable: being findable is what the product is
+// for.
+func hidden(r *http.Request) bool {
+	if r.URL.Query().Has("k") {
+		return true
+	}
+	path := r.URL.Path
+	for _, prefix := range []string{"/panel", "/setup", "/sign-in", "/api/"} {
+		if path == prefix || strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func SecurityHeaders(secure Secure) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return securityHeaders(next, secure)
+	}
+}
+
+func securityHeaders(next http.Handler, secure Secure) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		// Only over HTTPS, and never with preload: preload is a one-way door
+		// on somebody else's domain — a self-hoster who tries this on a
+		// subdomain of their main site and changes their mind has months of
+		// browsers refusing plain HTTP for it. includeSubDomains is left out
+		// for the same reason: this server knows nothing about its neighbours.
+		if secure != nil && secure(r) {
+			h.Set("Strict-Transport-Security", "max-age=31536000")
+		}
+		if hidden(r) {
+			h.Set("X-Robots-Tag", "noindex, nofollow")
+		}
 		// A response whose type is guessed is a response somebody can make the
 		// browser treat as something else.
 		h.Set("X-Content-Type-Options", "nosniff")

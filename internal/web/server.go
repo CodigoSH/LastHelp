@@ -153,7 +153,7 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 
 	s.handler = s.wrap()
 	s.hookHandler = middleware.Recover(
-		middleware.SecurityHeaders(
+		middleware.SecurityHeaders(s.isSecure)(
 			middleware.BodyLimit(webhookBodyLimit)(
 				middleware.RateLimit(s.perAddress, s.perBlock, s.addressOf)(s.hooks))))
 	return s, nil
@@ -334,7 +334,7 @@ func (s *Server) wrap() http.Handler {
 	// Outside the rate limiter, so a refused request is answered with the same
 	// policy as a served one: a 429 that arrives without a CSP is a page the
 	// browser will happily run anything in.
-	h = middleware.SecurityHeaders(h)
+	h = middleware.SecurityHeaders(s.isSecure)(h)
 	h = middleware.Recover(h) // and if it explodes, say so
 	return h
 }

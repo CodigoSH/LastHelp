@@ -1,0 +1,11 @@
+# The public boards are meant to be found: that is what a feedback portal is
+# for. What is behind a session, and anything carrying the token that opens
+# somebody's own report, is not — those addresses also answer with
+# X-Robots-Tag: noindex, because a crawler that ignores this file still reads
+# the header.
+User-agent: *
+Disallow: /panel
+Disallow: /setup
+Disallow: /sign-in
+Disallow: /api/
+Allow: /

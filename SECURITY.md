@@ -62,6 +62,22 @@ assumptions apply, and keeping them apart is most of the design:
   else is `'self'` or `'none'`, and the whole product has no third party to make
   an exception for.
 
+- **What is private is not indexable.** Everything under the panel, the screens
+  that lead into it, and — the one that matters — any address carrying a follow
+  token answer with `X-Robots-Tag: noindex, nofollow`, and `robots.txt` says the
+  same for a crawler that reads it first. A follow link is the key to somebody's
+  own report, and an indexed key is a published one. A published board and a
+  published report stay indexable on purpose: being findable is what a feedback
+  portal is for. That is `TestPrivatePagesStayOutOfSearchAndPublicOnesDoNot`,
+  not a sentence.
+
+- **HSTS, over HTTPS only, and no further than this host.** A request that
+  arrived over TLS is told to remember it for a year. `includeSubDomains` and
+  `preload` are deliberately absent: both are one-way doors over domains this
+  server knows nothing about, and a self-hoster who tries either on a subdomain
+  of their main site and changes their mind has months of browsers refusing
+  plain HTTP for it.
+
 - **The forge URL comes from the operator.** Pointing at a Gitea on
   `192.168.1.x` with a self-signed certificate is the feature, not the
   vulnerability, so private addresses are allowed there. Cloud metadata
@@ -86,6 +102,15 @@ assumptions apply, and keeping them apart is most of the design:
 - **The feed asks for nothing.** Following a board over Atom stores nothing
   about you: no address, no account, no subscription. It is the notification
   channel this product leans on for exactly that reason.
+
+## The list, and what keeps it true
+
+Every control above is named in `internal/web/security_test.go` beside the test
+that keeps it true, and a test in that file walks the repository to check each
+one still exists. It is a test rather than a document on purpose: this policy
+claimed nothing about a content policy for months because there was not one —
+planned, never written, and invisible to everything. A list with no teeth would
+have let it happen again.
 
 ## Secure update delivery
 
