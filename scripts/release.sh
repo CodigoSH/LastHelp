@@ -116,6 +116,7 @@ PREFLIGHT=(
     "frontend build|bun run build"
     "go test -race|go test -count=1 -race ./..."
     "typecheck|bun run typecheck"
+    "bun test|bun test"
     "i18n:sync|bun run i18n:sync"
     "i18n:scan|bun run i18n:scan"
 )
