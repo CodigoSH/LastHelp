@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 )
 
 // overview is what the panel's front page draws.
@@ -46,6 +47,10 @@ type overview struct {
 type dayCount struct {
 	Day     int64 `json:"day"`
 	Reports int   `json:"reports"`
+	// Split by kind, because "three reports" and "three bugs" are different
+	// news and the chart is the only place that can say which it was.
+	Bugs  int `json:"bugs"`
+	Ideas int `json:"ideas"`
 }
 
 // itemBrief is a report as a line in a list: enough to recognise it and to go
@@ -172,22 +177,31 @@ func (s *Server) activity(days int) ([]dayCount, error) {
 	today := time.Now().UTC().Unix() / day * day
 	from := today - int64(days-1)*day
 
-	counted := map[int64]int{}
+	counted := map[int64]dayCount{}
 	rows, err := s.db.Query(
-		`SELECT created_at / 86400 * 86400 AS day, count(*)
+		`SELECT created_at / 86400 * 86400 AS day, kind, count(*)
 		   FROM item WHERE merged_into IS NULL AND created_at >= ?
-		  GROUP BY day`, from)
+		  GROUP BY day, kind`, from)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var at int64
+		var kind string
 		var n int
-		if err := rows.Scan(&at, &n); err != nil {
+		if err := rows.Scan(&at, &kind, &n); err != nil {
 			return nil, err
 		}
-		counted[at] = n
+		entry := counted[at]
+		entry.Reports += n
+		switch item.Kind(kind) {
+		case item.Bug:
+			entry.Bugs += n
+		case item.Idea:
+			entry.Ideas += n
+		}
+		counted[at] = entry
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -195,7 +209,9 @@ func (s *Server) activity(days int) ([]dayCount, error) {
 
 	out := make([]dayCount, 0, days)
 	for at := from; at <= today; at += day {
-		out = append(out, dayCount{Day: at, Reports: counted[at]})
+		entry := counted[at]
+		entry.Day = at
+		out = append(out, entry)
 	}
 	return out, nil
 }

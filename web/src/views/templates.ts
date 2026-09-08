@@ -1853,7 +1853,7 @@ export interface OverviewData {
   statuses: Record<string, number>;
   moderation: Record<string, number>;
   last_report: number;
-  series: { day: number; reports: number }[];
+  series: { day: number; reports: number; bugs: number; ideas: number }[];
   top: Brief[];
   recent: Brief[];
   boards: {
@@ -1978,6 +1978,11 @@ export function overviewScreen(data: OverviewData, text: Text): string {
            height: 120,
            from: series.length > 0 ? text.date(series[0]!.day) : "",
            to: series.length > 0 ? text.date(series[series.length - 1]!.day) : "",
+           meta: series.map((day) => ({
+             day: day.day,
+             bug: day.bugs ?? 0,
+             idea: day.ideas ?? 0,
+           })),
          },
        )}
      </div>`,

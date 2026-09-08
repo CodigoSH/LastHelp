@@ -26,6 +26,16 @@ export interface AreaChartOptions {
   /** A label under the first and the last point, if there is one. */
   from?: string;
   to?: string;
+  /**
+   * What each point is, beyond its height: the day it belongs to and whatever
+   * the caller wants the reader to be able to ask it — here, the split by kind.
+   *
+   * It travels into the markup as data attributes on the point that was drawn,
+   * so whatever reads the chart back takes the numbers from the drawing rather
+   * than recomputing which value belongs where. Two places doing that
+   * arithmetic is one place for them to disagree.
+   */
+  meta?: Array<Record<string, string | number>>;
 }
 
 /**
@@ -92,6 +102,17 @@ export function areaChart(values: number[], options: AreaChartOptions = {}): str
     <path class="chart-line" d="${line}" fill="none" vector-effect="non-scaling-stroke" />
     <line class="chart-last" x1="${n(last[0])}" y1="${n(last[1])}" x2="${n(last[0])}" y2="${n(floor)}"
       vector-effect="non-scaling-stroke" />
+    <line class="chart-cursor" x1="0" y1="${n(pad)}" x2="0" y2="${n(floor)}"
+      vector-effect="non-scaling-stroke" hidden />
+    <g class="chart-points">${points
+      .map(
+        ([x, y], i) =>
+          `<circle class="chart-dot" cx="${n(x)}" cy="${n(y)}" r="3" data-i="${i}"
+             data-count="${values[i] ?? 0}"${Object.entries(options.meta?.[i] ?? {})
+               .map(([key, value]) => ` data-${key}="${String(value).replace(/"/g, "&quot;")}"`)
+               .join("")} />`,
+      )
+      .join("")}</g>
   </svg>${
     options.from || options.to
       ? `<p class="chart-axis"><span>${options.from ?? ""}</span><span>${options.to ?? ""}</span></p>`

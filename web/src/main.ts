@@ -23,6 +23,7 @@ import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/t
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
+import { attachChartHover } from "./services/chartHover";
 import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
 import { icons } from "./views/icons";
@@ -1477,6 +1478,31 @@ async function showPanel(): Promise<void> {
     return;
   }
   await showInShell(views.overviewScreen(data, text), "/panel");
+  // What a day of the chart was, in the reader's own language and split the way
+  // the card beside it splits everything: the day, what arrived, and what kind
+  // it was. The numbers come from the point that was drawn; the words and the
+  // formats come from here, which is where the catalogue is.
+  attachChartHover(root, (point) => {
+    const day = Number(point.day ?? 0);
+    const total = Number(point.count ?? 0);
+    const kinds: Array<[string, number]> = [
+      ["idea", Number(point.idea ?? 0)],
+      ["bug", Number(point.bug ?? 0)],
+    ];
+    const rows = kinds
+      .filter(([, n]) => n > 0)
+      .map(
+        ([kind, n]) => `<span class="tip-row">
+          <span class="swatch swatch-${kind}"></span>${escapeHTML(i18n.t(`kind.${kind}`))}
+          <span class="count">${escapeHTML(i18n.number(n))}</span>
+        </span>`,
+      )
+      .join("");
+    return `<span class="tip-day">${escapeHTML(day > 0 ? i18n.date(day) : "")}</span>
+      <span class="tip-total">${escapeHTML(i18n.t("overview.reports"))}
+        <span class="count">${escapeHTML(i18n.number(total))}</span></span>
+      ${rows}`;
+  });
 }
 
 /**

@@ -965,6 +965,59 @@ async function main() {
     JSON.stringify(chart),
   );
 
+  // And it answers which day was which, under a real pointer. A dispatched
+  // MouseEvent does not drive hover — this house has been caught by that — so
+  // the pointer is moved with the browser's own input, onto the last point and
+  // then off the chart entirely.
+  const where = await evaluate(`
+    // Into view first: the pointer is dispatched in the window's own
+    // coordinates, and this browser opens at 600px tall — the chart is below
+    // the fold, so the first version of this check moved the pointer past the
+    // bottom of the window and measured a page nothing had touched.
+    document.querySelector(".chart-wrap").scrollIntoView({ block: "center" });
+    await new Promise(r => setTimeout(r, 300));
+    const box = document.querySelector(".chart-wrap svg").getBoundingClientRect();
+    return { x: Math.round(box.left + box.width * 0.98), y: Math.round(box.top + box.height * 0.6),
+             away: Math.round(box.top - 40) };
+  `);
+  await page.send("Input.dispatchMouseEvent", {
+    type: "mouseMoved", x: where.x, y: where.y, pointerType: "mouse",
+  });
+  await sleep(400);
+  const asked = await evaluate(`
+    const tip = document.querySelector(".chart-tip");
+    const dot = document.querySelector(".chart-dot.on");
+    const digits = (el) => Number((el?.textContent ?? "").replace(/[^0-9]/g, ""));
+    return {
+      // Compared against the point it landed on rather than against a fixed
+      // string: by now the walk has changed language once, and a check that
+      // expects English would be checking the language.
+      day: dot ? Number(dot.dataset.day) : 0,
+      count: dot ? Number(dot.dataset.count) : -1,
+      dayLine: (tip?.querySelector(".tip-day")?.textContent ?? "").trim(),
+      total: digits(tip?.querySelector(".tip-total .count")),
+      // The breakdown has to add up to what the day was, or it is decoration.
+      parts: [...(tip?.querySelectorAll(".tip-row .count") ?? [])].map(digits),
+      shown: tip ? !tip.hidden : false,
+      cursor: !document.querySelector(".chart-cursor").hasAttribute("hidden"),
+    };
+  `);
+  await page.send("Input.dispatchMouseEvent", {
+    type: "mouseMoved", x: where.x, y: where.away, pointerType: "mouse",
+  });
+  await sleep(300);
+  const gone = await evaluate(`
+    return { tip: document.querySelector(".chart-tip").hidden, lit: document.querySelectorAll(".chart-dot.on").length };
+  `);
+  const added = (asked.parts as number[]).reduce((sum: number, n: number) => sum + n, 0);
+  check(
+    "and says which day was which, and of what, under the pointer",
+    asked.shown === true && asked.cursor === true && asked.day > 0 &&
+      asked.dayLine.length > 0 && asked.total === asked.count && added === asked.count &&
+      gone.tip === true && gone.lit === 0,
+    `${JSON.stringify(asked)} → ${JSON.stringify(gone)}`,
+  );
+
   // 11e. Every number leads to the list it counts. A dashboard whose tiles are
   //      not links is a dashboard that answers "how many" and then leaves you
   //      to find them yourself.

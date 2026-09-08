@@ -3549,3 +3549,81 @@ a.stat:hover .stat-go {
   color: var(--danger);
   background: rgba(var(--danger-rgb), 0.12);
 }
+
+/* ---------------------------------------------------- the chart, asked
+
+ * The chart is thirty quiet days and one spike until somebody can ask it which
+ * day was which. The pointer gets a guide, the point it landed on, and a label
+ * with the day and the number.
+ */
+.chart-wrap { position: relative; }
+
+.chart-dot {
+  fill: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s var(--ease);
+}
+
+.chart-dot.on {
+  opacity: 1;
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.chart-cursor {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, calc(-100% - 0.6rem));
+  /* Measured before it is placed, so it has to be laid out even while it is
+     off: visibility rather than display, and hidden from the reader either
+     way by [hidden] elsewhere doing the same. */
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-2), var(--hairline);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Under the point instead, when the point is against the top of the card. */
+.chart-tip.below { transform: translate(-50%, 0.6rem); }
+
+/* The axis is pinned the way the drawing runs — oldest on the left — rather
+   than following the paragraph, which in Arabic put "30 days ago" on the right
+   of a line that starts on the left. */
+.chart-axis { direction: ltr; }
+
+/* What a day was: the date, what arrived, and what kind it was. */
+.chart-tip {
+  display: grid;
+  gap: 0.15rem;
+  min-inline-size: 8rem;
+  text-align: start;
+}
+
+.chart-tip .tip-day {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.chart-tip .tip-total,
+.chart-tip .tip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 500;
+}
+
+.chart-tip .tip-total { font-weight: 700; }
+.chart-tip .count { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
+.chart-tip .tip-row { color: var(--text-muted); font-size: 0.8rem; }
