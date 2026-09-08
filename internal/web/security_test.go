@@ -111,6 +111,8 @@ func TestTheSecurityInventoryIsComplete(t *testing.T) {
 		"a private route is private by being wrapped, not by a list":      "TestLayering",
 		"every outbound connection goes through the gate":                 "TestEveryOutboundConnectionGoesThroughAGate",
 		"a release is verified before it is installed":                    "TestTheInstallerAndTheBinaryTrustTheSameKeys",
+		"the sandbox the service runs in is signed with the release":      "TestTheInstallerAndTheReleaseAgreeOnWhatIsPublished",
+		"the installer runs on the shells it says it does":                "TestTheInstallerIsPOSIXShellAndNotBash",
 	}
 
 	root := repoRootFromHere(t)

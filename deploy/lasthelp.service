@@ -1,0 +1,81 @@
+[Unit]
+Description=LastHelp
+Documentation=https://git.codigosh.com/CodigoSH/LastHelp
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lasthelp
+Group=lasthelp
+WorkingDirectory=/var/lib/lasthelp
+ExecStart=/opt/lasthelp/bin/lasthelp
+Restart=on-failure
+RestartSec=5s
+
+# Long enough for SQLite to finish a WAL checkpoint on the way out. Cutting it
+# short is how a database ends up needing recovery on the next start.
+TimeoutStopSec=90s
+
+EnvironmentFile=/etc/lasthelp/lasthelp.env
+
+# --- Everything below is what matters if this process is ever compromised.
+# --- It takes text from strangers for a living and has no business doing any
+# --- of it.
+
+# Nothing it starts can gain privileges it did not have.
+NoNewPrivileges=yes
+
+# The filesystem is read-only except the two places it writes.
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lasthelp
+# Where the binary lives, because the built-in updater replaces it by renaming
+# a new one over it — which needs write permission on the directory, not on the
+# file. Remove this line when a package manager or a container image owns the
+# binary; the application then refuses to update itself, which is the right
+# answer when something else is in charge of it.
+ReadWritePaths=/opt/lasthelp/bin
+
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+DevicePolicy=closed
+
+# It listens on a port, calls a forge, and posts to notification services.
+# Nothing else.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+# Binding below 1024 is not needed: a reverse proxy holds 443 and this listens
+# above it. The installer refuses such a port for the same reason.
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Kernel surfaces this has no use for.
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+
+# No memory ceiling here on purpose.
+#
+# The sibling projects carry GOMEMLIMIT and MemoryMax, and theirs come from
+# measuring a real installation under load. Nobody has measured this one. A
+# limit copied from another program's numbers is a restart loop waiting for the
+# day somebody signs in twice at once — password verification alone reserves
+# 64 MiB for its duration, twice over at the parallelism this uses. The line to
+# add when there are numbers is Environment=GOMEMLIMIT= followed by MemoryMax=
+# above it, in that order, so the collector always gets to act first.
+
+[Install]
+WantedBy=multi-user.target

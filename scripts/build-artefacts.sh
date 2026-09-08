@@ -58,6 +58,14 @@ build linux arm64
 # architectures it accepts from uname; anything built that it cannot ask for is
 # an asset nobody can install, and anything it asks for that is missing is a
 # release that dies on a 404 in front of whoever ran the command.
+# The service unit ships with the release rather than living inside install.sh
+# as a heredoc. It is versioned here, it shows up in a diff, and — because it
+# goes into SHA256SUMS below — it is verified by the same signature as the
+# binary. A unit written by whatever copy of the installer somebody happened to
+# run is a unit nobody can check.
+echo "==> the service unit"
+cp deploy/lasthelp.service "${OUT}/lasthelp.service"
+
 echo "==> what the installer can fetch is what was built"
 installable=$(grep -o 'ARCH=[a-z0-9]\{1,\}' install.sh | cut -d= -f2 | sort -u)
 [ -n "$installable" ] || { echo "install.sh no longer states its architectures the way this reads them" >&2; exit 1; }
@@ -65,6 +73,8 @@ for arch in $installable; do
     [ -f "${OUT}/lasthelp-linux-${arch}" ] || {
         echo "install.sh downloads lasthelp-linux-${arch} and nothing built it" >&2; exit 1; }
 done
+[ -f "${OUT}/lasthelp.service" ] || {
+    echo "install.sh downloads lasthelp.service and nothing put it here" >&2; exit 1; }
 for built in "${OUT}"/lasthelp-*; do
     name=$(basename "$built")
     case " $(for a in $installable; do printf 'lasthelp-linux-%s ' "$a"; done)" in
@@ -76,7 +86,7 @@ done
 # In the format sha256sum already writes, so anybody can check it with the tools
 # already on their machine rather than one of ours.
 echo "==> checksums"
-( cd "$OUT" && sha256sum lasthelp-* > SHA256SUMS )
+( cd "$OUT" && sha256sum lasthelp-* lasthelp.service > SHA256SUMS )
 cat "${OUT}/SHA256SUMS"
 
 echo

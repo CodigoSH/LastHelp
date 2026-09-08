@@ -3,12 +3,12 @@
 ## One command
 
 ```sh
-curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo bash
+curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh
 ```
 
 It downloads a release, **checks that it is ours before installing anything**,
-and sets up a systemd service. Read it first if you would rather — it is one
-file, and piping a script into a root shell is a thing to do knowingly.
+and sets up a hardened systemd service. Read it first if you would rather — it
+is one file, and piping a script into a root shell is a thing to do knowingly.
 
 What it refuses rather than warns about:
 
@@ -23,10 +23,36 @@ What it refuses rather than warns about:
   22.04, Debian 12 or RHEL 9 onwards is new enough.
 
 Run it again to update. It stops the service, **backs up the database first**,
-replaces the binary and starts again — and it keeps the port and settings it
-finds rather than asking twice.
+replaces the binary and starts again — and it keeps the port and the
+configuration it finds rather than asking twice. The one file it never
+overwrites is `/etc/lasthelp/lasthelp.env`, because that is the one you have
+edited by hand.
 
-`CHANNEL=beta` installs the latest beta instead of the latest stable.
+It answers `--help`, and it can undo itself:
+
+```sh
+sudo sh install.sh --uninstall           # removes it, keeps the reports
+sudo sh install.sh --uninstall --purge   # erases them too, after you type DELETE
+```
+
+`LASTHELP_CHANNEL=beta` installs the latest beta instead of the latest stable.
+Every path it writes to can be pointed elsewhere the same way —
+`LASTHELP_PREFIX`, `LASTHELP_DATA`, `LASTHELP_ETC`, `LASTHELP_UNIT` — which is
+how it gets tested against a throwaway tree.
+
+## What it installs, and where
+
+| | |
+|---|---|
+| `/opt/lasthelp/bin/lasthelp` | the binary, owned by the service account so it can update itself |
+| `/var/lib/lasthelp/` | the database and the key that decrypts forge tokens |
+| `/etc/lasthelp/lasthelp.env` | the configuration, yours to edit |
+| `/etc/systemd/system/lasthelp.service` | the unit, taken from the release and covered by its signature |
+
+The unit is not written by the installer: it ships **with the release** and is
+listed in the signed `SHA256SUMS` alongside the binary, so the sandbox it puts
+the service in is verified rather than being whatever the copy of the installer
+you happened to run had inside it.
 
 ## With Docker
 

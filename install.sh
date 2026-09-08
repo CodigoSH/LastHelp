@@ -1,232 +1,482 @@
-#!/bin/bash
+#!/bin/sh
 #
-# LastHelp installer.
+# Installs LastHelp on a Linux machine with systemd.
 #
-# Downloads a release, checks that it is ours, and sets it up as a service.
+#   curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh
+#
+# It does five things and says what each one was: makes a user that owns
+# nothing else, fetches a release and checks it, puts the binary in
+# /opt/lasthelp/bin, writes a configuration file, and starts a hardened service.
+#
+# It is safe to run again. An existing installation is upgraded with its
+# database backed up first, and an existing configuration is never overwritten —
+# the one file an operator has edited by hand is the one thing a script must not
+# touch.
+#
+#   sudo sh install.sh --uninstall            removes it and keeps the data
+#   sudo sh install.sh --uninstall --purge    removes the data too
 #
 # It refuses rather than guesses. A failed verification stops the install; it
 # does not warn and carry on, because a warning in a scrolling terminal is a
 # warning nobody reads.
-set -euo pipefail
-
-REPO_API="https://git.codigosh.com/api/v1/repos/CodigoSH/LastHelp"
-REPO_URL="https://git.codigosh.com/CodigoSH/LastHelp"
-
-INSTALL_DIR="/opt/lasthelp"
-BIN="/usr/local/bin/lasthelp"
-DATA_DIR="/var/lib/lasthelp"
-SERVICE="/etc/systemd/system/lasthelp.service"
-USER_NAME="lasthelp"
-
-GREEN='\033[1;32m'; RED='\033[1;31m'; BLUE='\033[1;34m'; GRAY='\033[0;90m'; NC='\033[0m'
-step()  { echo -e "${BLUE}  • ${NC}$1"; }
-ok()    { echo -e "${GREEN}  ✓ ${NC}$1"; }
-die()   { echo -e "${RED}  ✗ ${NC}$1" >&2; exit 1; }
-note()  { echo -e "${GRAY}    $1${NC}"; }
-
-# The public keys this installer will accept a release from.
 #
-# A list, like the one compiled into the binary, and for the same reason: a
-# release signed with a rotated key has to remain verifiable by an installer
-# somebody downloaded last month. Empty means no release has been signed yet.
-RELEASE_KEYS=(
-    "BxLbpqP9EKO0HqYHddiBwZ9Jt0sTJsMQ2OMGTcfCCQA="
-)
+# Reading it before running it is the correct instinct, and this is why it is
+# short enough to read.
+set -eu
 
-echo
-echo "  LastHelp"
-echo "  A feedback portal that speaks to your forge."
-echo
+# ============================================================ CONFIGURATION
+#
+# This is CodigoSH's installer, and the point of it is that it is the same one
+# everywhere: what differs between projects is this block and nothing else, so a
+# fix made in one project is a file copied to the others.
+#
+# It is POSIX sh, and that is not decoration. The command above pipes it into
+# `sh`, which is dash on Debian and Ubuntu and BusyBox on Alpine — none of them
+# has arrays, `local`, `[[` or `echo -e`. Check a change with `dash -n` or
+# `busybox sh -n` before pushing it: a bashism here is not a subtle bug, it is a
+# syntax error before the first line runs, on the three distributions most
+# people self-host on.
+PROJECT="LastHelp"
+NAME="lasthelp"
+ENV_PREFIX="LASTHELP"
+TAGLINE="A feedback portal that speaks to your forge."
+FORGE="https://git.codigosh.com/CodigoSH/LastHelp"
+API_BASE="https://git.codigosh.com/api/v1/repos/CodigoSH/LastHelp"
+# How this project names its binaries in a release. LastGYM writes
+# lastgym_linux_amd64; this one uses dashes. It is the one thing a project
+# cannot change without also changing its own updater.
+artefact_for() { printf 'lasthelp-linux-%s' "$1"; }
 
-[ "${EUID:-$(id -u)}" -eq 0 ] || die "This needs root to install a service. Re-run with sudo."
+# The public keys a release may be signed with, one per line.
+#
+# A list, because a release signed with a rotated key has to stay verifiable by
+# an installer somebody downloaded last month. Append, never replace.
+#
+# A newline-separated string rather than an array: arrays are bash, and this
+# file has to parse under dash and BusyBox.
+RELEASE_KEYS='BxLbpqP9EKO0HqYHddiBwZ9Jt0sTJsMQ2OMGTcfCCQA='
 
-for tool in curl tar sha256sum; do
-    command -v "$tool" >/dev/null || die "$tool is required and was not found."
+# ============================================================ appearance
+#
+# Colour only when something is going to read it. Piped into a file or a log
+# these become escape codes in the middle of the words, and the first thing
+# anybody does with an installer that failed is paste its output somewhere.
+if [ -t 1 ]; then
+    RED=$(printf '\033[1;31m');  GREEN=$(printf '\033[1;32m')
+    BLUE=$(printf '\033[1;34m'); GRAY=$(printf '\033[0;90m')
+    BOLD=$(printf '\033[1m');    OFF=$(printf '\033[0m')
+else
+    RED= ; GREEN= ; BLUE= ; GRAY= ; BOLD= ; OFF=
+fi
+
+step()  { printf '%s  • %s%s\n' "$BLUE" "$OFF" "$1"; }
+done_() { printf '%s  ✓ %s%s\n' "$GREEN" "$OFF" "$1"; }
+note()  { printf '%s    %s%s\n' "$GRAY" "$1" "$OFF"; }
+say()   { printf '%s\n' "$*"; }
+die()   { printf '%s  ✗ %s%s\n' "$RED" "$1" "$OFF" >&2; exit 1; }
+
+# ============================================================ settings
+#
+# Every path is overridable so this script can be run end to end against a
+# temporary tree without touching the machine it is being tested on. Nothing
+# else moves them.
+VERSION="${LASTHELP_VERSION:-}"
+BASE="${LASTHELP_RELEASES:-$FORGE/releases}"
+API="${LASTHELP_API:-$API_BASE}"
+PREFIX="${LASTHELP_PREFIX:-/opt/$NAME}"
+DATA="${LASTHELP_DATA:-/var/lib/$NAME}"
+ETC="${LASTHELP_ETC:-/etc/$NAME}"
+USER_NAME="${LASTHELP_USER:-$NAME}"
+UNIT="${LASTHELP_UNIT:-/etc/systemd/system/$NAME.service}"
+
+PORT="${LASTHELP_PORT:-8080}"
+# Answerable without a terminal, because otherwise the beta is uninstallable
+# without one: the question below is skipped in a container or a cron job, the
+# default is `stable`, and before 1.0 there is no stable release to find.
+CHANNEL="${LASTHELP_CHANNEL:-stable}"
+PROXIED=no
+
+UNINSTALL=no
+PURGE=no
+for ARG in "$@"; do
+    case "$ARG" in
+        --uninstall) UNINSTALL=yes ;;
+        --purge) PURGE=yes ;;
+        --help|-h) sed -n '2,23p' "$0" 2>/dev/null | sed 's/^#\{0,1\} \{0,1\}//'; exit 0 ;;
+        *) die "unknown option: $ARG" ;;
+    esac
 done
 
-case "$(uname -m)" in
-    x86_64|amd64)  ARCH=amd64 ;;
-    aarch64|arm64) ARCH=arm64 ;;
-    *) die "No release is built for $(uname -m). Building from source works: see the README." ;;
-esac
-[ "$(uname -s)" = "Linux" ] || die "This installer sets up a systemd service and only runs on Linux."
+[ "$(id -u)" -eq 0 ] || die "run this as root (sudo sh install.sh)"
 
-# --- which release ---------------------------------------------------------
-
-CHANNEL="${CHANNEL:-stable}"
-step "Looking for the latest $CHANNEL release…"
-
-if [ "$CHANNEL" = "beta" ]; then
-    TAG=$(curl -fsSL "$REPO_API/releases?limit=1" | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p' | head -1)
-else
-    TAG=$(curl -fsSL "$REPO_API/releases/latest" | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p' | head -1)
-fi
-[ -n "${TAG:-}" ] || die "Could not find a release. Has one been published yet?"
-ok "Found $TAG"
-
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
-cd "$WORK"
-
-BASE="$REPO_URL/releases/download/$TAG"
-BINARY="lasthelp-linux-$ARCH"
-
-# --- verify before installing ----------------------------------------------
+# ============================================================ uninstall
 #
-# The order matters and is the same as the in-app updater's: the checksum file
-# is verified first, and only a verified checksum file is allowed to say what
-# the binary should hash to. Downloading the binary first and then asking an
-# unverified file whether it is right proves nothing.
+# Nothing here runs `rm -rf` on a path it has not looked at first. Every one of
+# them can be pointed somewhere else by an environment variable, and an empty or
+# relative one turns a tidy-up into whatever happens to be in the working
+# directory.
+safe_to_remove() {
+    case "$1" in
+        /|/usr|/etc|/var|/opt|/home|/root|/boot) die "refusing to remove $1" ;;
+        /*) [ ${#1} -gt 4 ] || die "refusing to remove $1" ;;
+        *) die "refusing to remove a path that is not absolute: '$1'" ;;
+    esac
+}
 
-step "Downloading the checksums…"
-curl -fsSL -o SHA256SUMS "$BASE/SHA256SUMS" || die "Could not download SHA256SUMS."
+if [ "$UNINSTALL" = yes ]; then
+    safe_to_remove "$PREFIX"
 
-if [ ${#RELEASE_KEYS[@]} -eq 0 ]; then
-    die "This installer has no release keys compiled in, so it cannot verify anything.
-    That is deliberate: no key does not mean accept anything. Get a newer installer."
+    # Confirmed before anything is touched, not after. Somebody who types the
+    # wrong word — or runs this where there is no terminal to type on — should
+    # end up with the installation they started with, not half of one.
+    if [ "$PURGE" = yes ]; then
+        safe_to_remove "$DATA"
+        safe_to_remove "$ETC"
+        if (exec 3< /dev/tty) 2>/dev/null; then
+            printf '  %sType the word DELETE to erase %s and %s: %s' "$BOLD" "$DATA" "$ETC" "$OFF" > /dev/tty
+            IFS= read -r CONFIRM < /dev/tty 2>/dev/null || CONFIRM=
+            [ "$CONFIRM" = "DELETE" ] || die "not confirmed. Nothing has been removed."
+        else
+            die "--purge needs a terminal to confirm on. Nothing has been removed."
+        fi
+    fi
+
+    step "Stopping the service..."
+    systemctl disable --now "$NAME" >/dev/null 2>&1 || true
+    rm -f "$UNIT"
+    systemctl daemon-reload >/dev/null 2>&1 || true
+
+    step "Removing the binary..."
+    rm -rf "$PREFIX"
+
+    if [ "$PURGE" = yes ]; then
+        rm -rf "$DATA" "$ETC"
+        userdel "$USER_NAME" >/dev/null 2>&1 || true
+        say ""
+        done_ "Removed, data and all."
+    else
+        say ""
+        done_ "Removed. The reports are still in $DATA"
+        note "Run again with --purge to erase them, or reinstall to pick up where you left off."
+    fi
+    exit 0
 fi
 
-if ! command -v openssl >/dev/null; then
-    die "openssl is required to check the release signature.
-    Install it and run this again — an unverified binary is not worth the convenience."
+# ============================================================ what we need
+command -v systemctl >/dev/null 2>&1 \
+    || die "this installer needs systemd; see the documentation for other init systems"
+for TOOL in curl sha256sum; do
+    command -v "$TOOL" >/dev/null 2>&1 || die "$TOOL is needed and is not installed"
+done
+
+case "$(uname -s)" in
+    Linux) ;;
+    *) die "this installer sets up a systemd service and only runs on Linux" ;;
+esac
+
+case "$(uname -m)" in
+    x86_64|amd64) ARCH=amd64 ;;
+    aarch64|arm64) ARCH=arm64 ;;
+    *) die "no build for $(uname -m). Building from source works: $FORGE" ;;
+esac
+ARTEFACT=$(artefact_for "$ARCH")
+
+say ""
+say "  ${BOLD}${PROJECT}${OFF}"
+say "  $TAGLINE"
+say ""
+
+# ============================================================ what is here
+#
+# An existing installation answers the questions below by itself. Asking
+# somebody to retype the port they chose last time is how an upgrade changes it
+# by accident.
+UPGRADE=no
+if [ -x "$PREFIX/bin/$NAME" ] && [ -f "$ETC/$NAME.env" ]; then
+    UPGRADE=yes
+    OLD_PORT=$(sed -n "s/^${ENV_PREFIX}_PORT=//p" "$ETC/$NAME.env" | tail -1)
+    [ -n "${OLD_PORT:-}" ] && PORT="$OLD_PORT"
+    case "$(sed -n "s/^${ENV_PREFIX}_TRUST_PROXY=//p" "$ETC/$NAME.env" | tail -1)" in
+        true|1|yes) PROXIED=yes ;;
+    esac
+    step "Existing installation found. Updating version on port ${BOLD}${PORT}${OFF}..."
+    say ""
 fi
 
-# Ed25519 signatures over raw data need `pkeyutl -rawin`, and that arrived in
-# OpenSSL 3.0. On 1.1.1 there is no command-line way to verify one at all:
-# without the flag openssl answers "operation not supported for this keytype",
-# and with it, "Option unknown option -rawin". Neither says what is wrong, and
-# both look like our signature is broken rather than their openssl being old.
-openssl_major=$(openssl version 2>/dev/null | sed -nE 's/^OpenSSL ([0-9]+).*/\1/p')
-if [ -z "$openssl_major" ] || [ "$openssl_major" -lt 3 ]; then
-    die "openssl 3.0 or newer is required to verify an ed25519 signature.
-    This machine has: $(openssl version 2>&1 | head -1)
-    Older openssl cannot check this kind of signature at all, and installing
-    without checking is not something this script will do for you."
+# ============================================================ questions
+#
+# From /dev/tty rather than stdin, because stdin is the script itself when this
+# arrives down a pipe — which is how the README says to run it. Without a
+# terminal, every answer is its default and nothing blocks.
+#
+# Opened rather than tested for, and opened inside a subshell. `[ -c /dev/tty ]`
+# only says the device node is there: it is there inside a container, under
+# nohup and in a systemd unit, and openable in none of them. And `:` is a
+# special built-in, so POSIX has a redirection error on it kill a
+# non-interactive shell outright — even inside the condition of an `if`. The
+# subshell contains that: it dies, the parent reads its status, the questions
+# are skipped.
+if (exec 3< /dev/tty) 2>/dev/null; then
+    # The prompt goes to the terminal, not to stdout: this is called as
+    # `IN=$(ask ...)` and command substitution would swallow a prompt printed on
+    # stdout, leaving the installer waiting for an answer to a question nobody
+    # can see.
+    ask() {
+        printf '%s' "$1" > /dev/tty
+        IFS= read -r REPLY < /dev/tty 2>/dev/null || REPLY=
+        printf '%s' "$REPLY"
+    }
+
+    if [ "$UPGRADE" = no ]; then
+        IN=$(ask "$(printf '  Port [%s]: ' "$PORT")")
+        [ -n "$IN" ] && PORT="$IN"
+
+        IN=$(ask '  Behind a reverse proxy? (nginx, Caddy, Traefik…) (y/N): ')
+        case "$IN" in y|Y|yes|Yes) PROXIED=yes ;; esac
+    fi
+
+    IN=$(ask "$(printf '  Release channel (stable/beta) [%s]: ' "$CHANNEL")")
+    case "$IN" in beta|Beta|BETA) CHANNEL=beta ;; stable|Stable|STABLE) CHANNEL=stable ;; esac
+    say ""
 fi
 
-step "Checking the signature…"
-curl -fsSL -o SHA256SUMS.sig "$BASE/SHA256SUMS.sig" || die "Could not download the signature."
-base64 -d < SHA256SUMS.sig > signature.bin 2>/dev/null || die "The signature is not valid base64."
+# A port has to be a number in range, and the answer to that question arrives
+# from a person typing at three in the morning. A bad one here becomes a service
+# that will not start and a log line about parsing an address.
+case "$PORT" in
+    ''|*[!0-9]*) die "the port must be a number, not \"$PORT\"" ;;
+esac
+[ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || die "the port must be between 1 and 65535"
+# Below 1024 needs a capability the service unit deliberately does not grant.
+[ "$PORT" -ge 1024 ] \
+    || die "ports below 1024 need privileges this service does not have. Put a reverse proxy in front instead."
 
-verified=false
-for key in "${RELEASE_KEYS[@]}"; do
+# What somebody types into a browser, as opposed to what the process binds to.
+IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -n "${IP:-}" ] || IP=localhost
+
+# ============================================================ which release
+#
+# `releases/latest` on Forgejo means the latest *stable* one and skips
+# pre-releases, so on a project whose only tag is a beta it is a 404 with no
+# explanation. The channel is asked for above precisely so that answer can be
+# "the newest thing there is", which is what somebody trying the beta wants.
+if [ -z "$VERSION" ]; then
+    step "Checking for the latest $CHANNEL release..."
+    if [ "$CHANNEL" = beta ]; then
+        VERSION=$(curl -fsSL "$API/releases?limit=1" 2>/dev/null \
+            | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p' | head -1)
+    else
+        VERSION=$(curl -fsSL "$API/releases/latest" 2>/dev/null \
+            | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p' | head -1)
+    fi
+    [ -n "$VERSION" ] \
+        || die "no $CHANNEL release found. Try the beta channel, or set ${ENV_PREFIX}_VERSION."
+fi
+RELEASE="$BASE/download/$VERSION"
+
+# ============================================================ download
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT INT TERM
+
+step "Installing $CHANNEL: $VERSION"
+curl -fsSL "$RELEASE/SHA256SUMS"       -o "$WORK/SHA256SUMS"      || die "cannot reach $RELEASE"
+curl -fsSL "$RELEASE/SHA256SUMS.sig"   -o "$WORK/SHA256SUMS.sig"  || die "the release has no signature"
+curl -fsSL "$RELEASE/$NAME.service"    -o "$WORK/$NAME.service"   || die "the release has no service unit"
+# Bounded: a release binary is tens of megabytes, and an unbounded download from
+# anywhere is a way to fill a disk.
+curl -fsSL --max-filesize 209715200 "$RELEASE/$ARTEFACT" -o "$WORK/$ARTEFACT" \
+    || die "no build for $ARCH in this release"
+
+# ============================================================ verify
+#
+# The order matters: the checksum file is verified first, and only a verified
+# checksum file is allowed to say what the binary should hash to. Downloading
+# the binary first and then asking an unverified file whether it is right proves
+# nothing.
+step "Verifying the signature..."
+[ -n "$RELEASE_KEYS" ] || die "this installer has no release keys compiled in, so it cannot verify
+    anything. That is deliberate: no key does not mean accept anything. Get a newer installer."
+
+command -v openssl >/dev/null 2>&1 \
+    || die "openssl is needed to check the release signature, and is not installed"
+
+# `pkeyutl -rawin` arrived in OpenSSL 3.0. On 1.1.1 there is no command-line way
+# to verify ed25519 at all: without the flag openssl answers "operation not
+# supported for this keytype", and with it, "Option unknown option -rawin".
+# Neither says what is wrong, and both read as though our signature were broken
+# rather than their openssl too old.
+OPENSSL_MAJOR=$(openssl version 2>/dev/null | sed -n 's/^OpenSSL \([0-9]*\).*/\1/p')
+[ -n "$OPENSSL_MAJOR" ] && [ "$OPENSSL_MAJOR" -ge 3 ] || die "openssl 3.0 or newer is required to
+    verify an ed25519 signature; this machine has $(openssl version 2>&1 | head -1).
+    Installing without checking is not something this script will do for you."
+
+base64 -d < "$WORK/SHA256SUMS.sig" > "$WORK/signature.bin" 2>/dev/null \
+    || die "the signature is not valid base64"
+
+VERIFIED=no
+printf '%s\n' "$RELEASE_KEYS" | while IFS= read -r KEY; do
+    [ -n "$KEY" ] || continue
     # An ed25519 public key as a DER SubjectPublicKeyInfo is a fixed 12-byte
-    # prefix followed by the 32 raw bytes, which is what lets openssl read a
-    # key we ship as plain base64.
-    printf 'MCowBQYDK2VwAyEA' > key.b64
-    printf '%s' "$key" | tail -c 44 >> key.b64
-    base64 -d < key.b64 > key.der 2>/dev/null || continue
-    openssl pkey -pubin -inform DER -in key.der -out key.pem 2>/dev/null || continue
-    if openssl pkeyutl -verify -pubin -inkey key.pem -rawin -in SHA256SUMS -sigfile signature.bin >/dev/null 2>&1; then
-        verified=true
+    # prefix followed by the 32 raw bytes, which is what lets openssl read a key
+    # shipped as plain base64.
+    printf '%s' "MCowBQYDK2VwAyEA$KEY" | base64 -d > "$WORK/key.der" 2>/dev/null || continue
+    openssl pkey -pubin -inform DER -in "$WORK/key.der" -out "$WORK/key.pem" 2>/dev/null || continue
+    if openssl pkeyutl -verify -pubin -inkey "$WORK/key.pem" -rawin \
+        -in "$WORK/SHA256SUMS" -sigfile "$WORK/signature.bin" >/dev/null 2>&1; then
+        # The loop is a subshell — a pipeline's last stage is, in every POSIX
+        # shell — so a variable set here does not survive it. The answer leaves
+        # through the filesystem, which does.
+        : > "$WORK/verified"
         break
     fi
 done
-$verified || die "The signature does not match any key this installer knows.
-    Either this release was not signed by us, or something changed it on the way here.
-    Not installing."
-ok "Signed by CodigoSH"
+[ -f "$WORK/verified" ] && VERIFIED=yes
+[ "$VERIFIED" = yes ] \
+    || die "the signature matches no key this installer knows. Either this release was not signed
+    by us, or something changed it on the way here. Not installing."
+done_ "Signed by CodigoSH"
 
-step "Downloading $BINARY…"
-# Bounded: a release binary is tens of megabytes, and an unbounded download from
-# anywhere is a way to fill a disk.
-curl -fsSL --max-filesize 209715200 -o "$BINARY" "$BASE/$BINARY" || die "Download failed."
+step "Verifying the checksums..."
+( cd "$WORK" && grep -E " ($ARTEFACT|$NAME\.service)\$" SHA256SUMS | sha256sum -c - ) >/dev/null 2>&1 \
+    || die "the download does not match its signed checksums. Do not run it."
+done_ "The download is what was signed"
 
-step "Checking the binary against the signed checksums…"
-grep " $BINARY\$" SHA256SUMS > expected.txt || die "$BINARY is not listed in SHA256SUMS."
-sha256sum -c expected.txt >/dev/null 2>&1 || die "The binary does not match its checksum. Not installing."
-ok "The binary is the one that was signed"
+chmod 0755 "$WORK/$ARTEFACT"
+# It has to be able to say what it is before it goes anywhere near a database.
+"$WORK/$ARTEFACT" version >/dev/null 2>&1 \
+    || die "the downloaded binary does not run on this machine. Nothing was installed."
 
-# --- install ---------------------------------------------------------------
-
-UPDATING=false
-[ -f "$SERVICE" ] && UPDATING=true
-
-PORT="${PORT:-8080}"
-if $UPDATING; then
-    PORT=$(sed -n 's/.*LASTHELP_PORT=\([0-9]*\).*/\1/p' "$SERVICE" | head -1)
-    PORT="${PORT:-8080}"
-    step "Updating an existing installation on port $PORT…"
-    systemctl stop lasthelp 2>/dev/null || true
+# ============================================================ the port
+#
+# Reported, never freed. Killing whatever holds the port is an outage caused by
+# an installer on a machine where 8080 is somebody's other service. Saying what
+# has it is enough: the person running this knows what their own machine does.
+if [ "$UPGRADE" = no ] && command -v ss >/dev/null 2>&1 \
+    && ss -ltn "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then
+    step "Port $PORT is already in use..."
+    ss -ltnp "sport = :$PORT" 2>/dev/null | tail -n +2 | sed 's/^/    /' || true
+    die "choose another port, or stop that first. Nothing has been changed."
 fi
 
-id -u "$USER_NAME" >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin "$USER_NAME"
-install -d -o "$USER_NAME" -g "$USER_NAME" -m 750 "$INSTALL_DIR" "$DATA_DIR"
-
-if $UPDATING && [ -f "$DATA_DIR/lasthelp.db" ]; then
-    # Before replacing anything. An update that goes wrong with no backup is an
-    # update nobody can undo.
-    BACKUP="$DATA_DIR/lasthelp.db.before-$TAG"
-    step "Backing up the database to $(basename "$BACKUP")…"
-    cp "$DATA_DIR/lasthelp.db" "$BACKUP"
-    chown "$USER_NAME:$USER_NAME" "$BACKUP"
+# ============================================================ account
+if ! id "$USER_NAME" >/dev/null 2>&1; then
+    step "Creating the $USER_NAME account..."
+    # No login, no home to speak of, no shell. It owns its data directory and
+    # nothing else on the machine.
+    useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin "$USER_NAME" 2>/dev/null \
+        || useradd --system --home-dir "$DATA" --shell /sbin/nologin "$USER_NAME"
 fi
 
-install -m 755 "$BINARY" "$BIN"
-ok "Installed $BIN"
+# The binary's directory belongs to the service, and that is the whole of what
+# makes the built-in updater possible: it replaces the binary by renaming a new
+# one over it, which needs write permission on the *directory*. The unit grants
+# ReadWritePaths on the same directory for the same reason — two halves of one
+# decision, and either one alone is an updater that can only say "permission
+# denied".
+#
+# Running this again repairs an installation that got it wrong: `install -d` on
+# a directory that exists still sets its owner.
+install -d -m 0755 -o root         -g root         "$PREFIX"
+install -d -m 0755 -o "$USER_NAME" -g "$USER_NAME" "$PREFIX/bin"
+install -d -m 0700 -o "$USER_NAME" -g "$USER_NAME" "$DATA"
+install -d -m 0750 -o root         -g "$USER_NAME" "$ETC"
 
-if ! $UPDATING; then
-    cat > "$SERVICE" <<UNIT
-[Unit]
-Description=LastHelp
-Documentation=$REPO_URL
-After=network-online.target
-Wants=network-online.target
+# ============================================================ configuration
+if [ ! -f "$ETC/$NAME.env" ]; then
+    step "Writing the configuration..."
+    cat > "$ETC/$NAME.env" <<CONF
+# $PROJECT configuration. Every setting has a default; these are the ones worth
+# knowing about.
 
-[Service]
-Type=simple
-User=$USER_NAME
-Group=$USER_NAME
-WorkingDirectory=$DATA_DIR
-ExecStart=$BIN
-Restart=on-failure
-RestartSec=5
+${ENV_PREFIX}_PORT=$PORT
+${ENV_PREFIX}_DB_FILE=$DATA/$NAME.db
+# Back this up separately from the database: it decrypts the forge tokens.
+${ENV_PREFIX}_KEY_FILE=$DATA/$NAME.key
 
-Environment="LASTHELP_PORT=$PORT"
-Environment="LASTHELP_DB_FILE=$DATA_DIR/lasthelp.db"
-Environment="LASTHELP_KEY_FILE=$DATA_DIR/lasthelp.key"
+# The address people actually open, through your reverse proxy. Used in the
+# links that go out by mail and in the feeds.
+#${ENV_PREFIX}_PUBLIC_URL=https://help.example.org
+
 # Turn this on only when a reverse proxy really is in front. With it on and no
 # proxy there, a caller chooses the address their requests are attributed to and
 # the rate limits stop meaning anything.
-Environment="LASTHELP_TRUST_PROXY=false"
+${ENV_PREFIX}_TRUST_PROXY=$( [ "$PROXIED" = yes ] && echo true || echo false )
+# How many proxies are in front, when there is more than one.
+#${ENV_PREFIX}_TRUST_PROXY_HOPS=1
 
-NoNewPrivileges=true
-PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=$DATA_DIR
-ProtectKernelTunables=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-LockPersonality=true
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-    systemctl daemon-reload
-    systemctl enable lasthelp >/dev/null 2>&1
-    ok "Service installed"
-fi
-
-systemctl restart lasthelp
-sleep 1
-
-if systemctl is-active --quiet lasthelp; then
-    ok "Running on port $PORT"
+# Mail, for notifying whoever reported something. Without it, nothing is sent
+# and the rest of the product works.
+#${ENV_PREFIX}_SMTP_HOST=smtp.example.org
+#${ENV_PREFIX}_SMTP_PORT=587
+#${ENV_PREFIX}_SMTP_USERNAME=
+#${ENV_PREFIX}_SMTP_PASSWORD=
+#${ENV_PREFIX}_SMTP_FROM=help@example.org
+CONF
+    chmod 0640 "$ETC/$NAME.env"
+    chown root:"$USER_NAME" "$ETC/$NAME.env"
 else
-    die "The service did not start. Look at: journalctl -u lasthelp -n 40"
+    # The one file somebody has edited by hand. Left exactly as it is.
+    step "Keeping the existing configuration..."
 fi
 
-echo
-if $UPDATING; then
-    echo "  Updated to $TAG."
-else
-    echo "  Open http://localhost:$PORT and claim the instance."
-    note "The first account created is the administrator, and setup then refuses to run"
-    note "again — so claim it before this is reachable from the internet."
+# ============================================================ install
+if [ "$UPGRADE" = yes ] && [ -f "$DATA/$NAME.db" ]; then
+    # Before replacing anything. An update that goes wrong with no backup is an
+    # update nobody can undo.
+    BACKUP="$DATA/$NAME.db.before-$VERSION"
+    step "Backing up the database to $(basename "$BACKUP")..."
+    systemctl stop "$NAME" >/dev/null 2>&1 || true
+    cp "$DATA/$NAME.db" "$BACKUP"
+    chown "$USER_NAME:$USER_NAME" "$BACKUP"
 fi
-echo
-note "Data:  $DATA_DIR/lasthelp.db"
-note "Key:   $DATA_DIR/lasthelp.key   (back it up separately from the database)"
-note "Logs:  journalctl -u lasthelp -f"
-echo
+
+step "Installing the binary..."
+# Owned by the service, like the directory holding it. Root-owning the file
+# would buy nothing — anybody who can write the directory can replace the file
+# whatever it says — and this way a fresh install and an updated one look the
+# same on disk.
+install -m 0755 -o "$USER_NAME" -g "$USER_NAME" "$WORK/$ARTEFACT" "$PREFIX/bin/$NAME"
+
+# ============================================================ service
+step "Configuring the service..."
+install -m 0644 "$WORK/$NAME.service" "$UNIT"
+systemctl daemon-reload
+systemctl enable "$NAME" >/dev/null 2>&1
+
+if [ "$UPGRADE" = yes ]; then
+    systemctl restart "$NAME"
+else
+    systemctl start "$NAME"
+fi
+
+# Waited for rather than assumed. "Installed successfully" followed by a service
+# that died on its first line is the worst possible ending.
+sleep 2
+if ! systemctl is-active --quiet "$NAME"; then
+    say ""
+    say "  ${RED}The service did not start. What it said:${OFF}"
+    journalctl -u "$NAME" -n 20 --no-pager || true
+    die "the installation finished and the service is not running"
+fi
+
+# ============================================================ and then
+say ""
+if [ "$UPGRADE" = yes ]; then
+    done_ "Updated to $VERSION."
+    say ""
+    note "Data:   $DATA/$NAME.db"
+    note "Logs:   journalctl -u $NAME -f"
+else
+    done_ "Installation complete."
+    say ""
+    say "  Open ${BLUE}${BOLD}http://$IP:$PORT${OFF} and claim the instance."
+    note "The first account created is the administrator, and setup then refuses to"
+    note "run again — so claim it before this is reachable from the internet."
+    say ""
+    note "Config: $ETC/$NAME.env"
+    note "Data:   $DATA/$NAME.db"
+    note "Key:    $DATA/$NAME.key   (back it up separately from the database)"
+    note "Logs:   journalctl -u $NAME -f"
+fi
+say ""

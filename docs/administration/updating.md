@@ -42,7 +42,7 @@ was.
 ## With the installer
 
 ```sh
-curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo bash
+curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh
 ```
 
 Run it again and it updates: it keeps the port and settings it finds, backs up

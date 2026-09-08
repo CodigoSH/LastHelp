@@ -125,9 +125,13 @@ func TestTheInstallerAndTheBinaryTrustTheSameKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Double quotes in Go, single quotes in the shell: the installer keeps its
+	// keys as a newline-separated string rather than an array, because an array
+	// is bash and that script has to parse under dash and BusyBox.
 	key := regexp.MustCompile(`"([A-Za-z0-9+/]{42,44}=*)"`)
+	shellKey := regexp.MustCompile(`([A-Za-z0-9+/]{43}=)`)
 	inBinary := key.FindAllStringSubmatch(string(goKeys), -1)
-	inInstaller := key.FindAllStringSubmatch(string(installer), -1)
+	inInstaller := shellKey.FindAllStringSubmatch(string(installer), -1)
 
 	if len(inBinary) != len(inInstaller) {
 		t.Errorf("\nthe binary trusts %d release key(s) and install.sh trusts %d\n\n"+

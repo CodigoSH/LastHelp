@@ -57,7 +57,7 @@ forge bridge for GitHub, GitLab, Gitea and Forgejo, installing, and updating in
 place.
 
 Not there yet: **Bitbucket**, and a **stable release** — the only release is a
-prerelease, which is why the installer needs `CHANNEL=beta` below.
+prerelease, which is why the installer needs `LASTHELP_CHANNEL=beta` below.
 
 ---
 
@@ -103,12 +103,12 @@ And no AI. Nothing anybody writes here is sent to a third party — the whole po
 Run this command to install or update LastHelp:
 
 ```bash
-curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo CHANNEL=beta bash
+curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo LASTHELP_CHANNEL=beta sh
 ```
 
-**`CHANNEL=beta` is needed today: there is no stable release yet**, and the installer's default channel only ever picks a stable one, so nobody following the plain command lands on a prerelease by accident.
+**`LASTHELP_CHANNEL=beta` is needed today: there is no stable release yet**, and the installer's default channel only ever picks a stable one, so nobody following the plain command lands on a prerelease by accident.
 
-It verifies the signature over the checksums before anything reaches the disk, installs a systemd service, keeps the database in `/var/lib/lasthelp` and serves on port 8080 unless `PORT` says otherwise. **The first account created is the administrator**: open the address it prints and claim the instance — a server with somebody in it cannot be claimed again.
+It verifies the signature over the checksums before anything reaches the disk, installs a systemd service, keeps the database in `/var/lib/lasthelp` and serves on port 8080 unless you answer otherwise when it asks. **The first account created is the administrator**: open the address it prints and claim the instance — a server with somebody in it cannot be claimed again.
 
 ---
 
