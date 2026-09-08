@@ -780,6 +780,46 @@ async function main() {
     sidebar.publicNavHidden === true,
   );
 
+  // The bar on the chosen row is a join between it and the panel it opened, so
+  // it belongs on the edge where the two meet — and it went on the outer one
+  // first, which nothing here noticed because a bar is a bar in a screenshot.
+  //
+  // Read as geometry and by the logical side, never as left or right: the walk
+  // runs in Arabic further down, where the whole thing is mirrored and an
+  // arithmetic answer in physical pixels is the opposite of the truth.
+  //
+  // And in a window this wide, because the override was cleared a few hundred
+  // lines ago and what is left is whatever size the browser opened at. Below
+  // 52rem the sidebar is a strip across the top and the bar is on its bottom
+  // edge, which is correct there and would have passed this by measuring the
+  // one layout where the mistake cannot appear.
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: 1280, height: 900, deviceScaleFactor: 1, mobile: false,
+  });
+  await sleep(300);
+  const chosenRow = await evaluate(`
+    const side = document.querySelector(".side");
+    const item = document.querySelector('.side-item[aria-current="page"]');
+    const other = document.querySelector('.side-item:not([aria-current="page"])');
+    const style = getComputedStyle(item);
+    const rtl = getComputedStyle(document.documentElement).direction === "rtl";
+    const inner = (el) => rtl ? el.getBoundingClientRect().left : el.getBoundingClientRect().right;
+    return {
+      bar: parseFloat(style.borderInlineEndWidth),
+      outer: parseFloat(style.borderInlineStartWidth),
+      colour: style.borderInlineEndColor,
+      accent: getComputedStyle(document.documentElement).getPropertyValue("--accent").trim(),
+      toEdge: Math.abs(inner(side) - inner(item)),
+      otherToEdge: Math.abs(inner(side) - inner(other)),
+    };`);
+  check(
+    "the chosen row is barred on the side the content is on",
+    chosenRow.bar === 2 && chosenRow.outer === 0 && chosenRow.toEdge <= 2 && chosenRow.otherToEdge > 8,
+    JSON.stringify(chosenRow),
+  );
+  await page.send("Emulation.clearDeviceMetricsOverride");
+  await sleep(200);
+
   // Measured as geometry, not as an attribute. `hidden` applies display:none at
   // the lowest specificity there is, so any class rule with a display of its own
   // beats it — and the element sits in the layout wearing a correct `hidden`.

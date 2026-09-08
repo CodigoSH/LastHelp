@@ -1480,24 +1480,32 @@ body.admin-view > main {
 }
 
 /*
- * The current page, wearing what the house wears: a wash of the accent, a bar
- * of it on the leading edge, and the mark in accent — but the words in the
- * ordinary text colour and the ordinary weight.
+ * The current page, wearing what the house wears: a wash of the accent, the
+ * mark in accent, and a bar of it on the edge that faces the content — not the
+ * outer one. The row also loses its rounding and its margin on that side, so it
+ * runs into the panel it opened rather than floating beside it.
+ *
+ * The side matters and is easy to get backwards: the bar is a join between the
+ * chosen row and what it is showing, so it belongs where they meet.
  *
  * It used to be accent all through, which made the chosen item the loudest
- * thing on the screen and every other one look switched off. This is
- * Lastboard's, in logical properties so the bar changes sides on its own.
+ * thing on the screen and every other one look switched off.
  *
  * aria-current is on it in the markup as well: a colour and a bar are not
  * something a screen reader can hear.
  */
 .side-item[aria-current="page"] {
   /* The house's strength for a chosen row: a little more of it in the dark,
-     where a nine-per-cent wash disappears into the surface. */
+     where a light wash disappears into the surface. */
   background: rgba(var(--accent-rgb), 0.12);
   color: var(--text);
-  border-inline-start: 2px solid var(--accent);
-  padding-inline-start: calc(0.6rem - 2px);
+  border-inline-end: 2px solid var(--accent);
+  /* Out to the sidebar's own edge: the column is padded by 0.9rem. Logical
+     radii rather than the four-value shorthand, which is physical and would
+     square the wrong corners where the line runs the other way. */
+  margin-inline-end: -0.9rem;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
 }
 
 .side-item.sub {
@@ -1599,10 +1607,14 @@ body.admin-view > main {
     white-space: nowrap;
   }
 
+  /* In a strip the content is below, so that is where the bar goes, and the
+     row is rounded again on every corner. */
   .side-item[aria-current="page"] {
-    border-inline-start: 0;
+    border-inline-end: 0;
     border-block-end: 2px solid var(--accent);
-    padding-inline-start: 0.6rem;
+    margin-inline-end: 0;
+    border-start-end-radius: 8px;
+    border-end-end-radius: 8px;
   }
 
   .side-foot {
