@@ -1288,10 +1288,9 @@ async function showPanel(): Promise<void> {
     .catch(() => null);
 
   if (!data) {
-    // Not an administrator. The rest of the panel is still theirs; this one
-    // screen counts the whole installation, which is not.
-    const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
-    await showInShell(views.panelHome(organizations ?? [], text), "/panel");
+    // Not an administrator. The numbers count the whole installation, which is
+    // not theirs to see; the places they were given a role in are.
+    await showInShell(views.memberHome(me?.memberships ?? [], text), "/panel");
     return;
   }
   await showInShell(views.overviewScreen(data, text), "/panel");

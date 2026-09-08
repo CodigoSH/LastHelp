@@ -104,26 +104,43 @@ export function repositoryList(
  * offer no way to set anything up: the only path was curl. A screen that names
  * a problem it cannot help with reads as broken rather than as empty.
  */
-export function panelHome(orgs: OrganizationSummary[], text: Text): string {
-  const list =
-    orgs.length === 0
-      ? `<p class="empty">${escapeHTML(text.t("panel.firstStep"))}</p>`
-      : `<ul class="cards">${orgs
-          .map(
-            (o) => `<li><a class="card" href="/panel/${escapeAttr(o.slug)}">
-              <span class="card-title">${escapeHTML(o.name)}</span>
-              <span class="card-sub">/${escapeHTML(o.slug)}</span>
-            </a></li>`,
-          )
-          .join("")}</ul>`;
+/**
+ * The panel's front page for somebody who is not an administrator.
+ *
+ * Their world is the places they were given a role in, so that is what it
+ * shows: a card each, going straight to the queue, which is the screen they
+ * actually came for. It used to be the administrator's page with the numbers
+ * missing and an "add an organisation" button that would have been refused —
+ * an item you can see and cannot use is worse than one that was never there.
+ */
+export function memberHome(
+  memberships: { scope: string; role: string; organization?: string; repository?: string; name?: string }[],
+  text: Text,
+): string {
+  if (memberships.length === 0) {
+    return `<h1>${escapeHTML(text.t("shell.overview"))}</h1>
+      <p class="empty">${escapeHTML(text.t("overview.noRoles"))}</p>`;
+  }
 
-  return `
-    <h1>${escapeHTML(text.t("nav.panel"))}</h1>
-    ${list}
-    <p class="head-actions">
-      <a class="button primary" href="/panel/new">${escapeHTML(text.t("panel.newOrganization"))}</a>
-    </p>`;
+  const cards = memberships
+    .map((m) => {
+      const href = m.repository
+        ? `/${m.organization}/${m.repository}/queue`
+        : `/panel/${m.organization}`;
+      return `<li class="bento-card">
+        <a class="card-link" href="${escapeAttr(href)}">
+          <div class="card-head">${m.repository ? icons.repository() : icons.organization()}<h3>${escapeHTML(m.name ?? "")}</h3></div>
+          <span class="card-sub"><span class="tag">${escapeHTML(text.t(`role.${m.role}`))}</span></span>
+        </a>
+      </li>`;
+    })
+    .join("");
+
+  return `<h1>${escapeHTML(text.t("shell.overview"))}</h1>
+    <p class="lead">${escapeHTML(text.t("overview.memberLead"))}</p>
+    <ul class="bento">${cards}</ul>`;
 }
+
 
 /** The forge choices, in the order somebody is likely to recognise them. */
 export function forgeOptions(text: Text): [string, string][] {
@@ -1155,7 +1172,11 @@ export function overviewScreen(
       : `<li><div class="stat">${inner}</div></li>`;
   };
 
-  const bars = (title: string, counts: Record<string, number>, keyPrefix: string) => {
+  // The label comes in as a function rather than as a prefix to glue a key
+  // together from. A key built out of a variable is a key no search can follow,
+  // and the scan that finds strings nobody uses reported all four moderation
+  // states as dead while the screen was drawing them.
+  const bars = (title: string, counts: Record<string, number>, label: (key: string) => string) => {
     const entries = Object.entries(counts).filter(([, n]) => n > 0);
     if (entries.length === 0) return "";
     const most = Math.max(...entries.map(([, n]) => n));
@@ -1164,7 +1185,7 @@ export function overviewScreen(
         .sort((a, b) => b[1] - a[1])
         .map(
           ([key, n]) => `<div class="bar-row">
-            <span>${escapeHTML(text.t(`${keyPrefix}${key}`))}</span>
+            <span>${escapeHTML(label(key))}</span>
             <span class="bar-track"><span class="bar-fill" style="inline-size: ${Math.round((n / most) * 100)}%"></span></span>
             <span class="count">${escapeHTML(text.number(n))}</span>
           </div>`,
@@ -1189,9 +1210,9 @@ export function overviewScreen(
       ${stat(data.people, text.t("shell.people"), icons.people(), "/panel/people")}
     </ul>
 
-    ${bars(text.t("overview.byKind"), data.kinds, "kind.")}
-    ${bars(text.t("overview.byStatus"), data.statuses, "status.")}
-    ${bars(text.t("overview.byModeration"), data.moderation, "moderation.")}
+    ${bars(text.t("overview.byKind"), data.kinds, (k) => text.t(`kind.${k}`))}
+    ${bars(text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`))}
+    ${bars(text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`))}
 
     ${
       data.last_report > 0

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/session"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
@@ -140,12 +141,26 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 
 	memberships := make([]map[string]any, 0, len(actor.Memberships))
 	for _, m := range actor.Memberships {
-		memberships = append(memberships, map[string]any{
-			"scope":  string(m.Scope.Kind),
-			"id":     m.Scope.ID,
-			"org_id": m.Scope.OrgID,
-			"role":   string(m.Role),
-		})
+		// The place, by the name the screens use. Without this the panel knows
+		// somebody may triage repository 4 and has no way to turn that into a
+		// link — so the one screen a collaborator needs cannot be drawn.
+		entry := map[string]any{"scope": string(m.Scope.Kind), "role": string(m.Role)}
+		switch m.Scope.Kind {
+		case authz.ScopeOrganization:
+			if o, err := s.orgs().OrganizationByID(m.Scope.ID); err == nil {
+				entry["organization"] = o.Slug
+				entry["name"] = o.Name
+			}
+		case authz.ScopeRepository:
+			if repo, err := s.orgs().RepositoryByID(m.Scope.ID); err == nil {
+				entry["repository"] = repo.Slug
+				entry["name"] = repo.Name
+				if o, err := s.orgs().OrganizationByID(m.Scope.OrgID); err == nil {
+					entry["organization"] = o.Slug
+				}
+			}
+		}
+		memberships = append(memberships, entry)
 	}
 	// The wire format deliberately does not repeat the role vocabulary. If a
 	// role is ever renamed, a key spelled out here would quietly become stale —

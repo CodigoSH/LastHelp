@@ -55,6 +55,8 @@ overview.byStatus
 overview.emptyLead
 overview.lastReport
 overview.lead
+overview.memberLead
+overview.noRoles
 overview.published
 overview.reports
 overview.votes
@@ -98,8 +100,6 @@ profile.pictureClear
 repo.lead
 role.collaborator
 role.owner
-scope.org
-scope.repo
 setup.choosePicture
 setup.doneNext
 setup.instanceLead

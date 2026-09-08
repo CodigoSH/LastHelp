@@ -83,7 +83,14 @@ export interface Me {
   name?: string;
   avatar?: string;
   admin: boolean;
-  memberships: Array<{ scope: string; id: number; org_id: number; role: string }>;
+  memberships: Array<{
+    scope: string;
+    role: string;
+    /** The slug of the organisation, and of the repository when it is one. */
+    organization?: string;
+    repository?: string;
+    name?: string;
+  }>;
 }
 
 export interface OrganizationSummary {

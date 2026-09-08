@@ -516,6 +516,47 @@ async function main() {
   check("the layout mirrored", mirrored === true);
 
   // 14. Nothing exploded along the way.
+  // 12. The other account. Every check above ran as the administrator, which is
+  //     the comfortable one: it can reach everything, so none of them ever saw
+  //     what somebody with one role sees. A collaborator's panel is most of the
+  //     product for most of the people who will ever use it.
+  await evaluate(`
+    localStorage.setItem("lasthelp_lang", "en");
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const post = (path, body) => fetch(path, { method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify(body) }).then(r => r.json());
+
+    await post("/api/people", { username: "ana", display_name: "Ana", password: "una contraseña larga de verdad" });
+    const people = await fetch("/api/people").then(r => r.json());
+    const ana = people.people.find(p => p.username === "ana");
+    await post("/api/people/" + ana.id + "/grants",
+      { organization: "codigosh", repository: "lastboard", role: "collaborator" });
+    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+    await post("/api/session", { username: "ana", password: "una contraseña larga de verdad" });
+  `);
+  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1400);
+
+  const collaborator = await evaluate(`
+    return {
+      groups: [...document.querySelectorAll(".side-label")].map(e => e.textContent.trim()),
+      items: [...document.querySelectorAll(".side-item")].map(e => e.textContent.trim()),
+      cards: [...document.querySelectorAll(".admin-main .bento-card h3")].map(e => e.textContent.trim()),
+      offersToAdd: !!document.querySelector("[data-open-modal]"),
+    };`);
+  check(
+    "a collaborator's panel shows the places they were given",
+    JSON.stringify(collaborator.cards) === '["Lastboard"]',
+    JSON.stringify(collaborator.cards),
+  );
+  check(
+    "and offers nothing they would be refused",
+    collaborator.groups.length === 2 && collaborator.offersToAdd === false,
+    `${collaborator.groups.join(" · ")} — ${collaborator.items.join(", ")}`,
+  );
+
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
   await fetch(`http://127.0.0.1:${CDP}/json/close/${t.id}`);
