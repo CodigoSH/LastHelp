@@ -93,6 +93,85 @@ func (s *Server) handleChangeProfile(w http.ResponseWriter, r *http.Request) {
 
 const maxDisplayNameLength = 60
 
+// maxDashboardBytes bounds a value the browser composes. The layout is a short
+// list of card names; anything approaching this is not a layout.
+const maxDashboardBytes = 4 << 10
+
+type dashboardChange struct {
+	// Cards is the visible cards, in the order they are shown. Absent names are
+	// hidden, which is why the whole list is sent rather than a diff: a diff
+	// needs both sides to agree on what exists, and the two sides are a browser
+	// and a server that ship separately.
+	Cards []string `json:"cards"`
+}
+
+// handleGetDashboard answers with the layout this account arranged.
+func (s *Server) handleGetDashboard(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "error.unauthorized")
+		return
+	}
+	layout, err := s.accounts().Dashboard(actor.UserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if layout == "" {
+		// Never arranged one. The screen knows its own default order, and
+		// inventing one here would be a second place that has to be kept in
+		// step with it.
+		writeJSON(w, http.StatusOK, map[string]any{"cards": nil})
+		return
+	}
+	var out dashboardChange
+	if err := json.Unmarshal([]byte(layout), &out); err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"cards": nil})
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// handleSetDashboard stores it.
+func (s *Server) handleSetDashboard(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "error.unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxDashboardBytes)
+	var in dashboardChange
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	// Stored as it arrived, after being parsed: the names are the browser's own
+	// vocabulary and the server has no opinion about which cards exist. What it
+	// does have an opinion about is the size and the shape.
+	if len(in.Cards) > 64 {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	for _, card := range in.Cards {
+		if len(card) > 40 {
+			writeError(w, http.StatusBadRequest, "error.bad_request")
+			return
+		}
+	}
+
+	encoded, err := json.Marshal(in)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if err := s.accounts().SetDashboard(actor.UserID, string(encoded)); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, in)
+}
+
 // maxAvatarBytes bounds a picture that is stored in a row and sent with every
 // listing of people. Bigger than this is a file, and a file is a thing to
 // serve, cache and back up separately.

@@ -516,6 +516,57 @@ async function main() {
   check("the layout mirrored", mirrored === true);
 
   // 14. Nothing exploded along the way.
+  // 11b. The dashboard, arranged. It is the one screen somebody sees every day,
+  //      so it is the one worth being able to change — and a saved arrangement
+  //      that does not survive the next visit is worse than none.
+  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1300);
+
+  const dashboard = await evaluate(`
+    const before = [...document.querySelectorAll("[data-card]")].map(c => c.dataset.card);
+    const draggableWhileReading = document.querySelectorAll("[data-card][draggable=true]").length;
+
+    document.querySelector("[data-edit-dash]").click();
+    await new Promise(r => setTimeout(r, 900));
+    const draggableWhileEditing = document.querySelectorAll("[data-card][draggable=true]").length;
+
+    // Drag the first card past the last one, the way a pointer would.
+    const list = document.querySelector(".dashboard");
+    const cards = [...list.querySelectorAll("[data-card]")];
+    const first = cards[0], last = cards[cards.length - 1];
+    const dt = new DataTransfer();
+    first.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+    const box = last.getBoundingClientRect();
+    last.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer: dt, clientY: box.bottom - 2 }));
+    list.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer: dt }));
+    await new Promise(r => setTimeout(r, 1200));
+
+    const saved = (await (await fetch("/api/me/dashboard")).json()).cards;
+    return { before, draggableWhileReading, draggableWhileEditing, saved };
+  `);
+
+  check(
+    "the dashboard is not draggable until you say so",
+    dashboard.draggableWhileReading === 0 && dashboard.draggableWhileEditing > 0,
+    `${dashboard.draggableWhileReading} reading, ${dashboard.draggableWhileEditing} editing`,
+  );
+  check(
+    "a card dragged to the end stays there",
+    dashboard.saved?.[dashboard.saved.length - 1] === dashboard.before[0],
+    `${dashboard.before[0]} → last of ${JSON.stringify(dashboard.saved)}`,
+  );
+
+  const hidden = await evaluate(`
+    document.querySelector("[data-hide]").click();
+    await new Promise(r => setTimeout(r, 1200));
+    return (await (await fetch("/api/me/dashboard")).json()).cards;
+  `);
+  check(
+    "and a card hidden is remembered",
+    Array.isArray(hidden) && hidden.length === dashboard.saved.length - 1,
+    `${dashboard.saved.length} → ${hidden.length}`,
+  );
+
   // 12. The other account. Every check above ran as the administrator, which is
   //     the comfortable one: it can reach everything, so none of them ever saw
   //     what somebody with one role sees. A collaborator's panel is most of the

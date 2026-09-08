@@ -1206,77 +1206,160 @@ export function avatar(name: string, src?: string, big = false): string {
  * so a portal that has been useful for two years opens as fast as one installed
  * this morning.
  */
+/**
+ * Every card the overview can show, in the order it shows them by default.
+ *
+ * Named rather than numbered, because the layout an account saves is a list of
+ * these names: a number would mean the order in this array is part of the wire
+ * format, and reordering the default would silently rearrange everybody's
+ * saved dashboard.
+ */
+export const overviewCards = [
+  "reports",
+  "waiting",
+  "published",
+  "votes",
+  "organizations",
+  "repositories",
+  "people",
+  "kinds",
+  "statuses",
+  "moderation",
+  "recent",
+] as const;
+
+export type OverviewCard = (typeof overviewCards)[number];
+
+export interface OverviewData {
+  organizations: number;
+  repositories: number;
+  people: number;
+  pending: number;
+  published: number;
+  votes: number;
+  kinds: Record<string, number>;
+  statuses: Record<string, number>;
+  moderation: Record<string, number>;
+  last_report: number;
+}
+
+/**
+ * The front page of the panel, arranged by whoever is looking at it.
+ *
+ * The cards are dragged with the browser's own drag and drop rather than with
+ * pointer maths, which is what this house already does elsewhere: it carries
+ * the drag image, the drop effect and the keyboard's idea of a grab for free.
+ * It is only turned on while editing — a page whose contents move when you
+ * meant to click one is worse than one that cannot be arranged at all — and it
+ * stays off on touch, where the same gesture is how you scroll.
+ */
 export function overviewScreen(
-  data: {
-    organizations: number;
-    repositories: number;
-    people: number;
-    pending: number;
-    published: number;
-    votes: number;
-    kinds: Record<string, number>;
-    statuses: Record<string, number>;
-    moderation: Record<string, number>;
-    last_report: number;
-  },
+  data: OverviewData,
+  layout: OverviewCard[],
+  editing: boolean,
   text: Text,
 ): string {
-  const stat = (value: number, label: string, icon: string, href?: string) => {
-    const inner = `<span class="value">${escapeHTML(text.number(value))}</span>
+  const number = (value: number) => escapeHTML(text.number(value));
+
+  const stat = (id: string, value: number, label: string, icon: string, href?: string) => {
+    const inner = `<span class="value">${number(value)}</span>
       <span class="label">${icon}${escapeHTML(label)}</span>`;
-    // Always <li> outside and the card inside, whether the card is a link or
-    // not. Two different shapes meant one of them lost its box the moment the
-    // list learned to get out of the way of the other.
-    return href
-      ? `<li><a class="stat" href="${escapeAttr(href)}">${inner}</a></li>`
-      : `<li><div class="stat">${inner}</div></li>`;
+    return card(
+      id,
+      href && !editing
+        ? `<a class="stat" href="${escapeAttr(href)}">${inner}</a>`
+        : `<div class="stat">${inner}</div>`,
+      "narrow",
+    );
   };
 
-  // The label comes in as a function rather than as a prefix to glue a key
-  // together from. A key built out of a variable is a key no search can follow,
-  // and the scan that finds strings nobody uses reported all four moderation
-  // states as dead while the screen was drawing them.
-  const bars = (title: string, counts: Record<string, number>, label: (key: string) => string) => {
+  const bars = (id: string, title: string, counts: Record<string, number>, label: (key: string) => string) => {
     const entries = Object.entries(counts).filter(([, n]) => n > 0);
-    if (entries.length === 0) return "";
-    const most = Math.max(...entries.map(([, n]) => n));
-    return `<h2>${escapeHTML(title)}</h2>
-      <div class="bars">${entries
-        .sort((a, b) => b[1] - a[1])
-        .map(
-          ([key, n]) => `<div class="bar-row">
-            <span>${escapeHTML(label(key))}</span>
-            <span class="bar-track"><span class="bar-fill" style="inline-size: ${Math.round((n / most) * 100)}%"></span></span>
-            <span class="count">${escapeHTML(text.number(n))}</span>
-          </div>`,
-        )
-        .join("")}</div>`;
+    const body =
+      entries.length === 0
+        ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
+        : `<div class="bars">${entries
+            .sort((a, b) => b[1] - a[1])
+            .map(([key, n]) => {
+              const most = Math.max(...entries.map(([, count]) => count));
+              return `<div class="bar-row">
+                <span>${escapeHTML(label(key))}</span>
+                <span class="bar-track"><span class="bar-fill" style="inline-size: ${Math.round((n / most) * 100)}%"></span></span>
+                <span class="count">${number(n)}</span>
+              </div>`;
+            })
+            .join("")}</div>`;
+    return card(id, `<h3>${escapeHTML(title)}</h3>${body}`, "wide");
   };
+
+  function card(id: string, body: string, size: string): string {
+    return `<li class="dash-card ${size}" data-card="${escapeAttr(id)}"${editing ? ' draggable="true"' : ""}>
+      ${
+        editing
+          ? `<div class="dash-tools">
+               <span class="grip" aria-hidden="true">${icons.grip()}</span>
+               ${iconButton("remove", text.t("overview.hide"), `class="icon-button danger" data-hide="${escapeAttr(id)}"`)}
+             </div>`
+          : ""
+      }
+      ${body}
+    </li>`;
+  }
 
   const total = Object.values(data.kinds).reduce((a, b) => a + b, 0);
 
-  return `<h1>${escapeHTML(text.t("shell.overview"))}</h1>
+  const all: Record<OverviewCard, string> = {
+    reports: stat("reports", total, text.t("overview.reports"), icons.repository()),
+    waiting: stat("waiting", data.pending, text.t("panel.queue"), icons.queue()),
+    published: stat("published", data.published, text.t("overview.published"), icons.check()),
+    votes: stat("votes", data.votes, text.t("overview.votes"), icons.idea()),
+    organizations: stat("organizations", data.organizations, text.t("shell.organizations"), icons.organization(), "/panel/organizations"),
+    repositories: stat("repositories", data.repositories, text.t("portal.boards"), icons.repository(), "/panel/organizations"),
+    people: stat("people", data.people, text.t("shell.people"), icons.people(), "/panel/people"),
+    kinds: bars("kinds", text.t("overview.byKind"), data.kinds, (k) => text.t(`kind.${k}`)),
+    statuses: bars("statuses", text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`)),
+    moderation: bars("moderation", text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`)),
+    recent: card(
+      "recent",
+      `<h3>${escapeHTML(text.t("overview.recent"))}</h3>
+       <p class="lead">${escapeHTML(
+         data.last_report > 0 ? text.date(data.last_report) : text.t("overview.nothingYet"),
+       )}</p>`,
+      "narrow",
+    ),
+  };
+
+  const hidden = overviewCards.filter((name) => !layout.includes(name));
+
+  return `<div class="screen-head">
+      <h1>${escapeHTML(text.t("shell.overview"))}</h1>
+      ${
+        editing
+          ? actionButton("check", text.t("overview.done"), "data-edit-done", "primary")
+          : actionButton("edit", text.t("overview.arrange"), "data-edit-dash")
+      }
+    </div>
     <p class="lead">${escapeHTML(
-      total === 0 ? text.t("overview.emptyLead") : text.t("overview.lead"),
+      editing
+        ? text.t("overview.arrangeHelp")
+        : total === 0
+          ? text.t("overview.emptyLead")
+          : text.t("overview.lead"),
     )}</p>
 
-    <ul class="stats">
-      ${stat(total, text.t("overview.reports"), icons.repository())}
-      ${stat(data.pending, text.t("panel.queue"), icons.queue())}
-      ${stat(data.published, text.t("overview.published"), icons.check())}
-      ${stat(data.votes, text.t("overview.votes"), icons.idea())}
-      ${stat(data.organizations, text.t("shell.organizations"), icons.organization(), "/panel/organizations")}
-      ${stat(data.repositories, text.t("portal.boards"), icons.repository(), "/panel/organizations")}
-      ${stat(data.people, text.t("shell.people"), icons.people(), "/panel/people")}
+    <ul class="dashboard${editing ? " editing" : ""}">
+      ${layout.map((name) => all[name]).join("")}
     </ul>
 
-    ${bars(text.t("overview.byKind"), data.kinds, (k) => text.t(`kind.${k}`))}
-    ${bars(text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`))}
-    ${bars(text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`))}
-
     ${
-      data.last_report > 0
-        ? `<p class="hint">${escapeHTML(text.t("overview.lastReport", { when: text.date(data.last_report) }))}</p>`
+      editing && hidden.length > 0
+        ? `<h2>${escapeHTML(text.t("overview.hidden"))}</h2>
+           <p class="choices">${hidden
+             .map(
+               (name) =>
+                 `<button type="button" class="button ghost with-icon" data-show="${escapeAttr(name)}">${icons.add()}<span>${escapeHTML(text.t(`overview.card.${name}`))}</span></button>`,
+             )
+             .join("")}</p>`
         : ""
     }`;
 }
@@ -1418,7 +1501,11 @@ export function personalizationScreen(
 }
 
 /** The organisations, as cards. */
-export function organizationsScreen(orgs: OrganizationSummary[], canManage: boolean, text: Text): string {
+export function organizationsScreen(
+  orgs: OrganizationSummary[],
+  may: { canAdd: boolean; canManage: (slug: string) => boolean; canDelete: boolean },
+  text: Text,
+): string {
   const cards = orgs
     .map(
       (o) => `<li class="bento-card">
@@ -1427,10 +1514,10 @@ export function organizationsScreen(orgs: OrganizationSummary[], canManage: bool
           <span class="card-sub">/${escapeHTML(o.slug)}</span>
         </a>
         ${
-          canManage
+          may.canManage(o.slug)
             ? `<div class="card-actions">
                  ${iconButton("edit", text.t("action.edit"), `data-edit-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
-                 ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
+                 ${may.canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`) : ""}
                </div>`
             : ""
         }
@@ -1440,7 +1527,7 @@ export function organizationsScreen(orgs: OrganizationSummary[], canManage: bool
 
   return `<div class="screen-head">
       <h1>${escapeHTML(text.t("shell.organizations"))}</h1>
-      ${canManage ? actionButton("add", text.t("panel.newOrganization"), 'data-add-org data-open-modal="org-modal"', "primary") : ""}
+      ${may.canAdd ? actionButton("add", text.t("panel.newOrganization"), 'data-add-org data-open-modal="org-modal"', "primary") : ""}
     </div>
     <p class="lead">${escapeHTML(text.t("organizations.lead"))}</p>
     ${orgs.length === 0 ? `<p class="empty">${escapeHTML(text.t("panel.firstStep"))}</p>` : `<ul class="bento">${cards}</ul>`}`;
@@ -1451,6 +1538,8 @@ export function organizationScreen(
   org: OrganizationSummary & { forge?: string },
   repos: RepositorySummary[],
   canManage: boolean,
+  /** Deleting a repository ends every report in it, so it is the server's. */
+  canDelete: boolean,
   text: Text,
 ): string {
   const cards = repos
@@ -1471,7 +1560,7 @@ export function organizationScreen(
             ? `<div class="card-actions">
                  ${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
                  ${iconButton("edit", text.t("action.edit"), `data-edit-repo="${escapeAttr(r.slug)}"`)}
-                 ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`)}
+                 ${canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}
                </div>`
             : ""
         }

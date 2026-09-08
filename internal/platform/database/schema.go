@@ -61,6 +61,7 @@ var migrations = []migration{
 				is_administrator INTEGER NOT NULL DEFAULT 0,
 				disabled         INTEGER NOT NULL DEFAULT 0,
 				avatar           TEXT    NOT NULL DEFAULT '',
+				dashboard        TEXT    NOT NULL DEFAULT '',
 				created_at       INTEGER NOT NULL
 			)`,
 
@@ -292,6 +293,17 @@ var migrations = []migration{
 		stmts: []string{},
 		fn: func(tx *sql.Tx) error {
 			return addColumn(tx, "app_user", "avatar", "TEXT NOT NULL DEFAULT ''")
+		},
+	},
+	{
+		version: 5,
+		name:    "an account keeps its own dashboard",
+		// The order and the visibility of the overview's cards, as JSON. Per
+		// account rather than per browser: somebody who arranges their dashboard
+		// on a desktop and opens it on a laptop has not arranged anything if it
+		// lives in localStorage.
+		fn: func(tx *sql.Tx) error {
+			return addColumn(tx, "app_user", "dashboard", "TEXT NOT NULL DEFAULT ''")
 		},
 	},
 }

@@ -376,3 +376,28 @@ func (s Store) SetAvatar(userID int64, dataURL string) error {
 	}
 	return nil
 }
+
+// Dashboard reads the layout this account arranged for itself.
+//
+// Empty means "never arranged one", which is not the same as an empty
+// dashboard: the screen falls back to its default order, and an account that
+// has hidden every card stores that explicitly.
+func (s Store) Dashboard(userID int64) (string, error) {
+	var layout string
+	err := s.DB.QueryRow(`SELECT dashboard FROM app_user WHERE id = ?`, userID).Scan(&layout)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", ErrNotFound
+	case err != nil:
+		return "", fmt.Errorf("reading the dashboard: %w", err)
+	}
+	return layout, nil
+}
+
+// SetDashboard stores it.
+func (s Store) SetDashboard(userID int64, layout string) error {
+	if _, err := s.DB.Exec(`UPDATE app_user SET dashboard = ? WHERE id = ?`, layout, userID); err != nil {
+		return fmt.Errorf("storing the dashboard: %w", err)
+	}
+	return nil
+}

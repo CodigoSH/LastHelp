@@ -1516,3 +1516,98 @@ body > nav .brand {
   align-items: center;
   gap: 0.5rem;
 }
+
+/* ------------------------------------------------------------- the dashboard */
+
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.85rem;
+  margin: 1.25rem 0 2rem;
+  padding: 0;
+  list-style: none;
+  align-items: start;
+}
+
+.dash-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: var(--surface);
+  padding: 0;
+  overflow: hidden;
+}
+
+.dash-card.wide {
+  grid-column: span 2;
+}
+
+@media (min-width: 60rem) {
+  .dash-card.wide {
+    grid-column: span 3;
+  }
+}
+
+.dash-card > h3 {
+  margin: 1rem 1.1rem 0.25rem;
+  font-size: 1rem;
+}
+
+.dash-card .bars,
+.dash-card .hint {
+  margin: 0.5rem 1.1rem 1.1rem;
+}
+
+.dash-card .lead {
+  margin: 0 1.1rem 1.1rem;
+}
+
+/* The stat fills its card rather than drawing a second border inside it. */
+.dash-card .stat {
+  display: block;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  block-size: 100%;
+}
+
+/* While arranging: a grab cursor, the grip, and a way to take a card out. */
+.dashboard.editing .dash-card {
+  cursor: grab;
+  border-style: dashed;
+}
+
+.dashboard.editing .dash-card:active {
+  cursor: grabbing;
+}
+
+.dash-card.dragging {
+  opacity: 0.45;
+  border-color: var(--accent);
+}
+
+.dash-tools {
+  position: absolute;
+  inset-block-start: 0.35rem;
+  inset-inline-end: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  z-index: 1;
+}
+
+.dash-tools .grip {
+  color: var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.5rem;
+}
+
+/* Touch: the same gesture is how the page scrolls, so cards are not draggable
+   there and the tools are all there is. Said in CSS as well as in the script,
+   because a card that looks draggable and is not is a card people fight. */
+@media (hover: none) {
+  .dashboard.editing .dash-card {
+    cursor: default;
+  }
+}

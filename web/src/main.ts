@@ -284,6 +284,27 @@ function onSubmit(selector: string, handler: (data: FormData) => Promise<void>):
   });
 }
 
+/**
+ * What this account may do here, asked of its memberships rather than of a flag.
+ *
+ * The screens used to check `admin`, which is stricter than the rules: an owner
+ * may create repositories in their organisation, rename it and store its token,
+ * and the panel offered none of it. A screen that hides what the server would
+ * allow is as wrong as one that offers what it would refuse — the difference is
+ * only which of the two you find out about.
+ */
+function ownsOrganization(slug: string): boolean {
+  if (me?.admin === true) return true;
+  return (me?.memberships ?? []).some(
+    (m) => m.role === "owner" && m.scope === "org" && m.organization === slug,
+  );
+}
+
+/** Ending an organisation is the server's, not its owner's. */
+function isAdministrator(): boolean {
+  return me?.admin === true;
+}
+
 /** Signed in, or sent to the door. Every panel screen starts here. */
 async function requirePanel(): Promise<boolean> {
   me = await api.get<Me>("/api/me").catch(() => null);
@@ -1302,17 +1323,107 @@ async function showPanel(): Promise<void> {
     await showInShell(views.memberHome(me?.memberships ?? [], text), "/panel");
     return;
   }
-  await showInShell(views.overviewScreen(data, text), "/panel");
+  // The order this account arranged, or the one the screen ships with. A saved
+  // layout is filtered against what exists, so a card removed in a later
+  // version disappears instead of leaving a hole.
+  const saved = await api.get<{ cards: string[] | null }>("/api/me/dashboard").catch(() => null);
+  const layout = (saved?.cards ?? views.overviewCards).filter((name): name is views.OverviewCard =>
+    (views.overviewCards as readonly string[]).includes(name),
+  );
+
+  await showInShell(views.overviewScreen(data, layout, arrangingDashboard, text), "/panel");
+  wireDashboard(layout);
+}
+
+/** True while the dashboard is being rearranged rather than read. */
+let arrangingDashboard = false;
+
+/**
+ * Dragging, hiding and showing the cards.
+ *
+ * The browser's own drag and drop, which is what this house uses elsewhere: it
+ * carries the drag image and the drop effect without being asked. Only while
+ * editing — a page whose contents move when you meant to click one is worse
+ * than one that cannot be arranged — and never on touch, where the same gesture
+ * is how the page scrolls.
+ */
+function wireDashboard(layout: views.OverviewCard[]): void {
+  const save = async (cards: string[]) => {
+    await api.post("/api/me/dashboard", { cards }).catch(showFormError);
+    await render();
+  };
+
+  root?.querySelector<HTMLButtonElement>("[data-edit-dash]")?.addEventListener("click", () => {
+    arrangingDashboard = true;
+    void render();
+  });
+  root?.querySelector<HTMLButtonElement>("[data-edit-done]")?.addEventListener("click", () => {
+    arrangingDashboard = false;
+    void render();
+  });
+  root?.querySelectorAll<HTMLButtonElement>("[data-hide]").forEach((button) =>
+    button.addEventListener("click", () =>
+      save(layout.filter((name) => name !== button.dataset.hide)),
+    ),
+  );
+  root?.querySelectorAll<HTMLButtonElement>("[data-show]").forEach((button) =>
+    button.addEventListener("click", () => save([...layout, button.dataset.show ?? ""])),
+  );
+
+  if (!arrangingDashboard) return;
+  const list = root?.querySelector<HTMLUListElement>(".dashboard");
+  if (!list) return;
+
+  let dragging: HTMLLIElement | null = null;
+
+  list.addEventListener("dragstart", (event) => {
+    const card = (event.target as HTMLElement).closest<HTMLLIElement>("[data-card]");
+    if (!card) return;
+    dragging = card;
+    card.classList.add("dragging");
+    event.dataTransfer?.setData("text/plain", card.dataset.card ?? "");
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+  });
+
+  list.addEventListener("dragend", () => {
+    dragging?.classList.remove("dragging");
+    dragging = null;
+  });
+
+  list.addEventListener("dragover", (event) => {
+    if (!dragging) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+
+    // The card the pointer is over, and which half of it. Inserting before or
+    // after depending on the half is what stops a card flickering between two
+    // places while the pointer sits still on the boundary.
+    const over = (event.target as HTMLElement).closest<HTMLLIElement>("[data-card]");
+    if (!over || over === dragging) return;
+    const box = over.getBoundingClientRect();
+    const after = event.clientY - box.top > box.height / 2;
+    over.parentElement?.insertBefore(dragging, after ? over.nextSibling : over);
+  });
+
+  list.addEventListener("drop", (event) => {
+    event.preventDefault();
+    void save(
+      [...list.querySelectorAll<HTMLLIElement>("[data-card]")].map((card) => card.dataset.card ?? ""),
+    );
+  });
 }
 
 /** The organisations, as cards, with the way to add one. */
 async function showOrganizationsPanel(): Promise<void> {
   if (!(await requirePanel())) return;
   const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
-  const canManage = me?.admin === true;
 
   await showInShell(
-    views.organizationsScreen(organizations ?? [], canManage, text) +
+    views.organizationsScreen(
+      organizations ?? [],
+      { canAdd: isAdministrator(), canManage: ownsOrganization, canDelete: isAdministrator() },
+      text,
+    ) +
       views.modal(
         {
           id: "org-modal",
@@ -1497,12 +1608,15 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
     repositories: RepositorySummary[];
   }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
   const repos = body.repositories ?? [];
-  const canManage = me?.admin === true;
+  const canManage = ownsOrganization(orgSlug);
   const forge = body.organization.forge ?? "none";
 
   await showInShell(
-    views.organizationScreen(body.organization, repos, canManage, text) +
-      views.connectionForms(body.organization, repos, location.origin, text) +
+    views.organizationScreen(body.organization, repos, canManage, isAdministrator(), text) +
+      // The token and the channel belong to whoever runs the organisation. A
+      // collaborator triages without ever being able to answer "what is the
+      // token", which is the whole reason the two roles exist.
+      (canManage ? views.connectionForms(body.organization, repos, location.origin, text) : "") +
       views.modal(
         {
           id: "repo-modal",

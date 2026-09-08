@@ -113,6 +113,13 @@ export const icons = {
        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>`,
       s,
     ),
+  // The grip. Six dots is the shape everything that can be dragged wears, and
+  // borrowing it means nobody has to be told what it is.
+  grip: (s?: number) =>
+    `<svg class="icon" viewBox="0 0 24 24" width="${s ?? 16}" height="${s ?? 16}" fill="currentColor"
+      aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/>
+      <circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/>
+      <circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>`,
   open: (s?: number) =>
     stroke(`<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/>`, s),
 };
