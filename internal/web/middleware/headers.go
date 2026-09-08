@@ -12,24 +12,28 @@ import "net/http"
 //     allow and no nonce to carry — a nonce exists in the sibling project
 //     because that one has inline scripts, and copying it here would be
 //     machinery guarding nothing.
-//   - style-src has to keep 'unsafe-inline'. The interface sets style
-//     attributes — the size of a mark, the width of a bar, where a tooltip
-//     lands — and there is no nonce for an attribute: the house measured that
-//     in Lastboard, 922 violations and every one of them an attribute. Saying
-//     otherwise here would be a policy that breaks the product to look strict.
+//   - style-src is 'self' too, which took work rather than a word. The
+//     interface used to set style attributes — the size of a mark, the width of
+//     a bar, where a tooltip lands — and there is no nonce for an attribute.
+//     They are classes now, and the three values that are genuinely open-ended
+//     — the operator's accent, a toast's countdown, the tooltip's position —
+//     are written as rules into a stylesheet the document adopts, which the
+//     policy does not govern. The browser walk fails if any of that regresses.
 //   - img-src allows data:, because an avatar and an instance logo are stored
 //     as data URLs in the database and rendered from there.
-//   - Everything else is 'self' or 'none', and there is no third party in this
-//     product to make an exception for.
+//   - default-src is 'none', so a directive nobody thought about refuses rather
+//     than inherits: anything this page needs is named above, and there is no
+//     third party in this product to make an exception for.
 //
 // frame-ancestors rather than X-Frame-Options: the header is the older spelling
 // of the same rule and every browser this ships to reads the directive.
-const contentSecurityPolicy = "default-src 'self'; " +
+const contentSecurityPolicy = "default-src 'none'; " +
 	"script-src 'self'; " +
-	"style-src 'self' 'unsafe-inline'; " +
+	"style-src 'self'; " +
 	"img-src 'self' data:; " +
 	"font-src 'self'; " +
 	"connect-src 'self'; " +
+	"manifest-src 'self'; " +
 	"form-action 'self'; " +
 	"frame-ancestors 'none'; " +
 	"base-uri 'none'; " +

@@ -1,3 +1,5 @@
+import { setRule } from "./dynamicStyles";
+
 /**
  * What a day of the chart was, under the pointer.
  *
@@ -16,6 +18,9 @@
  * the words and the number formats stay where the catalogue is.
  */
 export type Describe = (of: DOMStringMap) => string;
+
+/** The frame a position is waiting for, or null when none is. */
+let queued: number | null = null;
 
 export function attachChartHover(root: ParentNode | null, describe: Describe): void {
   const wrap = root?.querySelector<HTMLElement>(".chart-wrap");
@@ -82,8 +87,22 @@ export function attachChartHover(root: ParentNode | null, describe: Describe): v
     const half = tip.offsetWidth / 2;
     const above = top - tip.offsetHeight - 10 >= 0;
     tip.classList.toggle("below", !above);
-    tip.style.left = `${Math.min(Math.max(left, half + 4), Math.max(box.width - half - 4, half + 4))}px`;
-    tip.style.top = `${top}px`;
+
+    // Written as a rule rather than onto the element. The page is served with
+    // no 'unsafe-inline' in style-src, and an assignment to element.style is an
+    // inline style to the browser; a rule in the document's own adopted sheet
+    // is not. Once per frame, because a pointer produces more events than a
+    // screen has frames.
+    const at = {
+      x: Math.min(Math.max(left, half + 4), Math.max(box.width - half - 4, half + 4)),
+      y: top,
+    };
+    if (queued === null) {
+      queued = requestAnimationFrame(() => {
+        queued = null;
+        setRule("chart-tip", `.chart-tip { --tip-x: ${Math.round(at.x)}px; --tip-y: ${Math.round(at.y)}px; }`);
+      });
+    }
   };
 
   const hide = () => {

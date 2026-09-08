@@ -208,7 +208,7 @@ export function wizard(spec: WizardSpec, text: Text): string {
          of the page is the same logo twice on one screen. -->
     ${
       spec.mark
-        ? `<img class="wizard-mark brand-logo" style="--mark-size:52px" src="${escapeAttr(spec.mark)}" alt="" width="52" height="52" />`
+        ? `<img class="wizard-mark brand-logo mark-52" src="${escapeAttr(spec.mark)}" alt="" width="52" height="52" />`
         : ""
     }
     <ol class="steps" aria-label="${escapeAttr(text.t("wizard.progress", { step: spec.step, total }))}">

@@ -1788,9 +1788,11 @@ export function adminShell(spec: ShellSpec, text: Text): string {
  */
 export function brandMark(logo: string | undefined, size = 24): string {
   const src = logo && logo.trim() !== "" ? logo : "/logo.svg";
-  // The size travels as a variable: the class sets one, and a width attribute
-  // does not beat a stylesheet.
-  return `<img class="brand-logo" style="--mark-size:${size}px" src="${escapeAttr(src)}" alt=""
+  // The size is a class, not a style attribute: there are four of them in the
+  // whole product, and the policy this page is served under does not allow an
+  // inline style. A width attribute would not do — it does not beat a
+  // stylesheet, which is what put the size in a variable in the first place.
+  return `<img class="brand-logo mark-${size}" src="${escapeAttr(src)}" alt=""
     width="${size}" height="${size}" />`;
 }
 
@@ -1947,7 +1949,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
               const most = Math.max(...entries.map(([, count]) => count));
               return `<div class="bar-row hue-${escapeAttr(key)}">
                 <span>${escapeHTML(label(key))}</span>
-                <span class="bar-track"><span class="bar-fill" style="inline-size: ${Math.round((n / most) * 100)}%"></span></span>
+                <span class="bar-track"><span class="bar-fill" data-fill="${Math.round((n / most) * 20)}"></span></span>
                 <span class="count">${number(n)}</span>
               </div>`;
             })

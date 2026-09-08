@@ -1079,6 +1079,15 @@ func TestEveryResponseCarriesAPolicy(t *testing.T) {
 		if !strings.Contains(policy, "frame-ancestors 'none'") {
 			t.Errorf("%s can be framed: %q", path, policy)
 		}
+		// The one that took work rather than a word: no 'unsafe-inline'
+		// anywhere, style included. Every inline style the interface used to
+		// write is a class or a rule in the sheet the document adopts.
+		if strings.Contains(policy, "unsafe-inline") || strings.Contains(policy, "unsafe-eval") {
+			t.Errorf("%s allows inline: %q", path, policy)
+		}
+		if !strings.Contains(policy, "default-src 'none'") {
+			t.Errorf("%s inherits for a directive nobody named: %q", path, policy)
+		}
 		if !strings.Contains(policy, "img-src 'self' data:") {
 			t.Errorf("%s forbids the data URLs avatars are stored as: %q", path, policy)
 		}

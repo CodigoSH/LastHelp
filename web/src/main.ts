@@ -24,6 +24,7 @@ import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
 import { attachChartHover } from "./services/chartHover";
+import { setRule } from "./services/dynamicStyles";
 import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
 import { icons } from "./views/icons";
@@ -254,17 +255,19 @@ async function readAsDataURL(file: File | undefined): Promise<string | null> {
  * can be written into a property at all.
  */
 function applyAccent(accent: string): void {
-  const root = document.documentElement;
+  // Written as a rule rather than onto the element: the page is served under a
+  // policy with no 'unsafe-inline' in style-src, and setting a property on
+  // documentElement.style is an inline style as far as the browser is
+  // concerned. A rule in the sheet this document adopted is not.
   if (!accent) {
-    root.style.removeProperty("--accent");
-    root.style.removeProperty("--accent-rgb");
-    root.style.removeProperty("--accent-alt");
+    setRule("accent");
     return;
   }
   const [r, g, b] = [1, 3, 5].map((at) => parseInt(accent.slice(at, at + 2), 16));
-  root.style.setProperty("--accent", accent);
-  root.style.setProperty("--accent-rgb", `${r}, ${g}, ${b}`);
-  root.style.setProperty("--accent-alt", accent);
+  setRule(
+    "accent",
+    `:root { --accent: ${accent}; --accent-rgb: ${r}, ${g}, ${b}; --accent-alt: ${accent}; }`,
+  );
 }
 
 function openModal(id: string): void {

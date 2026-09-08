@@ -34,7 +34,20 @@ const DEFAULT_MS = 3000;
 /** With an action, longer: it has to be reachable before it leaves. */
 const ACTION_MS = 6000;
 /** Must match the CSS leave transition. */
+import { setRule } from "./dynamicStyles";
+
 const EXIT_MS = 260;
+
+/** How many have been drawn, which is where each one's id comes from. */
+let drawn = 0;
+
+/** How long this toast's bar takes to empty. */
+function drain(el: HTMLElement, duration: number): void {
+  setRule(
+    `toast-${el.dataset.toast}`,
+    `.toast[data-toast="${el.dataset.toast}"] .toast-bar { animation-duration: ${Math.round(duration)}ms; }`,
+  );
+}
 
 interface Timer {
   remaining: number;
@@ -97,7 +110,11 @@ function draw(opts: Options): void {
   el.dataset.key = keyOf(opts);
   // An error interrupts; everything else waits its turn.
   el.setAttribute("role", kind === "error" ? "alert" : "status");
-  el.style.setProperty("--toast-duration", `${duration}ms`);
+  // How long its bar takes to drain, as a rule of its own rather than a style
+  // attribute: three of these exist at a time and each one is told apart by an
+  // id, which is what the rule is keyed on.
+  el.dataset.toast = String(++drawn);
+  drain(el, duration);
 
   const message = document.createElement("span");
   message.className = "toast-message";
@@ -162,13 +179,16 @@ function resume(el: HTMLElement): void {
 }
 
 function restart(el: HTMLElement, duration: number): void {
-  el.style.setProperty("--toast-duration", `${duration}ms`);
+  drain(el, duration);
   const bar = el.querySelector<HTMLElement>(".toast-bar");
   if (bar) {
-    // A residual animation wins by source order and would never replay.
-    bar.style.animation = "none";
+    // A residual animation wins by source order and would never replay. The
+    // class is removed after a forced reflow, which is the only way to make an
+    // animation start again — and it is a class rather than an inline style,
+    // because the policy this page is served under allows neither.
+    bar.classList.add("no-drain");
     void bar.offsetWidth;
-    bar.style.animation = "";
+    bar.classList.remove("no-drain");
   }
   const t = timers.get(el);
   if (t) clearTimeout(t.handle);
@@ -185,6 +205,9 @@ function dismiss(el: HTMLElement): void {
   el.classList.remove("toast-visible");
   window.setTimeout(() => {
     el.remove();
+    // And its rule goes with it: a sheet that only ever grows is a leak with a
+    // slow fuse.
+    setRule(`toast-${el.dataset.toast}`);
     if (queue.length && visible() < MAX_VISIBLE) {
       const next = queue.shift();
       if (next) draw(next);

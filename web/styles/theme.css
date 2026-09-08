@@ -1948,6 +1948,31 @@ a.stat:hover {
   overflow: hidden;
 }
 
+/* Every width a bar can be, in twentieths. It was an inline percentage; a
+   relative bar reads the same at this granularity and needs no style
+   attribute to say it. */
+.bar-fill[data-fill="0"] { inline-size: 0; }
+.bar-fill[data-fill="1"] { inline-size: 5%; }
+.bar-fill[data-fill="2"] { inline-size: 10%; }
+.bar-fill[data-fill="3"] { inline-size: 15%; }
+.bar-fill[data-fill="4"] { inline-size: 20%; }
+.bar-fill[data-fill="5"] { inline-size: 25%; }
+.bar-fill[data-fill="6"] { inline-size: 30%; }
+.bar-fill[data-fill="7"] { inline-size: 35%; }
+.bar-fill[data-fill="8"] { inline-size: 40%; }
+.bar-fill[data-fill="9"] { inline-size: 45%; }
+.bar-fill[data-fill="10"] { inline-size: 50%; }
+.bar-fill[data-fill="11"] { inline-size: 55%; }
+.bar-fill[data-fill="12"] { inline-size: 60%; }
+.bar-fill[data-fill="13"] { inline-size: 65%; }
+.bar-fill[data-fill="14"] { inline-size: 70%; }
+.bar-fill[data-fill="15"] { inline-size: 75%; }
+.bar-fill[data-fill="16"] { inline-size: 80%; }
+.bar-fill[data-fill="17"] { inline-size: 85%; }
+.bar-fill[data-fill="18"] { inline-size: 90%; }
+.bar-fill[data-fill="19"] { inline-size: 95%; }
+.bar-fill[data-fill="20"] { inline-size: 100%; }
+
 .bar-fill {
   display: block;
   block-size: 100%;
@@ -2043,6 +2068,19 @@ a.stat:hover {
 /* Sized by the caller through a variable rather than by the class, which used
    to win over the width attribute and shrank the sign-in mark to the size of a
    favicon. */
+/*
+ * The sizes a mark comes in, as classes.
+ *
+ * They were a --mark-size in a style attribute, which the policy this is served
+ * under does not allow — and there are five of them in the whole product, so a
+ * class each says the same thing with nothing dynamic about it.
+ */
+.mark-24 { --mark-size: 24px; }
+.mark-26 { --mark-size: 26px; }
+.mark-44 { --mark-size: 44px; }
+.mark-52 { --mark-size: 52px; }
+.mark-56 { --mark-size: 56px; }
+
 .brand-logo {
   inline-size: var(--mark-size, 1.5rem);
   block-size: var(--mark-size, 1.5rem);
@@ -2689,7 +2727,7 @@ body > nav .brand {
   /* transform-origin has no logical keyword, so the mirrored case is stated
      below: the bar drains from the side the text starts on. */
   transform-origin: left center;
-  animation: toast-drain var(--toast-duration, 3000ms) linear forwards;
+  animation: toast-drain 3000ms linear forwards;
 }
 
 .toast-bar:dir(rtl) { transform-origin: right center; }
@@ -3579,6 +3617,11 @@ a.stat:hover .stat-go {
 .chart-tip {
   position: absolute;
   z-index: 2;
+  /* Where it landed, written into these two by the pointer as a rule in the
+     document's adopted sheet — never as a style attribute, which is what the
+     content policy refuses. */
+  inset-block-start: var(--tip-y, 0);
+  left: var(--tip-x, 0);
   transform: translate(-50%, calc(-100% - 0.6rem));
   /* Measured before it is placed, so it has to be laid out even while it is
      off: visibility rather than display, and hidden from the reader either
@@ -3627,3 +3670,7 @@ a.stat:hover .stat-go {
 .chart-tip .tip-total { font-weight: 700; }
 .chart-tip .count { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
 .chart-tip .tip-row { color: var(--text-muted); font-size: 0.8rem; }
+
+/* Held still so it can start again: an animation that is already running does
+   not replay, and removing this class after a reflow is what restarts it. */
+.toast-bar.no-drain { animation: none !important; }
