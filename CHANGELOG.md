@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0-Beta.01] - 2026-09-08
+
 ### Added
 
 - Public boards where anybody can report a bug or suggest an idea without an
