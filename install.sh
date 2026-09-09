@@ -181,9 +181,23 @@ case "$(uname -m)" in
 esac
 ARTEFACT=$(artefact_for "$ARCH")
 
-say ""
-say "  ${BOLD}${PROJECT}${OFF}"
-say "  $TAGLINE"
+banner() {
+    [ -t 1 ] || return 0
+    clear
+    printf '%s' "$BLUE"
+    cat <<'ART'
+ _              _   _   _      _
+| |    __ _ ___| |_| | | | ___| |_ __
+| |   / _` / __| __| |_| |/ _ \ | '_ \
+| |__| (_| \__ \ |_|  _  |  __/ | |_) |
+|_____\__,_|___/\__|_| |_|\___|_| .__/
+                                |_|
+ART
+    printf '%s\n' "$OFF"
+}
+
+banner
+say "  Welcome to $PROJECT. Let's get you started."
 say ""
 
 # ============================================================ what is here
@@ -192,13 +206,35 @@ say ""
 # somebody to retype the port they chose last time is how an upgrade changes it
 # by accident.
 UPGRADE=no
-if [ -x "$PREFIX/bin/$NAME" ] && [ -f "$ETC/$NAME.env" ]; then
+# The unit, not the binary, is what says an installation is here.
+#
+# Looking for the binary in the place *this* version puts it means an
+# installation made by an earlier one is invisible: the questions get asked
+# again, and then the port check refuses because something is listening on
+# 8080 — that something being the very service about to be upgraded. Which is
+# what happened, on a real machine, the first time this ran against an install
+# it had not made itself.
+if [ -f "$UNIT" ]; then
     UPGRADE=yes
-    OLD_PORT=$(sed -n "s/^${ENV_PREFIX}_PORT=//p" "$ETC/$NAME.env" | tail -1)
+
+    if [ -f "$ETC/$NAME.env" ]; then
+        OLD_PORT=$(sed -n "s/^${ENV_PREFIX}_PORT=//p" "$ETC/$NAME.env" | tail -1)
+        OLD_PROXY=$(sed -n "s/^${ENV_PREFIX}_TRUST_PROXY=//p" "$ETC/$NAME.env" | tail -1)
+    else
+        # An installation from before the configuration lived in a file: the
+        # settings are Environment= lines inside the unit. They are read out of
+        # it here so an upgrade keeps the port somebody chose rather than
+        # quietly moving their server to 8080.
+        LEGACY=yes
+        OLD_PORT=$(sed -n 's/.*Environment="'"${ENV_PREFIX}"'_PORT=\([0-9]*\)".*/\1/p' "$UNIT" | head -1)
+        OLD_PROXY=$(sed -n 's/.*Environment="'"${ENV_PREFIX}"'_TRUST_PROXY=\([a-z]*\)".*/\1/p' "$UNIT" | head -1)
+    fi
+
     [ -n "${OLD_PORT:-}" ] && PORT="$OLD_PORT"
-    case "$(sed -n "s/^${ENV_PREFIX}_TRUST_PROXY=//p" "$ETC/$NAME.env" | tail -1)" in
+    case "${OLD_PROXY:-}" in
         true|1|yes) PROXIED=yes ;;
     esac
+
     step "Existing installation found. Updating version on port ${BOLD}${PORT}${OFF}..."
     say ""
 fi
@@ -227,16 +263,19 @@ if (exec 3< /dev/tty) 2>/dev/null; then
         printf '%s' "$REPLY"
     }
 
+    # Port, then channel, then proxy: the order the rest of the house asks in.
     if [ "$UPGRADE" = no ]; then
-        IN=$(ask "$(printf '  Port [%s]: ' "$PORT")")
+        IN=$(ask "$(printf '  Desired Port [%s]: ' "$PORT")")
         [ -n "$IN" ] && PORT="$IN"
-
-        IN=$(ask '  Behind a reverse proxy? (nginx, Caddy, Traefik…) (y/N): ')
-        case "$IN" in y|Y|yes|Yes) PROXIED=yes ;; esac
     fi
 
-    IN=$(ask "$(printf '  Release channel (stable/beta) [%s]: ' "$CHANNEL")")
+    IN=$(ask "$(printf '  Release Channel (stable/beta) [%s]: ' "$CHANNEL")")
     case "$IN" in beta|Beta|BETA) CHANNEL=beta ;; stable|Stable|STABLE) CHANNEL=stable ;; esac
+
+    if [ "$UPGRADE" = no ]; then
+        IN=$(ask '  Behind a reverse proxy? (nginx, Traefik, Caddy, Cloudflare...) (yes/no) [no]: ')
+        case "$IN" in y|Y|yes|Yes) PROXIED=yes ;; esac
+    fi
     say ""
 fi
 
@@ -352,8 +391,16 @@ chmod 0755 "$WORK/$ARTEFACT"
 # Reported, never freed. Killing whatever holds the port is an outage caused by
 # an installer on a machine where 8080 is somebody's other service. Saying what
 # has it is enough: the person running this knows what their own machine does.
-if [ "$UPGRADE" = no ] && command -v ss >/dev/null 2>&1 \
-    && ss -ltn "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then
+#
+# The service being upgraded is stopped first, so the port it was holding is
+# free by the time this looks. Without that the check finds the process it is
+# about to replace, reports it as a stranger, and refuses the upgrade — which is
+# exactly what it did on the first machine that ran it.
+if [ "$UPGRADE" = yes ]; then
+    systemctl stop "$NAME" >/dev/null 2>&1 || true
+fi
+
+if command -v ss >/dev/null 2>&1 && ss -ltn "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then
     step "Port $PORT is already in use..."
     ss -ltnp "sport = :$PORT" 2>/dev/null | tail -n +2 | sed 's/^/    /' || true
     die "choose another port, or stop that first. Nothing has been changed."
@@ -426,7 +473,6 @@ if [ "$UPGRADE" = yes ] && [ -f "$DATA/$NAME.db" ]; then
     # update nobody can undo.
     BACKUP="$DATA/$NAME.db.before-$VERSION"
     step "Backing up the database to $(basename "$BACKUP")..."
-    systemctl stop "$NAME" >/dev/null 2>&1 || true
     cp "$DATA/$NAME.db" "$BACKUP"
     chown "$USER_NAME:$USER_NAME" "$BACKUP"
 fi
@@ -437,6 +483,15 @@ step "Installing the binary..."
 # whatever it says — and this way a fresh install and an updated one look the
 # same on disk.
 install -m 0755 -o "$USER_NAME" -g "$USER_NAME" "$WORK/$ARTEFACT" "$PREFIX/bin/$NAME"
+
+# An earlier version of this installer put the binary in /usr/local/bin. The new
+# unit runs the one in $PREFIX/bin, so the old copy is not what serves any more
+# — and leaving an outdated binary on the PATH under the same name is how
+# somebody debugging at midnight ends up running the version before last.
+if [ "${LEGACY:-no}" = yes ] && [ -f /usr/local/bin/"$NAME" ]; then
+    step "Removing the binary the previous layout left in /usr/local/bin..."
+    rm -f /usr/local/bin/"$NAME"
+fi
 
 # ============================================================ service
 step "Configuring the service..."
@@ -462,21 +517,12 @@ fi
 
 # ============================================================ and then
 say ""
-if [ "$UPGRADE" = yes ]; then
-    done_ "Updated to $VERSION."
-    say ""
-    note "Data:   $DATA/$NAME.db"
-    note "Logs:   journalctl -u $NAME -f"
-else
-    done_ "Installation complete."
-    say ""
-    say "  Open ${BLUE}${BOLD}http://$IP:$PORT${OFF} and claim the instance."
+done_ "Installation complete!"
+say ""
+say "  💬 Open $PROJECT at: ${BLUE}${BOLD}http://$IP:$PORT${OFF}"
+say ""
+if [ "$UPGRADE" = no ]; then
     note "The first account created is the administrator, and setup then refuses to"
     note "run again — so claim it before this is reachable from the internet."
     say ""
-    note "Config: $ETC/$NAME.env"
-    note "Data:   $DATA/$NAME.db"
-    note "Key:    $DATA/$NAME.key   (back it up separately from the database)"
-    note "Logs:   journalctl -u $NAME -f"
 fi
-say ""

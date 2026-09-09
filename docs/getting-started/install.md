@@ -35,7 +35,11 @@ sudo sh install.sh --uninstall           # removes it, keeps the reports
 sudo sh install.sh --uninstall --purge   # erases them too, after you type DELETE
 ```
 
-`LASTHELP_CHANNEL=beta` installs the latest beta instead of the latest stable.
+It asks three questions — port, release channel, reverse proxy — and remembers
+the answers, so an upgrade never asks twice. Where there is no terminal to ask
+on, every answer is its default and the environment supplies the ones that
+matter: `LASTHELP_CHANNEL=beta` for the beta channel, `LASTHELP_PORT` for the
+port.
 Every path it writes to can be pointed elsewhere the same way —
 `LASTHELP_PREFIX`, `LASTHELP_DATA`, `LASTHELP_ETC`, `LASTHELP_UNIT` — which is
 how it gets tested against a throwaway tree.
