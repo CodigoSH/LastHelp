@@ -84,7 +84,7 @@ export function landing(
   }
 
   return `<div class="page">${hero}
-    <section>
+    <section class="section">
       ${sectionHead(text.t("shell.organizations"), text.number(orgs.length))}
       ${organizationList(orgs, text)}
     </section>
@@ -124,10 +124,10 @@ export function emptyState(words: string, icon = "", action = ""): string {
 
 /** The small title of a part of a page, with what it holds counted beside it. */
 export function sectionHead(title: string, count?: string): string {
-  return `<div class="section-head">
-    <h2>${escapeHTML(title)}</h2>
+  return `<h2 class="section-legend">
+    <span>${escapeHTML(title)}</span>
     ${count !== undefined ? `<span class="count-chip">${escapeHTML(count)}</span>` : ""}
-  </div>`;
+  </h2>`;
 }
 
 /** The mark in front of a name: two letters of the thing itself. */
@@ -183,7 +183,7 @@ export function repositoryList(
   }
 
   return `<div class="page">${header}
-    <section>
+    <section class="section">
       ${sectionHead(text.t("portal.boards"), text.number(repos.length))}
       <ul class="cards">${repos
         .map(
@@ -494,16 +494,14 @@ export function board(
         // is the filter you are looking through and how many it found, which is
         // the one sentence the list cannot say about itself.
         `<section class="section">
-          <p class="section-legend">
-            <span>${escapeHTML(
-              filters.kind === "bug"
-                ? text.t("kind.bug")
-                : filters.kind === "idea"
-                  ? text.t("kind.idea")
-                  : text.t("board.all"),
-            )}</span>
-            <span class="count-chip">${escapeHTML(text.number(items.length))}</span>
-          </p>
+          ${sectionHead(
+            filters.kind === "bug"
+              ? text.t("kind.bug")
+              : filters.kind === "idea"
+                ? text.t("kind.idea")
+                : text.t("board.all"),
+            text.number(items.length),
+          )}
           <ul class="items">${items.map((i) => itemRow(i, text)).join("")}</ul>
         </section>`;
 
