@@ -93,14 +93,6 @@ VERSION_STAMPS=(
     "package.json|\"version\": \".*\"|s/\"version\": \".*\"/\"version\": \"\$NEW_VERSION\"/|package.json"
 )
 
-# Where the release notes come from. `changelog` takes the [Unreleased] section
-# of CHANGELOG.md; `commits` generates them from Conventional Commit subjects.
-#
-# Hand-written wins: generated notes list what changed in the repository, which
-# is not what a reader of a release page wants to know. A hand-written
-# RELEASE_NOTES_<tag>.md still beats both.
-NOTES_FROM="changelog"
-
 # The preflight, as a list of "label|command". It runs before anything is
 # written, because a tag and a push are what cannot be taken back cheaply.
 #
@@ -386,68 +378,93 @@ fi
 # Commits that describe the release process rather than the release, and the
 # types nobody deciding whether to update needs to read.
 HOUSEKEEPING='^release:|^chore\(release\)|^docs\(release\)|^chore: cleanup|^chore: bump|pre-release|^Merge branch|^Merge remote-tracking|^test(\([a-z0-9_ -]+\))?!?:|^ci(\([a-z0-9_ -]+\))?!?:|^style(\([a-z0-9_ -]+\))?!?:|^docs(\([a-z0-9_ -]+\))?!?:|^[a-z]+\(docs\)!?:|^[a-z]+\(ci\)!?:'
-CONVENTIONAL_TYPES='feat|fix|refactor|perf|chore|docs|style|build|ci|test|i18n|revert'
+CONVENTIONAL_TYPES='feat|fix|refactor|perf|chore|docs|style|build|ci|test|i18n|revert|remove'
 
 clean_subjects() {
     grep -vE "$HOUSEKEEPING" | \
+    grep -viE '^(feat|fix|chore)?(\([a-z0-9_-]+\))?:? *minor updates$' | \
     sed -E "s/^($CONVENTIONAL_TYPES)(\([a-z0-9_ -]+\))?(!)?: *//I" | \
     awk 'NF {$1=toupper(substr($1,1,1))substr($1,2); print "- " $0}' | \
     sort -u
 }
 subjects() { git log "$RANGE" --pretty=format:"%s"; }
 
-# The [Unreleased] section, for projects whose notes come from the changelog.
-unreleased() {
-    awk '/^## \[Unreleased\]/ { on = 1; next } /^## \[/ { on = 0 } on { print }' CHANGELOG.md \
-        | sed -e '/./,$!d' | awk 'BEGIN{b=0} {lines[NR]=$0} END{for(i=NR;i>0;i--) if(lines[i] ~ /[^[:space:]]/){last=i;break} for(i=1;i<=last;i++) print lines[i]}'
-}
+# The buckets. Keep-a-Changelog has a Removed section, and without a bucket for
+# it a withdrawal has to be committed as a feature and comes out under "Added",
+# reading to anyone scanning the notes as the opposite of what happened. Commit
+# a withdrawal as `remove:`.
+FEATS=$(subjects | grep -iE "^feat" | clean_subjects || echo "")
+FIXES=$(subjects | grep -iE "^fix" | clean_subjects || echo "")
+REFACTORS=$(subjects | grep -iE "^(refactor|perf)" | clean_subjects || echo "")
+REMOVALS=$(subjects | grep -iE "^remove" | clean_subjects || echo "")
+OTHER=$(subjects | grep -viE "^(feat|fix|refactor|perf|remove)" | clean_subjects || echo "")
 
-NOTES_FILE="RELEASE_NOTES_$NEW_TAG.md"
+CHANGED=""
+[ -n "$REFACTORS" ] && CHANGED="$REFACTORS"
+[ -n "$OTHER" ] && CHANGED="${CHANGED:+$CHANGED$'\n'}$OTHER"
 
+# --- CHANGELOG.md, on stables only -----------------------------------------
+#
+# A beta gets its own release page and its own notes; the file in the
+# repository is the record of released versions, and a beta is not one. A
+# stable aggregates the whole cycle, which is what somebody upgrading from the
+# previous stable actually wants to read.
+if [ "$TYPE" == "stable" ] && [ -f "CHANGELOG.md" ]; then
+    echo "📝 Updating CHANGELOG.md..."
+    DATE=$(date +%Y-%m-%d)
+
+    # Built in a temp file with real newlines: composing it in a shell variable
+    # strips the trailing ones and runs the section headers together, which
+    # arrives as "…home### Fixed".
+    ENTRY_FILE=$(mktemp)
+    {
+        printf '## [%s] - %s\n\n' "$NEW_VERSION" "$DATE"
+        [ -n "$FEATS" ]    && printf '### Added\n%s\n\n' "$FEATS"
+        [ -n "$FIXES" ]    && printf '### Fixed\n%s\n\n' "$FIXES"
+        [ -n "$CHANGED" ]  && printf '### Changed\n%s\n\n' "$CHANGED"
+        [ -n "$REMOVALS" ] && printf '### Removed\n%s\n\n' "$REMOVALS"
+        true
+    } > "$ENTRY_FILE"
+
+    if [ "$DRY_RUN" = "1" ]; then
+        echo "   [dry-run] CHANGELOG.md entry that would be inserted:"
+        sed 's/^/     /' "$ENTRY_FILE"
+    else
+        # Inserted before the first version heading, so the newest is on top.
+        awk 'NR==FNR { entry = entry $0 "\n"; next }
+             /^## \[/ && !done { printf "%s", entry; done=1 }
+             { print }' "$ENTRY_FILE" CHANGELOG.md > CHANGELOG.md.tmp \
+            && mv CHANGELOG.md.tmp CHANGELOG.md
+    fi
+    rm -f "$ENTRY_FILE"
+fi
+
+# --- The release body ------------------------------------------------------
+#
 # A hand-written file always wins: the generated one is a list of commit
 # subjects, which is not what a reader wants.
+NOTES_FILE="RELEASE_NOTES_$NEW_TAG.md"
 if [ -f "$NOTES_FILE" ]; then
     echo "📄 Using existing release notes: $NOTES_FILE"
-    BODY=$(cat "$NOTES_FILE")
-elif [ "$NOTES_FROM" = "changelog" ]; then
-    BODY_SECTIONS=$(unreleased)
-    [ -n "$(echo "$BODY_SECTIONS" | tr -d '[:space:]')" ] || \
-        die "CHANGELOG.md has nothing under [Unreleased], so there is nothing to say about $NEW_TAG."
-    BODY=$(printf '**%s**\n\n%s' "$TITLE" "$BODY_SECTIONS")
-    echo "📄 Release notes from the [Unreleased] section of CHANGELOG.md"
 else
-    FEATS=$(subjects | grep -iE "^feat" | clean_subjects || echo "")
-    FIXES=$(subjects | grep -iE "^fix" | clean_subjects || echo "")
-    OTHER=$(subjects | grep -viE "^(feat|fix)" | clean_subjects || echo "")
-    BODY=$(
+    # The title leads the notes. It is the one line a reader sees first, and
+    # keeping it out of the sections is what stops it from also being counted
+    # as a feature of the next stable.
+    compose_notes() {
         printf '**%s**\n\n' "$TITLE"
-        [ -n "$FEATS" ] && printf '### Added\n%s\n\n' "$FEATS"
-        [ -n "$FIXES" ] && printf '### Fixed\n%s\n\n' "$FIXES"
-        [ -n "$OTHER" ] && printf '### Changed\n%s\n' "$OTHER"
+        [ -n "$FEATS" ]    && printf '### Added\n%s\n\n' "$FEATS"
+        [ -n "$FIXES" ]    && printf '### Fixed\n%s\n\n' "$FIXES"
+        [ -n "$CHANGED" ]  && printf '### Changed\n%s\n\n' "$CHANGED"
+        [ -n "$REMOVALS" ] && printf '### Removed\n%s\n' "$REMOVALS"
         true
-    )
-    echo "📄 Release notes generated from $RANGE_LABEL"
-fi
+    }
 
-if [ "$DRY_RUN" = "1" ]; then
-    echo "   [dry-run] $NOTES_FILE would be:"
-    printf '%s\n' "$BODY" | sed 's/^/     /'
-else
-    printf '%s\n' "$BODY" > "$NOTES_FILE"
-fi
-
-# Every release gets its own heading, betas included: somebody deciding whether
-# to update wants to read what changed since the version they are running, and
-# a beta they skipped is part of that.
-if [ "$NOTES_FROM" = "changelog" ]; then
-    echo "📝 Moving [Unreleased] into [$NEW_VERSION]..."
     if [ "$DRY_RUN" = "1" ]; then
-        echo "   [dry-run] ## [$NEW_VERSION] - $(date +%Y-%m-%d)"
+        echo "   [dry-run] $NOTES_FILE would be generated from $RANGE_LABEL as:"
+        compose_notes | sed 's/^/     /'
     else
-        awk -v v="$NEW_VERSION" -v d="$(date +%Y-%m-%d)" '
-            /^## \[Unreleased\]/ && !done { print "## [Unreleased]"; print ""; print "## [" v "] - " d; done=1; next }
-            { print }
-        ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+        compose_notes > "$NOTES_FILE"
+        echo "📄 Release notes generated from $RANGE_LABEL"
     fi
 fi
 

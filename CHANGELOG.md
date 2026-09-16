@@ -1,61 +1,13 @@
 # Changelog
 
-All notable changes to this project are documented here. The format follows
+Every released version, newest first. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Fixed
-
-- **The form for reporting something was not laid out.** Its fields were
-  stacked into a narrow column with the send button adrift beside them, on the
-  one page the product exists to collect. Two different things shared a class
-  name, so a rule written for a row in the moderation queue was being applied to
-  the form.
-- Notices were tinted with a hard-coded orange, so an operator who set their own
-  accent colour got every other tinted surface in their colour and their notices
-  in ours.
-- On a report opened by the team, the merge block sat against the reply form's
-  button and read as that form's caption.
-- Upgrading over an installation made by an earlier installer is recognised as
-  an upgrade again: it was asking every question a second time and then refusing
-  because the port was busy — held by the very service it was about to replace.
-  The port check now asks whose process it is rather than assuming.
-- A key file that an instance run from a working copy had left behind was
-  committed to this repository and stayed there for eight days. It is gone from
-  the history, `*.key` and `*.pem` are ignored, and a check now asks git — not
-  the filesystem — whether anything shaped like an instance secret is tracked.
-  That key had sealed nothing: the database it belonged to had no forge
-  connected and both encrypted columns were empty. Nothing had to be rotated.
-
-### Changed
-
-- **Secrets are stored as they are given.** The forge token, the webhook secret
-  and a reporter's email address were sealed with a key kept in a file beside
-  the database; they are now columns like any other. The key protected against
-  nobody who could reach the machine — it travelled in the same directory as the
-  data — while making a restore on another machine fail silently and adding a
-  file that could leak, and did. Upgrading moves the sealed values across on the
-  first start and says so in the log; the key file is then read by nothing and
-  can be deleted. An installation whose key is already lost is told which values
-  have to be entered again. Account passwords are unaffected: they are hashed
-  with Argon2id and always were.
-
-- The setup wizard and the sign-in screen are each one card — mark, heading,
-  fields and the way on — instead of a mark floating above a card with the
-  button below it.
-- The theme is chosen by pointing at one of three tiles rather than by reading
-  three words in a bar.
-- Dark mode uses neutral greys rather than blue-black ones, and cards carry the
-  light hairline along their top edge that keeps a dark card from reading as a
-  hole in the page.
-- Lists and groups — the organisations, the repositories, the board under its
-  filter, each roadmap column — are drawn as a bordered section with its name on
-  the border and the count beside it.
-- The installer speaks the same words as the ones the other projects ship, and
-  the command to install is the same everywhere: it asks which port, which
-  release channel and whether a proxy is in front, and remembers the answers.
+Entries are written from the commit subjects when a stable is cut. A beta is
+not a released version: it gets its own release page, with the same sections,
+and its changes reach this file with the stable that carries them. The entries
+below 1.0.0 were written by hand, before that was so.
 
 ## [1.0.0-Beta.03] - 2026-09-09
 
