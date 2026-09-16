@@ -3590,7 +3590,7 @@ a.stat:hover .stat-go {
  */
 /* One line: the link over most of it, then the decision, then the state it
    would change. A queue of ten waiting reports was ten double-height rows. */
-.report {
+.queue-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -3604,21 +3604,21 @@ a.stat:hover .stat-go {
     border-color 0.18s var(--ease);
 }
 
-.report:hover {
+.queue-row:hover {
   transform: translateY(-1px);
   border-color: var(--accent-line);
   box-shadow: var(--shadow-md), var(--hairline);
 }
 
-.report .item,
-.report .item:hover {
+.queue-row .item,
+.queue-row .item:hover {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
   transform: none;
 }
 
-.report .item {
+.queue-row .item {
   flex: 1 1 18rem;
   min-inline-size: 0;
 }

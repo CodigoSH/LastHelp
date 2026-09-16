@@ -2188,7 +2188,12 @@ export function reportsScreen(data: ReportsData, filters: ReportFilters, text: T
     const board = r.board
       ? `<span class="chip">${icons.repository(12)}<span>${escapeHTML(r.board.name)}</span></span>`
       : "";
-    return `<li class="report" data-id="${escapeAttr(r.public_id)}">
+    // `queue-row`, not `report`: the public form is a <form class="report">, and
+    // a row in the queue is not the same thing as the page somebody fills in.
+    // Sharing the name meant the row's flex layout was applied to the form,
+    // which stacked its fields into a narrow column with the button adrift
+    // beside them — on the one page a stranger uses.
+    return `<li class="queue-row" data-id="${escapeAttr(r.public_id)}">
       <a class="item" href="/i/${escapeAttr(r.public_id)}">
         ${
           r.kind === "idea"

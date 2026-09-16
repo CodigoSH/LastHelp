@@ -316,6 +316,32 @@ async function main() {
   `);
   check("it says where the report is going", form.crumb === "/codigosh,/codigosh/lastboard", form.crumb);
   check("the kind is a choice of two cards", form.cards === 2, String(form.cards));
+
+  // Measured, because this was broken for an unknown length of time and nothing
+  // said so: `.report` named both this form and a row in the moderation queue,
+  // so the row's `display: flex; align-items: center` was applied here and
+  // stacked the fields into a narrow column with the button adrift beside them.
+  // The page still rendered, every other check still passed, and the
+  // documentation screenshot showed it. A form is not on screen if it is not
+  // laid out.
+  const laidOut = await evaluate(`
+    const form = document.querySelector("form.report").getBoundingClientRect();
+    const title = document.querySelector("#report-title").getBoundingClientRect();
+    const send = document.querySelector("form.report button[type=submit]").getBoundingClientRect();
+    const cards = [...document.querySelectorAll(".choice-card")].map(c => c.getBoundingClientRect());
+    return {
+      titleFills: Math.round((title.width / form.width) * 100),
+      sendFills: Math.round((send.width / form.width) * 100),
+      // Side by side: two cards on one row have the same top and different lefts.
+      choicesAbreast: cards.length === 2 && Math.abs(cards[0].top - cards[1].top) < 2
+        && Math.abs(cards[0].left - cards[1].left) > 50,
+    };
+  `);
+  check(
+    "and the form is laid out, not stacked into a column",
+    laidOut.titleFills > 60 && laidOut.sendFills > 60 && laidOut.choicesAbreast === true,
+    JSON.stringify(laidOut),
+  );
   // Compared against the catalogue the page is actually in, not against the
   // English words: this walk runs in whatever language the browser asks for,
   // and a probe carrying its own copy of the expected text only measures
@@ -1127,10 +1153,10 @@ async function main() {
 
   const listing = await evaluate(`
     return {
-      rows: document.querySelectorAll(".report").length,
+      rows: document.querySelectorAll(".queue-row").length,
       waiting: document.querySelector('[data-moderation="pending"] .count-chip')?.textContent?.trim() ?? "",
-      decisions: document.querySelectorAll(".report .row-actions").length,
-      boards: [...new Set([...document.querySelectorAll(".report .chip")].map(c => c.textContent.trim()))],
+      decisions: document.querySelectorAll(".queue-row .row-actions").length,
+      boards: [...new Set([...document.querySelectorAll(".queue-row .chip")].map(c => c.textContent.trim()))],
     };
   `);
   check(
@@ -1148,7 +1174,7 @@ async function main() {
   // say so: the status is what a published report is in, and until then the
   // state is what it is waiting for.
   const states = await evaluate(`
-    return [...document.querySelectorAll(".report")].map(r => ({
+    return [...document.querySelectorAll(".queue-row")].map(r => ({
       decide: !!r.querySelector("[data-act]"),
       state: r.querySelector(".status")?.className ?? "",
     }));
@@ -1168,8 +1194,8 @@ async function main() {
   });
   await sleep(400);
   const grouped = await evaluate(`
-    const row = [...document.querySelectorAll(".report")].find(r => r.querySelector(".row-actions"));
-    const plain = [...document.querySelectorAll(".report")].find(r => !r.querySelector(".row-actions"));
+    const row = [...document.querySelectorAll(".queue-row")].find(r => r.querySelector(".row-actions"));
+    const plain = [...document.querySelectorAll(".queue-row")].find(r => !r.querySelector(".row-actions"));
     const buttons = [...row.querySelectorAll(".row-actions .button")].map(b => b.getBoundingClientRect());
     const chip = row.querySelector(".status").getBoundingClientRect();
     // The distance between two boxes on a line, whichever way the line runs.
@@ -1203,7 +1229,7 @@ async function main() {
   await evaluate(`document.querySelector('[data-moderation="pending"]').click()`);
   await sleep(1200);
   const narrowed = await evaluate(`
-    return { search: location.search, rows: document.querySelectorAll(".report").length };
+    return { search: location.search, rows: document.querySelectorAll(".queue-row").length };
   `);
   check(
     "narrowing it goes into the address, so a view can be sent to somebody",
@@ -1216,7 +1242,7 @@ async function main() {
   // author — the team included — so a waiting report could only be triaged by
   // trusting its title. And the decision is on the report now, not one screen
   // away from the reading.
-  await evaluate(`document.querySelector(".report a.item").click()`);
+  await evaluate(`document.querySelector(".queue-row a.item").click()`);
   await sleep(1400);
   const reading = await evaluate(`
     const decide = document.querySelector(".decide");
@@ -1244,10 +1270,10 @@ async function main() {
 
   await evaluate(`history.pushState({}, "", "/panel/reports?moderation=pending"); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(1300);
-  await evaluate(`document.querySelector('.report [data-act="published"]').click()`);
+  await evaluate(`document.querySelector('.queue-row [data-act="published"]').click()`);
   await sleep(1400);
   const triaged = await evaluate(`
-    return { rows: document.querySelectorAll(".report").length,
+    return { rows: document.querySelectorAll(".queue-row").length,
              waiting: document.querySelector('[data-moderation="pending"] .count-chip')?.textContent?.trim() ?? "" };
   `);
   check(
@@ -1352,8 +1378,8 @@ async function main() {
   await sleep(1400);
   const theirs = await evaluate(`
     return {
-      rows: document.querySelectorAll(".report").length,
-      boards: [...new Set([...document.querySelectorAll(".report .chip")].map(c => c.textContent.trim()))],
+      rows: document.querySelectorAll(".queue-row").length,
+      boards: [...new Set([...document.querySelectorAll(".queue-row .chip")].map(c => c.textContent.trim()))],
       // One board, so there is nothing to choose between and no control for it.
       boardPicker: !!document.querySelector("[data-board]"),
     };

@@ -1573,7 +1573,7 @@ async function showReports(): Promise<void> {
   // Triage from the list. The screen is redrawn rather than the row removed:
   // under "everything" a published report stays, wearing its new state, and a
   // row that vanished would read as a report that was deleted.
-  root?.querySelectorAll<HTMLButtonElement>(".report [data-act]").forEach((button) =>
+  root?.querySelectorAll<HTMLButtonElement>(".queue-row [data-act]").forEach((button) =>
     button.addEventListener("click", async () => {
       const id = button.closest<HTMLLIElement>("li[data-id]")?.dataset.id;
       if (!id) return;
