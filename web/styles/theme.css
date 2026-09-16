@@ -534,10 +534,10 @@ ul { list-style: none; margin: 0; padding: 0; }
   align-items: center;
   gap: 0.85rem;
   padding: 1rem 1.1rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   background: var(--panel);
-  box-shadow: var(--shadow-sm), var(--hairline);
+  box-shadow: var(--card-shadow);
   text-decoration: none;
   color: inherit;
   transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease),
@@ -695,6 +695,54 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 /* ------------------------------------------------------------------- rows */
 
+/*
+ * A section of a board: the same device as a roadmap column, written once here
+ * so the two cannot drift. A bordered box whose name is a pill on the border —
+ * a legend, interrupting the line rather than sitting under it.
+ *
+ * `overflow: visible` and the top margin are what keep the pill from being
+ * clipped: it is lifted half its own height above the edge.
+ */
+.section {
+  position: relative;
+  margin-block-start: 0.55rem;
+  padding: 1.1rem 0.9rem 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  box-shadow: var(--card-shadow);
+  overflow: visible;
+}
+
+.section-legend {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0.85rem;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.section-legend .count-chip {
+  padding: 0 0.3rem;
+  min-inline-size: 0;
+  font-size: 0.65rem;
+}
+
 .items { display: grid; gap: 0.5rem; }
 
 .items > li { animation: fade 0.35s var(--ease) both; }
@@ -716,12 +764,12 @@ ul { list-style: none; margin: 0; padding: 0; }
   gap: 0.9rem;
   align-items: center;
   padding: 0.85rem 1rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   text-decoration: none;
   color: inherit;
   background: var(--panel);
-  box-shadow: var(--shadow-sm), var(--hairline);
+  box-shadow: var(--card-shadow);
   transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease),
     border-color 0.18s var(--ease);
 }
@@ -1033,42 +1081,80 @@ summary:focus-visible,
   align-items: stretch;
 }
 
+/*
+ * A roadmap column is a section of the board, and the house draws a section as
+ * a bordered box whose name is a pill sitting ON the border — a fieldset
+ * legend, interrupting the line rather than sitting under it inside a rule of
+ * its own. Taken from the reference's grid, where it is what makes a group of
+ * tiles read as a group.
+ *
+ * `overflow: visible` and the position are not decoration: the pill is lifted
+ * half its height above the top edge and would be clipped otherwise.
+ */
 .roadmap .column {
+  position: relative;
   display: grid;
   align-content: start;
   gap: 0.6rem;
-  border: 1px solid var(--border);
+  margin-block-start: 0.55rem;
+  border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
-  padding: 0.9rem;
+  padding: 1.1rem 0.9rem 0.9rem;
   background: color-mix(in srgb, var(--panel) 70%, transparent);
+  box-shadow: var(--card-shadow);
+  overflow: visible;
   animation: rise 0.4s var(--ease) both;
 }
 
 .roadmap .column:nth-child(2) { animation-delay: 0.07s; }
 .roadmap .column:nth-child(3) { animation-delay: 0.14s; }
 
-/* Each column carries the colour of the state it collects, as a bar across its
-   top: three identical grey boxes are three boxes you have to read. */
+/* The legend, on the border. Monospaced and spaced out, which is what tells the
+   eye it labels the box rather than starting its contents — and opaque, so the
+   border passes behind it and stops. Each one carries the colour of the state
+   it collects: three identical grey boxes are three boxes you have to read. */
 .column-head {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0.85rem;
+  transform: translateY(-50%);
+  z-index: 2;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding-block-end: 0.6rem;
-  border-block-end: 1px solid var(--border);
+  gap: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
   --hue: var(--hue-off);
 }
 
-.column-head h2 { margin: 0; font-size: 0.95rem; }
+.column-head h2 {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
 
 .column-head .dot {
-  inline-size: 0.55rem;
-  block-size: 0.55rem;
+  inline-size: 0.45rem;
+  block-size: 0.45rem;
   border-radius: 50%;
   background: var(--hue);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--hue) 20%, transparent);
 }
 
-.column-head .count-chip { margin-inline-start: auto; }
+/* Inside the pill now, right after the name: pushed to the far end it would
+   stretch the legend the width of the column. */
+.column-head .count-chip {
+  padding: 0 0.3rem;
+  min-inline-size: 0;
+  font-size: 0.65rem;
+}
 
 .column-planned .column-head { --hue: var(--hue-hold); }
 .column-in_progress .column-head { --hue: var(--hue-work); }

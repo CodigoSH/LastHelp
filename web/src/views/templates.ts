@@ -489,7 +489,23 @@ export function board(
           icons.queue(28),
           `<a class="button primary with-icon" href="${report}">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>`,
         )
-      : `<ul class="items">${items.map((i) => itemRow(i, text)).join("")}</ul>`;
+      : // The list lives inside a section of the board, and the house draws a
+        // section as a bordered box whose name rides on its border. The legend
+        // is the filter you are looking through and how many it found, which is
+        // the one sentence the list cannot say about itself.
+        `<section class="section">
+          <p class="section-legend">
+            <span>${escapeHTML(
+              filters.kind === "bug"
+                ? text.t("kind.bug")
+                : filters.kind === "idea"
+                  ? text.t("kind.idea")
+                  : text.t("board.all"),
+            )}</span>
+            <span class="count-chip">${escapeHTML(text.number(items.length))}</span>
+          </p>
+          <ul class="items">${items.map((i) => itemRow(i, text)).join("")}</ul>
+        </section>`;
 
   return `<div class="page">
     <header class="page-head board-head">
