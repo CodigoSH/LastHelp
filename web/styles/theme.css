@@ -1607,9 +1607,14 @@ body.admin-view > main {
   min-block-size: 100vh;
 }
 
+/* Merged from the two declared at the top level. The sidebar is the one surface
+   that does not float: it is the wall the application hangs on, so it takes the
+   recessed colour and lets the content beside it be the thing with depth. The
+   third `.side` further down is inside a media query — the narrow strip — and
+   is a different rule, not a copy of this one. */
 .side {
   border-inline-end: 1px solid var(--border);
-  background: var(--panel);
+  background: color-mix(in srgb, var(--panel) 92%, var(--text-main) 3%);
   padding: 1.25rem 0.9rem;
   display: flex;
   flex-direction: column;
@@ -2539,8 +2544,13 @@ body > nav .brand {
   }
 }
 
+/* Merged from two: the later one laid it out and won the margin, so the
+   quarter-rem in the first was a number nobody was reading. */
 .dash-card > h3 {
-  margin: 1rem 1.1rem 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 1.1rem 0.5rem;
   font-size: 1rem;
 }
 
@@ -2756,23 +2766,37 @@ body > nav .brand {
   margin-block: 1rem;
 }
 
+/* Merged from two declarations: the later one set the radius, the padding, the
+   shadow and the transition, so half of what the first said never applied. */
 .choice-card {
   display: grid;
   justify-items: start;
   gap: 0.2rem;
-  padding: 0.9rem 1rem;
+  padding: 1rem 1.1rem;
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 2px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm), var(--hairline);
   background: var(--panel);
   color: inherit;
   font: inherit;
   text-align: start;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease),
+    box-shadow 0.18s var(--ease), background 0.18s var(--ease);
 }
 
 .choice-card:hover { border-color: rgba(var(--accent-rgb), 0.55); }
-.choice-card .icon { color: var(--text-dim); margin-block-end: 0.15rem; }
+/* The mark of the kind, in a tile rather than loose above the words: the same
+   shape as every other icon tile in the product. Merged from two — the earlier
+   one's margin never applied. */
+.choice-card .icon {
+  box-sizing: content-box;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-dim);
+  color: var(--text-dim);
+  margin-block-end: 0.35rem;
+}
 .choice-card .choice-title { font-weight: 600; }
 .choice-card .choice-sub { color: var(--text-dim); font-size: 0.875rem; }
 
@@ -3066,11 +3090,13 @@ body > nav .brand {
 /* The card on a plain field, centred in the window rather than at the top of a
    column. This is the first screen of the day for everybody on the team, and it
    was a heading, two boxes and a button with the same word on all three. */
+/* Merged from two: the later width is the one that applied, so the 24rem here
+   was a number nobody was reading. */
 .signin {
   display: grid;
   justify-items: center;
   gap: 1.25rem;
-  max-inline-size: 24rem;
+  max-inline-size: 26rem;
   margin-inline: auto;
   padding-block-start: clamp(1rem, 8vh, 5rem);
 }
@@ -3081,7 +3107,13 @@ body > nav .brand {
   text-align: center;
 }
 
-.signin-head h1 { margin: 0.4rem 0 0; font-size: 1.5rem; }
+/* Merged from two: the size came from the later one, the margin from the
+   earlier, and neither half described the heading on the screen. */
+.signin-head h1 {
+  margin: 0.4rem 0 0;
+  font-size: clamp(1.4rem, 1.1rem + 1vw, 1.9rem);
+  letter-spacing: -0.03em;
+}
 .signin-head .lead { margin: 0; color: var(--text-dim); }
 
 .signin form { inline-size: 100%; margin: 0; }
@@ -3160,13 +3192,6 @@ a.bento-card:hover,
   box-shadow: var(--shadow-md), var(--hairline);
 }
 
-/* The sidebar is the one surface that does not float: it is the wall the
-   application hangs on, so it takes the recessed colour and lets the content
-   beside it be the thing with depth. */
-.side {
-  background: color-mix(in srgb, var(--panel) 92%, var(--text-main) 3%);
-}
-
 
 .admin-main > h1 { margin-block-end: 0.35rem; }
 
@@ -3195,37 +3220,15 @@ a.bento-card:hover,
 
 /* --------------------------------------------------- reporting, refined */
 
-.choice-card {
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm), var(--hairline);
-  padding: 1rem 1.1rem;
-  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease),
-    box-shadow 0.18s var(--ease), background 0.18s var(--ease);
-}
-
 .choice-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md), var(--hairline); }
-
-/* The mark of the kind, in a tile rather than loose above the words: it is the
-   same shape as every other icon tile in the product. */
-.choice-card .icon {
-  box-sizing: content-box;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--surface-dim);
-  color: var(--text-dim);
-  margin-block-end: 0.35rem;
-}
 
 .choice-card.on { box-shadow: var(--shadow-sm), var(--hairline), 0 0 0 1px var(--accent); }
 .choice-card.on .icon { background: var(--accent-wash); color: var(--accent-alt); }
 
 /* ------------------------------------------------------ signing in, refined */
 
-.signin { max-inline-size: 26rem; }
-
 .signin .wizard-card { box-shadow: var(--shadow-md), var(--hairline); }
 
-.signin-head h1 { font-size: clamp(1.4rem, 1.1rem + 1vw, 1.9rem); letter-spacing: -0.03em; }
 
 /* The mark on the entrance, lit the way the front page lights it. */
 .signin-head .brand-logo {
@@ -3327,13 +3330,6 @@ a.bento-card:hover,
    across: at a quarter of the window it is a smear. */
 .dash-card.full {
   grid-column: 1 / -1;
-}
-
-.dash-card > h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 1rem 1.1rem 0.5rem;
 }
 
 .stat-go {

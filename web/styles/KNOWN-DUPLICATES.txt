@@ -15,9 +15,7 @@
 # declaration earlier changes what it competes with, three screens changed, and
 # the script that did it mangled ten selectors on the way. By hand, one at a
 # time, looking at the screen after each.
-.choice-card
-.choice-card .icon
-.dash-card > h3
-.side
-.signin
-.signin-head h1
+
+# Empty. Every one of them has been merged, one at a time, with the twelve
+# documentation screenshots compared after each. Nothing goes back in here: a
+# new duplicate fails the rule, which is the whole point.
