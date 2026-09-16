@@ -104,7 +104,7 @@ func TestTheSecurityInventoryIsComplete(t *testing.T) {
 		"nothing private is indexable, and a follow token never is":       "TestPrivatePagesStayOutOfSearchAndPublicOnesDoNot",
 		"HSTS over TLS and only there":                                    "TestHSTSIsSentOverTLSAndOnlyThere",
 		"passwords are hashed with argon2id, not truncated":               "TestALongPassphraseIsNotTruncated",
-		"the forge token is encrypted at rest":                            "TestTheStoredTokenIsNotReadableInTheDatabase",
+		"the forge token goes in and never comes back out":                "TestTheTokenNeverComesBackOutOfTheAPI",
 		"nothing waiting for a person is public":                          "TestNothingWaitingIsPublic",
 		"a caller cannot choose the address they are limited by":          "TestTheCallerCannotChooseTheirOwnAddress",
 		"only authz decides what somebody may do":                         "TestOnlyAuthzDecidesPermissions",

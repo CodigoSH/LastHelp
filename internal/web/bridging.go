@@ -28,14 +28,10 @@ import (
 // handed a gigabyte.
 const webhookBodyLimit = 1 << 20
 
-// clientFor builds the adapter for an organisation, decrypting the token at the
+// clientFor builds the adapter for an organisation, reading the token at the
 // moment of use rather than carrying it around.
 func (s *Server) clientFor(o org.Organization) (forge.Client, error) {
-	sealed, _, err := s.orgs().Credentials(o.ID)
-	if err != nil {
-		return nil, err
-	}
-	token, err := s.box.Open(sealed)
+	token, _, err := s.orgs().Credentials(o.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -105,14 +101,8 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, sealedSecret, err := s.orgs().Credentials(organisation.ID)
+	_, secret, err := s.orgs().Credentials(organisation.ID)
 	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	secret, err := s.box.Open(sealedSecret)
-	if err != nil {
-		slog.Error("could not read the webhook secret", "org", organisation.Slug, "error", err)
 		http.NotFound(w, r)
 		return
 	}
@@ -264,17 +254,7 @@ func (s *Server) handleSetCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sealedToken, err := s.box.Seal(in.Token)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	sealedSecret, err := s.box.Seal(in.WebhookSecret)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	if err := s.orgs().SetCredentials(o.ID, sealedToken, sealedSecret); err != nil {
+	if err := s.orgs().SetCredentials(o.ID, in.Token, in.WebhookSecret); err != nil {
 		slog.Error("storing credentials", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
@@ -383,13 +363,9 @@ func (s *Server) handleSetNotifyChannel(w http.ResponseWriter, r *http.Request) 
 // known, so it goes out in English. That is a real limitation, written down
 // rather than hidden: the honest fix is asking for a language alongside the
 // address, and that costs a field on a form whose whole point is being short.
-func (s *Server) tellReporter(_ context.Context, sealed []byte, title, reason, link string) error {
+func (s *Server) tellReporter(_ context.Context, address, title, reason, link string) error {
 	if s.cfg.Mail.From == "" {
 		return nil
-	}
-	address, err := s.box.Open(sealed)
-	if err != nil {
-		return err
 	}
 
 	sender := mail.Sender{Config: s.cfg.Mail, Offline: s.cfg.Offline}

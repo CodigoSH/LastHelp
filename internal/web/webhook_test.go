@@ -2,7 +2,9 @@ package web
 
 import (
 	"bytes"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/fake"
@@ -175,8 +177,20 @@ func TestTheTokenIsNeverEchoedBack(t *testing.T) {
 	}
 }
 
-// TestTheStoredTokenIsNotReadableInTheDatabase.
-func TestTheStoredTokenIsNotReadableInTheDatabase(t *testing.T) {
+// TestTheTokenNeverComesBackOutOfTheAPI.
+//
+// This replaced a test that checked the token was unreadable in the database.
+// It is readable now, deliberately: a key kept beside the database protects
+// nothing against the file leaving the machine, because the key leaves with it.
+// The boundary is the backup, and that is where the password belongs.
+//
+// What still has to be true, and is what this asks: the token goes in and never
+// comes back. A panel that echoes it into a form, a listing that carries it for
+// convenience, an error that quotes it — each of those puts write access to
+// somebody's forge into a browser, a proxy log and a screenshot.
+func TestTheTokenNeverComesBackOutOfTheAPI(t *testing.T) {
+	const secret = "ghp_the_secret_token"
+
 	team := newInstance(t)
 	team.claim()
 
@@ -185,19 +199,32 @@ func TestTheStoredTokenIsNotReadableInTheDatabase(t *testing.T) {
 	})
 	_ = resp.Body.Close()
 	resp = team.do(http.MethodPost, "/api/orgs/codigosh/credentials",
-		map[string]string{"token": "ghp_the_secret_token", "webhook_secret": "s"})
+		map[string]string{"token": secret, "webhook_secret": "s"})
 	_ = resp.Body.Close()
 
-	var stored []byte
-	if err := team.db().QueryRow(`SELECT token_enc FROM organization WHERE slug = 'codigosh'`).
+	// It is stored, because the bridge has to use it.
+	var stored string
+	if err := team.db().QueryRow(`SELECT token FROM organization WHERE slug = 'codigosh'`).
 		Scan(&stored); err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Contains(stored, []byte("ghp_the_secret_token")) {
-		t.Error("the token is readable in the database; a leaked backup would be write access to the forge")
+	if stored != secret {
+		t.Fatalf("the token was not stored as given: %q", stored)
 	}
-	if len(stored) == 0 {
-		t.Error("nothing was stored at all")
+
+	// And it does not come back out of anything the panel asks for.
+	for _, path := range []string{
+		"/api/organizations",
+		"/api/orgs/codigosh",
+		"/api/orgs/codigosh/credentials",
+		"/api/orgs/codigosh/repositories",
+	} {
+		resp := team.do(http.MethodGet, path, nil)
+		body, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if strings.Contains(string(body), secret) {
+			t.Errorf("%s hands the forge token back:\n%s", path, body)
+		}
 	}
 }
 

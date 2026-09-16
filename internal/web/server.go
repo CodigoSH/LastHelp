@@ -21,7 +21,6 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/outbound"
-	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/secretbox"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
@@ -72,7 +71,6 @@ type Server struct {
 	// box seals the forge credentials. Its key lives in a file beside the
 	// database rather than in it, so a leaked backup is not write access to
 	// somebody's forge.
-	box secretbox.Box
 
 	// out is the one way to somebody else's server.
 	out *outbound.Client
@@ -126,7 +124,9 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	}
 	s.shell = string(shell)
 
-	if s.box, err = secretbox.Open(cfg.KeyFile); err != nil {
+	// Secrets are stored as they are given, and the one thing left that knows
+	// how to open a sealed value is the migration that empties the old columns.
+	if err := unsealOnce(db, cfg.KeyFile); err != nil {
 		return nil, err
 	}
 	s.out = outbound.New(cfg.Offline, 20*time.Second)

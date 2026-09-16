@@ -36,9 +36,12 @@ type Config struct {
 	// X-Forwarded-For — never the leftmost, which the caller writes.
 	TrustProxyHops int
 
-	// KeyFile holds the key that encrypts the forge credentials. It sits beside
-	// the database rather than inside it: a backup script copies the database,
-	// and a key that travelled with it would make the encryption decorative.
+	// KeyFile is where a version before this one kept the key that encrypted
+	// the forge credentials. Secrets are no longer encrypted at rest, so this
+	// is read exactly once — at startup, to move what is still sealed into the
+	// plain columns beside it — and never written. It stays a setting because
+	// an operator who moved the key is the one operator whose values would
+	// otherwise become unreadable at the moment of upgrading.
 	KeyFile string
 
 	// PublicURL is where this instance is reachable from outside, used to build
@@ -120,8 +123,9 @@ func boolean(key string, fallback bool) bool {
 	return v
 }
 
-// keyFile defaults to sitting next to the database, which is where an operator
-// looks for it and where the documentation says it is.
+// keyFile defaults to sitting next to the database, because that is where the
+// version that created it put it. Nothing creates it now: a missing file means
+// this installation never encrypted anything, which is the normal case.
 func keyFile() string {
 	if explicit := str("LASTHELP_KEY_FILE", ""); explicit != "" {
 		return explicit

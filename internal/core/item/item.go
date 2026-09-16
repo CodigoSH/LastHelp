@@ -168,13 +168,12 @@ type New struct {
 	Body   string
 	Fields []Field
 
-	// EmailSealed is the reporter's address, already encrypted, and only if
+	// Email is the reporter's address, and only if
 	// they asked to be told about changes.
 	//
-	// Sealed by the caller rather than here: the domain does not do
-	// cryptography, and taking the address in the clear would mean this package
-	// had it in memory and in every stack trace. Empty is the normal case.
-	EmailSealed []byte
+	// Empty is the normal case: the field is only offered when a mail relay
+	// exists to use it, and it is deleted when the item closes.
+	Email string
 }
 
 // Store reads and writes items.
@@ -218,14 +217,13 @@ func (s Store) Create(in New, moderation Moderation, now time.Time) (Item, strin
 		return Item{}, "", err
 	}
 
-	var email any
-	if len(in.EmailSealed) > 0 {
-		email = in.EmailSealed
-	}
+	// Empty rather than NULL: the column is NOT NULL DEFAULT '' like every other
+	// plain column added since, and "no address" is the normal case.
+	email := in.Email
 
 	res, err := s.DB.Exec(`INSERT INTO item
 		(public_id, repo_id, kind, title, body, status, moderation_state,
-		 body_hash, author_email_enc, follow_token_hash, created_at, published_at)
+		 body_hash, author_email, follow_token_hash, created_at, published_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		publicID, in.RepoID, string(in.Kind), in.Title, in.Body,
 		string(StatusNew), string(moderation),
@@ -521,21 +519,23 @@ func sameToken(a, b string) bool {
 	return diff == 0
 }
 
-// SealedEmail returns the reporter's encrypted address, or nothing.
+// ReporterEmail returns the reporter's address, or nothing.
 //
-// It comes back sealed. Only the caller with the key can read it, which is what
-// keeps the address out of every listing, every log line and every response
-// that merely happens to load an item.
-func (s Store) SealedEmail(itemID int64) ([]byte, error) {
-	var sealed []byte
-	err := s.DB.QueryRow(`SELECT author_email_enc FROM item WHERE id = ?`, itemID).Scan(&sealed)
+// It is asked for by id, on its own, so that the address stays out of every
+// listing and out of every response that merely happens to load an item. That
+// is now the whole of what keeps it from travelling — it used to be encrypted
+// as well — so the narrowness matters more than it did: nothing selects this
+// column unless it is about to send a message to it.
+func (s Store) ReporterEmail(itemID int64) (string, error) {
+	var address string
+	err := s.DB.QueryRow(`SELECT author_email FROM item WHERE id = ?`, itemID).Scan(&address)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return nil, ErrNotFound
+		return "", ErrNotFound
 	case err != nil:
-		return nil, fmt.Errorf("reading the address: %w", err)
+		return "", fmt.Errorf("reading the address: %w", err)
 	}
-	return sealed, nil
+	return address, nil
 }
 
 // ForgetEmail removes the address.
@@ -545,7 +545,12 @@ func (s Store) SealedEmail(itemID int64) ([]byte, error) {
 // reason. SECURITY.md says it is deleted when the item closes, and this is the
 // code that has to make that true.
 func (s Store) ForgetEmail(itemID int64) error {
-	_, err := s.DB.Exec(`UPDATE item SET author_email_enc = NULL WHERE id = ?`, itemID)
+	// Both columns: the plain one this writes to, and the sealed one an older
+	// version of this product may have filled. Forgetting an address has to
+	// forget it wherever it is, or the promise in SECURITY.md is only true for
+	// databases created after today.
+	_, err := s.DB.Exec(
+		`UPDATE item SET author_email = '', author_email_enc = NULL WHERE id = ?`, itemID)
 	if err != nil {
 		return fmt.Errorf("forgetting the address: %w", err)
 	}

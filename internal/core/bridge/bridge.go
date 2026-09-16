@@ -49,10 +49,11 @@ type Announcer func(ctx context.Context, repoID int64, title, body, url string) 
 
 // Teller delivers to the person who reported something.
 //
-// It is handed the address still sealed: the domain never holds it in the
-// clear, so it cannot end up in a log line, an error, or a stack trace. What
-// can decrypt it is outside, and only for as long as it takes to send.
-type Teller func(ctx context.Context, sealedEmail []byte, title, body, url string) error
+// It is handed the address, and it is the only thing that is. Nothing else in
+// the domain asks for it: the address is read by id, at the moment a message is
+// about to be sent, and it reaches no listing, no response and no log line
+// because nothing else selects the column.
+type Teller func(ctx context.Context, address, title, body, url string) error
 
 // ErrNoForge means the organisation is not connected to one. It is not a
 // failure state: running with no forge at all is supported, and everything
@@ -60,8 +61,8 @@ type Teller func(ctx context.Context, sealedEmail []byte, title, body, url strin
 var ErrNoForge = errors.New("this organisation has no forge")
 
 // Clients builds a client for an organisation. It is a function rather than a
-// map so the credential is decrypted at the moment of use rather than being
-// carried around in memory.
+// map so the credential is read at the moment of use rather than being carried
+// around in memory, where a panic would print it.
 type Clients func(o org.Organization) (forge.Client, error)
 
 // Bridge carries what both directions need.
@@ -399,11 +400,11 @@ func (b Bridge) tellReporter(ctx context.Context, itemID int64, reason string) e
 		return err
 	}
 
-	sealed, err := b.Items.SealedEmail(itemID)
+	address, err := b.Items.ReporterEmail(itemID)
 	if err != nil {
 		return err
 	}
-	if len(sealed) == 0 {
+	if address == "" {
 		// Nobody asked to be told. The common case, and not a failure.
 		return b.forgetIfFinished(it)
 	}
@@ -412,7 +413,7 @@ func (b Bridge) tellReporter(ctx context.Context, itemID int64, reason string) e
 	if b.PublicURL != "" {
 		link = strings.TrimSuffix(b.PublicURL, "/") + "/i/" + it.PublicID
 	}
-	if err := b.Tell(ctx, sealed, it.Title, reason, link); err != nil {
+	if err := b.Tell(ctx, address, it.Title, reason, link); err != nil {
 		return err
 	}
 	return b.forgetIfFinished(it)

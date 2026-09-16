@@ -233,14 +233,14 @@ func TestCredentialsGoInAndOutSealed(t *testing.T) {
 		t.Errorf("a fresh organisation reported %v", err)
 	}
 
-	if err := s.SetCredentials(o.ID, []byte("sealed-token"), []byte("sealed-secret")); err != nil {
+	if err := s.SetCredentials(o.ID, "a-token", "a-webhook-secret"); err != nil {
 		t.Fatal(err)
 	}
 	token, secret, err := s.Credentials(o.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(token) != "sealed-token" || string(secret) != "sealed-secret" {
+	if token != "a-token" || secret != "a-webhook-secret" {
 		t.Errorf("came back as %q / %q", token, secret)
 	}
 }

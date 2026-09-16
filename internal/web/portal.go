@@ -307,23 +307,16 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	// Everything waits for a human unless the repository says otherwise. The
 	// queue is the protection: nothing the public writes reaches a public page
 	// without somebody having looked at it.
-	// The address is sealed here, at the edge, so the domain never holds it in
-	// the clear. Left blank — which is the normal case and what the form
-	// encourages — nothing is stored at all.
-	var sealedEmail []byte
-	if address := strings.TrimSpace(in.Email); address != "" {
-		var sealErr error
-		if sealedEmail, sealErr = s.box.Seal(address); sealErr != nil {
-			slog.Error("sealing a reporter address", "error", sealErr)
-			writeError(w, http.StatusInternalServerError, "error.internal")
-			return
-		}
-	}
+	// Left blank — which is the normal case and what the form encourages —
+	// nothing is stored at all. When it is given, it is stored as given: what
+	// keeps it from travelling is that nothing reads the column except the code
+	// about to send a message, and that it is deleted when the report closes.
+	address := strings.TrimSpace(in.Email)
 
 	moderation := item.Pending
 	created, token, createErr := s.items().Create(item.New{
 		RepoID: repo.ID, Kind: kind, Title: in.Title, Body: in.Body,
-		EmailSealed: sealedEmail, Fields: fields,
+		Email: address, Fields: fields,
 	}, moderation, s.now())
 	if createErr != nil {
 		if errors.Is(createErr, item.ErrNotFound) {

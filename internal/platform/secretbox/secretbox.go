@@ -1,56 +1,44 @@
-// Package secretbox encrypts the few things that must not be readable in a
-// database backup.
+// Package secretbox reads what an earlier version of this product encrypted.
 //
-// Which is a short list: the forge token and the webhook secret. Everything
-// else in this database is either public already or a hash.
+// Nothing here seals anything any more. Secrets live in the database as they
+// were given: a key kept on the same machine as the data protects against
+// nothing that a password on the backup does not protect better, and it carried
+// a failure of its own — a key file is a file, and a file next to the database
+// is a file that ends up copied somewhere it should not be.
 //
-// The key does not live in the database. That is the whole point: a backup that
-// leaked would otherwise carry both the ciphertext and the key to it, which is
-// the same as storing the token in plain text with extra steps.
+// What is left is the reading half, called once by the startup migration that
+// moves sealed values into the plain columns beside them. It cannot make a key:
+// a migration that generated one would write a fresh file on every install that
+// has none, decrypt nothing with it, and leave behind exactly the thing this
+// product stopped wanting to exist.
 package secretbox
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 )
 
 // ErrNoKey means there is no key file, so nothing encrypted can be read.
 var ErrNoKey = errors.New("no encryption key")
 
-// Box seals and opens.
+// Box opens values sealed by an earlier version.
 type Box struct {
 	aead cipher.AEAD
 }
 
-// Open loads the key beside the database, creating it on first use.
-//
-// 0600 and a separate file. An operator who copies the database file — which is
-// what every backup script does — does not copy this, and a leaked backup is
-// then a leak of hashes and public text rather than of write access to
-// somebody's forge.
-func Open(path string) (Box, error) {
+// OpenExisting reads a key that is already there. A missing file comes back as
+// os.ErrNotExist, which the caller reports to the operator rather than treating
+// as a failure to start: on every install that never encrypted anything, there
+// is no key and there is nothing to open.
+func OpenExisting(path string) (Box, error) {
 	key, err := os.ReadFile(path)
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		key = make([]byte, 32)
-		if _, err := rand.Read(key); err != nil {
-			return Box{}, fmt.Errorf("generating the encryption key: %w", err)
-		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			return Box{}, fmt.Errorf("creating the key directory: %w", err)
-		}
-		if err := os.WriteFile(path, key, 0o600); err != nil {
-			return Box{}, fmt.Errorf("writing the encryption key: %w", err)
-		}
-	case err != nil:
-		return Box{}, fmt.Errorf("reading the encryption key: %w", err)
-	case len(key) != 32:
+	if err != nil {
+		return Box{}, err
+	}
+	if len(key) != 32 {
 		return Box{}, fmt.Errorf("the key file is %d bytes, want 32", len(key))
 	}
 
@@ -65,22 +53,10 @@ func Open(path string) (Box, error) {
 	return Box{aead: aead}, nil
 }
 
-// Seal encrypts. The nonce is random per call and stored in front of the
-// ciphertext: reusing one with GCM is catastrophic, and the only safe way to
-// never reuse one is to never choose one.
-func (b Box) Seal(plain string) ([]byte, error) {
-	if b.aead == nil {
-		return nil, ErrNoKey
-	}
-	nonce := make([]byte, b.aead.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, fmt.Errorf("generating a nonce: %w", err)
-	}
-	return b.aead.Seal(nonce, nonce, []byte(plain), nil), nil
-}
-
-// Openes decrypts. A value that has been tampered with fails rather than
-// decrypting to something else, which is what the authentication in AEAD is for.
+// Open decrypts. The nonce sits in front of the ciphertext, which is where the
+// version that wrote these bytes put it. A value that has been tampered with
+// fails rather than decrypting to something else, which is what the
+// authentication in AEAD is for.
 func (b Box) Open(sealed []byte) (string, error) {
 	if b.aead == nil {
 		return "", ErrNoKey

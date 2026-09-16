@@ -233,17 +233,16 @@ func TestTheReporterIsToldAndThenForgotten(t *testing.T) {
 	b, _, _ := setup(t, org.ForgeNone)
 
 	var told []string
-	b.Tell = func(_ context.Context, sealed []byte, title, reason, _ string) error {
-		told = append(told, string(sealed)+"|"+title+"|"+reason)
+	b.Tell = func(_ context.Context, address, title, reason, _ string) error {
+		told = append(told, address+"|"+title+"|"+reason)
 		return nil
 	}
 
-	// Somebody who asked to be notified. The address arrives already sealed —
-	// the domain never sees it in the clear — so for this test the "sealed"
-	// bytes stand in for whatever the box produced.
+	// Somebody who asked to be notified. The address is stored as given, and
+	// what keeps it from travelling is that only this path reads it.
 	it, _, err := b.Items.Create(item.New{
 		RepoID: 1, Kind: item.Bug, Title: "crash on import",
-		EmailSealed: []byte("sealed:somebody@example.com"),
+		Email: "somebody@example.com",
 	}, item.Published, epoch)
 	if err != nil {
 		t.Fatal(err)
@@ -264,11 +263,11 @@ func TestTheReporterIsToldAndThenForgotten(t *testing.T) {
 	if len(told) != 1 {
 		t.Fatalf("the reporter was told %d times, want 1", len(told))
 	}
-	sealed, err := b.Items.SealedEmail(it.ID)
+	address, err := b.Items.ReporterEmail(it.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sealed) == 0 {
+	if address == "" {
 		t.Fatal("the address was forgotten while the item is still open, so nothing can tell " +
 			"them about the next change")
 	}
@@ -289,15 +288,15 @@ func TestTheReporterIsToldAndThenForgotten(t *testing.T) {
 			"the closure before being forgotten", len(told))
 	}
 
-	sealed, err = b.Items.SealedEmail(it.ID)
+	address, err = b.Items.ReporterEmail(it.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sealed) != 0 {
+	if address != "" {
 		t.Errorf("the address survived the item closing: %q\n\n"+
 			"It was collected for one purpose and that purpose is over. SECURITY.md says it "+
 			"is deleted, and a document describing a behaviour nobody exercises is a document "+
-			"that is right until the day it is not.", sealed)
+			"that is right until the day it is not.", address)
 	}
 }
 
@@ -309,7 +308,7 @@ func TestNobodyWhoLeftNoAddressIsChased(t *testing.T) {
 	b, _, it := setup(t, org.ForgeNone)
 
 	called := 0
-	b.Tell = func(context.Context, []byte, string, string, string) error {
+	b.Tell = func(context.Context, string, string, string, string) error {
 		called++
 		return nil
 	}

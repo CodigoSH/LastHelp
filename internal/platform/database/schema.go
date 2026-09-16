@@ -320,6 +320,35 @@ var migrations = []migration{
 			return addColumn(tx, "app_user", "language", "TEXT NOT NULL DEFAULT ''")
 		},
 	},
+	{
+		version: 7,
+		name:    "secrets are stored as they are given",
+		// The three sealed columns become plain ones beside them.
+		//
+		// What was sealed — a forge token, a webhook secret, the address of
+		// somebody who asked to be told when their report moved — is the
+		// operator's own data on the operator's own machine, and the key that
+		// opened it sat in the same directory. Against the one thing encryption
+		// at rest can cover, a copy of the file leaving the machine, a key that
+		// travels beside the data protects nothing. The boundary is the backup,
+		// and that is where the password belongs.
+		//
+		// The old columns are left exactly where they are. A migration that
+		// deletes one re-breaks every database old enough to still need it, and
+		// the rule holds even when the column is one this code no longer reads.
+		fn: func(tx *sql.Tx) error {
+			for _, c := range []struct{ table, column string }{
+				{"organization", "token"},
+				{"organization", "webhook_secret"},
+				{"item", "author_email"},
+			} {
+				if err := addColumn(tx, c.table, c.column, "TEXT NOT NULL DEFAULT ''"); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

@@ -11,13 +11,18 @@ import (
 // ErrNoCredentials means this organisation has no token stored.
 var ErrNoCredentials = errors.New("no forge credentials")
 
-// SetCredentials stores the token and webhook secret, already encrypted.
+// SetCredentials stores the token and the webhook secret.
 //
-// The store never sees them in the clear and never decrypts: it takes sealed
-// bytes and hands sealed bytes back. Which means a query, a log line or a
-// backup of this table is not a leak of write access to somebody's forge.
-func (s Store) SetCredentials(orgID int64, token, webhookSecret []byte) error {
-	res, err := s.DB.Exec(`UPDATE organization SET token_enc = ?, webhook_secret_enc = ? WHERE id = ?`,
+// They are stored as they were given. They used to be sealed with a key that
+// lived beside the database, which against the one thing encryption at rest can
+// cover — the file leaving the machine — protected nothing, because the key left
+// with it. The boundary is the backup, and that is where the password is.
+//
+// What follows from that: this table is worth the same as the token in it. A
+// query, a log line or a copy of the file is write access to somebody's forge,
+// and the backup screen says so before it makes one.
+func (s Store) SetCredentials(orgID int64, token, webhookSecret string) error {
+	res, err := s.DB.Exec(`UPDATE organization SET token = ?, webhook_secret = ? WHERE id = ?`,
 		token, webhookSecret, orgID)
 	if err != nil {
 		return fmt.Errorf("storing the credentials: %w", err)
@@ -28,17 +33,17 @@ func (s Store) SetCredentials(orgID int64, token, webhookSecret []byte) error {
 	return nil
 }
 
-// Credentials returns the sealed bytes.
-func (s Store) Credentials(orgID int64) (token, webhookSecret []byte, err error) {
-	err = s.DB.QueryRow(`SELECT token_enc, webhook_secret_enc FROM organization WHERE id = ?`, orgID).
+// Credentials returns the token and the webhook secret.
+func (s Store) Credentials(orgID int64) (token, webhookSecret string, err error) {
+	err = s.DB.QueryRow(`SELECT token, webhook_secret FROM organization WHERE id = ?`, orgID).
 		Scan(&token, &webhookSecret)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return nil, nil, ErrNotFound
+		return "", "", ErrNotFound
 	case err != nil:
-		return nil, nil, fmt.Errorf("reading the credentials: %w", err)
-	case len(token) == 0:
-		return nil, nil, ErrNoCredentials
+		return "", "", fmt.Errorf("reading the credentials: %w", err)
+	case token == "":
+		return "", "", ErrNoCredentials
 	}
 	return token, webhookSecret, nil
 }

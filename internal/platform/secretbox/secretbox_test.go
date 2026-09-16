@@ -1,33 +1,67 @@
 package secretbox
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func box(t *testing.T) (Box, string) {
+// seal writes a value the way the retired version wrote it: a random nonce in
+// front of an AES-GCM ciphertext. It lives here, in the test, because nothing
+// in the product seals any more and a sealing function kept in the package
+// would be code with no callers pretending to be a feature.
+//
+// What it does NOT prove on its own is that this is really the format on disk
+// in somebody's installation — a wrong idea of the format written twice agrees
+// with itself. That was settled the other way, once: a database built by
+// v1.0.0-Beta.03 was opened by this code and the token came back out whole.
+// This test is here so that reading stops working loudly if anybody tidies the
+// reader afterwards.
+func seal(t *testing.T, key []byte, plain string) []byte {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "key")
-	b, err := Open(path)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return b, path
+	aead, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonce := make([]byte, aead.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		t.Fatal(err)
+	}
+	return aead.Seal(nonce, nonce, []byte(plain), nil)
 }
 
-func TestARoundTrip(t *testing.T) {
-	b, _ := box(t)
+func keyFile(t *testing.T) (string, []byte) {
+	t.Helper()
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "lasthelp.key")
+	if err := os.WriteFile(path, key, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path, key
+}
 
-	sealed, err := b.Seal("ghp_a_forge_token")
+func TestASealedValueComesBackOut(t *testing.T) {
+	path, key := keyFile(t)
+	sealed := seal(t, key, "ghp_a_forge_token")
+	if strings.Contains(string(sealed), "ghp_") {
+		t.Fatal("the fixture is not encrypted, so this test proves nothing")
+	}
+
+	b, err := OpenExisting(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(sealed), "ghp_") {
-		t.Fatal("the token is readable in the stored bytes")
-	}
-
 	plain, err := b.Open(sealed)
 	if err != nil {
 		t.Fatal(err)
@@ -37,97 +71,74 @@ func TestARoundTrip(t *testing.T) {
 	}
 }
 
-// TestTheSameValueSealsDifferentlyEveryTime.
-//
-// A random nonce per call. Reusing one with GCM is catastrophic, and two
-// organisations with the same token must not be visibly the same in a backup.
-func TestTheSameValueSealsDifferentlyEveryTime(t *testing.T) {
-	b, _ := box(t)
+// TestAMissingKeyIsNotMadeUp is the one that matters now. Open used to create a
+// key when the file was gone, which is right for a product that seals and wrong
+// for a migration: every install that never encrypted anything would get a
+// fresh key file written into its data directory on upgrade, decrypting
+// nothing, and the file this product stopped wanting would be back.
+func TestAMissingKeyIsNotMadeUp(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lasthelp.key")
 
-	first, err := b.Seal("same")
-	if err != nil {
-		t.Fatal(err)
+	if _, err := OpenExisting(path); !os.IsNotExist(err) {
+		t.Fatalf("want a not-exist error, got %v", err)
 	}
-	second, err := b.Seal("same")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(first) == string(second) {
-		t.Error("two seals of the same value are identical: the nonce is not random")
+	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+		t.Fatalf("something was written: %v, %v", entries, err)
 	}
 }
 
 // TestTamperingIsDetected. AEAD, not just encryption: a changed byte has to
 // fail rather than decrypt to something else.
 func TestTamperingIsDetected(t *testing.T) {
-	b, _ := box(t)
-	sealed, err := b.Seal("a token")
-	if err != nil {
-		t.Fatal(err)
-	}
+	path, key := keyFile(t)
+	sealed := seal(t, key, "ghp_a_forge_token")
 	sealed[len(sealed)-1] ^= 0xff
 
-	if _, err := b.Open(sealed); err == nil {
-		t.Error("a tampered value decrypted")
+	b, err := OpenExisting(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain, err := b.Open(sealed); err == nil {
+		t.Fatalf("a tampered value opened as %q", plain)
 	}
 }
 
-// TestAnotherKeyCannotRead is what makes the separate file worth having.
+// TestAnotherKeyCannotRead is what makes the migration report a row as
+// unreadable instead of silently writing rubbish into the plain column.
 func TestAnotherKeyCannotRead(t *testing.T) {
-	first, _ := box(t)
-	second, _ := box(t)
+	_, key := keyFile(t)
+	sealed := seal(t, key, "ghp_a_forge_token")
 
-	sealed, err := first.Seal("a token")
+	other, _ := keyFile(t)
+	b, err := OpenExisting(other)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := second.Open(sealed); err == nil {
-		t.Error("a different key opened it")
-	}
-}
-
-// TestTheKeyFileIsNotWorldReadable.
-//
-// It sits next to the database, and the database is what backup scripts copy.
-// A key anybody on the machine can read is a key that travels with it.
-func TestTheKeyFileIsNotWorldReadable(t *testing.T) {
-	_, path := box(t)
-
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if mode := info.Mode().Perm(); mode != 0o600 {
-		t.Errorf("the key file is %o, want 600", mode)
-	}
-}
-
-func TestTheKeyIsKeptBetweenStarts(t *testing.T) {
-	b, path := box(t)
-	sealed, err := b.Seal("a token")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	again, err := Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	plain, err := again.Open(sealed)
-	if err != nil {
-		t.Fatalf("restarting could not read what it wrote: %v", err)
-	}
-	if plain != "a token" {
-		t.Errorf("came back as %q", plain)
+	if plain, err := b.Open(sealed); err == nil {
+		t.Fatalf("another key read it as %q", plain)
 	}
 }
 
 func TestAKeyFileOfTheWrongSizeIsRefused(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "key")
+	path := filepath.Join(t.TempDir(), "lasthelp.key")
 	if err := os.WriteFile(path, []byte("too short"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(path); err == nil {
-		t.Error("a truncated key file was accepted; everything sealed with it would be unreadable later")
+	if _, err := OpenExisting(path); err == nil {
+		t.Fatal("a nine-byte key was accepted")
+	}
+}
+
+// TestAValueTooShortToBeSealedIsRefused: a column holding something that is not
+// a sealed value at all must not be read as an empty string and moved.
+func TestAValueTooShortToBeSealedIsRefused(t *testing.T) {
+	path, _ := keyFile(t)
+	b, err := OpenExisting(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Open([]byte("short")); err == nil {
+		t.Fatal("five bytes were accepted as a sealed value")
 	}
 }
