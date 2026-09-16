@@ -19,13 +19,8 @@
 .chart
 .choice-card
 .choice-card .icon
-.comment .who
 .dash-card > h3
-.detail
-.detail .body
-.detail h1
 .modal
 .side
-.side .brand
 .signin
 .signin-head h1

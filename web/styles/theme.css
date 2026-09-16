@@ -1028,7 +1028,6 @@ summary:focus-visible,
 .similar-head { font-weight: 600; margin-block: 0 0.35rem; }
 
 .detail .meta { display: flex; gap: 0.6rem; align-items: center; }
-.detail .body { white-space: pre-wrap; }
 
 .follow-link { display: flex; gap: 0.5rem; margin-block-start: 0.5rem; }
 .follow-link input { flex: 1; font-family: var(--font-mono); font-size: 0.8rem; }
@@ -1045,7 +1044,17 @@ summary:focus-visible,
 }
 
 .comment-team { border-inline-start: 3px solid var(--accent); }
-.comment .who { margin: 0 0 0.25rem; font-size: 0.8rem; color: var(--text-dim); }
+/* Merged from two: the later one set the layout and won the margin, the earlier
+   one still supplied the size and the colour. Neither half described the line
+   that is on the screen. */
+.comment .who {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
 .comment .what { margin: 0; white-space: pre-wrap; }
 
 .queue { display: grid; gap: 0.75rem; margin-block-start: 1rem; }
@@ -1609,8 +1618,14 @@ body.admin-view > main {
   overflow-y: auto;
 }
 
+/* Merged from three declarations spread over fifteen hundred lines: the layout
+   came from one, the padding from another, and the size from the last, which
+   was the only one that counted. */
 .side .brand {
-  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 1.05rem;
   padding: 0 0.6rem 1rem;
 }
 
@@ -2273,12 +2288,6 @@ a.stat:hover {
   flex: 1;
 }
 
-.side .brand {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
 /* Sized by the caller through a variable rather than by the class, which used
    to win over the width attribute and shrank the sign-in mark to the size of a
    favicon. */
@@ -2563,14 +2572,15 @@ body > nav .brand {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 1.25rem;
   align-items: start;
-  padding: 1.25rem;
+  padding: clamp(1.1rem, 3vw, 1.75rem);
   border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 2px);
+  border-radius: var(--radius-xl);
   background: var(--panel);
-  margin-block-start: 0.75rem;
+  margin-block-start: 0;
+  box-shadow: var(--shadow-sm), var(--hairline);
 }
 
-.detail h1 { margin: 0.4rem 0 0.75rem; }
+.detail h1 { margin: 0.55rem 0 0.9rem; }
 .detail .meta { flex-wrap: wrap; margin: 0; }
 .detail .body { white-space: normal; }
 .detail .body p { margin: 0 0 0.7rem; }
@@ -2653,13 +2663,6 @@ body > nav .brand {
   font-weight: 600;
   color: var(--text-dim);
   font-variant-numeric: tabular-nums;
-}
-
-.comment .who {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 0 0 0.4rem;
 }
 
 .comment .avatar {
@@ -3164,7 +3167,6 @@ a.bento-card:hover,
   background: color-mix(in srgb, var(--panel) 92%, var(--text-main) 3%);
 }
 
-.side .brand { font-size: 1.05rem; }
 
 .admin-main > h1 { margin-block-end: 0.35rem; }
 
@@ -3174,14 +3176,6 @@ a.bento-card:hover,
 
 /* ---------------------------------------------------- one report, refined */
 
-.detail {
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-sm), var(--hairline);
-  padding: clamp(1.1rem, 3vw, 1.75rem);
-  margin-block-start: 0;
-}
-
-.detail h1 { margin: 0.55rem 0 0.9rem; }
 
 /* The report itself reads at the measure of a paragraph even though the card
    is as wide as the page: a line of a hundred and forty characters is a line
