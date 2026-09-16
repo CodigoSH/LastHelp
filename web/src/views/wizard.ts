@@ -197,34 +197,43 @@ export function wizard(spec: WizardSpec, text: Text): string {
       const state = n < spec.step ? "done" : n === spec.step ? "now" : "";
       return `<li class="step ${state}"${n === spec.step ? ' aria-current="step"' : ""}>
         <span class="dot" aria-hidden="true"></span>
-        <span class="step-name">${escapeHTML(name)}</span>
+        <span class="step-name visually-hidden">${escapeHTML(name)}</span>
       </li>`;
     })
     .join("");
 
+  // Everything inside one card, the way the rest of the house does it: the
+  // mark, then where you are, then the step, then the fields, then the way on.
+  // It used to be a mark floating above a card with the heading between them,
+  // which is three groups pretending to be one.
   return `<section class="wizard">
-    <!-- The mark, above the steps, on the first run only. A wizard inside the
-         panel is already under a sidebar wearing it; a second one in the middle
-         of the page is the same logo twice on one screen. -->
-    ${
-      spec.mark
-        ? `<img class="wizard-mark brand-logo mark-52" src="${escapeAttr(spec.mark)}" alt="" width="52" height="52" />`
-        : ""
-    }
-    <ol class="steps" aria-label="${escapeAttr(text.t("wizard.progress", { step: spec.step, total }))}">
-      ${dots}
-    </ol>
-    <header class="wizard-head">
-      <h1>${escapeHTML(spec.title)}</h1>
-      ${spec.lead ? `<p class="lead">${escapeHTML(spec.lead)}</p>` : ""}
-    </header>
     <form class="${escapeAttr(spec.formClass)}">
-      <div class="wizard-card">${spec.body}</div>
-      <p class="form-error" role="alert" hidden></p>
-      <div class="wizard-actions">
-        ${spec.back ? `<a class="button ghost" href="${escapeAttr(spec.back.href)}">${escapeHTML(spec.back.label)}</a>` : ""}
-        <span class="spacer"></span>
-        <button class="button primary" type="submit">${escapeHTML(spec.submit)}</button>
+      <div class="wizard-card">
+        <!-- The mark, on the first run only. A wizard inside the panel is
+             already under a sidebar wearing it; a second one in the middle of
+             the page is the same logo twice on one screen. -->
+        ${
+          spec.mark
+            ? `<img class="wizard-mark brand-logo mark-52" src="${escapeAttr(spec.mark)}" alt="" width="52" height="52" />`
+            : ""
+        }
+        <header class="wizard-head">
+          <!-- Drawn as the house's caption, but it is still the heading of the
+               page: an <h1> styled small, not a paragraph. A screen reader
+               navigating by headings should not find a setup screen that has
+               none. -->
+          <h1 class="wizard-where">${escapeHTML(spec.title)}</h1>
+          <ol class="steps" aria-label="${escapeAttr(text.t("wizard.progress", { step: spec.step, total }))}">
+            ${dots}
+          </ol>
+          ${spec.lead ? `<p class="lead">${escapeHTML(spec.lead)}</p>` : ""}
+        </header>
+        <div class="wizard-fields">${spec.body}</div>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="wizard-actions">
+          <button class="button primary" type="submit">${escapeHTML(spec.submit)}</button>
+          ${spec.back ? `<a class="button ghost" href="${escapeAttr(spec.back.href)}">${escapeHTML(spec.back.label)}</a>` : ""}
+        </div>
       </div>
     </form>
   </section>`;

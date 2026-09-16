@@ -212,9 +212,13 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* The house's ambient light, copied from the reference rather than guessed at:
+     a warm pool up and to the left and a cool one down and to the right. Ours
+     had both of them at the top, tighter, which lit the header instead of the
+     room. */
   background:
-    radial-gradient(60rem 26rem at 50% -8rem, rgba(var(--accent-rgb), 0.16), transparent 72%),
-    radial-gradient(40rem 24rem at 88% 8%, rgba(var(--accent-rgb), 0.06), transparent 70%);
+    radial-gradient(circle at 20% 30%, rgba(var(--accent-rgb), 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(100, 100, 255, 0.08) 0%, transparent 50%);
 }
 
 ::selection {
@@ -1221,43 +1225,91 @@ summary:focus-visible,
 }
 /* ---------------------------------------------------------------- wizard */
 
+/*
+ * The wizard, in the shape the rest of the house uses: one narrow card holding
+ * the mark, where you are, the fields and the way on — rather than a mark
+ * floating above a card with a heading loose between them, which is three
+ * groups pretending to be one.
+ */
 .wizard {
-  max-width: 34rem;
-  margin: clamp(1.5rem, 4vw, 3rem) auto;
+  display: grid;
+  justify-items: center;
+  padding-block: clamp(2rem, 8vh, 5rem);
 }
 
-/* The dots. A list, so a screen reader hears "step 2 of 3" from the markup and
-   not from the shape. */
+.wizard form {
+  inline-size: min(26rem, 100%);
+}
+
+.wizard-card {
+  display: grid;
+  gap: 1.25rem;
+  justify-items: stretch;
+  padding: clamp(1.5rem, 4vw, 2rem);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.wizard-mark {
+  justify-self: center;
+}
+
+.wizard-head {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+/* Where you are, in the house's caption voice: small, spaced, quiet. It says
+   the name of the step, so the row of dots below it does not have to. */
+.wizard-where {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.wizard-head .lead {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+}
+
+/* The dots: a line with a circle on each step and a ring around the one you are
+   on. The names live in the markup for a screen reader and are not drawn — the
+   caption above already said which step this is, and three names on one line is
+   what stopped the card being narrow. */
 .steps {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  list-style: none;
+  gap: 0;
+  margin: 0;
   padding: 0;
-  margin: 0 0 1.75rem;
+  list-style: none;
+  inline-size: min(15rem, 100%);
 }
 
 .steps li {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   flex: 1;
+}
+
+.steps li:last-child {
+  flex: 0;
 }
 
 .steps li::after {
   content: "";
   flex: 1;
-  height: 2px;
-  background: var(--border);
-  border-radius: 2px;
-}
-
-/* The last step has no line after it, so with an equal share of the row it left
-   a gap and the whole bar read as narrower than the card underneath it. It
-   takes only the width of its own label instead, which ends the bar exactly
-   where the card ends. */
-.steps li:last-child {
-  flex: 0 0 auto;
+  block-size: 1px;
+  background: var(--border-strong);
 }
 
 .steps li:last-child::after {
@@ -1265,106 +1317,75 @@ summary:focus-visible,
 }
 
 .steps .dot {
-  inline-size: 0.7rem;
-  block-size: 0.7rem;
+  inline-size: 9px;
+  block-size: 9px;
   border-radius: 50%;
-  background: var(--border);
-  flex: none;
-  transition: background 0.18s ease, box-shadow 0.18s ease;
+  background: var(--border-strong);
 }
 
 .steps .done .dot {
-  background: rgba(var(--accent-rgb), 0.55);
+  background: var(--accent);
 }
 
 .steps .done::after {
-  background: rgba(var(--accent-rgb), 0.35);
+  background: var(--accent);
 }
 
 .steps .now .dot {
   background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.18);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.25);
 }
 
-.step-name {
-  font-size: 0.8rem;
-  color: var(--text-dim);
+/* In the markup, out of the picture: a screen reader gets "step 2 of 3" and the
+   name of each one without being able to see a row of circles. */
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
   white-space: nowrap;
+  clip-path: inset(50%);
+  border: 0;
 }
 
-.steps .now .step-name {
-  color: var(--text-main);
+.wizard-fields {
+  display: grid;
+  gap: 1rem;
+}
+
+/* The field labels in the card speak the same caption voice as the step name.
+   Scoped to the card on purpose: the forms a visitor fills in are prose with a
+   question above them, and shouting at somebody reporting a bug is not the
+   house's voice. */
+.wizard-card .field > label {
+  font-size: 0.72rem;
   font-weight: 600;
-}
-
-/* Only the current step keeps its label on a narrow screen: five words in a row
-   wrap into a paragraph and stop reading as a progress bar. */
-@media (max-width: 34rem) {
-  .steps li:not(.now) .step-name {
-    display: none;
-  }
-}
-
-.step-count {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--text-dim);
-  font-size: 0.85rem;
-  margin: 0 0 0.35rem;
-  letter-spacing: 0.02em;
 }
 
-/* Centred, under a centred stepper. A heading hard against the left edge of a
-   card that is itself centred on an empty page reads as a fragment of a wider
-   layout that is not there. */
-.wizard-head {
-  text-align: center;
-}
-
-.wizard-head h1 {
-  margin: 0 0 0.5rem;
-  font-size: clamp(1.5rem, 3.5vw, 2rem);
-  letter-spacing: -0.01em;
-}
-
-.wizard-head .lead {
-  color: var(--text-dim);
-  margin: 0 0 1.75rem;
-}
-
-/* The fields inside the card keep reading from the start of the line: centring
-   a form is centring the text somebody is trying to type into. */
-.wizard-card {
-  text-align: start;
-}
-
-.wizard-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 4px);
-  padding: clamp(1.25rem, 3vw, 1.75rem);
-}
-
-/* The way forward on the end the eye leaves from, and the way back on the other
-   one. A single button on the left reads as the only thing you can do. */
+/* The way on, full width, with the way back under it as a plain link. A primary
+   action tucked in a corner of a narrow card reads like a footnote. */
 .wizard-actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  margin-top: 1.5rem;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: stretch;
 }
 
-.button.ghost {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
+.wizard-actions .button.primary {
+  inline-size: 100%;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  box-shadow: var(--accent-glow);
 }
 
-.button.ghost:hover {
-  color: var(--text-main);
-  border-color: var(--text-dim);
-}
-
-.wizard-actions .spacer {
-  flex: 1;
+.wizard-actions .button.ghost {
+  justify-content: center;
+  background: none;
+  border: 0;
 }
 
 /* ---------------------------------------------------------------- fields */
@@ -1632,29 +1653,51 @@ body.admin-view > main {
   }
 }
 
-/* The theme choice, three buttons rather than a switch: a switch has two ends
-   and there are three answers, one of which is "whatever the system says". */
+/* The theme choice: three tiles with a drawing on each, the chosen one outlined
+   in the accent. It was a segmented bar of three words — a control somebody
+   reads instead of one they recognise, and the house answers this question by
+   pointing. */
 .theme-choice {
-  display: inline-flex;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
 }
 
 .theme-choice button {
-  border: 0;
-  background: transparent;
-  color: var(--text-dim);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 0.5rem;
+  min-block-size: 5.25rem;
+  padding: 0.8rem 0.4rem;
   font: inherit;
   font-size: 0.85rem;
-  padding: 0.3rem 0.6rem;
+  color: var(--text-dim);
+  background: var(--surface-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   cursor: pointer;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.theme-choice button:hover {
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+
+.theme-choice button .icon {
+  inline-size: 20px;
+  block-size: 20px;
 }
 
 .theme-choice button[aria-pressed="true"] {
-  background: rgba(var(--accent-rgb), 0.16);
-  color: var(--accent-alt);
-  font-weight: 600;
+  color: var(--text-main);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--accent-glow);
+}
+
+.theme-choice button[aria-pressed="true"] .icon {
+  color: var(--accent);
 }
 
 /* --------------------------------------------------------- panel sections */
@@ -3579,32 +3622,6 @@ a.stat:hover .stat-go {
 /* Cards in a row take the height of what is in them. Stretched to match the
    tallest, a short one puts its action in the middle of a field of nothing. */
 .bento { align-items: start; }
-
-/* The theme's three buttons wear the same segmented control as every other
-   set of three in the product. They were a square-cornered box from before
-   there was one, which is how a screen ends up looking like a different
-   product's settings page. */
-.theme-choice {
-  gap: 0.15rem;
-  padding: 0.2rem;
-  border-radius: 999px;
-  background: var(--surface-dim);
-}
-
-.theme-choice button {
-  border-radius: 999px;
-  padding: 0.32rem 0.8rem;
-  font-weight: 600;
-  transition: color 0.15s var(--ease), background 0.15s var(--ease);
-}
-
-.theme-choice button:hover { color: var(--text-main); }
-
-.theme-choice button[aria-pressed="true"] {
-  background: var(--panel);
-  color: var(--accent-alt);
-  box-shadow: var(--shadow-sm);
-}
 
 /*
  * Leaving, in red.

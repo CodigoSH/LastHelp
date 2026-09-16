@@ -214,11 +214,19 @@ async function main() {
   // reads as a fragment of a wider layout that is not there. Measured, because
   // text-align can be set and change nothing.
   const centred = await evaluate(`
-    const h = document.querySelector(".wizard-head h1").getBoundingClientRect();
+    const h = document.querySelector(".wizard-head .wizard-where").getBoundingClientRect();
     const box = document.querySelector(".wizard").getBoundingClientRect();
     return Math.abs((h.left - box.left) - (box.right - h.right)) < 2;
   `);
   check("the wizard's title is centred", centred === true);
+
+  // It is drawn as a small caption now, which is exactly how a heading stops
+  // being one by accident. A setup screen with no <h1> is a page a screen
+  // reader cannot navigate by headings.
+  const heading = await evaluate(
+    `return document.querySelector(".wizard-where")?.tagName ?? "";`,
+  );
+  check("and it is still the heading of the page", heading === "H1", heading);
 
   await evaluate(`
     const f = document.querySelector("form.setup-account");

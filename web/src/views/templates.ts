@@ -1347,22 +1347,7 @@ function preferenceFields(
     }) +
     `<div class="field">
       <label>${escapeHTML(text.t("shell.theme"))}</label>
-      <div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
-        ${(["system", "light", "dark"] as const)
-          .map(
-            (value) =>
-              `<button type="button" data-theme-choice="${value}" aria-pressed="${theme === value}">${escapeHTML(
-                text.t(
-                  value === "system"
-                    ? "shell.themeSystem"
-                    : value === "light"
-                      ? "shell.themeLight"
-                      : "shell.themeDark",
-                ),
-              )}</button>`,
-          )
-          .join("")}
-      </div>
+      ${themeChoice(theme, text)}
     </div>`
   );
 }
@@ -2327,10 +2312,12 @@ export function appearanceScreen(
 
 function themeChoice(theme: string, text: Text): string {
   return `<div class="theme-choice" role="group" aria-label="${escapeAttr(text.t("shell.theme"))}">
-    ${(["system", "light", "dark"] as const)
+    ${(["light", "dark", "system"] as const)
       .map(
         (value) =>
-          `<button type="button" data-theme-choice="${value}" aria-pressed="${theme === value}">${escapeHTML(
+          `<button type="button" data-theme-choice="${value}" aria-pressed="${theme === value}">${
+            value === "light" ? icons.sun(20) : value === "dark" ? icons.moon(20) : icons.monitor(20)
+          }<span>${escapeHTML(
             text.t(
               value === "system"
                 ? "shell.themeSystem"
@@ -2338,7 +2325,7 @@ function themeChoice(theme: string, text: Text): string {
                   ? "shell.themeLight"
                   : "shell.themeDark",
             ),
-          )}</button>`,
+          )}</span></button>`,
       )
       .join("")}
   </div>`;
