@@ -1109,18 +1109,29 @@ export function itemView(item: ItemDetail, text: Text): string {
  * on every password field in the product.
  */
 export function signInForm(text: Text, instance?: { name?: string; logo?: string }): string {
+  // One card holding all of it — mark, where you are, the fields, the way in —
+  // which is what the setup does and what the reference's own entrance does.
+  // The mark and the name used to float above the card with the button hanging
+  // below it: three groups on two consecutive screens answering the same
+  // question two different ways.
   return `<section class="signin">
-    <header class="signin-head">
-      ${brandMark(instance?.logo, 56)}
-      <h1>${escapeHTML(instance?.name || text.t("app.name"))}</h1>
-    </header>
     <form class="auth">
       <div class="wizard-card">
-        ${field({ id: "auth-username", name: "username", label: text.t("auth.username"), required: true, autocomplete: "username" }, text)}
-        ${field({ id: "auth-password", name: "password", label: text.t("auth.password"), type: "password", required: true, autocomplete: "current-password" }, text)}
+        <img class="wizard-mark brand-logo mark-56" src="${escapeAttr(
+          instance?.logo && instance.logo.trim() !== "" ? instance.logo : "/logo.svg",
+        )}" alt="" width="56" height="56" />
+        <header class="signin-head">
+          <h1>${escapeHTML(instance?.name || text.t("app.name"))}</h1>
+        </header>
+        <div class="wizard-fields">
+          ${field({ id: "auth-username", name: "username", label: text.t("auth.username"), required: true, autocomplete: "username" }, text)}
+          ${field({ id: "auth-password", name: "password", label: text.t("auth.password"), type: "password", required: true, autocomplete: "current-password" }, text)}
+        </div>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="wizard-actions">
+          <button class="button primary signin-go" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
+        </div>
       </div>
-      <p class="form-error" role="alert" hidden></p>
-      <button class="button primary signin-go" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
     </form>
   </section>`;
 }

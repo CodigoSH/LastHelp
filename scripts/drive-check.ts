@@ -672,7 +672,10 @@ async function main() {
     const word = document.querySelector(".signin-go").textContent.trim();
     return {
       times: (document.body.innerText.match(new RegExp(word, "g")) ?? []).length,
-      mark: !!document.querySelector(".signin-head .brand-logo"),
+      // Asked of the card rather than of the header inside it: what this check
+      // is for is that the entrance wears the installation's mark, not where in
+      // the markup that mark happens to hang.
+      mark: !!document.querySelector(".signin .brand-logo"),
       eye: !!document.querySelector(".pw-toggle"),
       navLink: !!document.querySelector("body > nav a[href='/sign-in']"),
       lead: !!document.querySelector(".signin-head .lead"),

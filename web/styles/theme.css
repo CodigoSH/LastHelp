@@ -3075,7 +3075,6 @@ body > nav .brand {
 .signin-head {
   display: grid;
   justify-items: center;
-  gap: 0.35rem;
   text-align: center;
 }
 
@@ -3086,13 +3085,10 @@ body > nav .brand {
 .signin .wizard-card { inline-size: 100%; box-sizing: border-box; }
 
 /* Full width: there is one thing to do on this page. */
-.signin-go {
-  inline-size: 100%;
-  justify-content: center;
-  margin-block-start: 1rem;
-  padding-block: 0.65rem;
-  font-weight: 600;
-}
+/* The way in, placed by the same rule as the wizard's: full width inside the
+   card rather than a button of its own hanging under it. */
+.signin-go { inline-size: 100%; }
+
 
 /* The mark above the steps of the wizard. It wears the same lit tile as the one
    on the front page and on the entrance: three screens showing the same mark
