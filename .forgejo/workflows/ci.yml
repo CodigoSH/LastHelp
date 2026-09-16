@@ -29,11 +29,11 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.26.2'
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.11"
 
       # Without this there is no `tsc`: it is a devDependency and nothing else
       # here installs one. `bun run build` is not affected — the build script
@@ -110,11 +110,11 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version: '1.26.2'
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.3.11"
 
       # The Go build embeds internal/web/dist, which is build output and is not
       # in the repository. Without this step every package that imports the web
