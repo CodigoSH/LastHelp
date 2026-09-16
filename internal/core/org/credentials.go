@@ -19,8 +19,12 @@ var ErrNoCredentials = errors.New("no forge credentials")
 // with it. The boundary is the backup, and that is where the password is.
 //
 // What follows from that: this table is worth the same as the token in it. A
-// query, a log line or a copy of the file is write access to somebody's forge,
-// and the backup screen says so before it makes one.
+// query, a log line or a copy of the file is write access to somebody's forge.
+//
+// The backup screen does not say so yet. It offers one file and names
+// "accounts, reports, votes, replies and settings", which was true when the
+// token was sealed and is not now. Saying it there, and offering a password on
+// the file, is the other half of this change and is not written.
 func (s Store) SetCredentials(orgID int64, token, webhookSecret string) error {
 	res, err := s.DB.Exec(`UPDATE organization SET token = ?, webhook_secret = ? WHERE id = ?`,
 		token, webhookSecret, orgID)
