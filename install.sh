@@ -392,18 +392,33 @@ chmod 0755 "$WORK/$ARTEFACT"
 # an installer on a machine where 8080 is somebody's other service. Saying what
 # has it is enough: the person running this knows what their own machine does.
 #
-# The service being upgraded is stopped first, so the port it was holding is
-# free by the time this looks. Without that the check finds the process it is
-# about to replace, reports it as a stranger, and refuses the upgrade — which is
-# exactly what it did on the first machine that ran it.
-if [ "$UPGRADE" = yes ]; then
-    systemctl stop "$NAME" >/dev/null 2>&1 || true
-fi
-
-if command -v ss >/dev/null 2>&1 && ss -ltn "sport = :$PORT" 2>/dev/null | grep -q LISTEN; then
-    step "Port $PORT is already in use..."
-    ss -ltnp "sport = :$PORT" 2>/dev/null | tail -n +2 | sed 's/^/    /' || true
-    die "choose another port, or stop that first. Nothing has been changed."
+# And *whose* process it is, is asked rather than assumed. The first version of
+# this stopped the service and took whatever was still listening to be a
+# stranger; before that it did not even look, and refused an upgrade because the
+# port was held — by the very service it was about to replace. Reading
+# /proc/<pid>/exe answers the real question, does not depend on systemd knowing
+# the unit by the name this script expects, and names the intruder in the
+# message. Ported from Lastboard's, which got here first.
+#
+# No `ss`, no check: refusing an upgrade because the machine has no iproute2
+# would be a worse failure than the one this prevents.
+if command -v ss >/dev/null 2>&1; then
+    FOREIGN=""
+    for PID in $(ss -ltnp "sport = :$PORT" 2>/dev/null \
+        | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u); do
+        HOLDER=$(readlink -f "/proc/$PID/exe" 2>/dev/null || true)
+        case "$HOLDER" in
+            # Ours, in either layout: the restart below replaces it.
+            "$PREFIX/bin/$NAME"|/usr/local/bin/"$NAME") ;;
+            *) FOREIGN="$FOREIGN    PID $PID  ${HOLDER:-unknown}
+" ;;
+        esac
+    done
+    if [ -n "$FOREIGN" ]; then
+        step "Port $PORT is held by something that is not $PROJECT:"
+        printf '%s' "$FOREIGN"
+        die "free that port, or choose another one, and run this again. Nothing has been changed."
+    fi
 fi
 
 # ============================================================ account
@@ -468,6 +483,13 @@ else
 fi
 
 # ============================================================ install
+if [ "$UPGRADE" = yes ]; then
+    # Stopped here rather than up at the port check, which is the only place it
+    # was needed for: a copy of a database taken from under a running server is
+    # a copy of a database mid-write.
+    systemctl stop "$NAME" >/dev/null 2>&1 || true
+fi
+
 if [ "$UPGRADE" = yes ] && [ -f "$DATA/$NAME.db" ]; then
     # Before replacing anything. An update that goes wrong with no backup is an
     # update nobody can undo.
