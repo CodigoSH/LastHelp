@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // relay is enough of an SMTP server to hold a conversation, so these tests need
@@ -15,6 +16,15 @@ type relay struct {
 	listener net.Listener
 	mu       sync.Mutex
 	sessions []string
+	// Signalled once per recorded session.
+	//
+	// Send returns when the client is done talking; the server records the
+	// conversation in a goroutine of its own, afterwards. Reading the transcript
+	// the instant Send returns therefore races, and on a machine with something
+	// else to do the reader wins: the test saw an empty conversation and
+	// reported five missing lines with nothing after the colon. It passed here
+	// ten times out of ten and failed in CI, which is the shape of that bug.
+	recorded chan struct{}
 }
 
 func newRelay(t *testing.T) *relay {
@@ -23,7 +33,7 @@ func newRelay(t *testing.T) *relay {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := &relay{listener: listener}
+	r := &relay{listener: listener, recorded: make(chan struct{}, 16)}
 	go r.accept()
 	t.Cleanup(func() { _ = listener.Close() })
 	return r
@@ -31,7 +41,31 @@ func newRelay(t *testing.T) *relay {
 
 func (r *relay) address() string { return r.listener.Addr().String() }
 
-func (r *relay) transcript() string {
+// transcript is what the relay heard, and it does not race: it waits for the
+// session to be written down first.
+func (r *relay) transcript(t *testing.T) string {
+	t.Helper()
+	r.waitForSession(t)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return strings.Join(r.sessions, "\n")
+}
+
+// waitForSession blocks until the server has recorded one, or says so.
+func (r *relay) waitForSession(t *testing.T) {
+	t.Helper()
+	select {
+	case <-r.recorded:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the relay recorded no conversation within five seconds")
+	}
+}
+
+// nothingHeard is the other half: a test that asserts silence has to wait long
+// enough to be sure, and cannot use the channel — nothing will ever arrive on
+// it. Reading the slice directly is correct here precisely because the claim is
+// that the goroutine never ran.
+func (r *relay) nothingHeard() string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return strings.Join(r.sessions, "\n")
@@ -98,8 +132,13 @@ func (r *relay) serve(conn net.Conn) {
 
 func (r *relay) record(session string) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.sessions = append(r.sessions, session)
+	r.mu.Unlock()
+	// Buffered, so a relay nobody is waiting on does not block its own goroutine.
+	select {
+	case r.recorded <- struct{}{}:
+	default:
+	}
 }
 
 func sender(r *relay) Sender {
@@ -118,7 +157,7 @@ func TestAMessageArrives(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	transcript := r.transcript()
+	transcript := r.transcript(t)
 	for _, expected := range []string{
 		"MAIL FROM:<lasthelp@example.com>",
 		"RCPT TO:<somebody@example.com>",
@@ -143,7 +182,7 @@ func TestItIsMarkedAsAutomatic(t *testing.T) {
 	if err := sender(r).Send("a@example.com", "s", "b"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(r.transcript(), "Auto-Submitted: auto-generated") {
+	if !strings.Contains(r.transcript(t), "Auto-Submitted: auto-generated") {
 		t.Error("the message is not marked as automatic")
 	}
 }
@@ -159,7 +198,7 @@ func TestANonASCIISubjectIsEncoded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	transcript := r.transcript()
+	transcript := r.transcript(t)
 	if !strings.Contains(transcript, "Subject: =?UTF-8?B?") {
 		t.Errorf("an Arabic subject was not encoded:\n%s", transcript)
 	}
@@ -183,7 +222,10 @@ func TestHeaderInjectionIsRefused(t *testing.T) {
 	if err := s.Send("a@example.com\r\nBcc: everybody@example.com", "s", "b"); err == nil {
 		t.Error("an address with a line break was sent")
 	}
-	if transcript := r.transcript(); strings.Contains(transcript, "Bcc") {
+	// nothingHeard, not transcript: both sends are refused before a connection is
+	// opened, so there is no conversation to wait for and waiting for one is a
+	// five-second failure that says the opposite of what happened.
+	if transcript := r.nothingHeard(); strings.Contains(transcript, "Bcc") {
 		t.Errorf("an injected header reached the relay:\n%s", transcript)
 	}
 }
@@ -207,7 +249,7 @@ func TestTheOfflineSwitchStopsMail(t *testing.T) {
 	if err := s.Send("a@example.com", "s", "b"); !errors.Is(err, ErrOffline) {
 		t.Errorf("got %v, want ErrOffline", err)
 	}
-	if r.transcript() != "" {
+	if r.nothingHeard() != "" {
 		t.Error("something reached the relay while offline")
 	}
 }
