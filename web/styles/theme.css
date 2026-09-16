@@ -1243,6 +1243,7 @@ summary:focus-visible,
   word-break: break-all;
 }
 .triage { margin-block-start: 2rem; padding-block-start: 1rem; border-block-start: 1px solid var(--border); }
+
 .triage-note { font-size: 0.875rem; color: var(--text-dim); }
 
 .exports { font-size: 0.875rem; margin-block: 0.5rem 0; }
@@ -2732,6 +2733,18 @@ body > nav .brand {
 .team-tools { margin-block-start: 1rem; }
 .team-tools .tools { display: grid; gap: 0.75rem; }
 .team-tools .tools h2 { font-size: 1rem; margin: 0.5rem 0 0; }
+
+/* The second thing in the block is a second thing. Without this the heading sits
+   against the button of the form above it and reads as that form's caption —
+   "Send / Merge into another" as one sentence — which is how somebody merges a
+   report they meant to reply to.
+ *
+ * Written with the same two classes as the rule above on purpose. The first
+ * attempt was `.triage form + h2`, which matches and still loses: one class and
+ * two elements is lower than two classes and one element, so the margin stayed
+ * at the 8px set here. It looked correct in the file and did nothing on screen,
+ * and only the computed value said so. */
+.team-tools .tools form + h2 { margin-block-start: 1.75rem; }
 .team-tools .triage { margin: 0; }
 .team-tools .status-control { margin: 0; }
 
