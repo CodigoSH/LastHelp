@@ -228,3 +228,33 @@ jobs:
             exit 1
           fi
           echo "the stable channel sees: ${latest:-no stable release yet}"
+
+  # Retention runs from here, not from the tag push. The prune asks the API
+  # which releases exist, and on a tag push it asked before this one had been
+  # published — so it decided from a list that was one version out of date.
+  # With `needs:`, it runs only when the release above actually shipped, which
+  # also means a failed release never costs the previous beta.
+  #
+  # Not `on: workflow_run`, whose support here is incomplete.
+  prune:
+    name: Prune old releases
+    needs: release
+    runs-on: ubuntu-latest
+    container: node:22-bookworm
+    steps:
+      - name: Dispatch the prune, live
+        env:
+          CI_TOKEN: ${{ secrets.CI_TOKEN }}
+        run: |
+          [ -n "$CI_TOKEN" ] || { echo "CI_TOKEN is not set" >&2; exit 1; }
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: token $CI_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"ref":"main","inputs":{"dry_run":"false"}}' \
+            "${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/actions/workflows/prune-releases.yml/dispatches")
+
+          # 204 and nothing else. A dispatch that quietly did not happen is a
+          # retention policy that quietly does not exist.
+          [ "$code" = "204" ] || { echo "the prune dispatch answered HTTP $code" >&2; exit 1; }
+          echo "prune dispatched"

@@ -1,0 +1,153 @@
+# Keeps what the downloads page holds bounded, with nobody doing it by hand.
+#
+# The policy:
+#   Stables  the entry, the tag and the notes are kept for every one of them.
+#            The binaries and checksums are kept only on the last KEEP_STABLE,
+#            because an old release nobody should install any more is still
+#            worth reading about.
+#   Betas    only the newest survives, and only while its stable has not
+#            shipped. Every other beta goes completely: release, tag and
+#            assets. A beta leaves no trace, and nothing is lost by that — the
+#            changelog is built from the commits, so what a beta carried is
+#            described by the stable that carries it too.
+#
+# Trigger: workflow_dispatch only, and release.yml dispatches it from a job
+# that runs after a successful publish. Not `on: workflow_run`, whose support
+# here is incomplete; and not the tag push, which raced the release and always
+# read the API one version behind.
+#
+# Safety: it is a dry run unless somebody says otherwise. The default of a
+# button that deletes things should never be to delete them.
+name: Prune old releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only log what would be deleted"
+        type: boolean
+        default: true
+
+env:
+  KEEP_STABLE: "2"
+  KEEP_BETA: "1"
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    # See ci.yml: the label lands on a 2021 Debian image by default.
+    container: node:22-bookworm
+    steps:
+      - name: Prune
+        env:
+          CI_TOKEN: ${{ secrets.CI_TOKEN }}
+          INPUT_DRY: ${{ inputs.dry_run }}
+        run: |
+          [ -n "$CI_TOKEN" ] || { echo "CI_TOKEN is not set" >&2; exit 1; }
+          [ -n "$GITHUB_API_URL" ] || { echo "GITHUB_API_URL is not set" >&2; exit 1; }
+
+          python3 - <<'PY'
+          import json, os, re, urllib.error, urllib.request
+
+          BASE = os.environ["GITHUB_API_URL"]
+          REPO = os.environ["GITHUB_REPOSITORY"]
+          TOKEN = os.environ["CI_TOKEN"]
+          KEEP_STABLE = int(os.environ.get("KEEP_STABLE", "2"))
+          KEEP_BETA = int(os.environ.get("KEEP_BETA", "1"))
+
+          # Live only when the input is explicitly false. Anything else — unset,
+          # empty, a typo — is a dry run.
+          DRY = os.environ.get("INPUT_DRY", "true").strip().lower() != "false"
+
+
+          def req(method, path, expect_json=True):
+              r = urllib.request.Request(BASE + path, method=method)
+              r.add_header("Authorization", "token " + TOKEN)
+              r.add_header("Accept", "application/json")
+              try:
+                  with urllib.request.urlopen(r, timeout=30) as resp:
+                      body = resp.read()
+                      return json.loads(body) if (expect_json and body) else None
+              except urllib.error.HTTPError as e:
+                  print(f"    ! HTTP {e.code} {method} {path}: {e.read()[:160]!r}")
+              except Exception as e:
+                  print(f"    ! error {method} {path}: {e}")
+              return None
+
+
+          def all_releases():
+              """Every release, or None when the API could not be read.
+
+              The difference matters: a repository with no releases is a
+              no-op, while an API that answered 401 and came back as an empty
+              list would look like one — and this job would report success
+              having pruned nothing, for as long as the token stayed broken.
+              """
+              out, page = [], 1
+              while True:
+                  d = req("GET", f"/repos/{REPO}/releases?limit=50&page={page}")
+                  if d is None:
+                      return None
+                  out.extend(d)
+                  if len(d) < 50:
+                      break
+                  page += 1
+              return out
+
+
+          def version(tag):
+              m = re.match(r"(\d+)\.(\d+)\.(\d+)", tag.lstrip("vV"))
+              return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+
+
+          def prerelease_number(tag):
+              m = re.search(r"(?:beta|rc)\.(\d+)", tag.lower())
+              return int(m.group(1)) if m else 0
+
+
+          releases = all_releases()
+          if releases is None:
+              print("could not read the releases; nothing was deleted")
+              raise SystemExit(1)
+          if not releases:
+              print("this repository has no releases yet; nothing to do")
+              raise SystemExit(0)
+
+          stables = sorted([r for r in releases if not r.get("prerelease")],
+                           key=lambda r: version(r["tag_name"]), reverse=True)
+          betas = sorted([r for r in releases if r.get("prerelease")],
+                         key=lambda r: (version(r["tag_name"]), prerelease_number(r["tag_name"])),
+                         reverse=True)
+
+          latest_stable = version(stables[0]["tag_name"]) if stables else (0, 0, 0)
+
+          # The newest beta is kept only while its cycle is still open. Once the
+          # stable for that version has shipped, the beta is a worse copy of it.
+          keep_beta = set()
+          if betas and version(betas[0]["tag_name"]) > latest_stable:
+              keep_beta = {r["id"] for r in betas[:KEEP_BETA]}
+
+          doomed_betas = [r for r in betas if r["id"] not in keep_beta]
+          stripped_stables = stables[KEEP_STABLE:]
+
+          print(f"== Prune [{'DRY-RUN' if DRY else 'LIVE'}] ==")
+          print(f"{len(releases)} releases: {len(stables)} stable, {len(betas)} beta")
+          print(f"keeping binaries on: {[r['tag_name'] for r in stables[:KEEP_STABLE]] or 'no stables yet'}")
+          print(f"keeping beta: {[r['tag_name'] for r in betas if r['id'] in keep_beta] or 'none'}")
+
+          for r in doomed_betas:
+              tag, rid = r["tag_name"], r["id"]
+              print(f"  DELETE beta entirely: {tag}")
+              if not DRY:
+                  req("DELETE", f"/repos/{REPO}/releases/{rid}", expect_json=False)
+                  req("DELETE", f"/repos/{REPO}/tags/{tag}", expect_json=False)
+
+          for r in stripped_stables:
+              tag, rid, assets = r["tag_name"], r["id"], r.get("assets", [])
+              print(f"  STRIP assets from stable: {tag} ({len(assets)}; entry, tag and notes stay)")
+              if not DRY:
+                  for a in assets:
+                      req("DELETE", f"/repos/{REPO}/releases/{rid}/assets/{a['id']}", expect_json=False)
+
+          print("Done.")
+          PY
