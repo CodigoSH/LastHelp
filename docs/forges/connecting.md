@@ -40,9 +40,11 @@ Deliver here: https://help.example.com/hooks/xO3f…
 That address is opaque and stable, and it stays on that screen — a forge is
 configured with it once, and somebody who lost it has no other way to find it.
 
-The token is **never shown again**, by design: it is stored encrypted, and no
-endpoint here returns a stored credential, because one that did would be a way
-to read it through the panel.
+The token is **never shown again**, by design: no endpoint here returns a
+stored credential, because one that did would be a way to read it through the
+panel. It is stored in the database as you gave it — a key next to the database
+would travel with every copy of it — so a copy of that file is a copy of this
+token. Keep it where the token would be safe.
 
 Over the API, which is what the panel calls:
 

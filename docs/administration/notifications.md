@@ -55,9 +55,10 @@ so it cannot show something the page would not.
 an optional address field — with no relay it is not shown at all, because
 collecting an address nothing can use is collecting personal data for nothing.
 
-That address is encrypted with the same key as the forge tokens, is never
-returned by any endpoint, and is **deleted when the item closes**. It was
-collected for one purpose and that purpose is over.
+That address is never returned by any endpoint — not to the team, not through
+the API — and is **deleted when the item closes**. It was collected for one
+purpose and that purpose is over. It is stored as it was given, so it is in the
+database file: whoever can read that file can read it.
 
 Mail is plain text, marked `Auto-Submitted: auto-generated`, and nobody reads
 replies to it.

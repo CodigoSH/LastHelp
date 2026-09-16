@@ -463,8 +463,6 @@ if [ ! -f "$ETC/$NAME.env" ]; then
 
 ${ENV_PREFIX}_PORT=$PORT
 ${ENV_PREFIX}_DB_FILE=$DATA/$NAME.db
-# Back this up separately from the database: it decrypts the forge tokens.
-${ENV_PREFIX}_KEY_FILE=$DATA/$NAME.key
 
 # The address people actually open, through your reverse proxy. Used in the
 # links that go out by mail and in the feeds.

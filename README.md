@@ -84,13 +84,13 @@ Bitbucket is not bridged yet. Everything else above works end to end, and is che
 
 ### Security
 
-Passwords are hashed with Argon2id. Sessions are opaque tokens in an `HttpOnly`, `SameSite=Lax` cookie, marked `Secure` over HTTPS, and CSRF is a double-submit token checked alongside `Sec-Fetch-Site` — a header the browser writes from the real origins and a page cannot forge. Every response carries a Content-Security-Policy with `script-src 'self'`, so an injected script does not run, and `Referrer-Policy: no-referrer`, because the address of a report carries the token that opens it. Rate limits are keyed on the address our own proxy added rather than the first one the caller sent, because a proxy appends to `X-Forwarded-For` and reading the left-hand entry lets anybody choose their own identity. Forge tokens are stored encrypted and never shown again, request bodies are bounded per handler, and every release is signed.
+Passwords are hashed with Argon2id. Sessions are opaque tokens in an `HttpOnly`, `SameSite=Lax` cookie, marked `Secure` over HTTPS, and CSRF is a double-submit token checked alongside `Sec-Fetch-Site` — a header the browser writes from the real origins and a page cannot forge. Every response carries a Content-Security-Policy with `script-src 'self'`, so an injected script does not run, and `Referrer-Policy: no-referrer`, because the address of a report carries the token that opens it. Rate limits are keyed on the address our own proxy added rather than the first one the caller sent, because a proxy appends to `X-Forwarded-For` and reading the left-hand entry lets anybody choose their own identity. A stored forge token is never shown again and no endpoint returns one, request bodies are bounded per handler, and every release is signed.
 
 For a detailed breakdown, including what the threat model does **not** cover, see the [Security Policy](SECURITY.md).
 
 ### Privacy
 
-**Reporting is anonymous by design.** No account, no tracking, no analytics, and no telemetry of any kind: nothing about you or your instance is ever reported to us. The email address a reporter may leave is optional, asked for only when a mail relay exists to use it, stored encrypted, visible only to the team, and deleted when the report closes.
+**Reporting is anonymous by design.** No account, no tracking, no analytics, and no telemetry of any kind: nothing about you or your instance is ever reported to us. The email address a reporter may leave is optional, asked for only when a mail relay exists to use it, never returned by any endpoint, and deleted when the report closes.
 
 And no AI. Nothing anybody writes here is sent to a third party — the whole point is that it reaches one database and nowhere else.
 

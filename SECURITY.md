@@ -32,11 +32,18 @@ assumptions apply, and keeping them apart is most of the design:
   who has decided to target your project and is willing to work at it by hand.
   Against that the tools are the breaker, closing submissions for a while, and
   the fact that nothing is published without a person approving it.
-- **The forge credential never leaves encrypted.** The token and webhook secret
-  are sealed with a key kept in a file beside the database, not in it: a leaked
-  backup is then a leak of hashes and public text rather than of write access to
-  your forge. Nothing echoes a stored token back, and a collaborator — somebody
-  trusted to triage one repository — cannot reach it at all.
+- **The forge credential never comes back out.** Nothing echoes a stored token
+  back — not the panel, not the API — and a collaborator, somebody trusted to
+  triage one repository, cannot reach it at all. That is a test, not a promise:
+  `TestTheTokenNeverComesBackOutOfTheAPI`.
+
+  What we do **not** claim: it is not encrypted at rest. Earlier betas sealed it
+  with a key kept beside the database, and that protected against nothing — the
+  key travelled in the same directory as the data it was protecting, so anyone
+  who could copy one could copy both, and the server had to be able to read it
+  unattended anyway. The honest statement is the one above plus this one: **the
+  database file is the boundary.** Whoever holds it holds your forge token.
+  Back it up somewhere only you can read.
 
 - **A webhook is authenticated by its signature and nothing else.** A forge
   cannot sign in, so that endpoint sits outside the session and CSRF checks. The
@@ -94,10 +101,10 @@ assumptions apply, and keeping them apart is most of the design:
   have. An email address is stored only if a reporter asked to be notified — and
   the field is not even offered unless a mail relay is configured, because
   collecting an address nothing can use is collecting personal data for nothing.
-  It is encrypted with the same key as the forge credentials, is never returned
-  by any endpoint, and is deleted when the item closes — after they have been
-  told about the closure, not before. That last part is
-  `TestTheReporterIsToldAndThenForgotten`, not a sentence.
+  It is never returned by any endpoint and is deleted when the item closes —
+  after they have been told about the closure, not before. That last part is
+  `TestTheReporterIsToldAndThenForgotten`, not a sentence. Until then it sits in
+  the database as it was given, which is the same boundary as everything else.
 
 - **The feed asks for nothing.** Following a board over Atom stores nothing
   about you: no address, no account, no subscription. It is the notification

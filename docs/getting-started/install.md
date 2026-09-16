@@ -98,21 +98,21 @@ make build   # frontend and binaries into bin/
 
 ## Where the data lives
 
-Two files, and they are not the same thing:
+One file. `lasthelp.db` holds everything: repositories, reports, votes,
+accounts, and the forge token this server uses to open issues.
 
-| File | What it is |
-|---|---|
-| `lasthelp.db` | Everything: repositories, reports, votes, accounts |
-| `lasthelp.key` | The key that encrypts the forge tokens and reporters' email addresses |
+**That file is the thing to protect.** Passwords are hashed and cannot be read
+back, but the forge token and the webhook secret are in there as they were
+given, because a key kept on the same machine as the database protects against
+nobody who can reach the machine. Copy it somewhere only you can read, and treat
+a copy that leaves this server as a copy of your forge credentials.
 
-**Back up both, but not into the same place.** The key sits beside the database
-rather than inside it precisely so that a leaked database backup is a leak of
-hashes and public text rather than of write access to your forge. Copying them
-together undoes that.
-
-Lose the key and the encrypted values are gone: you would re-enter the forge
-tokens, and any stored email addresses become unreadable. Nothing else is
-affected.
+> **Upgrading from Beta.03 or earlier?** Those versions encrypted the token with
+> a `lasthelp.key` file next to the database. The first start after upgrading
+> moves the values across and says so in the log — `encrypted values from an
+> earlier version moved into plain columns`. After that the key file is read by
+> nothing and you can delete it. If you had already lost it, the log says that
+> instead, and you paste the forge token again in the panel.
 
 ## Settings
 
@@ -124,7 +124,7 @@ invents one the binary does not read. The ones worth knowing about:
 |---|---|---|
 | `LASTHELP_PORT` | `8080` | Listening port. `LASTHELP_ADDR` takes a full address instead |
 | `LASTHELP_DB_FILE` | `lasthelp.db` | The database |
-| `LASTHELP_KEY_FILE` | beside the database | The encryption key |
+| `LASTHELP_KEY_FILE` | beside the database | Only for upgrading: where a pre-Beta.04 install kept its encryption key |
 | `LASTHELP_PUBLIC_URL` | empty | Where this instance is reachable, for the links in notifications and feeds |
 | `LASTHELP_TRUST_PROXY` | `false` | Turn on **only** when a reverse proxy really is in front |
 | `LASTHELP_TRUST_PROXY_HOPS` | `1` | How many proxies |
