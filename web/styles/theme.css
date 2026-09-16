@@ -972,7 +972,9 @@ summary:focus-visible,
   box-shadow: var(--accent-glow), 0 0 0 4px rgba(var(--accent-rgb), 0.14);
 }
 
-.button.danger { color: var(--danger-color); }
+/* Merged from two: the later one made it a solid red button, which meant the
+   earlier one's text colour never applied. */
+.button.danger { background: #b91c1c; color: #fff; }
 .button.danger:hover { border-color: rgba(var(--danger-rgb), 0.5); }
 .button .count { font-variant-numeric: tabular-nums; font-weight: 700; }
 .button.small { padding: 0.35rem 0.75rem; font-size: 0.875rem; }
@@ -1965,6 +1967,11 @@ body.admin-view > main {
 
 /* ------------------------------------------------------------------ modals */
 
+/* The shadow was declared again on its own further down and that is the one
+   that applied; the hand-written value here had been dead for a long time. The
+   radius still comes from the shared rule further down, where .modal is the
+   last selector of a list that also dresses the cards — which is why that rule
+   is left exactly where it is. */
 .modal {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 6px);
@@ -1972,7 +1979,7 @@ body.admin-view > main {
   color: var(--text-main);
   padding: 0;
   inline-size: min(34rem, calc(100vw - 2rem));
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal::backdrop {
@@ -2399,11 +2406,6 @@ a.stat:hover {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
   color: var(--text-dim);
-}
-
-.button.danger {
-  background: #b91c1c;
-  color: #fff;
 }
 
 .spacer {
@@ -3152,8 +3154,6 @@ body > nav .brand {
   box-shadow: var(--shadow-sm), var(--hairline);
 }
 
-.modal { box-shadow: var(--shadow-lg); }
-
 a.bento-card:hover,
 .person:hover {
   border-color: var(--accent-line);
@@ -3361,10 +3361,12 @@ a.stat:hover .stat-go {
   margin: 0 1.1rem 1rem;
 }
 
+/* One rule. The height was set twice and only the later value ever applied, so
+   the first was a number nobody was reading. */
 .chart {
   display: block;
   inline-size: 100%;
-  block-size: clamp(6rem, 14vw, 9rem);
+  block-size: clamp(4.5rem, 9vw, 6.5rem);
   overflow: visible;
 }
 
@@ -3672,8 +3674,6 @@ a.stat:hover .stat-go {
 
 /* The chart reads across, not down: a tall box of mostly empty air says the
    month was empty when it was only quiet. */
-.chart { block-size: clamp(4.5rem, 9vw, 6.5rem); }
-
 .chart-grid {
   stroke: var(--border);
   stroke-width: 1;
