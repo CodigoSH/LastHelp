@@ -279,6 +279,16 @@ if (exec 3< /dev/tty) 2>/dev/null; then
     say ""
 fi
 
+# The opening three, in Lastboard's order and its words.
+#
+# They are what makes an install of any of these feel like the same product in
+# the first seconds, which is the whole point of the installer being shared. The
+# architecture was settled above — the artefact name depends on it — and this is
+# where a person finds out, in the same place they find out in the others.
+step "Checking system compatibility..."
+step "Preparing environment..."
+step "Downloading latest version..."
+
 # A port has to be a number in range, and the answer to that question arrives
 # from a person typing at three in the morning. A bad one here becomes a service
 # that will not start and a log line about parsing an address.
@@ -301,7 +311,7 @@ IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 # explanation. The channel is asked for above precisely so that answer can be
 # "the newest thing there is", which is what somebody trying the beta wants.
 if [ -z "$VERSION" ]; then
-    step "Checking for the latest $CHANNEL release..."
+    step "Checking for latest $CHANNEL version..."
     if [ "$CHANNEL" = beta ]; then
         VERSION=$(curl -fsSL "$API/releases?limit=1" 2>/dev/null \
             | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p' | head -1)
@@ -318,7 +328,7 @@ RELEASE="$BASE/download/$VERSION"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
-step "Installing $CHANNEL: $VERSION"
+step "Installing latest $CHANNEL: $VERSION"
 curl -fsSL "$RELEASE/SHA256SUMS"       -o "$WORK/SHA256SUMS"      || die "cannot reach $RELEASE"
 curl -fsSL "$RELEASE/SHA256SUMS.sig"   -o "$WORK/SHA256SUMS.sig"  || die "the release has no signature"
 curl -fsSL "$RELEASE/$NAME.service"    -o "$WORK/$NAME.service"   || die "the release has no service unit"
@@ -333,7 +343,7 @@ curl -fsSL --max-filesize 209715200 "$RELEASE/$ARTEFACT" -o "$WORK/$ARTEFACT" \
 # checksum file is allowed to say what the binary should hash to. Downloading
 # the binary first and then asking an unverified file whether it is right proves
 # nothing.
-step "Verifying the signature..."
+step "Verifying signature..."
 [ -n "$RELEASE_KEYS" ] || die "this installer has no release keys compiled in, so it cannot verify
     anything. That is deliberate: no key does not mean accept anything. Get a newer installer."
 
@@ -374,12 +384,12 @@ done
 [ "$VERIFIED" = yes ] \
     || die "the signature matches no key this installer knows. Either this release was not signed
     by us, or something changed it on the way here. Not installing."
-done_ "Signed by CodigoSH"
+done_ "Signature verified."
 
-step "Verifying the checksums..."
+step "Verifying checksum..."
 ( cd "$WORK" && grep -E " ($ARTEFACT|$NAME\.service)\$" SHA256SUMS | sha256sum -c - ) >/dev/null 2>&1 \
     || die "the download does not match its signed checksums. Do not run it."
-done_ "The download is what was signed"
+done_ "Checksum verified."
 
 chmod 0755 "$WORK/$ARTEFACT"
 # It has to be able to say what it is before it goes anywhere near a database.
@@ -516,7 +526,7 @@ if [ "${LEGACY:-no}" = yes ] && [ -f /usr/local/bin/"$NAME" ]; then
 fi
 
 # ============================================================ service
-step "Configuring the service..."
+step "Configuring system service..."
 install -m 0644 "$WORK/$NAME.service" "$UNIT"
 systemctl daemon-reload
 systemctl enable "$NAME" >/dev/null 2>&1
@@ -538,13 +548,15 @@ if ! systemctl is-active --quiet "$NAME"; then
 fi
 
 # ============================================================ and then
+#
+# Three lines, like the others. What ended up here as well was a warning that
+# the first account created is the administrator and should be claimed before
+# the server is reachable — true, and important, and still the wrong place for
+# it: that belongs to the setup this product is about to grow, not to the tail
+# of an installer somebody is already scrolling past. The documentation is where
+# the rest lives.
 say ""
 done_ "Installation complete!"
 say ""
 say "  💬 Open $PROJECT at: ${BLUE}${BOLD}http://$IP:$PORT${OFF}"
 say ""
-if [ "$UPGRADE" = no ]; then
-    note "The first account created is the administrator, and setup then refuses to"
-    note "run again — so claim it before this is reachable from the internet."
-    say ""
-fi
