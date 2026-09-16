@@ -994,16 +994,25 @@ summary:focus-visible,
   font-weight: 600;
 }
 
+/* One rule, merged from two that were fifteen hundred lines apart. What the
+   browser actually applied was this: the first's border, bar and shadow, with
+   the second's spacing and background on top. Reading either half on its own
+   told you something that was not on the screen.
+ *
+ * The tint is written against --accent-rgb. It was a literal rgba(232, 82, 14),
+ * so an operator who chose their own accent got every other tinted surface in
+ * their colour and their notices in ours. */
 .notice {
   display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.7rem 0.9rem;
+  align-items: start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
   border-inline-start: 3px solid var(--accent);
   border-radius: var(--radius);
-  background: var(--panel);
+  background: rgba(var(--accent-rgb), 0.1);
   box-shadow: var(--shadow-sm);
+  color: var(--text-main);
   font-size: 0.9rem;
 }
 
@@ -2383,17 +2392,6 @@ a.stat:hover {
   color: var(--text-dim);
 }
 
-.notice {
-  display: flex;
-  align-items: start;
-  gap: 0.5rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: var(--radius);
-  background: rgba(232, 82, 14, 0.1);
-  color: var(--text-main);
-  font-size: 0.9rem;
-}
-
 .button.danger {
   background: #b91c1c;
   color: #fff;
@@ -2449,12 +2447,6 @@ a.stat:hover {
 
 /* The kind, as a shape plus a word: the icon is what the eye finds in a list of
    twenty, the word is what makes it nameable. */
-.kind {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
 .votes {
   display: inline-flex;
   align-items: center;
@@ -2586,22 +2578,28 @@ body > nav .brand {
 
 /* A vote is a number and a verb stacked, not a word with a number after it:
    the count is what somebody scans for and the verb is what they press. */
+/* Merged from two declarations. What applied was the first's grid and width
+   with the second's padding, radius and recessed background on top; each half
+   on its own described a block that is not on the screen. */
 .vote-block {
   display: grid;
   justify-items: center;
   gap: 0.1rem;
   min-inline-size: 4.75rem;
-  padding: 0.7rem 0.9rem;
+  padding: 0.85rem 1rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--canvas);
+  border-radius: var(--radius-lg);
+  background: var(--surface-dim);
+  box-shadow: var(--hairline);
   color: inherit;
   font: inherit;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease),
+    background 0.15s var(--ease);
 }
 
-.vote-block:hover { border-color: var(--accent); }
+/* Both halves said this; the later one added the lift. */
+.vote-block:hover { transform: translateY(-1px); border-color: var(--accent); }
 
 .vote-block .count {
   font-size: 1.5rem;
@@ -3193,16 +3191,6 @@ a.bento-card:hover,
 
 .detail .body p { line-height: 1.65; }
 
-.vote-block {
-  border-radius: var(--radius-lg);
-  background: var(--surface-dim);
-  box-shadow: var(--hairline);
-  padding: 0.85rem 1rem;
-  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease),
-    background 0.15s var(--ease);
-}
-
-.vote-block:hover { transform: translateY(-1px); border-color: var(--accent); }
 
 .answers dl > div {
   padding: 0.6rem 0.75rem;

@@ -24,12 +24,8 @@
 .detail
 .detail .body
 .detail h1
-.kind
 .modal
-.notice
 .side
 .side .brand
 .signin
 .signin-head h1
-.vote-block
-.vote-block:hover
