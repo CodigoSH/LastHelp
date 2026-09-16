@@ -21,16 +21,16 @@
   --accent-line: rgba(var(--accent-rgb), 0.38);
   --accent-glow: 0 12px 26px -14px rgba(var(--accent-rgb), 0.85);
 
-  --bg: #f6f7f9;
+  --canvas: #f6f7f9;
   /* The bar floats over the page and blurs what passes under it, so it needs a
      translucent version of the page colour. color-mix would compute it, but a
      bar that turns transparent on a browser without it is not a trade worth
      making for one value. */
-  --bg-glass: rgba(246, 247, 249, 0.82);
-  --surface: #ffffff;
-  --surface-2: #eef0f4;
-  --text: #12151b;
-  --text-muted: #5b6470;
+  --canvas-glass: rgba(246, 247, 249, 0.82);
+  --panel: #ffffff;
+  --surface-dim: #eef0f4;
+  --text-main: #12151b;
+  --text-dim: #5b6470;
   --border: #e3e7ec;
   --border-strong: #cdd4dd;
 
@@ -40,8 +40,14 @@
   /* The one red in the product: a refusal, a deletion, and leaving. Named here
      so the three of them are the same red and so the dark theme can lighten it
      — #dc2626 on a dark surface is under 4.5:1 and this is text people read. */
-  --danger: #dc2626;
+  --danger-color: #dc2626;
   --danger-rgb: 220, 38, 38;
+  --success-color: #16a34a;
+  --success-rgb: 22, 163, 74;
+  --warning-color: #ea580c;
+  --warning-rgb: 234, 88, 12;
+  --info-color: #0284c7;
+  --info-rgb: 2, 132, 199;
   --hue-work: var(--accent);
   --hue-done: #15803d;
   --hue-hold: #b45309;
@@ -55,9 +61,9 @@
   /* Three depths, and no more. Everything that sits on the page uses the first,
      everything that lifts on hover the second, and only what floats over the
      page — a dialog, a toast — the third. */
-  --shadow-1: 0 1px 2px rgba(16, 20, 28, 0.05), 0 1px 3px rgba(16, 20, 28, 0.04);
-  --shadow-2: 0 6px 16px -8px rgba(16, 20, 28, 0.18), 0 2px 6px -3px rgba(16, 20, 28, 0.08);
-  --shadow-3: 0 26px 60px -28px rgba(16, 20, 28, 0.45);
+  --shadow-sm: 0 1px 2px rgba(16, 20, 28, 0.05), 0 1px 3px rgba(16, 20, 28, 0.04);
+  --shadow-md: 0 6px 16px -8px rgba(16, 20, 28, 0.18), 0 2px 6px -3px rgba(16, 20, 28, 0.08);
+  --shadow-lg: 0 26px 60px -28px rgba(16, 20, 28, 0.45);
   /* The lit top edge that separates a raised surface from a flat one. It is
      white in daylight and a whisper of white in the dark, which is why it is a
      token and not a literal. */
@@ -97,45 +103,45 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b0d12;
-    --bg-glass: rgba(11, 13, 18, 0.78);
-    --surface: #14171e;
-    --surface-2: #1a1e26;
-    --text: #e9ecf2;
-    --text-muted: #98a2b1;
+    --canvas: #0b0d12;
+    --canvas-glass: rgba(11, 13, 18, 0.78);
+    --panel: #14171e;
+    --surface-dim: #1a1e26;
+    --text-main: #e9ecf2;
+    --text-dim: #98a2b1;
     --border: #242a34;
     --border-strong: #333c49;
     --hue-open: #60a5fa;
-    --danger: #f87171;
+    --danger-color: #f87171;
     --danger-rgb: 248, 113, 113;
     --hue-done: #4ade80;
     --hue-hold: #fbbf24;
     --hue-off: #9aa3b2;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-2: 0 8px 22px -10px rgba(0, 0, 0, 0.75);
-    --shadow-3: 0 30px 70px -30px rgba(0, 0, 0, 0.9);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 8px 22px -10px rgba(0, 0, 0, 0.75);
+    --shadow-lg: 0 30px 70px -30px rgba(0, 0, 0, 0.9);
     --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0b0d12;
-  --bg-glass: rgba(11, 13, 18, 0.78);
-  --surface: #14171e;
-  --surface-2: #1a1e26;
-  --text: #e9ecf2;
-  --text-muted: #98a2b1;
+  --canvas: #0b0d12;
+  --canvas-glass: rgba(11, 13, 18, 0.78);
+  --panel: #14171e;
+  --surface-dim: #1a1e26;
+  --text-main: #e9ecf2;
+  --text-dim: #98a2b1;
   --border: #242a34;
   --border-strong: #333c49;
   --hue-open: #60a5fa;
-  --danger: #f87171;
+  --danger-color: #f87171;
   --danger-rgb: 248, 113, 113;
   --hue-done: #4ade80;
   --hue-hold: #fbbf24;
   --hue-off: #9aa3b2;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-2: 0 8px 22px -10px rgba(0, 0, 0, 0.75);
-  --shadow-3: 0 30px 70px -30px rgba(0, 0, 0, 0.9);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 22px -10px rgba(0, 0, 0, 0.75);
+  --shadow-lg: 0 30px 70px -30px rgba(0, 0, 0, 0.9);
   --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
@@ -179,13 +185,13 @@ a:hover {
    the content and still be painted: with the background on <body> it would
    propagate to the canvas and cover anything at a negative depth. */
 html {
-  background: var(--bg);
+  background: var(--canvas);
 }
 
 body {
   margin: 0;
   background: transparent;
-  color: var(--text);
+  color: var(--text-main);
   font-family: var(--font);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -218,7 +224,7 @@ body::before {
 ::placeholder {
   /* Firefox dims placeholders on its own; without this the two engines disagree
      about how grey a hint is. */
-  color: var(--text-muted);
+  color: var(--text-dim);
   opacity: 0.75;
 }
 
@@ -286,7 +292,7 @@ body > nav {
   position: sticky;
   inset-block-start: 0;
   z-index: 30;
-  background: var(--bg-glass);
+  background: var(--canvas-glass);
   backdrop-filter: blur(14px) saturate(140%);
   border-block-end: 1px solid var(--border);
 }
@@ -310,7 +316,7 @@ body > nav {
   gap: 0.55rem;
   font-weight: 650;
   font-size: 1rem;
-  color: var(--text);
+  color: var(--text-main);
   text-decoration: none;
   letter-spacing: -0.01em;
 }
@@ -392,12 +398,12 @@ h2 {
 }
 
 .lead {
-  color: var(--text-muted);
+  color: var(--text-dim);
   margin-block: 0;
   max-inline-size: var(--prose);
 }
 
-.hint { color: var(--text-muted); font-size: 0.875rem; }
+.hint { color: var(--text-dim); font-size: 0.875rem; }
 
 /* Where you are, above what you are looking at. Small, quiet, and a link. */
 .crumb {
@@ -408,10 +414,10 @@ h2 {
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
-.crumb a { color: var(--text-muted); text-decoration: none; }
+.crumb a { color: var(--text-dim); text-decoration: none; }
 .crumb a:hover { color: var(--accent-alt); }
 .brand:hover { text-decoration: none; }
 
@@ -437,12 +443,12 @@ h2 {
   display: grid;
   justify-items: center;
   gap: 0.5rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   padding: clamp(1.75rem, 4vw, 2.75rem) 1.25rem;
   text-align: center;
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
 }
 
 .empty .icon { color: var(--border-strong); }
@@ -482,8 +488,8 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding: 1rem 1.1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
   text-decoration: none;
   color: inherit;
   transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease),
@@ -493,12 +499,12 @@ ul { list-style: none; margin: 0; padding: 0; }
 .card:hover {
   transform: translateY(-2px);
   border-color: var(--accent-line);
-  box-shadow: var(--shadow-2), var(--hairline);
+  box-shadow: var(--shadow-md), var(--hairline);
 }
 
 .card-body { display: grid; gap: 0.1rem; min-inline-size: 0; }
 .card-title { font-weight: 600; letter-spacing: -0.01em; }
-.card-sub { color: var(--text-muted); font-size: 0.85rem; }
+.card-sub { color: var(--text-dim); font-size: 0.85rem; }
 
 /* The monogram in front of a name. Two letters of the thing itself, which is
    how somebody finds their own organisation in a list of eight. */
@@ -523,7 +529,7 @@ ul { list-style: none; margin: 0; padding: 0; }
    flipped by the same variable everything else physical uses. */
 .card-go {
   margin-inline-start: auto;
-  color: var(--text-muted);
+  color: var(--text-dim);
   display: inline-flex;
   transition: transform 0.18s var(--ease), color 0.18s var(--ease);
   transform: scaleX(var(--rtl-flip));
@@ -550,14 +556,14 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding: 0.1rem 0.55rem;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text-muted);
+  background: var(--surface-dim);
+  color: var(--text-dim);
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
 }
 
-.chip .icon { color: var(--text-muted); }
+.chip .icon { color: var(--text-dim); }
 .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 
 /* ------------------------------------------------------------------ board */
@@ -586,7 +592,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding: 0.2rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--surface-dim);
 }
 
 .tab, .sort, .choice {
@@ -594,7 +600,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-dim);
   cursor: pointer;
   font: inherit;
   font-size: 0.875rem;
@@ -603,12 +609,12 @@ ul { list-style: none; margin: 0; padding: 0; }
   transition: color 0.15s var(--ease), background 0.15s var(--ease);
 }
 
-.tab:hover, .sort:hover, .choice:hover { color: var(--text); }
+.tab:hover, .sort:hover, .choice:hover { color: var(--text-main); }
 
 .tab.on, .sort.on, .choice.on {
-  background: var(--surface);
+  background: var(--panel);
   color: var(--accent-alt);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-sm);
 }
 
 /* The search, with its mark inside the field. A magnifier standing outside the
@@ -624,7 +630,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .search-wrap .icon {
   position: absolute;
   inset-inline-start: 0.7rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   pointer-events: none;
 }
 
@@ -634,7 +640,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding-inline-start: 2.2rem;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--panel);
   color: inherit;
   font: inherit;
 }
@@ -666,8 +672,8 @@ ul { list-style: none; margin: 0; padding: 0; }
   border-radius: var(--radius-lg);
   text-decoration: none;
   color: inherit;
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
   transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease),
     border-color 0.18s var(--ease);
 }
@@ -675,7 +681,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .item:hover {
   transform: translateY(-1px);
   border-color: var(--accent-line);
-  box-shadow: var(--shadow-2), var(--hairline);
+  box-shadow: var(--shadow-md), var(--hairline);
 }
 
 .item-main { display: grid; gap: 0.25rem; min-inline-size: 0; }
@@ -692,7 +698,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   align-items: center;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 /* The count of votes, as a tile the eye lands on first. The word stays under
@@ -707,7 +713,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding: 0.4rem 0.5rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface-2);
+  background: var(--surface-dim);
 }
 
 .score .count {
@@ -722,7 +728,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .score.voted {
@@ -740,7 +746,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   gap: 0.3rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-dim);
   white-space: nowrap;
 }
 
@@ -749,7 +755,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 .status, .when, .votes {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   white-space: nowrap;
 }
 
@@ -800,7 +806,7 @@ input, textarea, select {
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--panel);
   color: inherit;
   font: inherit;
   /* start, not left: the caret belongs at the beginning of the line in every
@@ -846,8 +852,8 @@ summary:focus-visible,
   padding: 0.55rem 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
   color: inherit;
   font: inherit;
   font-weight: 600;
@@ -877,7 +883,7 @@ summary:focus-visible,
   box-shadow: var(--accent-glow), 0 0 0 4px rgba(var(--accent-rgb), 0.14);
 }
 
-.button.danger { color: var(--danger); }
+.button.danger { color: var(--danger-color); }
 .button.danger:hover { border-color: rgba(var(--danger-rgb), 0.5); }
 .button .count { font-variant-numeric: tabular-nums; font-weight: 700; }
 .button.small { padding: 0.35rem 0.75rem; font-size: 0.875rem; }
@@ -894,7 +900,7 @@ summary:focus-visible,
 }
 
 .form-error {
-  color: var(--danger);
+  color: var(--danger-color);
   font-size: 0.875rem;
   font-weight: 600;
 }
@@ -907,8 +913,8 @@ summary:focus-visible,
   border: 1px solid var(--border);
   border-inline-start: 3px solid var(--accent);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-1);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
   font-size: 0.9rem;
 }
 
@@ -918,7 +924,7 @@ summary:focus-visible,
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
   padding: 0.75rem 0.9rem;
-  background: var(--surface-2);
+  background: var(--surface-dim);
 }
 
 .similar-head { font-weight: 600; margin-block: 0 0.35rem; }
@@ -936,12 +942,12 @@ summary:focus-visible,
   padding: 0.85rem 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
 }
 
 .comment-team { border-inline-start: 3px solid var(--accent); }
-.comment .who { margin: 0 0 0.25rem; font-size: 0.8rem; color: var(--text-muted); }
+.comment .who { margin: 0 0 0.25rem; font-size: 0.8rem; color: var(--text-dim); }
 .comment .what { margin: 0; white-space: pre-wrap; }
 
 .queue { display: grid; gap: 0.75rem; margin-block-start: 1rem; }
@@ -949,11 +955,11 @@ summary:focus-visible,
   padding: 1rem 1.1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
 }
 .queue h3 { margin: 0.25rem 0; }
-.queue .body { white-space: pre-wrap; color: var(--text-muted); }
+.queue .body { white-space: pre-wrap; color: var(--text-dim); }
 .actions { display: flex; gap: 0.5rem; margin-block-start: 0.6rem; flex-wrap: wrap; }
 
 /* The honeypot: out of the layout entirely rather than display:none, because
@@ -986,7 +992,7 @@ summary:focus-visible,
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 0.9rem;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
   animation: rise 0.4s var(--ease) both;
 }
 
@@ -1032,8 +1038,8 @@ summary:focus-visible,
   padding: 0.7rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
   text-decoration: none;
   color: inherit;
   transition: transform 0.18s var(--ease), border-color 0.18s var(--ease),
@@ -1043,7 +1049,7 @@ summary:focus-visible,
 .roadmap li a:hover {
   transform: translateY(-1px);
   border-color: var(--accent-line);
-  box-shadow: var(--shadow-2), var(--hairline);
+  box-shadow: var(--shadow-md), var(--hairline);
 }
 
 /* A column with nothing in it is quiet, not broken: a short dashed line with a
@@ -1054,7 +1060,7 @@ summary:focus-visible,
   border-style: dashed;
   border-color: var(--border);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 /* ----------------------------------------------------------- panel pieces */
@@ -1071,7 +1077,7 @@ summary:focus-visible,
 .issue-control { display: grid; gap: 0.5rem; margin-block-start: 0.8rem; }
 .issue-control .attach { display: flex; gap: 0.5rem; margin: 0; }
 .issue-control .attach input { flex: 1; }
-.issue-note { font-size: 0.875rem; color: var(--text-muted); margin: 0; }
+.issue-note { font-size: 0.875rem; color: var(--text-dim); margin: 0; }
 .issue-link { margin-block-start: 0.8rem; font-size: 0.9rem; }
 
 .new-org, .new-repo { max-inline-size: 28rem; }
@@ -1083,14 +1089,14 @@ summary:focus-visible,
   white-space: pre-wrap;
   font-family: inherit;
   font-size: 0.875rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.6rem 0.8rem;
   max-block-size: 14rem;
   overflow-y: auto;
 }
-.update-note { font-size: 0.875rem; color: var(--text-muted); }
+.update-note { font-size: 0.875rem; color: var(--text-dim); }
 
 .credentials, .channel, .team-reply, .merge { max-inline-size: 28rem; }
 .channel-fields, .channel-mail { display: grid; gap: 0.35rem; }
@@ -1099,11 +1105,11 @@ summary:focus-visible,
 .webhook-path {
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   word-break: break-all;
 }
 .triage { margin-block-start: 2rem; padding-block-start: 1rem; border-block-start: 1px solid var(--border); }
-.triage-note { font-size: 0.875rem; color: var(--text-muted); }
+.triage-note { font-size: 0.875rem; color: var(--text-dim); }
 
 .exports { font-size: 0.875rem; margin-block: 0.5rem 0; }
 
@@ -1140,9 +1146,9 @@ summary:focus-visible,
   inline-size: 4.5rem;
   block-size: 4.5rem;
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-2), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
+  box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
 }
 
 .hero h1 {
@@ -1157,7 +1163,7 @@ summary:focus-visible,
   font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.25rem);
   max-inline-size: 34rem;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-dim);
   text-wrap: balance;
 }
 
@@ -1190,8 +1196,8 @@ summary:focus-visible,
   padding: 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface) 65%, transparent);
-  color: var(--text-muted);
+  background: color-mix(in srgb, var(--panel) 65%, transparent);
+  color: var(--text-dim);
   font-size: 0.925rem;
   animation: rise 0.45s var(--ease) both;
 }
@@ -1282,12 +1288,12 @@ summary:focus-visible,
 
 .step-name {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   white-space: nowrap;
 }
 
 .steps .now .step-name {
-  color: var(--text);
+  color: var(--text-main);
   font-weight: 600;
 }
 
@@ -1300,7 +1306,7 @@ summary:focus-visible,
 }
 
 .step-count {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 0.85rem;
   margin: 0 0 0.35rem;
   letter-spacing: 0.02em;
@@ -1320,7 +1326,7 @@ summary:focus-visible,
 }
 
 .wizard-head .lead {
-  color: var(--text-muted);
+  color: var(--text-dim);
   margin: 0 0 1.75rem;
 }
 
@@ -1331,7 +1337,7 @@ summary:focus-visible,
 }
 
 .wizard-card {
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 4px);
   padding: clamp(1.25rem, 3vw, 1.75rem);
@@ -1349,12 +1355,12 @@ summary:focus-visible,
 .button.ghost {
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .button.ghost:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
+  color: var(--text-main);
+  border-color: var(--text-dim);
 }
 
 .wizard-actions .spacer {
@@ -1380,7 +1386,7 @@ summary:focus-visible,
 .field .hint {
   margin: 0.4rem 0 0;
   font-size: 0.875rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 /* An example is worth more than a paragraph of prose about the format, and it
@@ -1388,7 +1394,7 @@ summary:focus-visible,
 .field .example {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.9em;
-  color: var(--text);
+  color: var(--text-main);
   background: rgba(127, 127, 127, 0.14);
   border-radius: 5px;
   padding: 0.1rem 0.35rem;
@@ -1438,7 +1444,7 @@ body.admin-view > main {
 
 .side {
   border-inline-end: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--panel);
   padding: 1.25rem 0.9rem;
   display: flex;
   flex-direction: column;
@@ -1460,7 +1466,7 @@ body.admin-view > main {
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .side-item {
@@ -1469,7 +1475,7 @@ body.admin-view > main {
   gap: 0.55rem;
   padding: 0.5rem 0.6rem;
   border-radius: 8px;
-  color: var(--text);
+  color: var(--text-main);
   text-decoration: none;
   font-size: 0.95rem;
   line-height: 1.3;
@@ -1498,7 +1504,7 @@ body.admin-view > main {
   /* The house's strength for a chosen row: a little more of it in the dark,
      where a light wash disappears into the surface. */
   background: rgba(var(--accent-rgb), 0.12);
-  color: var(--text);
+  color: var(--text-main);
   border-inline-end: 2px solid var(--accent);
   /* Out to the sidebar's own edge: the column is padded by 0.9rem. Logical
      radii rather than the four-value shorthand, which is physical and would
@@ -1511,11 +1517,11 @@ body.admin-view > main {
 .side-item.sub {
   padding-inline-start: 1.6rem;
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .side-item.sub[aria-current="page"] {
-  color: var(--text);
+  color: var(--text-main);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1540,7 +1546,7 @@ body.admin-view > main {
   margin: 0;
   padding-inline-start: 0.6rem;
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   overflow-wrap: anywhere;
 }
 
@@ -1638,7 +1644,7 @@ body.admin-view > main {
 .theme-choice button {
   border: 0;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-dim);
   font: inherit;
   font-size: 0.85rem;
   padding: 0.3rem 0.6rem;
@@ -1669,7 +1675,7 @@ body.admin-view > main {
   padding: 0.65rem 0.9rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--panel);
 }
 
 .person-name {
@@ -1678,7 +1684,7 @@ body.admin-view > main {
 
 .person-role {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .facts {
@@ -1702,7 +1708,7 @@ body.admin-view > main {
 .facts code {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.875rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   unicode-bidi: isolate;
 }
 
@@ -1744,22 +1750,22 @@ body.admin-view > main {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-dim);
   cursor: pointer;
 }
 
 .icon-button:hover {
   background: rgba(127, 127, 127, 0.14);
-  color: var(--text);
+  color: var(--text-main);
 }
 
 .icon-button.danger:hover {
-  color: var(--danger);
+  color: var(--danger-color);
   background: rgba(var(--danger-rgb), 0.12);
 }
 
 .side-item .icon {
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .side-item[aria-current="page"] .icon {
@@ -1771,8 +1777,8 @@ body.admin-view > main {
 .modal {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 6px);
-  background: var(--bg);
-  color: var(--text);
+  background: var(--canvas);
+  color: var(--text-main);
   padding: 0;
   inline-size: min(34rem, calc(100vw - 2rem));
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
@@ -1802,7 +1808,7 @@ body.admin-view > main {
 }
 
 .modal .lead {
-  color: var(--text-muted);
+  color: var(--text-dim);
   margin: 0.35rem 0 0;
 }
 
@@ -1840,7 +1846,7 @@ body.admin-view > main {
   padding: 1.1rem;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
-  background: var(--surface);
+  background: var(--panel);
   color: inherit;
   text-decoration: none;
   transition: border-color 0.15s ease, transform 0.15s ease;
@@ -1861,11 +1867,11 @@ a.bento-card:hover {
 .bento-card h3 {
   margin: 0;
   font-size: 1.05rem;
-  color: var(--text);
+  color: var(--text-main);
 }
 
 .bento-card .card-sub {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 0.875rem;
 }
 
@@ -1908,7 +1914,7 @@ a.bento-card:hover {
   padding: 0.9rem 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
+  background: var(--panel);
 }
 
 /* A stat that is a link is still a card. Without this the anchor stays inline,
@@ -1942,7 +1948,7 @@ a.stat:hover {
   gap: 0.4rem;
   margin-top: 0.2rem;
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 /* A bar per status, drawn from the numbers rather than from a chart library:
@@ -2017,7 +2023,7 @@ a.stat:hover {
 
 .bar-row .count {
   text-align: end;
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2067,7 +2073,7 @@ a.stat:hover {
   padding: 0.1rem 0.45rem;
   border-radius: 6px;
   background: rgba(127, 127, 127, 0.14);
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.75rem;
 }
@@ -2186,7 +2192,7 @@ a.stat:hover {
 .fact-value {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   overflow-wrap: anywhere;
   unicode-bidi: isolate;
 }
@@ -2207,7 +2213,7 @@ a.stat:hover {
 .restore-note {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .notice {
@@ -2217,7 +2223,7 @@ a.stat:hover {
   padding: 0.6rem 0.75rem;
   border-radius: var(--radius);
   background: rgba(232, 82, 14, 0.1);
-  color: var(--text);
+  color: var(--text-main);
   font-size: 0.9rem;
 }
 
@@ -2304,7 +2310,7 @@ a.stat:hover {
 
 .status-declined,
 .status-not_reproducible {
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 body > nav .brand {
@@ -2347,7 +2353,7 @@ body > nav .brand {
   position: relative;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
-  background: var(--surface);
+  background: var(--panel);
   padding: 0;
   overflow: hidden;
 }
@@ -2400,7 +2406,7 @@ body > nav .brand {
   padding: 1.25rem;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
-  background: var(--surface);
+  background: var(--panel);
   margin-block-start: 0.75rem;
 }
 
@@ -2420,7 +2426,7 @@ body > nav .brand {
   padding: 0.7rem 0.9rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--canvas);
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -2436,7 +2442,7 @@ body > nav .brand {
   font-variant-numeric: tabular-nums;
 }
 
-.vote-block .label { font-size: 0.8rem; color: var(--text-muted); }
+.vote-block .label { font-size: 0.8rem; color: var(--text-dim); }
 
 .vote-block.voted {
   border-color: var(--accent);
@@ -2475,11 +2481,11 @@ body > nav .brand {
 .count-chip {
   padding: 0.05rem 0.5rem;
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--border);
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2496,7 +2502,7 @@ body > nav .brand {
   font-size: 0.7rem;
 }
 
-.comment .who-name { color: var(--text); font-weight: 600; }
+.comment .who-name { color: var(--text-main); font-weight: 600; }
 
 /* Who is answering matters more here than anywhere else in the product: a
    reply from the team is the reason somebody opened the page again. */
@@ -2522,7 +2528,7 @@ body > nav .brand {
   gap: 0.75rem;
 }
 
-.comment-sent { margin: 0; font-size: 0.875rem; color: var(--text-muted); }
+.comment-sent { margin: 0; font-size: 0.875rem; color: var(--text-dim); }
 
 /* Narrow: the vote goes under the report rather than squeezing the title into
    a column two words wide. */
@@ -2541,7 +2547,7 @@ body > nav .brand {
   gap: 0.35rem;
   align-self: start;
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
   text-decoration: none;
 }
 
@@ -2574,7 +2580,7 @@ body > nav .brand {
   padding: 0.9rem 1rem;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
-  background: var(--surface);
+  background: var(--panel);
   color: inherit;
   font: inherit;
   text-align: start;
@@ -2583,9 +2589,9 @@ body > nav .brand {
 }
 
 .choice-card:hover { border-color: rgba(var(--accent-rgb), 0.55); }
-.choice-card .icon { color: var(--text-muted); margin-block-end: 0.15rem; }
+.choice-card .icon { color: var(--text-dim); margin-block-end: 0.15rem; }
 .choice-card .choice-title { font-weight: 600; }
-.choice-card .choice-sub { color: var(--text-muted); font-size: 0.875rem; }
+.choice-card .choice-sub { color: var(--text-dim); font-size: 0.875rem; }
 
 .choice-card.on {
   border-color: var(--accent);
@@ -2612,10 +2618,10 @@ body > nav .brand {
   border-block-start: 1px dashed var(--border);
 }
 
-.answers-head { margin: 0 0 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.answers-head { margin: 0 0 0.5rem; font-size: 0.8rem; font-weight: 600; color: var(--text-dim); }
 .answers dl { display: grid; gap: 0.5rem; margin: 0; }
 .answers dl > div { display: grid; gap: 0.1rem; }
-.answers dt { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+.answers dt { font-size: 0.8rem; font-weight: 600; color: var(--text-dim); }
 .answers dd { margin: 0; white-space: pre-wrap; }
 
 /* Checkboxes in a settings form. They were a row of pills reading "Bug" and
@@ -2635,7 +2641,7 @@ body > nav .brand {
   padding: 0.5rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: var(--canvas);
   font-weight: 400;
   cursor: pointer;
 }
@@ -2697,8 +2703,8 @@ body > nav .brand {
   border: 1px solid var(--border);
   border-inline-start: 4px solid var(--accent);
   border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--text);
+  background: var(--panel);
+  color: var(--text-main);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
   font-size: 0.9rem;
   overflow: hidden;
@@ -2739,14 +2745,14 @@ body > nav .brand {
   justify-content: center;
   border: 0;
   background: none;
-  color: var(--text-muted);
+  color: var(--text-dim);
   padding: 0.2rem;
   border-radius: 4px;
   line-height: 0;
   cursor: pointer;
 }
 
-.toast-close:hover { color: var(--text); background: rgba(128, 128, 128, 0.15); }
+.toast-close:hover { color: var(--text-main); background: rgba(128, 128, 128, 0.15); }
 
 .toast-bar {
   position: absolute;
@@ -2814,8 +2820,8 @@ body > nav .brand {
   padding: 0.05rem 0.3rem;
   border: 1px solid var(--border);
   border-radius: 3px;
-  background: var(--bg);
-  color: var(--text-muted);
+  background: var(--canvas);
+  color: var(--text-dim);
   font-family: ui-monospace, monospace;
   font-size: 0.6rem;
   line-height: 1.5;
@@ -2823,7 +2829,7 @@ body > nav .brand {
   letter-spacing: 0.03em;
 }
 
-.avatar-pick:hover .avatar-pick-badge { color: var(--text); }
+.avatar-pick:hover .avatar-pick-badge { color: var(--text-main); }
 
 /* The picker, and the cross that clears it.
  *
@@ -2849,8 +2855,8 @@ body > nav .brand {
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 50%;
-  background: var(--bg);
-  color: var(--text-muted);
+  background: var(--canvas);
+  color: var(--text-dim);
   cursor: pointer;
   z-index: 1;
 }
@@ -2867,10 +2873,10 @@ body > nav .brand {
   margin-block-start: 1rem;
   border-block-start: 1px solid var(--border);
   padding-block-start: 0.9rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
-.side-public:hover { color: var(--text); }
+.side-public:hover { color: var(--text-main); }
 
 /* ------------------------------------------------------------------ signing in */
 
@@ -2894,7 +2900,7 @@ body > nav .brand {
 }
 
 .signin-head h1 { margin: 0.4rem 0 0; font-size: 1.5rem; }
-.signin-head .lead { margin: 0; color: var(--text-muted); }
+.signin-head .lead { margin: 0; color: var(--text-dim); }
 
 .signin form { inline-size: 100%; margin: 0; }
 .signin .wizard-card { inline-size: 100%; box-sizing: border-box; }
@@ -2917,9 +2923,9 @@ body > nav .brand {
   box-sizing: content-box;
   padding: 0.75rem;
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-2), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
+  box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
 }
 
 /* The eye on a password field. Put there by a service that walks every screen,
@@ -2945,11 +2951,11 @@ body > nav .brand {
   background: none;
   padding: 0.25rem;
   border-radius: 4px;
-  color: var(--text-muted);
+  color: var(--text-dim);
   cursor: pointer;
 }
 
-.pw-toggle:hover { color: var(--text); }
+.pw-toggle:hover { color: var(--text-main); }
 
 /* ------------------------------------------------- the same light, inside
  *
@@ -2966,22 +2972,22 @@ body > nav .brand {
 .facts li,
 .modal {
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-1), var(--hairline);
+  box-shadow: var(--shadow-sm), var(--hairline);
 }
 
-.modal { box-shadow: var(--shadow-3); }
+.modal { box-shadow: var(--shadow-lg); }
 
 a.bento-card:hover,
 .person:hover {
   border-color: var(--accent-line);
-  box-shadow: var(--shadow-2), var(--hairline);
+  box-shadow: var(--shadow-md), var(--hairline);
 }
 
 /* The sidebar is the one surface that does not float: it is the wall the
    application hangs on, so it takes the recessed colour and lets the content
    beside it be the thing with depth. */
 .side {
-  background: color-mix(in srgb, var(--surface) 92%, var(--text) 3%);
+  background: color-mix(in srgb, var(--panel) 92%, var(--text-main) 3%);
 }
 
 .side .brand { font-size: 1.05rem; }
@@ -2996,7 +3002,7 @@ a.bento-card:hover,
 
 .detail {
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-1), var(--hairline);
+  box-shadow: var(--shadow-sm), var(--hairline);
   padding: clamp(1.1rem, 3vw, 1.75rem);
   margin-block-start: 0;
 }
@@ -3013,7 +3019,7 @@ a.bento-card:hover,
 
 .vote-block {
   border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  background: var(--surface-dim);
   box-shadow: var(--hairline);
   padding: 0.85rem 1rem;
   transition: transform 0.15s var(--ease), border-color 0.15s var(--ease),
@@ -3026,20 +3032,20 @@ a.bento-card:hover,
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--surface-2);
+  background: var(--surface-dim);
 }
 
 /* --------------------------------------------------- reporting, refined */
 
 .choice-card {
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-1), var(--hairline);
+  box-shadow: var(--shadow-sm), var(--hairline);
   padding: 1rem 1.1rem;
   transition: transform 0.18s var(--ease), border-color 0.18s var(--ease),
     box-shadow 0.18s var(--ease), background 0.18s var(--ease);
 }
 
-.choice-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2), var(--hairline); }
+.choice-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md), var(--hairline); }
 
 /* The mark of the kind, in a tile rather than loose above the words: it is the
    same shape as every other icon tile in the product. */
@@ -3047,19 +3053,19 @@ a.bento-card:hover,
   box-sizing: content-box;
   padding: 0.5rem;
   border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-muted);
+  background: var(--surface-dim);
+  color: var(--text-dim);
   margin-block-end: 0.35rem;
 }
 
-.choice-card.on { box-shadow: var(--shadow-1), var(--hairline), 0 0 0 1px var(--accent); }
+.choice-card.on { box-shadow: var(--shadow-sm), var(--hairline), 0 0 0 1px var(--accent); }
 .choice-card.on .icon { background: var(--accent-wash); color: var(--accent-alt); }
 
 /* ------------------------------------------------------ signing in, refined */
 
 .signin { max-inline-size: 26rem; }
 
-.signin .wizard-card { box-shadow: var(--shadow-2), var(--hairline); }
+.signin .wizard-card { box-shadow: var(--shadow-md), var(--hairline); }
 
 .signin-head h1 { font-size: clamp(1.4rem, 1.1rem + 1vw, 1.9rem); letter-spacing: -0.03em; }
 
@@ -3068,9 +3074,9 @@ a.bento-card:hover,
   box-sizing: content-box;
   padding: 0.75rem;
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-2), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
+  box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
 }
 
 /* --------------------------------------------------- the last few details */
@@ -3082,26 +3088,26 @@ a.bento-card:hover,
   block-size: 2.4rem;
   border-color: var(--border);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
 }
 
 .head-actions .icon-button:hover {
   border-color: var(--border-strong);
-  color: var(--text);
-  background: var(--surface);
+  color: var(--text-main);
+  background: var(--panel);
 }
 
 /* The bar's own controls. An underlined link beside a button reads as the older
    half of a page that was styled twice. */
 .nav-right .link {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-weight: 600;
   text-decoration: none;
 }
 
-.nav-right .link:hover { color: var(--text); text-decoration: underline; }
-.nav-right a:not(.button) { color: var(--text-muted); font-weight: 600; text-decoration: none; }
+.nav-right .link:hover { color: var(--text-main); text-decoration: underline; }
+.nav-right a:not(.button) { color: var(--text-dim); font-weight: 600; text-decoration: none; }
 .nav-right a:not(.button):hover { color: var(--accent-alt); }
 
 /* Signing out of the panel: the same quiet control as the bar's, at the foot of
@@ -3113,12 +3119,12 @@ a.bento-card:hover,
   justify-self: start;
   padding: 0.35rem 0.6rem;
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 0.9rem;
   text-decoration: none;
 }
 
-.side-foot .link:hover { background: rgba(127, 127, 127, 0.12); color: var(--text); }
+.side-foot .link:hover { background: rgba(127, 127, 127, 0.12); color: var(--text-main); }
 
 /* The team's tools, which are three separate jobs in one card and used to run
    into each other: a rule between them and one width for every field. */
@@ -3188,7 +3194,7 @@ a.stat:hover .stat-go {
 
 .dash-card:has(a.stat):hover {
   border-color: var(--accent-line);
-  box-shadow: var(--shadow-2), var(--hairline);
+  box-shadow: var(--shadow-md), var(--hairline);
 }
 
 /* --------------------------------------------------------------- the chart */
@@ -3228,7 +3234,7 @@ a.stat:hover .stat-go {
   justify-content: space-between;
   margin: 0.35rem 0 0;
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 /* ---------------------------------------------------------------- the ring */
@@ -3263,7 +3269,7 @@ a.stat:hover .stat-go {
   font-variant-numeric: tabular-nums;
 }
 
-.arc-track { stroke: var(--surface-2); }
+.arc-track { stroke: var(--surface-dim); }
 .arc-idea { stroke: var(--accent); }
 .arc-bug { stroke: var(--hue-open); }
 
@@ -3343,7 +3349,7 @@ a.stat:hover .stat-go {
 }
 
 .brief:hover, .board-rows a:hover {
-  background: var(--surface-2);
+  background: var(--surface-dim);
   border-color: var(--border);
 }
 
@@ -3364,7 +3370,7 @@ a.stat:hover .stat-go {
   inline-size: 1.9rem;
   block-size: 1.9rem;
   border-radius: var(--radius-sm);
-  background: var(--surface-2);
+  background: var(--surface-dim);
   color: var(--hue-open);
 }
 
@@ -3418,8 +3424,8 @@ a.stat:hover .stat-go {
   padding-inline-end: 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-1), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-sm), var(--hairline);
   transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease),
     border-color 0.18s var(--ease);
 }
@@ -3427,7 +3433,7 @@ a.stat:hover .stat-go {
 .report:hover {
   transform: translateY(-1px);
   border-color: var(--accent-line);
-  box-shadow: var(--shadow-2), var(--hairline);
+  box-shadow: var(--shadow-md), var(--hairline);
 }
 
 .report .item,
@@ -3487,7 +3493,7 @@ a.stat:hover .stat-go {
 .controls select {
   padding: 0.4rem 0.6rem;
   border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--surface-dim);
   font-weight: 600;
   font-size: 0.875rem;
 }
@@ -3551,7 +3557,7 @@ a.stat:hover .stat-go {
 .failure .hero-mark {
   inline-size: 3.5rem;
   block-size: 3.5rem;
-  color: var(--text-muted);
+  color: var(--text-dim);
 }
 
 .failure h1 { margin: 0; }
@@ -3582,7 +3588,7 @@ a.stat:hover .stat-go {
   gap: 0.15rem;
   padding: 0.2rem;
   border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--surface-dim);
 }
 
 .theme-choice button {
@@ -3592,12 +3598,12 @@ a.stat:hover .stat-go {
   transition: color 0.15s var(--ease), background 0.15s var(--ease);
 }
 
-.theme-choice button:hover { color: var(--text); }
+.theme-choice button:hover { color: var(--text-main); }
 
 .theme-choice button[aria-pressed="true"] {
-  background: var(--surface);
+  background: var(--panel);
   color: var(--accent-alt);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-sm);
 }
 
 /*
@@ -3610,12 +3616,12 @@ a.stat:hover .stat-go {
  */
 .side-foot .link,
 .nav-right .sign-out {
-  color: var(--danger);
+  color: var(--danger-color);
 }
 
 .side-foot .link:hover,
 .nav-right .sign-out:hover {
-  color: var(--danger);
+  color: var(--danger-color);
   background: rgba(var(--danger-rgb), 0.12);
 }
 
@@ -3635,7 +3641,7 @@ a.stat:hover .stat-go {
 
 .chart-dot.on {
   opacity: 1;
-  stroke: var(--surface);
+  stroke: var(--panel);
   stroke-width: 2;
 }
 
@@ -3660,8 +3666,8 @@ a.stat:hover .stat-go {
   padding: 0.3rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
-  box-shadow: var(--shadow-2), var(--hairline);
+  background: var(--panel);
+  box-shadow: var(--shadow-md), var(--hairline);
   font-size: 0.8rem;
   font-weight: 600;
   white-space: nowrap;
@@ -3685,7 +3691,7 @@ a.stat:hover .stat-go {
 }
 
 .chart-tip .tip-day {
-  color: var(--text-muted);
+  color: var(--text-dim);
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -3700,7 +3706,7 @@ a.stat:hover .stat-go {
 
 .chart-tip .tip-total { font-weight: 700; }
 .chart-tip .count { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
-.chart-tip .tip-row { color: var(--text-muted); font-size: 0.8rem; }
+.chart-tip .tip-row { color: var(--text-dim); font-size: 0.8rem; }
 
 /* Held still so it can start again: an animation that is already running does
    not replay, and removing this class after a reflow is what restarts it. */
