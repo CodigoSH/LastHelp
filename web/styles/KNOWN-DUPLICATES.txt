@@ -1,0 +1,35 @@
+# Selectors that were already declared twice when the rule that watches this
+# was written, on 2026-09-16.
+#
+# Each of these is a later declaration silently overriding an earlier one: the
+# first rule's overlapping properties are dead code, and nothing says so at the
+# point where somebody reads either half. They are not bugs yet — the page looks
+# the way it looks — but each is a trap for whoever edits the wrong one.
+#
+# This list only ever gets SHORTER. Nothing is added: a new duplicate fails the
+# rule, which is the whole point. Fixing one means merging the two declarations
+# by hand and deleting its line here — and the rule refuses a line for something
+# that is no longer duplicated, so the list cannot rot.
+#
+# Merging them mechanically was tried once and was a mistake: moving a
+# declaration earlier changes what it competes with, three screens changed, and
+# the script that did it mangled ten selectors on the way. By hand, one at a
+# time, looking at the screen after each.
+.button.danger
+.chart
+.choice-card
+.choice-card .icon
+.comment .who
+.dash-card > h3
+.detail
+.detail .body
+.detail h1
+.kind
+.modal
+.notice
+.side
+.side .brand
+.signin
+.signin-head h1
+.vote-block
+.vote-block:hover

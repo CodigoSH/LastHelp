@@ -33,6 +33,8 @@
   --text-dim: #5b6470;
   --border: #e3e7ec;
   --border-strong: #cdd4dd;
+  --card-border: rgba(0, 0, 0, 0.07);
+  --card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 10px rgba(0, 0, 0, 0.06);
 
   /* State, as hues rather than as words. A board where everything is grey is a
      board nobody can scan; these are the four meanings a status can carry. */
@@ -101,48 +103,90 @@
  * values so that choosing dark on a light system works too — a theme toggle
  * that only ever turns things darker is one that cannot be turned back.
  */
+/*
+ * The dark palette, written once.
+ *
+ * It is switched on from two places — the system preference and an explicit
+ * choice — and the values used to be copied into both. One copy got a change
+ * and the other did not, and because the screenshots emulate the system
+ * preference the edit appeared to do nothing at all. Now the values live in
+ * --dark-* and the two selectors below only point at them; an architecture rule
+ * fails if either stops covering the same set or grows a literal of its own.
+ *
+ * The greys are the reference's: neutral rather than blue-black, so the warm
+ * light in the corner has something to warm.
+ */
+:root {
+  --dark-canvas: #121212;
+  --dark-canvas-glass: rgba(18, 18, 18, 0.78);
+  --dark-panel: #1a1a1a;
+  --dark-surface-dim: #242424;
+  --dark-text-main: #e9ecf2;
+  --dark-text-dim: #98a2b1;
+  --dark-border: #333333;
+  --dark-border-strong: #444444;
+  /* A card's edge, and the light line along its top that stops it reading as a
+     hole cut in the page. */
+  --dark-card-border: rgba(255, 255, 255, 0.09);
+  --dark-card-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 12px rgba(0, 0, 0, 0.35);
+  --dark-hue-open: #60a5fa;
+  --dark-danger-color: #f87171;
+  --dark-danger-rgb: 248, 113, 113;
+  --dark-hue-done: #4ade80;
+  --dark-hue-hold: #fbbf24;
+  --dark-hue-off: #9aa3b2;
+  --dark-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --dark-shadow-md: 0 8px 22px -10px rgba(0, 0, 0, 0.75);
+  --dark-shadow-lg: 0 30px 70px -30px rgba(0, 0, 0, 0.9);
+  --dark-hairline: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --canvas: #0b0d12;
-    --canvas-glass: rgba(11, 13, 18, 0.78);
-    --panel: #14171e;
-    --surface-dim: #1a1e26;
-    --text-main: #e9ecf2;
-    --text-dim: #98a2b1;
-    --border: #242a34;
-    --border-strong: #333c49;
-    --hue-open: #60a5fa;
-    --danger-color: #f87171;
-    --danger-rgb: 248, 113, 113;
-    --hue-done: #4ade80;
-    --hue-hold: #fbbf24;
-    --hue-off: #9aa3b2;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-    --shadow-md: 0 8px 22px -10px rgba(0, 0, 0, 0.75);
-    --shadow-lg: 0 30px 70px -30px rgba(0, 0, 0, 0.9);
-    --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --canvas: var(--dark-canvas);
+    --canvas-glass: var(--dark-canvas-glass);
+    --panel: var(--dark-panel);
+    --surface-dim: var(--dark-surface-dim);
+    --text-main: var(--dark-text-main);
+    --text-dim: var(--dark-text-dim);
+    --border: var(--dark-border);
+    --border-strong: var(--dark-border-strong);
+    --card-border: var(--dark-card-border);
+    --card-shadow: var(--dark-card-shadow);
+    --hue-open: var(--dark-hue-open);
+    --danger-color: var(--dark-danger-color);
+    --danger-rgb: var(--dark-danger-rgb);
+    --hue-done: var(--dark-hue-done);
+    --hue-hold: var(--dark-hue-hold);
+    --hue-off: var(--dark-hue-off);
+    --shadow-sm: var(--dark-shadow-sm);
+    --shadow-md: var(--dark-shadow-md);
+    --shadow-lg: var(--dark-shadow-lg);
+    --hairline: var(--dark-hairline);
   }
 }
 
 :root[data-theme="dark"] {
-  --canvas: #0b0d12;
-  --canvas-glass: rgba(11, 13, 18, 0.78);
-  --panel: #14171e;
-  --surface-dim: #1a1e26;
-  --text-main: #e9ecf2;
-  --text-dim: #98a2b1;
-  --border: #242a34;
-  --border-strong: #333c49;
-  --hue-open: #60a5fa;
-  --danger-color: #f87171;
-  --danger-rgb: 248, 113, 113;
-  --hue-done: #4ade80;
-  --hue-hold: #fbbf24;
-  --hue-off: #9aa3b2;
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 8px 22px -10px rgba(0, 0, 0, 0.75);
-  --shadow-lg: 0 30px 70px -30px rgba(0, 0, 0, 0.9);
-  --hairline: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --canvas: var(--dark-canvas);
+  --canvas-glass: var(--dark-canvas-glass);
+  --panel: var(--dark-panel);
+  --surface-dim: var(--dark-surface-dim);
+  --text-main: var(--dark-text-main);
+  --text-dim: var(--dark-text-dim);
+  --border: var(--dark-border);
+  --border-strong: var(--dark-border-strong);
+  --card-border: var(--dark-card-border);
+  --card-shadow: var(--dark-card-shadow);
+  --hue-open: var(--dark-hue-open);
+  --danger-color: var(--dark-danger-color);
+  --danger-rgb: var(--dark-danger-rgb);
+  --hue-done: var(--dark-hue-done);
+  --hue-hold: var(--dark-hue-hold);
+  --hue-off: var(--dark-hue-off);
+  --shadow-sm: var(--dark-shadow-sm);
+  --shadow-md: var(--dark-shadow-md);
+  --shadow-lg: var(--dark-shadow-lg);
+  --hairline: var(--dark-hairline);
 }
 
 * {
@@ -2394,9 +2438,10 @@ body > nav .brand {
 
 .dash-card {
   position: relative;
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-border);
   border-radius: calc(var(--radius) + 2px);
   background: var(--panel);
+  box-shadow: var(--card-shadow);
   padding: 0;
   overflow: hidden;
 }
