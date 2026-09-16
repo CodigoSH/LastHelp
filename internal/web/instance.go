@@ -38,7 +38,7 @@ const maxInstanceNameLength = 60
 // public page anyway — a visitor who could not read them would be shown a page
 // wearing somebody else's branding. Only changing them is the administrator's.
 func (s *Server) handleGetInstance(w http.ResponseWriter, r *http.Request) {
-	store := settings.Store{DB: s.db}
+	store := s.settings()
 	name, err := store.Get(settings.InstanceName)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "error.internal")
@@ -98,7 +98,7 @@ func (s *Server) handleSetInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store := settings.Store{DB: s.db}
+	store := s.settings()
 	for key, value := range map[string]string{
 		settings.InstanceName:   name,
 		settings.InstanceLogo:   logo,

@@ -41,6 +41,11 @@ func (s *Server) clientFor(o org.Organization) (forge.Client, error) {
 		return github.Client{BaseURL: o.BaseURL, Token: token, Out: s.out}, nil
 	case org.ForgeGitLab:
 		return gitlab.Client{BaseURL: o.BaseURL, Token: token, Out: s.out}, nil
+	// Gitea and Forgejo share an adapter. Not because compatibility is
+	// assumed — they are separate projects now — but because the surface used
+	// here has the same shape in both, and both are driven against a real
+	// server separately. If they diverge, this grows a branch rather than the
+	// interface growing a fifth member.
 	case org.ForgeGitea, org.ForgeForgejo:
 		return gitea.Client{BaseURL: o.BaseURL, Token: token, Out: s.out}, nil
 	default:

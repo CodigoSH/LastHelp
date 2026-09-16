@@ -202,7 +202,7 @@ func (s *Server) wantsBeta(r *http.Request) bool {
 	if value := r.URL.Query().Get("beta"); value != "" {
 		return value == "true"
 	}
-	channel, err := (settings.Store{DB: s.db}).Get(settings.UpdateChannel)
+	channel, err := s.settings().Get(settings.UpdateChannel)
 	return err == nil && channel == "beta"
 }
 
@@ -226,7 +226,7 @@ func (s *Server) handleSetChannel(w http.ResponseWriter, r *http.Request) {
 	if in.Beta {
 		channel = "beta"
 	}
-	if err := (settings.Store{DB: s.db}).Set(settings.UpdateChannel, channel); err != nil {
+	if err := s.settings().Set(settings.UpdateChannel, channel); err != nil {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}

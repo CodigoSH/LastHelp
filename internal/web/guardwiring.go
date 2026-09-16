@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/guard"
-	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/util"
 )
 
@@ -33,7 +32,7 @@ func (s *Server) bucketOf(r *http.Request) string {
 }
 
 func (s *Server) stoplist() []string {
-	raw, err := (settings.Store{DB: s.db}).Get(StoplistSetting)
+	raw, err := s.settings().Get(StoplistSetting)
 	if err != nil || raw == "" {
 		return nil
 	}

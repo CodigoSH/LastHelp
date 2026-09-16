@@ -28,12 +28,6 @@ const (
 	Forgejo Kind = "forgejo"
 )
 
-// Gitea and Forgejo share an adapter. Not because compatibility is assumed —
-// they are separate projects now — but because the surface used here has the
-// same shape in both, and both are tested separately. If they diverge, the
-// adapter grows a branch rather than the interface growing a fifth member.
-func (k Kind) sharesGiteaShape() bool { return k == Gitea || k == Forgejo }
-
 var (
 	// ErrNotFound means the forge says there is no such repository or issue.
 	ErrNotFound = errors.New("not found on the forge")

@@ -100,9 +100,19 @@ VERSION_STAMPS=(
 # `i18n:scan` join this list with the first frontend test and the first
 # translated string. A preflight that invokes a script nobody wrote fails every
 # release until someone deletes the line, which teaches people to delete lines.
+# Pinned, and it is the only version of this analyser named anywhere in the
+# project. A floating one puts the release in the red on a day nobody touched
+# code, because somebody else published a stricter check.
+STATICCHECK_VERSION="v0.8.1"
+
 PREFLIGHT=(
     "gofmt|test -z \"\$(gofmt -l ./cmd ./internal)\""
     "go vet|go vet ./..."
+    # go vet does not see dead code: a function that lost its last caller
+    # compiles, passes vet and passes every test. Two of them had been sitting
+    # here — a predicate about which forges share an adapter, and the accessor
+    # for the settings store while seven places built that store by hand.
+    "staticcheck|go run honnef.co/go/tools/cmd/staticcheck@\$STATICCHECK_VERSION ./..."
     "architecture rules|go test -count=1 ./internal/arch/"
     "bun install|bun install --frozen-lockfile"
     "frontend build|bun run build"
