@@ -6,6 +6,40 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The form for reporting something was not laid out.** Its fields were
+  stacked into a narrow column with the send button adrift beside them, on the
+  one page the product exists to collect. Two different things shared a class
+  name, so a rule written for a row in the moderation queue was being applied to
+  the form.
+- Notices were tinted with a hard-coded orange, so an operator who set their own
+  accent colour got every other tinted surface in their colour and their notices
+  in ours.
+- On a report opened by the team, the merge block sat against the reply form's
+  button and read as that form's caption.
+- Upgrading over an installation made by an earlier installer is recognised as
+  an upgrade again: it was asking every question a second time and then refusing
+  because the port was busy — held by the very service it was about to replace.
+  The port check now asks whose process it is rather than assuming.
+
+### Changed
+
+- The setup wizard and the sign-in screen are each one card — mark, heading,
+  fields and the way on — instead of a mark floating above a card with the
+  button below it.
+- The theme is chosen by pointing at one of three tiles rather than by reading
+  three words in a bar.
+- Dark mode uses neutral greys rather than blue-black ones, and cards carry the
+  light hairline along their top edge that keeps a dark card from reading as a
+  hole in the page.
+- Lists and groups — the organisations, the repositories, the board under its
+  filter, each roadmap column — are drawn as a bordered section with its name on
+  the border and the count beside it.
+- The installer speaks the same words as the ones the other projects ship, and
+  the command to install is the same everywhere: it asks which port, which
+  release channel and whether a proxy is in front, and remembers the answers.
+
 ## [1.0.0-Beta.03] - 2026-09-09
 
 ### Added
