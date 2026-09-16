@@ -358,8 +358,16 @@ done
 # --- 5. The changelog and the notes ----------------------------------------
 
 if [ "$TYPE" == "stable" ]; then
+    # Since the previous STABLE, so the entry covers the whole beta cycle: the
+    # reader is somebody upgrading from the last stable, and every beta in
+    # between is part of what they are about to get.
+    #
+    # And if there is no previous stable, the range is the whole history rather
+    # than the last beta. Falling back to the last tag reads as harmless and is
+    # not: the first stable of a project that shipped three betas would list
+    # only what changed since the third, and the first two would appear in no
+    # changelog entry ever written.
     LAST_TAG=$(git tag -l "v*" --sort=-v:refname | grep -v -E 'Beta|RC' | head -n 1 || true)
-    [ -n "$LAST_TAG" ] || LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
 else
     LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
 fi
@@ -431,9 +439,17 @@ if [ "$TYPE" == "stable" ] && [ -f "CHANGELOG.md" ]; then
         sed 's/^/     /' "$ENTRY_FILE"
     else
         # Inserted before the first version heading, so the newest is on top.
+        #
+        # The END clause is what makes the FIRST entry work. Without it, a
+        # changelog that has no version heading yet — a new project, or this
+        # one before its first stable — matches nothing, the entry is never
+        # printed, and the file comes out byte for byte identical. Measured:
+        # the release is cut, the notes are published, and the changelog
+        # silently gains nothing.
         awk 'NR==FNR { entry = entry $0 "\n"; next }
              /^## \[/ && !done { printf "%s", entry; done=1 }
-             { print }' "$ENTRY_FILE" CHANGELOG.md > CHANGELOG.md.tmp \
+             { print }
+             END { if (!done) printf "%s", entry }' "$ENTRY_FILE" CHANGELOG.md > CHANGELOG.md.tmp \
             && mv CHANGELOG.md.tmp CHANGELOG.md
     fi
     rm -f "$ENTRY_FILE"

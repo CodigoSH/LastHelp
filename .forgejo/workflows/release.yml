@@ -107,8 +107,24 @@ jobs:
           # never appears, diagnosed from a curl that said nothing.
           [ -n "$CI_TOKEN" ] || { echo "CI_TOKEN is not set" >&2; exit 1; }
 
-          notes="CHANGELOG.md"
-          body=$(awk "/^## \\[${TAG#v}\\]/{flag=1; next} /^## \\[/{flag=0} flag" "$notes")
+          # The notes come from the file the release script committed at this
+          # tag. They used to be cut out of CHANGELOG.md, which stopped working
+          # the day betas left that file: every beta would have been published
+          # with an empty body, and nothing would have said so.
+          #
+          # CHANGELOG.md stays as the fallback, because a stable does have a
+          # section there. If neither has anything, this stops: an empty
+          # release body is the silent failure, and the job can be re-run.
+          notes_file="RELEASE_NOTES_${TAG}.md"
+          if [ -f "$notes_file" ]; then
+            body=$(cat "$notes_file")
+          else
+            body=$(awk "/^## \\[${TAG#v}\\]/{flag=1; next} /^## \\[/{flag=0} flag" CHANGELOG.md)
+          fi
+          [ -n "$(printf '%s' "$body" | tr -d '[:space:]')" ] || {
+            echo "no notes for $TAG: neither $notes_file nor a CHANGELOG.md section" >&2
+            exit 1
+          }
 
           # A beta has to be published AS a beta. The forge decides what
           # /releases/latest answers from this flag, and that endpoint is the
@@ -125,26 +141,61 @@ jobs:
           # died on `jq: command not found` with the tag already pushed.
           payload=$(TAG="$TAG" BODY="$body" PRE="$pre" python3 -c 'import json, os; print(json.dumps({"tag_name": os.environ["TAG"], "name": os.environ["TAG"], "body": os.environ["BODY"], "draft": True, "prerelease": os.environ["PRE"] == "true"}))')
 
-          release=$(curl -sf -X POST \
-            "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases" \
-            -H "Authorization: token ${CI_TOKEN}" \
-            -H 'Content-Type: application/json' \
-            -d "$payload")
+          api="${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}"
 
-          id=$(echo "$release" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
-          [ -n "$id" ] || { echo "the forge did not return a release id" >&2; exit 1; }
+          # A release for this tag may already exist — forcing a tag re-runs
+          # this workflow, and POST /releases then answers with a conflict.
+          # `curl -sf` turned that into exit 22 and a red job with nothing
+          # wrong, so the tag is asked about first and an existing release is
+          # updated in place.
+          existing=$(curl -s -o /dev/null -w '%{http_code}' \
+            "$api/releases/tags/${TAG}" \
+            -H "Authorization: token ${CI_TOKEN}")
+
+          if [ "$existing" = "200" ]; then
+            echo "a release for ${TAG} exists; updating it"
+            id=$(curl -sf "$api/releases/tags/${TAG}" \
+              -H "Authorization: token ${CI_TOKEN}" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+            [ -n "$id" ] || { echo "the forge did not return a release id" >&2; exit 1; }
+
+            # Back to draft while the assets are swapped, so nobody downloads a
+            # release that is halfway through being rebuilt.
+            curl -sf -X PATCH "$api/releases/${id}" \
+              -H "Authorization: token ${CI_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d "$payload" > /dev/null
+
+            # The old assets go first: uploading a file whose name is already
+            # there is refused, and the release would keep the binaries of the
+            # build this one is replacing.
+            curl -sf "$api/releases/${id}/assets" \
+              -H "Authorization: token ${CI_TOKEN}" \
+              | python3 -c 'import json,sys; [print(a["id"]) for a in json.load(sys.stdin)]' \
+              | while read -r asset; do
+                  curl -sf -X DELETE "$api/releases/${id}/assets/${asset}" \
+                    -H "Authorization: token ${CI_TOKEN}" > /dev/null
+                done
+          else
+            release=$(curl -sf -X POST "$api/releases" \
+              -H "Authorization: token ${CI_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d "$payload")
+
+            id=$(echo "$release" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+            [ -n "$id" ] || { echo "the forge did not return a release id" >&2; exit 1; }
+          fi
 
           for file in dist/*; do
             curl -sf -X POST \
-              "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases/${id}/assets?name=$(basename "$file")" \
+              "$api/releases/${id}/assets?name=$(basename "$file")" \
               -H "Authorization: token ${CI_TOKEN}" \
               -F "attachment=@${file}" > /dev/null
           done
 
           # Published last, once every file is attached. A release that appears
           # before its assets is one somebody downloads empty.
-          curl -sf -X PATCH \
-            "${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}/releases/${id}" \
+          curl -sf -X PATCH "$api/releases/${id}" \
             -H "Authorization: token ${CI_TOKEN}" \
             -H 'Content-Type: application/json' \
             -d '{"draft": false}' > /dev/null
