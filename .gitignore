@@ -18,6 +18,17 @@ vendor/
 *.sqlite
 *.sqlite3
 
+# The key that decrypts the forge tokens, and anything shaped like it.
+#
+# This list had the database and not the key, and running the binary from the
+# repository root puts both here — keyFile() defaults to sitting next to the
+# database. So the key was committed, pushed, and lived in the public history
+# for eight days before anybody looked. An architecture rule now fails if a file
+# like this is tracked; this line is what stops it being created in the first
+# place.
+*.key
+*.pem
+
 # Environment variables
 .env
 .env.*
