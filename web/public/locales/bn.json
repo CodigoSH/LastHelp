@@ -321,6 +321,7 @@
   "shell.themeLight": "হালকা",
   "shell.themeSystem": "সিস্টেম",
   "shell.updates": "হালনাগাদ",
+  "shell.waitingCount": "অপেক্ষমাণ: {count}",
   "status.closed": "বন্ধ",
   "status.confirmed": "নিশ্চিত",
   "status.declined": "বাতিল",

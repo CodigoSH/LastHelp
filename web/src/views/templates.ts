@@ -1712,6 +1712,8 @@ export interface ShellSpec {
   logo?: string;
   avatar?: string;
   content: string;
+  /** What is waiting, already narrowed by the server to what this account may open. */
+  waiting?: { reports: number; messages: number };
 }
 
 /**
@@ -1727,9 +1729,16 @@ export interface ShellSpec {
  * and cannot use is worse than one that was never there.
  */
 export function adminShell(spec: ShellSpec, text: Text): string {
-  const item = (href: string, label: string, icon: string, extra = ""): string => {
+  // A count, or nothing. Zero is nothing: a badge that says 0 is a badge that
+  // teaches people to stop looking at badges.
+  const badge = (n: number): string =>
+    n > 0
+      ? `<span class="side-count" aria-label="${escapeAttr(text.t("shell.waitingCount", { count: String(n) }))}">${escapeHTML(String(n))}</span>`
+      : "";
+
+  const item = (href: string, label: string, icon: string, extra = "", count = 0): string => {
     const current = spec.path === href || (href !== "/panel" && spec.path.startsWith(href + "/"));
-    return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${icon}<span>${escapeHTML(label)}</span></a>`;
+    return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${icon}<span>${escapeHTML(label)}</span>${badge(count)}</a>`;
   };
 
   const group = (label: string, items: string): string =>
@@ -1748,7 +1757,13 @@ export function adminShell(spec: ShellSpec, text: Text): string {
             // The daily work, and the screen this panel did not have: what is
             // waiting, what is open and what was closed, across every board
             // this account has a role in.
-            item("/panel/reports", text.t("shell.reports"), icons.queue()) +
+            item(
+              "/panel/reports",
+              text.t("shell.reports"),
+              icons.queue(),
+              "",
+              (spec.waiting?.reports ?? 0) + (spec.waiting?.messages ?? 0),
+            ) +
             item("/panel/organizations", text.t("shell.organizations"), icons.organization()),
         )}
         ${group(

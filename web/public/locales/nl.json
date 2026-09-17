@@ -321,6 +321,7 @@
   "shell.themeLight": "Licht",
   "shell.themeSystem": "Systeem",
   "shell.updates": "Updates",
+  "shell.waitingCount": "In afwachting: {count}",
   "status.closed": "Gesloten",
   "status.confirmed": "Bevestigd",
   "status.declined": "Afgewezen",

@@ -188,3 +188,73 @@ func (s Store) RejectComment(id int64) error {
 	}
 	return nil
 }
+
+// PendingOnBoard is what is waiting for a person on one board.
+//
+// Returned per board, with the organisation beside it, because the caller has
+// to decide board by board whether this account may see it at all. Summing here
+// would mean this package deciding who may look — and the whole point of
+// keeping that in one place is that it is decided in one place.
+type PendingOnBoard struct {
+	RepoID   int64
+	OrgID    int64
+	Reports  int
+	Messages int
+}
+
+// PendingByBoard counts what is waiting on every board, whoever is asking.
+//
+// Two queries rather than one join: a board with pending comments and no
+// pending reports has to appear, and so does the reverse, which a single join
+// over both tables does not give without an outer join per side. Boards with
+// nothing waiting are left out entirely — the common case is that most of them
+// have nothing, and a caller summing an absent board adds zero either way.
+func (s Store) PendingByBoard() ([]PendingOnBoard, error) {
+	byRepo := map[int64]*PendingOnBoard{}
+
+	add := func(query string, into func(*PendingOnBoard, int)) error {
+		rows, err := s.DB.Query(query, string(Pending))
+		if err != nil {
+			return fmt.Errorf("counting what is waiting: %w", err)
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var repoID, orgID int64
+			var n int
+			if err := rows.Scan(&repoID, &orgID, &n); err != nil {
+				return fmt.Errorf("counting what is waiting: %w", err)
+			}
+			if byRepo[repoID] == nil {
+				byRepo[repoID] = &PendingOnBoard{RepoID: repoID, OrgID: orgID}
+			}
+			into(byRepo[repoID], n)
+		}
+		return rows.Err()
+	}
+
+	if err := add(`
+		SELECT i.repo_id, r.org_id, COUNT(*)
+		FROM item i JOIN repository r ON r.id = i.repo_id
+		WHERE i.moderation_state = ?
+		GROUP BY i.repo_id, r.org_id`,
+		func(p *PendingOnBoard, n int) { p.Reports = n }); err != nil {
+		return nil, err
+	}
+
+	if err := add(`
+		SELECT i.repo_id, r.org_id, COUNT(*)
+		FROM comment c
+		JOIN item i ON i.id = c.item_id
+		JOIN repository r ON r.id = i.repo_id
+		WHERE c.moderation_state = ?
+		GROUP BY i.repo_id, r.org_id`,
+		func(p *PendingOnBoard, n int) { p.Messages = n }); err != nil {
+		return nil, err
+	}
+
+	out := make([]PendingOnBoard, 0, len(byRepo))
+	for _, p := range byRepo {
+		out = append(out, *p)
+	}
+	return out, nil
+}

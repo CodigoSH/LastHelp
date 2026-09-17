@@ -1173,6 +1173,41 @@ async function main() {
     `${listing.decisions} of ${listing.rows} rows carry the buttons`,
   );
 
+  // The same number, in the menu. A count the server works out correctly and
+  // the page renders into a zero-width element is the failure that reading the
+  // DOM cannot see: the text is there and nothing is on screen. So this measures
+  // the box, and that it sits at the far end rather than against the label.
+  const badge = await evaluate(`
+    const reports = [...document.querySelectorAll(".side-item")]
+      .find(a => a.getAttribute("href") === "/panel/reports");
+    const pill = reports?.querySelector(".side-count");
+    const box = pill?.getBoundingClientRect();
+    return {
+      text: pill?.textContent?.trim() ?? "",
+      label: pill?.getAttribute("aria-label") ?? "",
+      width: Math.round(box?.width ?? 0),
+      height: Math.round(box?.height ?? 0),
+      // At the INLINE end of the item, which is the right one reading left to
+      // right and the left one in Arabic. Asking for "on the right" would have
+      // been asking the wrong question — this pass runs in Arabic, and there
+      // the badge is correctly on the left.
+      atEnd: (() => {
+        if (!box || !reports) return false;
+        const item = reports.getBoundingClientRect();
+        return getComputedStyle(reports).direction === "rtl"
+          ? box.left - item.left < 24
+          : item.right - box.right < 24;
+      })(),
+      dir: reports ? getComputedStyle(reports).direction : "",
+    };
+  `);
+  check(
+    "what is waiting is a number beside Reports, with a box around it",
+    badge.text === listing.waiting && badge.width > 8 && badge.height > 8 &&
+      badge.atEnd === true && badge.label !== "",
+    JSON.stringify(badge),
+  );
+
   // A report nobody outside the team can see is not open, and its chip used to
   // say so: the status is what a published report is in, and until then the
   // state is what it is waiting for.
@@ -1391,6 +1426,29 @@ async function main() {
     "a collaborator's listing holds their board and nothing else",
     theirs.rows > 0 && theirs.boards.length === 1 && theirs.boards[0] === "Lastboard" && theirs.boardPicker === false,
     JSON.stringify(theirs),
+  );
+
+  // 12c. And the count beside Reports is drawn, and drawn with a box. A number
+  //      the server computed correctly and the page renders into nothing is the
+  //      failure this cannot see any other way — reading the DOM says the text
+  //      is there while the element measures zero.
+  // And nothing waiting draws nothing. A badge that says 0 is a badge people
+  // learn to stop reading, and this account has an empty queue of its own —
+  // which is also the proof that the number is theirs and not the server's.
+  const noBadge = await evaluate(`
+    const r = await fetch("/api/me", { headers: { accept: "application/json" } });
+    const me = await r.json();
+    const reports = [...document.querySelectorAll(".side-item")]
+      .find(a => a.getAttribute("href") === "/panel/reports");
+    return {
+      pending: me.pending,
+      pill: !!reports?.querySelector(".side-count"),
+    };
+  `);
+  check(
+    "and an account with nothing waiting is shown no number at all",
+    noBadge.pending.reports === 0 && noBadge.pending.messages === 0 && noBadge.pill === false,
+    JSON.stringify(noBadge),
   );
 
   // 13. And a stranger, on the same address, is shown a page rather than an

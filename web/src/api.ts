@@ -103,6 +103,13 @@ export interface Me {
   name?: string;
   avatar?: string;
   admin: boolean;
+  /**
+   * What is waiting for this account, already narrowed to the boards it may
+   * open. Counted by the server for that reason: the page has no way to know
+   * which boards those are, and a number it worked out itself would be a second
+   * opinion on a permission.
+   */
+  pending?: { reports: number; messages: number };
   memberships: Array<{
     scope: string;
     role: string;

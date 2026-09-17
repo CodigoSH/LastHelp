@@ -321,6 +321,7 @@
   "shell.themeLight": "Claro",
   "shell.themeSystem": "Sistema",
   "shell.updates": "Actualizaciones",
+  "shell.waitingCount": "Pendientes: {count}",
   "status.closed": "Cerrado",
   "status.confirmed": "Confirmado",
   "status.declined": "Descartado",

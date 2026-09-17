@@ -321,6 +321,7 @@
   "shell.themeLight": "روشن",
   "shell.themeSystem": "نظام کے مطابق",
   "shell.updates": "اپ ڈیٹس",
+  "shell.waitingCount": "زیرِ التوا: {count}",
   "status.closed": "بند",
   "status.confirmed": "تصدیق شدہ",
   "status.declined": "مسترد",

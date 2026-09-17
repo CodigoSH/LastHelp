@@ -321,6 +321,7 @@
   "shell.themeLight": "فاتح",
   "shell.themeSystem": "حسب النظام",
   "shell.updates": "التحديثات",
+  "shell.waitingCount": "قيد الانتظار: {count}",
   "status.closed": "مغلق",
   "status.confirmed": "مؤكد",
   "status.declined": "مرفوض",

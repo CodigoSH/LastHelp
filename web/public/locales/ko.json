@@ -321,6 +321,7 @@
   "shell.themeLight": "밝게",
   "shell.themeSystem": "시스템",
   "shell.updates": "업데이트",
+  "shell.waitingCount": "대기 중: {count}",
   "status.closed": "종료",
   "status.confirmed": "확인됨",
   "status.declined": "보류",

@@ -321,6 +321,7 @@
   "shell.themeLight": "Hell",
   "shell.themeSystem": "System",
   "shell.updates": "Aktualisierungen",
+  "shell.waitingCount": "Ausstehend: {count}",
   "status.closed": "Geschlossen",
   "status.confirmed": "Bestätigt",
   "status.declined": "Abgelehnt",

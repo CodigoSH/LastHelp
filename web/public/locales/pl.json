@@ -321,6 +321,7 @@
   "shell.themeLight": "Jasny",
   "shell.themeSystem": "Systemowy",
   "shell.updates": "Aktualizacje",
+  "shell.waitingCount": "Oczekujące: {count}",
   "status.closed": "Zamknięte",
   "status.confirmed": "Potwierdzone",
   "status.declined": "Odrzucone",

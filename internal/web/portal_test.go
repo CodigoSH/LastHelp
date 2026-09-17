@@ -1099,3 +1099,68 @@ func TestEveryResponseCarriesAPolicy(t *testing.T) {
 		}
 	}
 }
+
+// TestTheWaitingCountStopsAtTheDoor.
+//
+// The number beside "Reports" is the first thing a collaborator sees, and a
+// number is a claim: this much is waiting for you. Counted globally it is wrong
+// twice — it sends somebody to a queue that is empty for them, and it tells
+// them how busy places they cannot open are.
+//
+// Two boards, one report waiting on each, and an account that triages one of
+// them. The count has to be one.
+func TestTheWaitingCountStopsAtTheDoor(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	team.createRepo("codigosh", "lastdav")
+
+	accounts := account.Store{DB: team.db()}
+	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var boardID int64
+	if err := team.db().QueryRow(`SELECT id FROM repository WHERE slug = 'lastboard'`).Scan(&boardID); err != nil {
+		t.Fatal(err)
+	}
+	if err := accounts.Grant(helper.ID, authz.Repository(boardID, 0), authz.RoleCollaborator, team.now()); err != nil {
+		t.Fatal(err)
+	}
+
+	public := team.anonymous()
+	public.submit("codigosh", "lastboard", "idea", "waiting in my repository")
+	public.submit("codigosh", "lastdav", "idea", "waiting next door")
+
+	waiting := func(c *instance, who string) map[string]any {
+		t.Helper()
+		body := decode(t, c.do(http.MethodGet, "/api/me", nil))
+		pending, ok := body["pending"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s: /api/me did not report what is waiting: %v", who, body["pending"])
+		}
+		return pending
+	}
+
+	// The administrator sees both boards, so both reports.
+	if got := waiting(team, "the administrator")["reports"]; got != float64(2) {
+		t.Errorf("the administrator was told %v reports are waiting, want 2", got)
+	}
+
+	helperClient := team.anonymous()
+	resp := helperClient.do(http.MethodPost, "/api/session", map[string]string{
+		"username": "helper", "password": "a good long passphrase",
+	})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the collaborator could not sign in: %d", resp.StatusCode)
+	}
+
+	// The collaborator triages one board, so one report — never the one next
+	// door, whose existence this number must not reveal either.
+	if got := waiting(helperClient, "the collaborator")["reports"]; got != float64(1) {
+		t.Errorf("the collaborator was told %v reports are waiting, want 1 — the\n"+
+			"board next door has one too, and they cannot open it", got)
+	}
+}

@@ -321,6 +321,7 @@
   "shell.themeLight": "روشن",
   "shell.themeSystem": "بر پایهٔ سامانه",
   "shell.updates": "به‌روزرسانی‌ها",
+  "shell.waitingCount": "در انتظار: {count}",
   "status.closed": "بسته‌شده",
   "status.confirmed": "تأییدشده",
   "status.declined": "رد شد",

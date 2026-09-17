@@ -321,6 +321,7 @@
   "shell.themeLight": "Φωτεινό",
   "shell.themeSystem": "Συστήματος",
   "shell.updates": "Ενημερώσεις",
+  "shell.waitingCount": "Σε αναμονή: {count}",
   "status.closed": "Έκλεισε",
   "status.confirmed": "Επιβεβαιώθηκε",
   "status.declined": "Απορρίφθηκε",

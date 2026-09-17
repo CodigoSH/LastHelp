@@ -321,6 +321,7 @@
   "shell.themeLight": "ライト",
   "shell.themeSystem": "システムに合わせる",
   "shell.updates": "アップデート",
+  "shell.waitingCount": "保留中：{count}",
   "status.closed": "クローズ",
   "status.confirmed": "確認済み",
   "status.declined": "見送り",

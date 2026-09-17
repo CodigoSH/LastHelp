@@ -321,6 +321,7 @@
   "shell.themeLight": "Светлое",
   "shell.themeSystem": "Системное",
   "shell.updates": "Обновления",
+  "shell.waitingCount": "Ожидают: {count}",
   "status.closed": "Закрыто",
   "status.confirmed": "Подтверждено",
   "status.declined": "Отклонено",

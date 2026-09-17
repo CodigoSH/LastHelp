@@ -321,6 +321,7 @@
   "shell.themeLight": "浅色",
   "shell.themeSystem": "跟随系统",
   "shell.updates": "更新",
+  "shell.waitingCount": "待处理：{count}",
   "status.closed": "已关闭",
   "status.confirmed": "已确认",
   "status.declined": "已谢绝",

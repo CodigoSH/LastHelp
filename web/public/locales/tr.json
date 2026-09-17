@@ -321,6 +321,7 @@
   "shell.themeLight": "Açık",
   "shell.themeSystem": "Sistem",
   "shell.updates": "Güncellemeler",
+  "shell.waitingCount": "Bekleyen: {count}",
   "status.closed": "Kapandı",
   "status.confirmed": "Doğrulandı",
   "status.declined": "Reddedildi",

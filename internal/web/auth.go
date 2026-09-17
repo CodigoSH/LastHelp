@@ -134,6 +134,36 @@ func (s *Server) handleSignOut(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// pendingFor counts what is waiting for this account, and only on the boards it
+// may actually act on.
+//
+// Asked board by board through Can, never by looking at a role: an
+// administrator sees everything because Can says so, and a collaborator sees
+// their own boards for the same reason. Counting globally and showing the
+// number to everybody would be wrong twice — it sends somebody to a queue that
+// turns out to be empty for them, and it tells them how much is happening in
+// places they cannot open.
+//
+// A failure here is a zero, not a 500: this is a number beside a menu item, and
+// the panel has to draw even when it cannot be computed.
+func (s *Server) pendingFor(actor authz.Actor) map[string]int {
+	out := map[string]int{"reports": 0, "messages": 0}
+
+	boards, err := s.items().PendingByBoard()
+	if err != nil {
+		slog.Error("counting what is waiting", "error", err)
+		return out
+	}
+	for _, b := range boards {
+		if !actor.Can(authz.Triage, authz.Repository(b.RepoID, b.OrgID)) {
+			continue
+		}
+		out["reports"] += b.Reports
+		out["messages"] += b.Messages
+	}
+	return out
+}
+
 // handleMe describes whoever is signed in, so the panel can draw itself.
 //
 // It reports memberships rather than a verdict on each button: the page uses
@@ -180,6 +210,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		"id":          actor.UserID,
 		"admin":       actor.IsAdministrator,
 		"memberships": memberships,
+		"pending":     s.pendingFor(actor),
 	}
 	if user, err := s.accounts().ByID(actor.UserID); err == nil {
 		body["username"] = user.Username

@@ -321,6 +321,7 @@
   "shell.themeLight": "हल्का",
   "shell.themeSystem": "सिस्टम",
   "shell.updates": "अपडेट",
+  "shell.waitingCount": "लंबित: {count}",
   "status.closed": "बंद",
   "status.confirmed": "पुष्ट",
   "status.declined": "अस्वीकृत",

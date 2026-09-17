@@ -321,6 +321,7 @@
   "shell.themeLight": "Terang",
   "shell.themeSystem": "Sistem",
   "shell.updates": "Pembaruan",
+  "shell.waitingCount": "Menunggu: {count}",
   "status.closed": "Ditutup",
   "status.confirmed": "Terkonfirmasi",
   "status.declined": "Ditolak",
