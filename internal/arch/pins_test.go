@@ -38,6 +38,11 @@ var pins = []pin{
 	{".forgejo/workflows/release.yml", "bun", regexp.MustCompile(`bun-version: '?"?([^'"\s]+)`)},
 
 	{"scripts/release.sh", "staticcheck", regexp.MustCompile(`STATICCHECK_VERSION="(\S+?)"`)},
+
+	// Of all the pins here this is the one that most wants to float, and the
+	// one where floating hurts most: a new advisory database turns the build
+	// red on a morning nobody touched the code.
+	{".forgejo/workflows/ci.yml", "govulncheck", regexp.MustCompile(`govulncheck@(\S+)`)},
 }
 
 // exactVersion is what a pin has to look like: three numbers, optionally with
@@ -73,8 +78,8 @@ func TestEveryToolVersionIsPinnedAndAgrees(t *testing.T) {
 		}
 	}
 
-	if len(found) != 3 {
-		t.Fatalf("read %d tools, want 3 (go, bun, staticcheck)", len(found))
+	if len(found) != 4 {
+		t.Fatalf("read %d tools, want 4 (go, bun, staticcheck, govulncheck)", len(found))
 	}
 
 	for what, versions := range found {

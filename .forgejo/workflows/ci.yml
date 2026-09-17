@@ -29,7 +29,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.2'
+          go-version: '1.26.7'
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -66,6 +66,26 @@ jobs:
 
       - name: go vet
         run: go vet ./...
+
+      # Blocking, and it blocks on one number: "your code is affected by N
+      # vulnerabilities". The other figure it prints — advisories in modules
+      # this requires but never calls — is noise, and govulncheck does not exit
+      # non-zero for it.
+      #
+      # It runs after the frontend build on purpose: the bundle is embedded with
+      # //go:embed, so anything that compiles this code needs it there first.
+      #
+      # Pinned. On @latest a new advisory database turns this red on a morning
+      # nobody touched the code, which teaches people to ignore it.
+      #
+      # It was worth turning on: the first run reported ten reachable
+      # vulnerabilities, all of them in the standard library of a toolchain that
+      # had gone six patch releases stale. Nothing here was wrong; the compiler
+      # was old, and nothing was asking.
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+          govulncheck ./...
 
       # -count=1 is not optional: the architecture rules read the repository
       # from disk, which the test cache does not track. A cached pass here means
@@ -110,7 +130,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26.2'
+          go-version: '1.26.7'
 
       - uses: oven-sh/setup-bun@v2
         with:

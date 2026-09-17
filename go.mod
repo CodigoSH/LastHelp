@@ -1,6 +1,6 @@
 module git.codigosh.com/CodigoSH/LastHelp
 
-go 1.26.2
+go 1.26.7
 
 require (
 	golang.org/x/crypto v0.56.0
