@@ -54,6 +54,7 @@
   "error.already_set_up": "Bu kurulum daha önce yapılandırıldı.",
   "error.bad_credentials": "Bu kullanıcı adı ile parola eşleşmiyor.",
   "error.bad_issue": "Bu bir konu numarası ya da URL değil.",
+  "error.bad_layout": "Bu sayfa tarif edildiği şekilde çizilemiyor. Hiçbir şey değiştirilmedi.",
   "error.bad_request": "İstek anlaşılamadı.",
   "error.bad_signature": "Teslimatın imzası eşleşmiyor.",
   "error.board_closed": "Bu depo bugünkü sınırına ulaştı. Daha sonra deneyin.",

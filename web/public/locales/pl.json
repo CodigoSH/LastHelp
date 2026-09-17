@@ -54,6 +54,7 @@
   "error.already_set_up": "Ta instalacja została już skonfigurowana.",
   "error.bad_credentials": "Ta nazwa użytkownika i hasło do siebie nie pasują.",
   "error.bad_issue": "To nie jest numer ani adres zgłoszenia.",
+  "error.bad_layout": "Tej strony nie da się narysować w opisany sposób. Nic nie zostało zmienione.",
   "error.bad_request": "Żądanie nie zostało zrozumiane.",
   "error.bad_signature": "Podpis dostarczenia się nie zgadza.",
   "error.board_closed": "To repozytorium osiągnęło dzisiejszy limit. Spróbuj później.",

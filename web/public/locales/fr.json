@@ -54,6 +54,7 @@
   "error.already_set_up": "Cette installation a déjà été configurée.",
   "error.bad_credentials": "Ce nom d'utilisateur et ce mot de passe ne correspondent pas.",
   "error.bad_issue": "Ce n'est ni un numéro de ticket ni une URL.",
+  "error.bad_layout": "Cette page ne peut pas être affichée telle qu'elle est décrite. Rien n'a été modifié.",
   "error.bad_request": "La requête n'a pas été comprise.",
   "error.bad_signature": "La signature de la livraison ne correspond pas.",
   "error.board_closed": "Ce dépôt a atteint sa limite pour aujourd'hui. Réessayez plus tard.",

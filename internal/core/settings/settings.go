@@ -52,6 +52,13 @@ const InstanceAccent = "instance_accent"
 // server, and a checkbox that forgets itself between visits is one nobody
 // trusts. Anything other than "beta" means stable, so a value nobody
 // understands fails towards the safer channel.
+// LandingLayout is what the public front page is made of, as JSON.
+//
+// A setting rather than a table of its own: it is one document belonging to the
+// installation, the same as its name and its mark, and a table with one row in
+// it is a table somebody has to remember exists.
+const LandingLayout = "landing_layout"
+
 const UpdateChannel = "update_channel"
 
 type Store struct {

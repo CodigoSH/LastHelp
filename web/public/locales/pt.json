@@ -54,6 +54,7 @@
   "error.already_set_up": "Esta instalação já foi configurada.",
   "error.bad_credentials": "Esse nome de utilizador e palavra-passe não correspondem.",
   "error.bad_issue": "Isso não é um número nem um URL de incidência.",
+  "error.bad_layout": "Essa página não pode ser desenhada como está descrita. Nada foi alterado.",
   "error.bad_request": "O pedido não foi compreendido.",
   "error.bad_signature": "A assinatura da entrega não corresponde.",
   "error.board_closed": "Este repositório atingiu o limite de hoje. Tente mais tarde.",

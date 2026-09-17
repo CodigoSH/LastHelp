@@ -54,6 +54,7 @@
   "error.already_set_up": "Deze installatie is al ingesteld.",
   "error.bad_credentials": "Die gebruikersnaam en dat wachtwoord horen niet bij elkaar.",
   "error.bad_issue": "Dat is geen issuenummer of URL.",
+  "error.bad_layout": "Die pagina kan niet worden getekend zoals beschreven. Er is niets gewijzigd.",
   "error.bad_request": "Het verzoek werd niet begrepen.",
   "error.bad_signature": "De handtekening van de levering klopt niet.",
   "error.board_closed": "Dit repository heeft zijn limiet voor vandaag bereikt. Probeer het later opnieuw.",

@@ -54,6 +54,7 @@
   "error.already_set_up": "This installation has already been set up.",
   "error.bad_credentials": "That username and password do not match.",
   "error.bad_issue": "That is not an issue number or URL.",
+  "error.bad_layout": "That page cannot be drawn as described. Nothing was changed.",
   "error.bad_request": "The request was not understood.",
   "error.bad_signature": "The signature of the delivery does not match.",
   "error.board_closed": "This repository has reached its limit for today. Try again later.",

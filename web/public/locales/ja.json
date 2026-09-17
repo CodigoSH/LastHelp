@@ -54,6 +54,7 @@
   "error.already_set_up": "このインストールはすでにセットアップ済みです。",
   "error.bad_credentials": "そのユーザー名とパスワードは一致しません。",
   "error.bad_issue": "イシュー番号でも URL でもありません。",
+  "error.bad_layout": "その内容ではページを組み立てられません。何も変更していません。",
   "error.bad_request": "リクエストを理解できませんでした。",
   "error.bad_signature": "配信の署名が一致しません。",
   "error.board_closed": "このリポジトリは本日の上限に達しました。しばらくしてからお試しください。",

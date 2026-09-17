@@ -2,11 +2,13 @@ package web
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/landing"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 )
 
@@ -110,4 +112,59 @@ func (s *Server) handleSetInstance(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, instanceSettings{Name: name, Logo: logo, Accent: accent})
+}
+
+// handleGetLanding answers what the front page is made of.
+//
+// Open, like the name and the mark: this is the page itself, and a visitor who
+// could not read it would be shown nothing. An unset layout comes back as the
+// default rather than as empty — an installation that never opened the editor
+// has a front page, it just never chose one.
+func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
+	stored, err := s.settings().Get(settings.LandingLayout)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	layout, err := landing.Parse(stored)
+	if err != nil {
+		// Something unreadable is in the settings row. The front page is not
+		// the place to find that out, so it falls back to the page everybody
+		// had before and says so where somebody will see it.
+		slog.Error("the stored front page layout could not be read", "error", err)
+		layout = landing.Default()
+	}
+	writeJSON(w, http.StatusOK, layout)
+}
+
+// handleSetLanding replaces it.
+//
+// Validated by the domain, which refuses a layout it cannot draw entirely
+// rather than saving the parts it recognised. Saving half of what somebody
+// composed and showing them the rest missing is how an editor teaches people
+// not to trust it.
+func (s *Server) handleSetLanding(w http.ResponseWriter, r *http.Request) {
+	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	var in landing.Layout
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	encoded, err := in.Encode()
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_layout")
+		return
+	}
+	if err := s.settings().Set(settings.LandingLayout, encoded); err != nil {
+		slog.Error("storing the front page layout", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, in)
 }

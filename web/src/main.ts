@@ -747,11 +747,22 @@ async function showOrganizations(): Promise<void> {
   // the way out of it; a visitor gets told plainly, rather than being sent to a
   // form that would refuse them.
   if (!me) me = await api.get<Me>("/api/me").catch(() => null);
+
+  // What this installation decided the page is made of. Failing softly: an
+  // unreachable layout falls back to the arrangement everybody had before,
+  // which is a front page rather than an error.
+  const composed = await api
+    .get<{ modules: views.LandingModule[] }>("/api/landing")
+    .catch(() => ({ modules: [] as views.LandingModule[] }));
+
   show(
-    views.landing(organizations ?? [], me?.admin === true, text, {
-      name: instanceName,
-      logo: instanceLogo,
-    }),
+    views.landing(
+      organizations ?? [],
+      me?.admin === true,
+      text,
+      { name: instanceName, logo: instanceLogo },
+      composed.modules ?? [],
+    ),
   );
 }
 

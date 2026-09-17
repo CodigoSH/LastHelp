@@ -1039,6 +1039,40 @@ async function main() {
     JSON.stringify(rewritten),
   );
 
+  // The front page, composed. Two halves: the default is the page everybody
+  // already had — proved elsewhere by comparing the pixels — and composing it
+  // actually changes what a visitor sees. Without the second half this is a
+  // setting that saves and does nothing.
+  const composed = await evaluate(`
+    const r = await fetch("/api/landing", {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-csrf-token": document.cookie.match(/lasthelp_csrf=([^;]+)/)?.[1] ?? "" },
+      body: JSON.stringify({ modules: [
+        { id: "words", kind: "text", width: "full", body: "We read everything that arrives." },
+        { id: "orgs", kind: "organisations", width: "full" },
+      ]}),
+    });
+    return { saved: r.status };
+  `);
+  check("the front page can be composed", composed.saved === 200, JSON.stringify(composed));
+
+  await evaluate(`history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1400);
+  const frontPage = await evaluate(`
+    return {
+      cells: document.querySelectorAll(".landing-cell").length,
+      words: document.body.textContent.includes("We read everything that arrives."),
+      hero: !!document.querySelector(".hero"),
+      orgs: !!document.querySelector(".section"),
+    };
+  `);
+  check(
+    "and what was composed is what a visitor is shown",
+    frontPage.cells === 2 && frontPage.words === true && frontPage.hero === false && frontPage.orgs === true,
+    JSON.stringify(frontPage),
+  );
+
+
   // 13. Right to left, which is where a stylesheet written in left and right
   //     falls apart.
   // Changed where somebody actually changes it, now that the top bar carries no

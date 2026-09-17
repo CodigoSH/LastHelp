@@ -54,6 +54,7 @@
   "error.already_set_up": "Pemasangan ini sudah disiapkan.",
   "error.bad_credentials": "Nama pengguna dan kata sandi itu tidak cocok.",
   "error.bad_issue": "Itu bukan nomor isu atau URL.",
+  "error.bad_layout": "Halaman itu tidak dapat digambar seperti yang dijelaskan. Tidak ada yang diubah.",
   "error.bad_request": "Permintaan tidak dipahami.",
   "error.bad_signature": "Tanda tangan pengiriman tidak cocok.",
   "error.board_closed": "Repositori ini sudah mencapai batas hariannya. Coba lagi nanti.",

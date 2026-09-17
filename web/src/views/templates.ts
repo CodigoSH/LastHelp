@@ -48,14 +48,35 @@ export interface Text {
  * it. An administrator looking at an empty one is offered the way out; a
  * visitor is told plainly, without being sent to a form that would refuse them.
  */
+export interface LandingModule {
+  id: string;
+  kind: "hero" | "intro" | "organisations" | "text";
+  width: "full" | "half";
+  body?: string;
+}
+
+/**
+ * The public front page, composed.
+ *
+ * It used to be a fixed arrangement — mark, tagline, three sentences, the list
+ * of organisations — which is the shape of a screen that asks for one thing,
+ * on the one screen that has to show a visitor where to go. Now the operator
+ * decides what is on it and in what order, and the default is exactly what was
+ * there before so that an installation which never opens the editor sees no
+ * change.
+ *
+ * A module this version does not know is skipped here rather than drawn as a
+ * hole. The server refuses to store one, so the only way to arrive at this is
+ * an older binary reading a newer layout — which is somebody downgrading, and
+ * being shown the rest of their page is better than being shown none of it.
+ */
 export function landing(
   orgs: OrganizationSummary[],
   isAdmin: boolean,
   text: Text,
   instance?: { name?: string; logo?: string },
+  modules?: LandingModule[],
 ): string {
-  // A mark and a sentence, not a paragraph of prose: three lines that each say
-  // one true thing about how this works.
   const point = (icon: string, words: string) =>
     `<li><span class="point-icon">${icon}</span><span>${escapeHTML(words)}</span></li>`;
 
@@ -70,25 +91,56 @@ export function landing(
            </div>`
         : ""
     }
-  </section>
-  <ul class="points">
+  </section>`;
+
+  const intro = `<ul class="points">
     ${point(icons.person(18), text.t("landing.pointNoAccount"))}
     ${point(icons.idea(18), text.t("landing.pointVotes"))}
     ${point(icons.open(18), text.t("landing.pointForge"))}
   </ul>`;
 
-  if (orgs.length === 0) {
-    return `<div class="page">${hero}
-      ${emptyState(text.t(isAdmin ? "landing.emptyOperator" : "portal.empty"), icons.organization(28))}
-    </div>`;
-  }
+  const organisations =
+    orgs.length === 0
+      ? emptyState(text.t(isAdmin ? "landing.emptyOperator" : "portal.empty"), icons.organization(28))
+      : `<section class="section">
+          ${sectionHead(text.t("shell.organizations"), text.number(orgs.length))}
+          ${organizationList(orgs, text)}
+        </section>`;
 
-  return `<div class="page">${hero}
-    <section class="section">
-      ${sectionHead(text.t("shell.organizations"), text.number(orgs.length))}
-      ${organizationList(orgs, text)}
-    </section>
-  </div>`;
+  // The operator's own words. Escaped and shown as written, line breaks and
+  // all: this module takes text, not markup, and the domain stores it that way
+  // for the same reason.
+  const words = (body: string) =>
+    body.trim() === ""
+      ? ""
+      : `<section class="section landing-text"><p>${escapeHTML(body).replace(/\n/g, "<br />")}</p></section>`;
+
+  const shown =
+    modules && modules.length > 0
+      ? modules
+      : ([
+          { id: "hero", kind: "hero", width: "full" },
+          { id: "intro", kind: "intro", width: "full" },
+          { id: "organisations", kind: "organisations", width: "full" },
+        ] as LandingModule[]);
+
+  const drawn = shown
+    .map((m) => {
+      const inner =
+        m.kind === "hero"
+          ? hero
+          : m.kind === "intro"
+            ? intro
+            : m.kind === "organisations"
+              ? organisations
+              : m.kind === "text"
+                ? words(m.body ?? "")
+                : "";
+      return inner === "" ? "" : `<div class="landing-cell ${m.width === "half" ? "half" : "full"}">${inner}</div>`;
+    })
+    .join("");
+
+  return `<div class="page"><div class="landing-grid">${drawn}</div></div>`;
 }
 
 /**

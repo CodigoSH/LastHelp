@@ -54,6 +54,7 @@
   "error.already_set_up": "此安装已经完成初始设置。",
   "error.bad_credentials": "用户名和密码不匹配。",
   "error.bad_issue": "这既不是议题编号也不是链接。",
+  "error.bad_layout": "无法按所描述的方式绘制该页面。未做任何更改。",
   "error.bad_request": "无法理解该请求。",
   "error.bad_signature": "投递的签名不匹配。",
   "error.board_closed": "该仓库已达到今天的上限。请稍后再试。",

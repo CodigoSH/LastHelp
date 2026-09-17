@@ -3863,3 +3863,45 @@ a.stat:hover .stat-go {
 /* Held still so it can start again: an animation that is already running does
    not replay, and removing this class after a reflow is what restarts it. */
 .toast-bar.no-drain { animation: none !important; }
+
+
+/*
+ * The front page, composed.
+ *
+ * A grid rather than a stack, because the whole point of letting the operator
+ * arrange it is that two things can sit side by side. Two columns at a width
+ * where that reads, one below it — a half-width module on a phone is a column
+ * of four words.
+ *
+ * The cells carry no decoration of their own: what goes in them already knows
+ * how it looks, and a box around a box is how a page starts looking like a
+ * form.
+ */
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /*
+   * The same 1.5rem `.page` itself uses. That is not a coincidence to be
+   * matched later: this grid sits where `.page`'s own grid used to space these
+   * blocks, so any other number moves the whole front page. Two tries with a
+   * gap of my own choosing moved it 32px and then 192px, and the pixel
+   * comparison against the old page is what said so both times.
+   */
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.landing-cell.full { grid-column: 1 / -1; }
+.landing-cell.half { grid-column: span 1; }
+
+.landing-text p {
+  margin: 0;
+  color: var(--text-main);
+  line-height: 1.6;
+  white-space: normal;
+}
+
+@media (max-width: 720px) {
+  .landing-grid { grid-template-columns: minmax(0, 1fr); }
+  .landing-cell.half { grid-column: 1 / -1; }
+}

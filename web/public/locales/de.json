@@ -54,6 +54,7 @@
   "error.already_set_up": "Diese Installation wurde bereits eingerichtet.",
   "error.bad_credentials": "Benutzername und Passwort passen nicht zusammen.",
   "error.bad_issue": "Das ist weder eine Ticketnummer noch eine URL.",
+  "error.bad_layout": "Diese Seite lässt sich so nicht darstellen. Es wurde nichts geändert.",
   "error.bad_request": "Die Anfrage wurde nicht verstanden.",
   "error.bad_signature": "Die Signatur der Zustellung stimmt nicht.",
   "error.board_closed": "Dieses Repository hat sein Tageslimit erreicht. Versuchen Sie es später erneut.",

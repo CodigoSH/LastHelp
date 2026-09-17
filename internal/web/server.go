@@ -178,6 +178,11 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/session", s.handleSignIn)
 
 	s.mux.HandleFunc("GET /api/orgs", s.handleOrganizations)
+
+	// The composition of the front page. Readable by anybody, for the same
+	// reason the name and the mark are: it IS the page a visitor is looking at.
+	// Changing it is the administrator's, and that half is wrapped below.
+	s.mux.HandleFunc("GET /api/landing", s.handleGetLanding)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos", s.handleRepositories)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}", s.handleRepository)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/items", s.handleListItems)
@@ -219,6 +224,10 @@ func (s *Server) routes() {
 	// Separate from moderation on purpose: one endpoint that could change the
 	// text and the state is one where an authorisation mistake costs both.
 	private("PATCH /api/items/{id}", s.handleEditItem)
+
+	// Composing the front page. Only the administrator: it is the first thing
+	// every visitor sees.
+	private("PUT /api/landing", s.handleSetLanding)
 	private("POST /api/comments/{id}/moderation", s.handleModerateComment)
 	private("GET /api/items/{id}/statuses", s.handleStatuses)
 	private("POST /api/items/{id}/status", s.handleSetStatus)
