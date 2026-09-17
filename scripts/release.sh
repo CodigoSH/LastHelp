@@ -485,6 +485,27 @@ else
         true
     }
 
+    # Every subject in this range can be one the filter drops — a cycle of
+    # `ci:`, `docs:` and `test:` work is a normal thing to have — and then the
+    # notes are the title and nothing else. That is not a small blemish: the
+    # release page is what somebody reads to decide whether to update, and a
+    # page that says nothing tells them nothing.
+    #
+    # It happened twice in one day in a sibling project before anybody noticed,
+    # because a dry run prints the empty result and it looks like a formatting
+    # quirk rather than a refusal to say anything.
+    #
+    # So this stops, and names the way out: write the file by hand. The escape
+    # hatch already exists and is checked for a few lines above.
+    if [ -z "$FEATS$FIXES$CHANGED$REMOVALS" ]; then
+        die "every commit since $RANGE_LABEL is one the notes filter drops, so the
+    release page would carry the title and nothing else.
+
+    Write $NOTES_FILE by hand and run this again — a hand-written file always
+    wins. Say what the release is for, even if the answer is that nothing in the
+    product changed."
+    fi
+
     if [ "$DRY_RUN" = "1" ]; then
         echo "   [dry-run] $NOTES_FILE would be generated from $RANGE_LABEL as:"
         compose_notes | sed 's/^/     /'

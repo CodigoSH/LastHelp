@@ -200,6 +200,36 @@ jobs:
             -H 'Content-Type: application/json' \
             -d '{"draft": false}' > /dev/null
 
+      # Asked of the forge rather than trusted from the uploads reporting success.
+      #
+      # A sibling project published a release whose binaries, checksums and
+      # signature were all in place and whose container image was missing: the
+      # job that built the image failed on its own, separately, and the release
+      # page looked complete. Nothing here is built by a second workflow, so
+      # that exact split cannot happen — but "every upload returned 2xx" is not
+      # the same statement as "the release has its files", and the second one is
+      # the one that matters to somebody downloading it.
+      - name: the release has everything it was built with
+        env:
+          CI_TOKEN: ${{ secrets.CI_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          api="${GITHUB_API_URL:-$FORGEJO_API}/repos/${GITHUB_REPOSITORY}"
+          published=$(curl -sf "$api/releases/tags/${TAG}" \
+            -H "Authorization: token ${CI_TOKEN}" \
+            | python3 -c 'import json,sys; [print(a["name"]) for a in json.load(sys.stdin).get("assets",[])]' \
+            | sort)
+
+          expected=$(cd dist && ls | sort)
+
+          missing=$(comm -23 <(printf '%s\n' "$expected") <(printf '%s\n' "$published"))
+          if [ -n "$missing" ]; then
+            echo "these were built and are not on the release:" >&2
+            printf '  %s\n' $missing >&2
+            exit 1
+          fi
+          echo "published: $(printf '%s\n' "$published" | tr '\n' ' ')"
+
       # Asked of the forge rather than trusted from the payload we sent.
       #
       # The first beta was published without the prerelease flag and everything
