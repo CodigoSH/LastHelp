@@ -140,6 +140,8 @@ function renderNav(): void {
  * it is on, and the page has to come back in the same mode.
  */
 let landingModules: views.LandingModule[] = [];
+let landingContent: views.LandingContent = {};
+let landingBoards: views.LandingBoard[] = [];
 let landingEditing = false;
 
 /**
@@ -186,6 +188,27 @@ function cssEscape(value: string): string {
   return value.replace(/["\\]/g, "\\$&");
 }
 
+/**
+ * What this installation decided the page is made of, and what goes in it.
+ *
+ * Failing softly: an unreachable layout leaves the page as the default rather
+ * than as an error, because this is the one screen a stranger sees first.
+ */
+async function fetchLanding(): Promise<void> {
+  type Composed = {
+    modules: views.LandingModule[];
+    content?: views.LandingContent;
+    boards?: views.LandingBoard[];
+  };
+  const composed = await api
+    .get<Composed>("/api/landing")
+    .catch((): Composed => ({ modules: [] }));
+
+  landingModules = composed.modules ?? [];
+  landingContent = composed.content ?? {};
+  landingBoards = composed.boards ?? [];
+}
+
 function drawLanding(orgs: OrganizationSummary[]): void {
   placeLandingModules(landingModules);
   show(
@@ -196,6 +219,8 @@ function drawLanding(orgs: OrganizationSummary[]): void {
       { name: instanceName, logo: instanceLogo },
       landingModules,
       landingEditing,
+      landingContent,
+      landingBoards,
     ),
   );
   // After the markup is on the page, never before: the row height is measured
@@ -215,13 +240,29 @@ function drawLanding(orgs: OrganizationSummary[]): void {
  * what you are looking at is real.
  */
 function wireLanding(orgs: OrganizationSummary[]): void {
-  const save = async () => {
+  /**
+   * Save, and read the page back when what it is made of changed.
+   *
+   * Moving and resizing needs no reread: the modules are the same ones and
+   * their content has not moved with them. Adding one, removing one or pointing
+   * one at a different board does — a module that has just appeared has nothing
+   * to draw until the server says what goes in it.
+   */
+  const save = async (refresh = false) => {
     try {
       await api.put("/api/landing", {
-        modules: landingModules.map((m) =>
-          m.kind === "text" ? m : { id: m.id, kind: m.kind, x: m.x, y: m.y, w: m.w, h: m.h },
-        ),
+        modules: landingModules.map((m) => ({
+          id: m.id,
+          kind: m.kind,
+          x: m.x,
+          y: m.y,
+          w: m.w,
+          h: m.h,
+          ...(m.kind === "text" ? { body: m.body ?? "" } : {}),
+          ...(m.scope ? { scope: m.scope } : {}),
+        })),
       });
+      if (refresh) await fetchLanding();
     } catch (err) {
       report(err);
     }
@@ -252,7 +293,7 @@ function wireLanding(orgs: OrganizationSummary[]): void {
       body: "",
     };
     landingModules = [...landingModules, added];
-    await save();
+    await save(true);
     drawLanding(orgs);
     // Opened straight away, the way the dashboard does it: a module you just
     // added with nothing in it is a module you were about to configure.
@@ -292,12 +333,12 @@ function wireLanding(orgs: OrganizationSummary[]): void {
   root?.querySelectorAll<HTMLButtonElement>("[data-remove-module]").forEach((button) =>
     button.addEventListener("click", async () => {
       landingModules = landingModules.filter((m) => m.id !== button.dataset.removeModule);
-      await save();
+      await save(true);
       drawLanding(orgs);
     }),
   );
 
-  if (landingEditing) wireLandingGrid(orgs, save);
+  if (landingEditing) wireLandingGrid(orgs, () => save());
 
   // One dialog, filled for whichever module opened it.
   const dialog = root?.querySelector<HTMLFormElement>("form.module-config");
@@ -307,7 +348,11 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
-    await save();
+    if (usesData(target.kind)) target.scope = String(data.get("scope") ?? "");
+    // Reread: pointing a module at a different board changes what goes in it,
+    // and the words of a text module are the only thing this dialog can change
+    // that the page already knows.
+    await save(usesData(target.kind));
     drawLanding(orgs);
   });
 }
@@ -490,8 +535,22 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     words.hidden = target.kind !== "text";
     area.value = target.body ?? "";
   }
+
+  // And only a module that draws something out of the database is asked which
+  // board to draw it from, for the same reason.
+  const where = form.querySelector<HTMLElement>("[data-for-scope]");
+  const scope = form.querySelector<HTMLSelectElement>("[name=scope]");
+  if (where && scope) {
+    where.hidden = !usesData(target.kind);
+    scope.value = target.scope ?? "";
+  }
   void orgs;
   openModal("module-config");
+}
+
+/** The kinds that draw out of the database, and so have a board to be told. */
+function usesData(kind: views.LandingModule["kind"]): boolean {
+  return kind === "boards" || kind === "most_voted";
 }
 
 function show(html: string): void {
@@ -1110,14 +1169,7 @@ async function showOrganizations(): Promise<void> {
   // form that would refuse them.
   if (!me) me = await api.get<Me>("/api/me").catch(() => null);
 
-  // What this installation decided the page is made of. Failing softly: an
-  // unreachable layout falls back to the arrangement everybody had before,
-  // which is a front page rather than an error.
-  const composed = await api
-    .get<{ modules: views.LandingModule[] }>("/api/landing")
-    .catch(() => ({ modules: [] as views.LandingModule[] }));
-
-  landingModules = composed.modules ?? [];
+  await fetchLanding();
   drawLanding(organizations ?? []);
 }
 

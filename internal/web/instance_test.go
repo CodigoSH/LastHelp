@@ -101,3 +101,75 @@ func TestComposingTheFrontPage(t *testing.T) {
 		t.Errorf("a collaborator composed the front page: %d", resp.StatusCode)
 	}
 }
+
+// TestMostVotedShowsIdeasAndOnlyIdeas.
+//
+// Only an idea can be voted for, so a "most voted" that included bugs would be
+// ranking a list of things that all have nought and putting whichever is newest
+// at the top. The front page promises this module by name — "ideas collect
+// votes, which shows what is most requested" — so what it shows has to be that.
+//
+// Proved here rather than in the browser pass: that journey has one published
+// idea and no published bug when it reaches the front page, so the module looks
+// identical with the filter and without it.
+func TestMostVotedShowsIdeasAndOnlyIdeas(t *testing.T) {
+	i := newInstance(t)
+	i.claim()
+	i.createOrg("acme")
+	i.createRepo("acme", "atlas")
+
+	idea, _ := i.submit("acme", "atlas", "idea", "dark mode for the dashboard")
+	bug, _ := i.submit("acme", "atlas", "bug", "the sidebar forgets its width")
+	for _, id := range []string{idea, bug} {
+		resp := i.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("publishing %s: %d", id, resp.StatusCode)
+		}
+	}
+
+	resp := i.do(http.MethodPut, "/api/landing", map[string]any{
+		"modules": []map[string]any{
+			{"id": "wanted", "kind": "most_voted", "x": 1, "y": 1, "w": 12, "h": 3},
+		},
+	})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("composing a page with a most voted module: %d", resp.StatusCode)
+	}
+
+	body := decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
+	content, _ := body["content"].(map[string]any)
+	rows, _ := content["wanted"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("the module carried %d reports, want only the idea", len(rows))
+	}
+	only, _ := rows[0].(map[string]any)
+	if only["kind"] != "idea" || only["title"] != "dark mode for the dashboard" {
+		t.Errorf("the module carried %v, which is not the idea", only)
+	}
+}
+
+// TestAStrangerIsHandedThePageAndNothingElse.
+//
+// The board list travels with the layout for whoever is going to compose it,
+// and for nobody else: it is the picker in the module dialog, not something a
+// visitor has any use for.
+//
+// This deliberately does NOT claim the default page skips the board query —
+// that is what layoutUsesData decides, and it has its own test. Asserting it
+// here would be asserting it from the response shape, which looks identical
+// whether the query ran or not: the first version of this was named for the
+// query and passed with the skip mutated away.
+func TestAStrangerIsHandedThePageAndNothingElse(t *testing.T) {
+	i := newInstance(t)
+	i.claim()
+
+	body := decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
+	if _, carried := body["content"]; carried {
+		t.Errorf("a default page came back carrying content: %v", body["content"])
+	}
+	if _, carried := body["boards"]; carried {
+		t.Errorf("a stranger was handed the board list: %v", body["boards"])
+	}
+}

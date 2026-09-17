@@ -409,3 +409,51 @@ func (s Store) DeleteRepository(id int64) error {
 	}
 	return nil
 }
+
+// Board is a repository together with the organisation that holds it.
+//
+// It exists because the front page can show boards without going through
+// organisations at all, and a board card there has to say which organisation it
+// belongs to — two installations can both have a board called "web".
+type Board struct {
+	Repository
+	OrgSlug string
+	OrgName string
+}
+
+// ListBoards is every board in the installation, in one query.
+//
+// One query rather than a listing per organisation because this is read on the
+// public front page: a loop that asks the database once per organisation is
+// fine in the panel, where one person is looking, and is a different shape of
+// cost on the one page that strangers load.
+func (s Store) ListBoards() ([]Board, error) {
+	rows, err := s.DB.Query(`
+		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
+		       r.accepts_bugs, r.accepts_ideas, r.moderation_mode, r.notify_config, r.created_at,
+		       o.slug, o.name
+		FROM repository r
+		JOIN organization o ON o.id = r.org_id
+		ORDER BY o.name COLLATE NOCASE, r.name COLLATE NOCASE, r.id`)
+	if err != nil {
+		return nil, fmt.Errorf("listing boards: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Board
+	for rows.Next() {
+		var b Board
+		var mode string
+		var created int64
+		err := rows.Scan(&b.ID, &b.OrgID, &b.Slug, &b.Name, &b.ForgeRepo,
+			&b.AcceptsBugs, &b.AcceptsIdeas, &mode, &b.NotifyConfig, &created,
+			&b.OrgSlug, &b.OrgName)
+		if err != nil {
+			return nil, fmt.Errorf("listing boards: %w", err)
+		}
+		b.ModerationMode = ModerationMode(mode)
+		b.CreatedAt = time.Unix(created, 0)
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}

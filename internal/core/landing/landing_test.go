@@ -7,13 +7,17 @@ import (
 	"testing"
 )
 
-// TestAnUnsetLayoutIsThePageThatWasThereBefore.
+// TestAnUnsetLayoutIsStillAFrontPage.
 //
-// The condition for shipping this at all: an installation that never opens the
-// editor must not notice it exists. If the default drifted from what the page
-// used to be, every existing instance would find its front page rearranged by
-// an update it did not ask for.
-func TestAnUnsetLayoutIsThePageThatWasThereBefore(t *testing.T) {
+// An installation that never opens the editor has a front page: it just never
+// chose one. The alternative — an empty grid until somebody composes something
+// — would mean a fresh instance greeting its first visitor with nothing.
+//
+// This used to promise that the default was pixel for pixel the page that came
+// before the grid. It is not any more, deliberately: the front page was rebuilt
+// on the dashboard's grid, and a promise to keep looking like the thing being
+// replaced is not a promise worth keeping.
+func TestAnUnsetLayoutIsStillAFrontPage(t *testing.T) {
 	for _, stored := range []string{"", "   ", "\n"} {
 		got, err := Parse(stored)
 		if err != nil {
@@ -196,5 +200,74 @@ func TestAPageComposedBeforeThereWasAGridStillComesBack(t *testing.T) {
 	}
 	if reread.Modules[0] != got.Modules[0] {
 		t.Errorf("a second read moved it: %+v then %+v", got.Modules[0], reread.Modules[0])
+	}
+}
+
+// TestAModuleThatShowsBoardsCanBeToldWhichOnes.
+//
+// The scope is what makes these worth having on an installation with more than
+// one organisation: without it, every "most voted" on the page shows the same
+// thing. The shape is checked, the existence is not — a board can be deleted
+// long after somebody composed a page that names it, and the page has to
+// survive that rather than refuse to load.
+func TestAModuleThatShowsBoardsCanBeToldWhichOnes(t *testing.T) {
+	for _, scope := range []string{"", "acme/atlas", "a-b_c/d0"} {
+		in := `{"modules":[{"id":"v","kind":"most_voted","x":1,"y":1,"w":12,"h":3,"scope":"` + scope + `"}]}`
+		got, err := Parse(in)
+		if err != nil {
+			t.Fatalf("scope %q was refused: %v", scope, err)
+		}
+		if got.Modules[0].Scope != scope {
+			t.Errorf("scope %q came back as %q", scope, got.Modules[0].Scope)
+		}
+	}
+}
+
+// TestAScopeThatNamesNothingUsableIsRefused.
+//
+// Both halves matter. A scope the reader cannot take apart would leave the
+// module drawing every board instead of the one it names, and a scope on a
+// module that cannot use one is somebody expecting a narrower page than they
+// are going to get. Neither is something to discover by looking at the page.
+func TestAScopeThatNamesNothingUsableIsRefused(t *testing.T) {
+	cases := map[string]string{
+		"no board named":      `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"acme"}]}`,
+		"empty half":          `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"acme/"}]}`,
+		"not a slug":          `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"Acme/At las"}]}`,
+		"a path, not a board": `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"../../etc"}]}`,
+		"on a module with no use for one": `{"modules":[{"id":"t","kind":"text","x":1,"y":1,"w":12,"h":2,` +
+			`"body":"hello","scope":"acme/atlas"}]}`,
+	}
+	for name, in := range cases {
+		if _, err := Parse(in); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+}
+
+// TestAPageOfWordsSaysItNeedsNothingFromTheDatabase.
+//
+// The front page is the one screen every stranger loads, and most installations
+// will never put a data module on it. This predicate is what keeps a page of a
+// mark, some words and a list of organisations from costing a board query and
+// an item query on every visit, so it is the thing to guard: the response looks
+// the same either way, which is exactly why reading the answer off the response
+// proves nothing.
+func TestAPageOfWordsSaysItNeedsNothingFromTheDatabase(t *testing.T) {
+	if Default().NeedsData() {
+		t.Error("the default page asked the database for something")
+	}
+	words := Layout{Modules: []Module{
+		{ID: "t", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: "hello"},
+		{ID: "h", Kind: Hero, X: 1, Y: 3, W: 12, H: 3},
+	}}
+	if words.NeedsData() {
+		t.Error("a page of words asked the database for something")
+	}
+	for _, kind := range []Kind{Boards, MostVoted} {
+		page := Layout{Modules: []Module{{ID: "d", Kind: kind, X: 1, Y: 1, W: 12, H: 3}}}
+		if !page.NeedsData() {
+			t.Errorf("a page holding %q said it needed nothing", kind)
+		}
 	}
 }

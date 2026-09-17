@@ -8,8 +8,11 @@ import (
 	"strings"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/landing"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
 // instanceSettings is what an operator can change about the installation
@@ -135,7 +138,140 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 		slog.Error("the stored front page layout could not be read", "error", err)
 		layout = landing.Default()
 	}
-	writeJSON(w, http.StatusOK, layout)
+	// The board list travels with the page for whoever is going to compose it:
+	// the dialog's board picker cannot be built out of what the page happens to
+	// be showing, or adding a most-voted module to a page with no boards module
+	// would offer an empty list.
+	composer := false
+	if actor, ok := middleware.ActorFrom(r); ok {
+		composer = actor.Can(authz.ManageServer, authz.Scope{})
+	}
+
+	body := map[string]any{"modules": layout.Modules}
+	boards, needed := s.boardsForLanding(layout, composer)
+	if needed {
+		body["content"] = landingContentFrom(layout, boards, s.mostVotedIn)
+	}
+	if composer {
+		body["boards"] = describeBoards(boards)
+	}
+	writeJSON(w, http.StatusOK, body)
+}
+
+// boardsForLanding reads the boards only when somebody on this request needs
+// them: a page of words and pictures shown to a stranger touches neither the
+// board table nor the item table.
+func (s *Server) boardsForLanding(layout landing.Layout, composer bool) ([]org.Board, bool) {
+	if !layout.NeedsData() && !composer {
+		return nil, false
+	}
+	boards, err := s.orgs().ListBoards()
+	if err != nil {
+		slog.Error("listing boards for the front page", "error", err)
+		return nil, false
+	}
+	return boards, layout.NeedsData()
+}
+
+// landingContentFrom is what the data modules of a layout have to show.
+//
+// Keyed by module id rather than by kind, because two modules of the same kind
+// on one page are the point: most voted for this board beside most voted for
+// that one. Nothing in here fails the request — a front page that answers with
+// an error because one module could not be filled is a front page that goes
+// down when a board is deleted.
+func landingContentFrom(layout landing.Layout, boards []org.Board,
+	voted func([]org.Board) []map[string]any) map[string]any {
+	content := map[string]any{}
+	for _, m := range layout.Modules {
+		switch m.Kind {
+		case landing.Boards:
+			content[m.ID] = describeBoards(inScope(boards, m.Scope))
+		case landing.MostVoted:
+			content[m.ID] = voted(inScope(boards, m.Scope))
+		}
+	}
+	return content
+}
+
+// inScope narrows a list of boards to what a module was pointed at.
+//
+// A scope naming a board that no longer exists comes back empty rather than as
+// everything: an operator who asked for one board and had it deleted should see
+// an empty module, not the whole installation silently taking its place.
+func inScope(boards []org.Board, scope string) []org.Board {
+	if scope == "" {
+		return boards
+	}
+	orgSlug, boardSlug, _ := strings.Cut(scope, "/")
+	out := make([]org.Board, 0, 1)
+	for _, b := range boards {
+		if b.OrgSlug == orgSlug && b.Slug == boardSlug {
+			out = append(out, b)
+		}
+	}
+	return out
+}
+
+func describeBoards(boards []org.Board) []map[string]any {
+	out := make([]map[string]any, 0, len(boards))
+	for _, b := range boards {
+		out = append(out, map[string]any{
+			"org":           b.OrgSlug,
+			"org_name":      b.OrgName,
+			"slug":          b.Slug,
+			"name":          b.Name,
+			"accepts_bugs":  b.AcceptsBugs,
+			"accepts_ideas": b.AcceptsIdeas,
+		})
+	}
+	return out
+}
+
+// mostVotedOnTheFrontPage is how many ideas one such module carries.
+//
+// Enough to fill a tall module and be worth scrolling, small enough that the
+// query stays cheap on the one page strangers load. The module scrolls rather
+// than clipping, so a short module shows fewer without the rest disappearing.
+const mostVotedOnTheFrontPage = 8
+
+func (s *Server) mostVotedIn(boards []org.Board) []map[string]any {
+	if len(boards) == 0 {
+		return []map[string]any{}
+	}
+	ids := make([]int64, 0, len(boards))
+	byID := make(map[int64]org.Board, len(boards))
+	for _, b := range boards {
+		ids = append(ids, b.ID)
+		byID[b.ID] = b
+	}
+
+	// Ideas only, because only an idea can be voted for. A "most voted" that
+	// silently included bugs would be ranking things that all have nought.
+	items, err := s.items().List(item.Filter{
+		RepoIDs:    ids,
+		Kind:       item.Idea,
+		SortByVote: true,
+		Limit:      mostVotedOnTheFrontPage,
+	})
+	if err != nil {
+		slog.Error("listing the most voted for the front page", "error", err)
+		return []map[string]any{}
+	}
+
+	out := make([]map[string]any, 0, len(items))
+	for _, it := range items {
+		b := byID[it.RepoID]
+		out = append(out, map[string]any{
+			"public_id": it.PublicID,
+			"title":     it.Title,
+			"kind":      string(it.Kind),
+			"status":    string(it.Status),
+			"votes":     it.VoteCount,
+			"board":     b.Name,
+		})
+	}
+	return out
 }
 
 // handleSetLanding replaces it.

@@ -38,7 +38,26 @@ const (
 	// this renders on a public page, and a module that accepted HTML would be
 	// a way to put script on it that no amount of escaping elsewhere fixes.
 	Text Kind = "text"
+
+	// Boards is the list of boards themselves, without going through the
+	// organisation that holds them. The usual installation is one person with
+	// one organisation and a handful of projects, and there the organisation
+	// level is a door with nothing behind it: a visitor who wants to report
+	// something has to open it to find the list they were looking for.
+	Boards Kind = "boards"
+
+	// MostVoted is the ideas people asked for most.
+	//
+	// The front page already promises this — "ideas collect votes, which shows
+	// what is most requested" — and until now there was nowhere on it that
+	// showed one. A promise a page makes and does not keep reads as broken.
+	MostVoted Kind = "most_voted"
 )
+
+// dataKinds are the modules that draw something out of the database rather
+// than out of their own configuration. They are the only ones a scope means
+// anything to.
+func (k Kind) usesData() bool { return k == Boards || k == MostVoted }
 
 // The grid, ported from the dashboard this house already runs.
 //
@@ -74,6 +93,12 @@ type Module struct {
 
 	// Body is the words of a Text module, and empty for every other kind.
 	Body string `json:"body,omitempty"`
+
+	// Scope is which board a data module draws from, as "org/board", and empty
+	// for all of them. It is stored as slugs rather than as row ids because a
+	// layout is written by hand often enough — and because an id would make a
+	// page silently point at whatever took that row's place.
+	Scope string `json:"scope,omitempty"`
 
 	// legacyWidth is the coarse width the first version of this stored. Read,
 	// never written: it exists so a layout saved then can be placed on the grid
@@ -124,6 +149,58 @@ func Default() Layout {
 		{ID: "intro", Kind: Intro, X: 1, Y: 4, W: 12, H: 2},
 		{ID: "organisations", Kind: Organisations, X: 1, Y: 6, W: 12, H: 2},
 	}}
+}
+
+// NeedsData says whether drawing this page means reading the database.
+//
+// It lives here rather than in the handler because it is a fact about what the
+// modules are, and because the handler is where somebody would be tempted to
+// answer it by looking at the response.
+func (l Layout) NeedsData() bool {
+	for _, m := range l.Modules {
+		if m.Kind.usesData() {
+			return true
+		}
+	}
+	return false
+}
+
+// validateScope checks what a data module was pointed at.
+//
+// Refused rather than ignored: a scope on a module that cannot use one is
+// somebody expecting a narrower page than they are going to get, and an
+// unreadable one is a module that would quietly draw everything instead of the
+// board it names. Whether that board still exists is not decided here — it can
+// be deleted long after the page was composed, and the page has to survive it.
+func (m Module) validateScope() error {
+	if m.Scope == "" {
+		return nil
+	}
+	if !m.Kind.usesData() {
+		return fmt.Errorf("module %q names a board and is not a module that shows one", m.ID)
+	}
+	org, board, found := strings.Cut(m.Scope, "/")
+	if !found || !isSlug(org) || !isSlug(board) {
+		return fmt.Errorf("module %q names %q, which is not an organisation and a board", m.ID, m.Scope)
+	}
+	return nil
+}
+
+// isSlug is the shape of the slugs the rest of the product hands out. Kept
+// deliberately narrow: this value is read back and compared, never interpolated
+// into anything, and a narrow shape is one fewer thing to reason about.
+func isSlug(v string) bool {
+	if v == "" || len(v) > 64 {
+		return false
+	}
+	for _, r := range v {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // ErrUnknownKind means a module nothing here can draw.
@@ -261,7 +338,7 @@ func (l Layout) validate() error {
 		seen[m.ID] = true
 
 		switch m.Kind {
-		case Hero, Intro, Organisations, Text:
+		case Hero, Intro, Organisations, Text, Boards, MostVoted:
 		default:
 			return fmt.Errorf("%w: %q", ErrUnknownKind, m.Kind)
 		}
@@ -290,6 +367,9 @@ func (l Layout) validate() error {
 		}
 		if len(m.Body) > maxTextBody {
 			return fmt.Errorf("module %q is longer than %d characters", m.ID, maxTextBody)
+		}
+		if err := m.validateScope(); err != nil {
+			return err
 		}
 	}
 	return nil

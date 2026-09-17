@@ -1230,6 +1230,90 @@ async function main() {
     JSON.stringify(corner),
   );
 
+  // The two modules that draw out of the database. Added the way an operator
+  // adds them — the picker and the button, not the API — because what is being
+  // checked is that somebody can compose this page, not that the server can
+  // store it.
+  const conDatos = await evaluate(`
+    const add = async (kind) => {
+      document.querySelector("[data-add-kind]").value = kind;
+      document.querySelector("[data-add-module]").click();
+      await new Promise(r => setTimeout(r, 1100));
+      // Each one opens its own dialog. Closed without changing anything: the
+      // default is every board, which is what this checks first.
+      document.querySelector("#module-config")?.close();
+      await new Promise(r => setTimeout(r, 300));
+    };
+    await add("boards");
+    await add("most_voted");
+
+    // The picker offers the boards, and "all of them" ahead of them.
+    const opciones = [...document.querySelectorAll("#module-scope option")]
+      .map(o => o.value);
+    const ofrecido = !document.querySelector("[data-for-scope]").hidden;
+
+    document.querySelector("[data-edit-done]").click();
+    await new Promise(r => setTimeout(r, 800));
+
+    const tableros = [...document.querySelectorAll(".landing-cell .cards .card")]
+      .map(a => a.getAttribute("href"));
+    const votadas = [...document.querySelectorAll(".landing-cell .briefs .brief")]
+      .map(a => ({ titulo: a.querySelector(".brief-title")?.textContent?.trim() ?? "",
+                   href: a.getAttribute("href"),
+                   votos: a.querySelector(".count")?.textContent?.trim() ?? "" }));
+    return { opciones, ofrecido, tableros, votadas };
+  `);
+  check(
+    "the front page can list the boards themselves, without the organisation in the way",
+    conDatos.tableros.includes("/codigosh/lastboard"),
+    JSON.stringify(conDatos.tableros),
+  );
+  // That the list holds ideas and only ideas is proved in Go, not here: this
+  // journey has one published idea and no published bug at this point, so the
+  // module shows the same single row whether it filters by kind or not. Trying
+  // it here meant seeding a bug, and that moved the row counts three later
+  // checks depend on.
+  check(
+    "and the ideas people asked for most, with their count",
+    conDatos.votadas.length === 1 && conDatos.votadas[0].votos === "1" &&
+      conDatos.votadas[0].href.startsWith("/i/"),
+    JSON.stringify(conDatos.votadas),
+  );
+  check(
+    "a data module is asked which board, and offered all of them first",
+    conDatos.ofrecido === true && conDatos.opciones[0] === "" &&
+      conDatos.opciones.includes("codigosh/lastboard"),
+    JSON.stringify(conDatos.opciones),
+  );
+
+  // Pointed at a board that is not there any more — which is what an operator
+  // is left with after deleting one they had composed a page around. The module
+  // has to come back empty, not quietly show every board instead: showing
+  // everything would be the page answering a question nobody asked.
+  const huerfano = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const layout = await fetch("/api/landing").then(r => r.json());
+    const modules = layout.modules.map(m =>
+      m.kind === "boards" ? { ...m, scope: "codigosh/gone" } : m);
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+    // Inside the boards module and nowhere else. Counting every .card on the
+    // page counted the organisations module's two as well, so this passed and
+    // failed for reasons that had nothing to do with the scope.
+    const suyo = document.querySelector('.landing-cell[data-module^="boards-"]');
+    return { tarjetas: suyo.querySelectorAll(".cards .card").length,
+             vacio: !!suyo.querySelector(".empty") };
+  `);
+  check(
+    "a module pointed at a board that is gone shows nothing, not everything",
+    huerfano.tarjetas === 0 && huerfano.vacio === true,
+    JSON.stringify(huerfano),
+  );
+
   await evaluate(`
     document.querySelector("[data-edit-done]")?.click();
     await new Promise(r => setTimeout(r, 500));
@@ -1246,7 +1330,7 @@ async function main() {
   `);
   check(
     "and what was arranged is what a visitor is shown",
-    frontPage.cells === 4 && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
+    frontPage.cells === 6 && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
     JSON.stringify(frontPage),
   );
 

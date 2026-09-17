@@ -50,14 +50,44 @@ export interface Text {
  */
 export interface LandingModule {
   id: string;
-  kind: "hero" | "intro" | "organisations" | "text";
+  kind: "hero" | "intro" | "organisations" | "text" | "boards" | "most_voted";
   /** One-based, the way CSS grid lines are. */
   x: number;
   y: number;
   w: number;
   h: number;
   body?: string;
+  /** Which board a data module draws from, as "org/board". Empty for all. */
+  scope?: string;
 }
+
+/** A board as the front page shows it, without going through its organisation. */
+export interface LandingBoard {
+  org: string;
+  org_name: string;
+  slug: string;
+  name: string;
+  accepts_bugs: boolean;
+  accepts_ideas: boolean;
+}
+
+/** One idea in a most-voted module. */
+export interface LandingVoted {
+  public_id: string;
+  title: string;
+  kind: string;
+  status: string;
+  votes: number;
+  board: string;
+}
+
+/**
+ * What the data modules of a page have to show, keyed by module id.
+ *
+ * By id and not by kind, because two modules of the same kind on one page is
+ * the point: the most wanted ideas for one board beside those for another.
+ */
+export type LandingContent = Record<string, LandingBoard[] | LandingVoted[] | undefined>;
 
 /** Twelve columns, which is the dashboard's grid and now this page's. */
 export const LANDING_COLUMNS = 12;
@@ -84,9 +114,12 @@ export function landing(
   instance?: { name?: string; logo?: string },
   modules?: LandingModule[],
   editing = false,
+  content: LandingContent = {},
+  allBoards: LandingBoard[] = [],
 ): string {
   const point = (icon: string, words: string) =>
     `<li><span class="point-icon">${icon}</span><span>${escapeHTML(words)}</span></li>`;
+
 
   const hero = `<section class="hero">
     <span class="hero-mark">${brandMark(instance?.logo, 44)}</span>
@@ -113,6 +146,60 @@ export function landing(
       : `<section class="section">
           ${sectionHead(text.t("shell.organizations"), text.number(orgs.length))}
           ${organizationList(orgs, text)}
+        </section>`;
+
+  /**
+   * The boards themselves, skipping the organisation that holds them.
+   *
+   * The card is the one the organisation page already uses, copied rather than
+   * reinvented, with the organisation's name added underneath: on a front page
+   * that lists boards from everywhere, "web" on its own does not say whose.
+   */
+  const boards = (rows: LandingBoard[]) =>
+    rows.length === 0
+      ? emptyState(text.t("landing.noBoards"), icons.repository(28))
+      : `<section class="section landing-scroll">
+          ${sectionHead(text.t("portal.boards"), text.number(rows.length))}
+          <ul class="cards">${rows
+            .map(
+              (b) => `<li><a class="card" href="/${escapeAttr(b.org)}/${escapeAttr(b.slug)}">
+                <span class="card-mark" aria-hidden="true">${escapeHTML(initials(b.name))}</span>
+                <span class="card-body">
+                  <span class="card-title">${escapeHTML(b.name)}</span>
+                  <span class="card-sub">${escapeHTML(b.org_name)}</span>
+                  <span class="chips">
+                    ${b.accepts_bugs ? `<span class="chip">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
+                    ${b.accepts_ideas ? `<span class="chip">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
+                  </span>
+                </span>
+                <span class="card-go" aria-hidden="true">${icons.chevron(18)}</span>
+              </a></li>`,
+            )
+            .join("")}</ul>
+        </section>`;
+
+  /**
+   * The ideas people asked for most.
+   *
+   * The page has promised this since it existed — "ideas collect votes, which
+   * shows what is most requested" — and had nowhere that showed one. The row is
+   * the dashboard's, votes and all, so a visitor and the team read the same
+   * thing in the same shape.
+   */
+  const voted = (rows: LandingVoted[]) =>
+    rows.length === 0
+      ? emptyState(text.t("landing.noVotes"), icons.idea(28))
+      : `<section class="section landing-scroll">
+          ${sectionHead(text.t("landing.moduleVoted"), text.number(rows.length))}
+          <ul class="briefs">${rows
+            .map(
+              (v) => `<li><a class="brief" href="/i/${escapeAttr(v.public_id)}">
+                <span class="score small"><span class="count">${escapeHTML(text.number(v.votes))}</span></span>
+                <span class="brief-title">${escapeHTML(v.title)}</span>
+                <span class="card-sub">${escapeHTML(v.board)}</span>
+              </a></li>`,
+            )
+            .join("")}</ul>
         </section>`;
 
   // The operator's own words. Escaped and shown as written, line breaks and
@@ -146,7 +233,11 @@ export function landing(
               ? organisations
               : m.kind === "text"
                 ? words(m.body ?? "")
-                : "";
+                : m.kind === "boards"
+                  ? boards((content[m.id] as LandingBoard[]) ?? [])
+                  : m.kind === "most_voted"
+                    ? voted((content[m.id] as LandingVoted[]) ?? [])
+                    : "";
       if (inner === "" && !editing) return "";
 
       // One button, not two. The dashboard in this house puts a module's
@@ -198,6 +289,8 @@ export function landing(
                   <option value="hero">${escapeHTML(text.t("landing.moduleHero"))}</option>
                   <option value="intro">${escapeHTML(text.t("landing.moduleIntro"))}</option>
                   <option value="organisations">${escapeHTML(text.t("shell.organizations"))}</option>
+                  <option value="boards">${escapeHTML(text.t("portal.boards"))}</option>
+                  <option value="most_voted">${escapeHTML(text.t("landing.moduleVoted"))}</option>
                 </select>
                 <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>
                 <button type="button" class="button primary" data-edit-done>${escapeHTML(text.t("action.done"))}</button>`
@@ -212,7 +305,7 @@ export function landing(
       ${drawn}
       ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
     </div>
-    ${editing ? moduleModal(text) : ""}
+    ${editing ? moduleModal(text, allBoards) : ""}
   </div>`;
 }
 
@@ -223,7 +316,18 @@ export function landing(
  * dialog whose body is filled for the module being edited. A module that grows
  * a setting later adds a field here rather than a screen somewhere.
  */
-function moduleModal(text: Text): string {
+function moduleModal(text: Text, boards: LandingBoard[] = []): string {
+  // Every board in the installation, and "all of them" first. Written from what
+  // the page was actually given rather than fetched again: this dialog opens
+  // over a page that already knows which boards there are.
+  const options = [
+    `<option value="">${escapeHTML(text.t("landing.scopeAll"))}</option>`,
+    ...boards.map(
+      (b) =>
+        `<option value="${escapeAttr(b.org + "/" + b.slug)}">${escapeHTML(b.org_name + " / " + b.name)}</option>`,
+    ),
+  ].join("");
+
   return modal(
     {
       id: "module-config",
@@ -237,6 +341,10 @@ function moduleModal(text: Text): string {
         <div class="field" data-for-text hidden>
           <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
           <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
+        </div>
+        <div class="field" data-for-scope hidden>
+          <label for="module-scope">${escapeHTML(text.t("landing.scope"))}</label>
+          <select id="module-scope" name="scope">${options}</select>
         </div>`,
     },
     text,
