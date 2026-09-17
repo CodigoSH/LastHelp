@@ -52,12 +52,38 @@ const (
 	// what is most requested" — and until now there was nowhere on it that
 	// showed one. A promise a page makes and does not keep reads as broken.
 	MostVoted Kind = "most_voted"
+
+	// RecentlyDone is what was put right lately.
+	//
+	// The strongest thing this page can say to somebody deciding whether it is
+	// worth typing anything: reports here get read and acted on. It takes both
+	// vocabularies that mean finished — an idea is done, a bug is closed — and
+	// leaves out the two that mean refused.
+	RecentlyDone Kind = "recently_done"
+
+	// CallToAction is a button that goes straight to a board's report form.
+	//
+	// The one thing this page exists to make happen, and until now the only
+	// route to it was the list: pick an organisation, pick a board, find the
+	// button. An operator with one project should be able to put that button on
+	// the front page and be done.
+	CallToAction Kind = "call_to_action"
 )
 
-// dataKinds are the modules that draw something out of the database rather
-// than out of their own configuration. They are the only ones a scope means
-// anything to.
-func (k Kind) usesData() bool { return k == Boards || k == MostVoted }
+// usesData is the modules that draw something out of the database rather than
+// out of their own configuration. They are the only ones a scope means anything
+// to — including the button, which needs the board list to know where it goes.
+func (k Kind) usesData() bool {
+	switch k {
+	case Boards, MostVoted, RecentlyDone, CallToAction:
+		return true
+	}
+	return false
+}
+
+// usesWords is the modules that carry words of their own: the operator's own
+// paragraph, and the label on the button.
+func (k Kind) usesWords() bool { return k == Text || k == CallToAction }
 
 // The grid, ported from the dashboard this house already runs.
 //
@@ -69,6 +95,11 @@ func (k Kind) usesData() bool { return k == Boards || k == MostVoted }
 const (
 	maxModules  = 24
 	maxTextBody = 4_000
+
+	// maxLabel is a button's words, in runes rather than bytes: the bound is
+	// about what fits on a button, and a byte count would cut a Japanese label
+	// at a third of the length of an English one.
+	maxLabel = 80
 
 	Columns = 12
 
@@ -338,7 +369,7 @@ func (l Layout) validate() error {
 		seen[m.ID] = true
 
 		switch m.Kind {
-		case Hero, Intro, Organisations, Text, Boards, MostVoted:
+		case Hero, Intro, Organisations, Text, Boards, MostVoted, RecentlyDone, CallToAction:
 		default:
 			return fmt.Errorf("%w: %q", ErrUnknownKind, m.Kind)
 		}
@@ -362,8 +393,14 @@ func (l Layout) validate() error {
 				return fmt.Errorf("modules %q and %q sit on top of each other", m.ID, other.ID)
 			}
 		}
-		if m.Kind != Text && m.Body != "" {
-			return fmt.Errorf("module %q carries words and is not a text module", m.ID)
+		if !m.Kind.usesWords() && m.Body != "" {
+			return fmt.Errorf("module %q carries words and has nowhere to put them", m.ID)
+		}
+		// A button's label is a label. Bounded separately from a paragraph
+		// because four thousand characters on a button is not a long label, it
+		// is a layout nobody can use and a page nobody can read past.
+		if m.Kind == CallToAction && len([]rune(m.Body)) > maxLabel {
+			return fmt.Errorf("module %q has a label longer than %d characters", m.ID, maxLabel)
 		}
 		if len(m.Body) > maxTextBody {
 			return fmt.Errorf("module %q is longer than %d characters", m.ID, maxTextBody)

@@ -258,7 +258,7 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           y: m.y,
           w: m.w,
           h: m.h,
-          ...(m.kind === "text" ? { body: m.body ?? "" } : {}),
+          ...(m.kind === "text" || m.kind === "call_to_action" ? { body: m.body ?? "" } : {}),
           ...(m.scope ? { scope: m.scope } : {}),
         })),
       });
@@ -280,16 +280,19 @@ function wireLanding(orgs: OrganizationSummary[]): void {
   root?.querySelector<HTMLButtonElement>("[data-add-module]")?.addEventListener("click", async () => {
     const kind = (root?.querySelector<HTMLSelectElement>("[data-add-kind]")?.value ??
       "text") as views.LandingModule["kind"];
-    // Under everything, full width: the one place a new module is certainly
-    // not on top of another one, whatever the page already looks like.
+    // Under everything: the one place a new module is certainly not on top of
+    // another one, whatever the page already looks like.
     const bottom = landingModules.reduce((low, m) => Math.max(low, m.y + m.h), 1);
     const added: views.LandingModule = {
       id: `${kind}-${Date.now().toString(36)}`,
       kind,
       x: 1,
       y: bottom,
-      w: views.LANDING_COLUMNS,
-      h: kind === "hero" ? 4 : kind === "organisations" ? 3 : 2,
+      // Sized from what each one draws rather than from a round number, the way
+      // the defaults for the page itself are: a button is a button, not a band
+      // across the page.
+      w: kind === "call_to_action" ? 4 : views.LANDING_COLUMNS,
+      h: kind === "hero" ? 3 : kind === "call_to_action" ? 1 : 2,
       body: "",
     };
     landingModules = [...landingModules, added];
@@ -348,6 +351,7 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
+    if (target.kind === "call_to_action") target.body = String(data.get("label") ?? "").trim();
     if (usesData(target.kind)) target.scope = String(data.get("scope") ?? "");
     // Reread: pointing a module at a different board changes what goes in it,
     // and the words of a text module are the only thing this dialog can change
@@ -544,13 +548,25 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     where.hidden = !usesData(target.kind);
     scope.value = target.scope ?? "";
   }
+
+  // And only the button is asked for a label. Left empty it says what the rest
+  // of the product says on that button, which is the right answer often enough
+  // that asking for it as a required field would be asking for nothing.
+  const naming = form.querySelector<HTMLElement>("[data-for-label]");
+  const label = form.querySelector<HTMLInputElement>("[name=label]");
+  if (naming && label) {
+    naming.hidden = target.kind !== "call_to_action";
+    label.value = target.kind === "call_to_action" ? (target.body ?? "") : "";
+  }
   void orgs;
   openModal("module-config");
 }
 
 /** The kinds that draw out of the database, and so have a board to be told. */
 function usesData(kind: views.LandingModule["kind"]): boolean {
-  return kind === "boards" || kind === "most_voted";
+  return (
+    kind === "boards" || kind === "most_voted" || kind === "recently_done" || kind === "call_to_action"
+  );
 }
 
 function show(html: string): void {

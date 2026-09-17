@@ -150,7 +150,7 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	body := map[string]any{"modules": layout.Modules}
 	boards, needed := s.boardsForLanding(layout, composer)
 	if needed {
-		body["content"] = landingContentFrom(layout, boards, s.mostVotedIn)
+		body["content"] = landingContentFrom(layout, boards, s.mostVotedIn, s.recentlyDoneIn)
 	}
 	if composer {
 		body["boards"] = describeBoards(boards)
@@ -181,7 +181,7 @@ func (s *Server) boardsForLanding(layout landing.Layout, composer bool) ([]org.B
 // an error because one module could not be filled is a front page that goes
 // down when a board is deleted.
 func landingContentFrom(layout landing.Layout, boards []org.Board,
-	voted func([]org.Board) []map[string]any) map[string]any {
+	voted, done func([]org.Board) []map[string]any) map[string]any {
 	content := map[string]any{}
 	for _, m := range layout.Modules {
 		switch m.Kind {
@@ -189,6 +189,10 @@ func landingContentFrom(layout landing.Layout, boards []org.Board,
 			content[m.ID] = describeBoards(inScope(boards, m.Scope))
 		case landing.MostVoted:
 			content[m.ID] = voted(inScope(boards, m.Scope))
+		case landing.RecentlyDone:
+			content[m.ID] = done(inScope(boards, m.Scope))
+		case landing.CallToAction:
+			content[m.ID] = whereItGoes(inScope(boards, m.Scope))
 		}
 	}
 	return content
@@ -228,48 +232,94 @@ func describeBoards(boards []org.Board) []map[string]any {
 	return out
 }
 
-// mostVotedOnTheFrontPage is how many ideas one such module carries.
+// reportsOnTheFrontPage is how many reports one such module carries.
 //
 // Enough to fill a tall module and be worth scrolling, small enough that the
 // query stays cheap on the one page strangers load. The module scrolls rather
 // than clipping, so a short module shows fewer without the rest disappearing.
-const mostVotedOnTheFrontPage = 8
+const reportsOnTheFrontPage = 8
 
+// whereItGoes is the board a button points at.
+//
+// An unscoped button goes to the first board, which is what makes it useful the
+// moment it is added rather than after a trip to its dialog: the installation
+// this module is for has one board, and on that one there is no other answer.
+// With no boards at all it points nowhere and the module draws nothing, because
+// a button to a report form that does not exist is worse than no button.
+func whereItGoes(boards []org.Board) map[string]any {
+	if len(boards) == 0 {
+		return nil
+	}
+	b := boards[0]
+	return map[string]any{
+		"org":  b.OrgSlug,
+		"slug": b.Slug,
+		"name": b.Name,
+		"href": "/" + b.OrgSlug + "/" + b.Slug + "/new",
+	}
+}
+
+// recentlyDoneIn is what was put right lately, newest first.
+//
+// Both vocabularies that mean finished and neither that means refused: showing
+// "declined" under a heading about what was done would be the page saying the
+// opposite of what happened.
+func (s *Server) recentlyDoneIn(boards []org.Board) []map[string]any {
+	return s.reportsIn(boards, item.Filter{
+		Statuses:     []item.Status{item.StatusDone, item.StatusClosed},
+		SortByClosed: true,
+	})
+}
+
+// mostVotedIn is the ideas people asked for most.
+//
+// Ideas only, because only an idea can be voted for. A "most voted" that
+// silently included bugs would be ranking things that all have nought.
 func (s *Server) mostVotedIn(boards []org.Board) []map[string]any {
+	return s.reportsIn(boards, item.Filter{Kind: item.Idea, SortByVote: true})
+}
+
+// reportsIn answers one of the report modules.
+//
+// The boards and the bound are the same for all of them and the question is
+// not, so the filter arrives already asked. Published only, which is the
+// default the item store deliberately keeps: the front page must not be the
+// place something unreviewed appears.
+func (s *Server) reportsIn(boards []org.Board, ask item.Filter) []map[string]any {
 	if len(boards) == 0 {
 		return []map[string]any{}
 	}
-	ids := make([]int64, 0, len(boards))
 	byID := make(map[int64]org.Board, len(boards))
+	ask.RepoIDs = make([]int64, 0, len(boards))
 	for _, b := range boards {
-		ids = append(ids, b.ID)
+		ask.RepoIDs = append(ask.RepoIDs, b.ID)
 		byID[b.ID] = b
 	}
+	ask.Limit = reportsOnTheFrontPage
 
-	// Ideas only, because only an idea can be voted for. A "most voted" that
-	// silently included bugs would be ranking things that all have nought.
-	items, err := s.items().List(item.Filter{
-		RepoIDs:    ids,
-		Kind:       item.Idea,
-		SortByVote: true,
-		Limit:      mostVotedOnTheFrontPage,
-	})
+	items, err := s.items().List(ask)
 	if err != nil {
-		slog.Error("listing the most voted for the front page", "error", err)
+		slog.Error("listing reports for the front page", "error", err)
 		return []map[string]any{}
 	}
 
 	out := make([]map[string]any, 0, len(items))
 	for _, it := range items {
-		b := byID[it.RepoID]
-		out = append(out, map[string]any{
+		row := map[string]any{
 			"public_id": it.PublicID,
 			"title":     it.Title,
 			"kind":      string(it.Kind),
 			"status":    string(it.Status),
 			"votes":     it.VoteCount,
-			"board":     b.Name,
-		})
+			"board":     byID[it.RepoID].Name,
+		}
+		if !it.ClosedAt.IsZero() {
+			// Seconds, like every other time this API sends: the browser side
+			// formats them in the language of the application, and a second
+			// shape would mean a second formatter to keep in step.
+			row["closed_at"] = it.ClosedAt.Unix()
+		}
+		out = append(out, row)
 	}
 	return out
 }

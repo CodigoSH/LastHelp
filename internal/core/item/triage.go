@@ -108,9 +108,13 @@ type Filter struct {
 	// needs: somebody who triages four repositories wants one screen, not four.
 	// When it is set RepoID is ignored; when both are empty nothing matches,
 	// which is the direction a mistake here should fail in.
-	RepoIDs    []int64
-	Kind       Kind       // empty for both
-	Status     Status     // empty for any
+	RepoIDs []int64
+	Kind    Kind   // empty for both
+	Status  Status // empty for any
+	// Statuses is several at once. When it is set Status is ignored: the front
+	// page asks for "the ones that are finished", which is two statuses in two
+	// different vocabularies — an idea is done, a bug is closed.
+	Statuses   []Status
 	Moderation Moderation // empty for published only
 	// AnyModeration returns every state, including what is still waiting for a
 	// person. It has to be asked for by name: the public listing leaves the
@@ -120,8 +124,12 @@ type Filter struct {
 	AnyModeration bool
 	Search        string // empty for everything
 	SortByVote    bool
-	Limit         int
-	Offset        int
+	// SortByClosed is newest finished first, and takes only what has actually
+	// finished: an item with no closing time has not, whatever its status says,
+	// and sorting those by a null would put them somewhere arbitrary.
+	SortByClosed bool
+	Limit        int
+	Offset       int
 }
 
 // List returns what matches, newest or most-wanted first.
@@ -157,9 +165,18 @@ func (s Store) List(f Filter) ([]Item, error) {
 		where = append(where, "kind = ?")
 		args = append(args, string(f.Kind))
 	}
-	if f.Status != "" {
+	switch {
+	case len(f.Statuses) > 0:
+		where = append(where, "status IN ("+placeholders(len(f.Statuses))+")")
+		for _, st := range f.Statuses {
+			args = append(args, string(st))
+		}
+	case f.Status != "":
 		where = append(where, "status = ?")
 		args = append(args, string(f.Status))
+	}
+	if f.SortByClosed {
+		where = append(where, "closed_at IS NOT NULL")
 	}
 
 	// The search is a subquery rather than a join, on purpose. item_fts has its
@@ -174,9 +191,12 @@ func (s Store) List(f Filter) ([]Item, error) {
 	}
 	query += ` WHERE ` + strings.Join(where, " AND ")
 
-	if f.SortByVote {
+	switch {
+	case f.SortByVote:
 		query += ` ORDER BY vote_count DESC, created_at DESC`
-	} else {
+	case f.SortByClosed:
+		query += ` ORDER BY closed_at DESC, id DESC`
+	default:
 		query += ` ORDER BY created_at DESC`
 	}
 

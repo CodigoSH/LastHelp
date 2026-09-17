@@ -4147,6 +4147,19 @@ a.stat:hover .stat-go {
   scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
 }
 
+/*
+ * The button module: the one thing this page exists to make happen, so it is
+ * centred in whatever box it was given rather than hugging a corner of it.
+ */
+.landing-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  block-size: 100%;
+}
+
 /* The board a voted idea belongs to, under its title rather than beside it:
    beside it, a long title pushes it off the row it was meant to label. */
 .landing-scroll .brief { flex-wrap: wrap; }

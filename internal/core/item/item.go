@@ -158,6 +158,11 @@ type Item struct {
 	Fields     []Field
 	MergedInto int64
 	CreatedAt  time.Time
+
+	// ClosedAt is when this reached a status that ends it — done, closed,
+	// declined, not reproducible — and the zero time while it is still open.
+	// The column was in the table from the first migration and nothing read it.
+	ClosedAt time.Time
 }
 
 // New is what a reporter submits.
@@ -388,7 +393,7 @@ func BodyHash(title, body string) string {
 // column onto a finished SELECT is how a second table ends up in the FROM and
 // the query silently becomes a cross join.
 const itemColumns = `id, public_id, repo_id, kind, title, body, status,
-	moderation_state, vote_count, COALESCE(merged_into, 0), created_at`
+	moderation_state, vote_count, COALESCE(merged_into, 0), created_at, closed_at`
 
 const selectItem = `SELECT ` + itemColumns + ` FROM item`
 
@@ -403,9 +408,10 @@ func (s Store) scanWith(row interface{ Scan(...any) error }, extra ...any) (Item
 		status  string
 		mod     string
 		created int64
+		closed  sql.NullInt64
 	)
 	dest := []any{&it.ID, &it.PublicID, &it.RepoID, &kind, &it.Title, &it.Body,
-		&status, &mod, &it.VoteCount, &it.MergedInto, &created}
+		&status, &mod, &it.VoteCount, &it.MergedInto, &created, &closed}
 	dest = append(dest, extra...)
 
 	err := row.Scan(dest...)
@@ -419,6 +425,9 @@ func (s Store) scanWith(row interface{ Scan(...any) error }, extra ...any) (Item
 	it.Status = Status(status)
 	it.Moderation = Moderation(mod)
 	it.CreatedAt = time.Unix(created, 0)
+	if closed.Valid {
+		it.ClosedAt = time.Unix(closed.Int64, 0)
+	}
 	return it, nil
 }
 

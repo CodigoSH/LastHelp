@@ -271,3 +271,60 @@ func TestAPageOfWordsSaysItNeedsNothingFromTheDatabase(t *testing.T) {
 		}
 	}
 }
+
+// TestAButtonsLabelIsBoundedAsALabel.
+//
+// The words of a paragraph and the words on a button are not the same bound.
+// Four thousand characters is a reasonable paragraph and an unusable button, so
+// the button has its own — counted in runes, because a bound about what fits on
+// a button that counted bytes would cut a Japanese label at a third of the
+// length of an English one.
+func TestAButtonsLabelIsBoundedAsALabel(t *testing.T) {
+	page := func(label string) string {
+		out, _ := json.Marshal(Layout{Modules: []Module{
+			{ID: "go", Kind: CallToAction, X: 1, Y: 1, W: 4, H: 1,
+				Scope: "acme/atlas", Body: label},
+		}})
+		return string(out)
+	}
+
+	if _, err := Parse(page(strings.Repeat("ぜ", maxLabel))); err != nil {
+		t.Errorf("a label of %d characters was refused: %v", maxLabel, err)
+	}
+	if _, err := Parse(page(strings.Repeat("ぜ", maxLabel+1))); err == nil {
+		t.Error("a label past the bound was accepted")
+	}
+	// The same label in bytes is three times over a byte bound, and has to be
+	// accepted: this is the case a byte count gets wrong.
+	if _, err := Parse(page(strings.Repeat("ぜ", maxLabel))); err != nil {
+		t.Errorf("a label of %d runes was measured in bytes: %v", maxLabel, err)
+	}
+}
+
+// TestOnlyWhatHasSomewhereToPutWordsMayCarryThem.
+//
+// A module carrying words it cannot draw is somebody's writing that vanished,
+// with nothing on the page to say where it went. Two kinds have somewhere to
+// put them — the operator's own paragraph and the label on the button — and the
+// rest are refused rather than quietly dropped.
+func TestOnlyWhatHasSomewhereToPutWordsMayCarryThem(t *testing.T) {
+	page := func(m Module) string {
+		out, _ := json.Marshal(Layout{Modules: []Module{m}})
+		return string(out)
+	}
+
+	for _, kind := range []Kind{Hero, Intro, Organisations, Boards, MostVoted, RecentlyDone} {
+		m := Module{ID: "m", Kind: kind, X: 1, Y: 1, W: 12, H: 2, Body: "hello"}
+		if _, err := Parse(page(m)); err == nil {
+			t.Errorf("%q was allowed to carry words it cannot draw", kind)
+		}
+	}
+
+	if _, err := Parse(page(Module{ID: "t", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: "hello"})); err != nil {
+		t.Errorf("a text module could not carry its own words: %v", err)
+	}
+	if _, err := Parse(page(Module{ID: "go", Kind: CallToAction, X: 1, Y: 1, W: 4, H: 1,
+		Scope: "acme/atlas", Body: "Report something"})); err != nil {
+		t.Errorf("a button could not carry its own label: %v", err)
+	}
+}

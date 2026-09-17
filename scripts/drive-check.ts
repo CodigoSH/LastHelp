@@ -1235,10 +1235,17 @@ async function main() {
   // checked is that somebody can compose this page, not that the server can
   // store it.
   const conDatos = await evaluate(`
+    // What the dialog offered, captured while it is open. Read afterwards it is
+    // always closed and always hidden: submitting redraws the page, and the
+    // dialog comes back in its initial state.
+    let opciones = [];
+    let ofrecido = false;
     const add = async (kind) => {
       document.querySelector("[data-add-kind]").value = kind;
       document.querySelector("[data-add-module]").click();
       await new Promise(r => setTimeout(r, 1100));
+      opciones = [...document.querySelectorAll("#module-scope option")].map(o => o.value);
+      ofrecido = !document.querySelector("[data-for-scope]").hidden;
       // Each one opens its own dialog. Closed without changing anything: the
       // default is every board, which is what this checks first.
       document.querySelector("#module-config")?.close();
@@ -1246,11 +1253,19 @@ async function main() {
     };
     await add("boards");
     await add("most_voted");
+    await add("recently_done");
 
-    // The picker offers the boards, and "all of them" ahead of them.
-    const opciones = [...document.querySelectorAll("#module-scope option")]
-      .map(o => o.value);
-    const ofrecido = !document.querySelector("[data-for-scope]").hidden;
+    // The button, with a label typed into its dialog rather than left default:
+    // what is being checked is that the words reach the button, not that a
+    // fallback exists.
+    document.querySelector("[data-add-kind]").value = "call_to_action";
+    document.querySelector("[data-add-module]").click();
+    await new Promise(r => setTimeout(r, 1100));
+    const etiquetaOfrecida = !document.querySelector("[data-for-label]").hidden;
+    const form = document.querySelector("form.module-config");
+    form.querySelector("[name=label]").value = "Tell us what broke";
+    form.requestSubmit();
+    await new Promise(r => setTimeout(r, 1100));
 
     document.querySelector("[data-edit-done]").click();
     await new Promise(r => setTimeout(r, 800));
@@ -1261,7 +1276,13 @@ async function main() {
       .map(a => ({ titulo: a.querySelector(".brief-title")?.textContent?.trim() ?? "",
                    href: a.getAttribute("href"),
                    votos: a.querySelector(".count")?.textContent?.trim() ?? "" }));
-    return { opciones, ofrecido, tableros, votadas };
+    const boton = document.querySelector(".landing-action a");
+    const hechas = document.querySelector('.landing-cell[data-module^="recently_done-"]');
+    return { opciones, ofrecido, tableros, votadas, etiquetaOfrecida,
+             boton: boton ? { href: boton.getAttribute("href"),
+                              palabras: boton.textContent.trim() } : null,
+             sinHechas: !!hechas?.querySelector(".empty"),
+             hechasRotas: hechas ? hechas.getBoundingClientRect().height < 10 : true };
   `);
   check(
     "the front page can list the boards themselves, without the organisation in the way",
@@ -1284,6 +1305,23 @@ async function main() {
     conDatos.ofrecido === true && conDatos.opciones[0] === "" &&
       conDatos.opciones.includes("codigosh/lastboard"),
     JSON.stringify(conDatos.opciones),
+  );
+
+  check(
+    "the page can carry the button that is the point of it, in the operator's words",
+    conDatos.etiquetaOfrecida === true && conDatos.boton !== null &&
+      conDatos.boton.href === "/codigosh/lastboard/new" &&
+      conDatos.boton.palabras.includes("Tell us what broke"),
+    JSON.stringify(conDatos.boton),
+  );
+  // Nothing has been finished at this point in the journey, which is the state
+  // every installation starts in and the one least likely to be looked at. The
+  // module has to say so and still occupy its box: a module that collapses to
+  // nothing reads as a page that failed to load.
+  check(
+    "a module with nothing to show yet says so, and still holds its place",
+    conDatos.sinHechas === true && conDatos.hechasRotas === false,
+    JSON.stringify({ vacio: conDatos.sinHechas, roto: conDatos.hechasRotas }),
   );
 
   // Pointed at a board that is not there any more — which is what an operator
@@ -1330,7 +1368,7 @@ async function main() {
   `);
   check(
     "and what was arranged is what a visitor is shown",
-    frontPage.cells === 6 && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
+    frontPage.cells === 8 && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
     JSON.stringify(frontPage),
   );
 

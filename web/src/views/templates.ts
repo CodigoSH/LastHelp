@@ -50,7 +50,15 @@ export interface Text {
  */
 export interface LandingModule {
   id: string;
-  kind: "hero" | "intro" | "organisations" | "text" | "boards" | "most_voted";
+  kind:
+    | "hero"
+    | "intro"
+    | "organisations"
+    | "text"
+    | "boards"
+    | "most_voted"
+    | "recently_done"
+    | "call_to_action";
   /** One-based, the way CSS grid lines are. */
   x: number;
   y: number;
@@ -71,14 +79,24 @@ export interface LandingBoard {
   accepts_ideas: boolean;
 }
 
-/** One idea in a most-voted module. */
-export interface LandingVoted {
+/** One report in a most-voted or recently-done module. */
+export interface LandingReport {
   public_id: string;
   title: string;
   kind: string;
   status: string;
   votes: number;
   board: string;
+  /** Only on something that has finished. */
+  closed_at?: number;
+}
+
+/** Where a call-to-action button goes, or null when there is nowhere to go. */
+export interface LandingDestination {
+  org: string;
+  slug: string;
+  name: string;
+  href: string;
 }
 
 /**
@@ -87,7 +105,10 @@ export interface LandingVoted {
  * By id and not by kind, because two modules of the same kind on one page is
  * the point: the most wanted ideas for one board beside those for another.
  */
-export type LandingContent = Record<string, LandingBoard[] | LandingVoted[] | undefined>;
+export type LandingContent = Record<
+  string,
+  LandingBoard[] | LandingReport[] | LandingDestination | null | undefined
+>;
 
 /** Twelve columns, which is the dashboard's grid and now this page's. */
 export const LANDING_COLUMNS = 12;
@@ -186,7 +207,7 @@ export function landing(
    * the dashboard's, votes and all, so a visitor and the team read the same
    * thing in the same shape.
    */
-  const voted = (rows: LandingVoted[]) =>
+  const voted = (rows: LandingReport[]) =>
     rows.length === 0
       ? emptyState(text.t("landing.noVotes"), icons.idea(28))
       : `<section class="section landing-scroll">
@@ -200,6 +221,51 @@ export function landing(
               </a></li>`,
             )
             .join("")}</ul>
+        </section>`;
+
+  /**
+   * What was put right lately.
+   *
+   * The strongest thing this page can say to somebody weighing up whether to
+   * type anything: reports here get read and acted on. So each row carries when
+   * it finished — without a date this is just a list of things that are done,
+   * and "done in 2019" and "done last week" say opposite things.
+   */
+  const finished = (rows: LandingReport[]) =>
+    rows.length === 0
+      ? emptyState(text.t("landing.noneDone"), icons.queue(28))
+      : `<section class="section landing-scroll">
+          ${sectionHead(text.t("landing.moduleDone"), text.number(rows.length))}
+          <ul class="briefs">${rows
+            .map(
+              (r) => `<li><a class="brief" href="/i/${escapeAttr(r.public_id)}">
+                ${kindMark(r.kind)}
+                <span class="brief-title">${escapeHTML(r.title)}</span>
+                ${r.closed_at ? `<span class="when">${escapeHTML(text.date(r.closed_at))}</span>` : ""}
+              </a></li>`,
+            )
+            .join("")}</ul>
+        </section>`;
+
+  /**
+   * The one thing this page exists to make happen.
+   *
+   * Until now the only route to a report form was the list: pick an
+   * organisation, pick a board, find the button. An operator with one project
+   * can put that button on the front page instead.
+   *
+   * Nothing is drawn when there is nowhere to send anybody. A button to a form
+   * that does not exist is worse than no button, and in edit mode the module is
+   * still there to open and point somewhere.
+   */
+  const action = (to: LandingDestination | null, label: string) =>
+    !to
+      ? ""
+      : `<section class="section landing-action">
+          <a class="button primary with-icon" href="${escapeAttr(to.href)}">
+            ${icons.add()}<span>${escapeHTML(label.trim() || text.t("board.report"))}</span>
+          </a>
+          <span class="card-sub">${escapeHTML(to.name)}</span>
         </section>`;
 
   // The operator's own words. Escaped and shown as written, line breaks and
@@ -236,8 +302,12 @@ export function landing(
                 : m.kind === "boards"
                   ? boards((content[m.id] as LandingBoard[]) ?? [])
                   : m.kind === "most_voted"
-                    ? voted((content[m.id] as LandingVoted[]) ?? [])
-                    : "";
+                    ? voted((content[m.id] as LandingReport[]) ?? [])
+                    : m.kind === "recently_done"
+                      ? finished((content[m.id] as LandingReport[]) ?? [])
+                      : m.kind === "call_to_action"
+                        ? action((content[m.id] as LandingDestination) ?? null, m.body ?? "")
+                        : "";
       if (inner === "" && !editing) return "";
 
       // One button, not two. The dashboard in this house puts a module's
@@ -291,6 +361,8 @@ export function landing(
                   <option value="organisations">${escapeHTML(text.t("shell.organizations"))}</option>
                   <option value="boards">${escapeHTML(text.t("portal.boards"))}</option>
                   <option value="most_voted">${escapeHTML(text.t("landing.moduleVoted"))}</option>
+                  <option value="recently_done">${escapeHTML(text.t("landing.moduleDone"))}</option>
+                  <option value="call_to_action">${escapeHTML(text.t("landing.moduleAction"))}</option>
                 </select>
                 <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>
                 <button type="button" class="button primary" data-edit-done>${escapeHTML(text.t("action.done"))}</button>`
@@ -341,6 +413,11 @@ function moduleModal(text: Text, boards: LandingBoard[] = []): string {
         <div class="field" data-for-text hidden>
           <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
           <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
+        </div>
+        <div class="field" data-for-label hidden>
+          <label for="module-label">${escapeHTML(text.t("landing.label"))}</label>
+          <input id="module-label" name="label" type="text" maxlength="80"
+                 placeholder="${escapeAttr(text.t("board.report"))}" />
         </div>
         <div class="field" data-for-scope hidden>
           <label for="module-scope">${escapeHTML(text.t("landing.scope"))}</label>
