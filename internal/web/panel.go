@@ -300,6 +300,74 @@ func (s *Server) handleCommentQueue(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out})
 }
 
+// handleAllWaitingComments is the comment queue without naming a board.
+//
+// The per-board queue answers "what is waiting here"; a person with five boards
+// had to ask it five times to find the one with something in it, and nothing
+// told them which. This answers "what is waiting for me", which is the question
+// they actually had.
+//
+// Scoped exactly like the count beside Reports, and for the same reason: asked
+// board by board through Can, so an administrator gets everything because the
+// rules say so and a collaborator gets theirs for the same reason. The board is
+// carried on every row — without it a decision would be about a message from a
+// place the reader cannot identify.
+func (s *Server) handleAllWaitingComments(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "error.unauthorized")
+		return
+	}
+
+	boards, err := s.items().PendingByBoard()
+	if err != nil {
+		slog.Error("reading the comment queue", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	ids := make([]int64, 0, len(boards))
+	where := map[int64]map[string]any{}
+	for _, b := range boards {
+		if b.Messages == 0 || !actor.Can(authz.Triage, authz.Repository(b.RepoID, b.OrgID)) {
+			continue
+		}
+		ids = append(ids, b.RepoID)
+		entry := map[string]any{}
+		if repo, err := s.orgs().RepositoryByID(b.RepoID); err == nil {
+			entry["repository"] = repo.Slug
+			entry["name"] = repo.Name
+			if o, err := s.orgs().OrganizationByID(b.OrgID); err == nil {
+				entry["organization"] = o.Slug
+			}
+		}
+		where[b.RepoID] = entry
+	}
+
+	waiting, err := s.items().WaitingCommentsOn(ids, intParam(r.URL.Query().Get("limit"), 50))
+	if err != nil {
+		slog.Error("reading the comment queue", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	out := make([]map[string]any, 0, len(waiting))
+	for _, c := range waiting {
+		row := map[string]any{
+			"id":         c.ID,
+			"author":     string(c.Author),
+			"body":       c.Body,
+			"created_at": c.CreatedAt.Unix(),
+			"item":       map[string]any{"public_id": c.ItemPublicID, "title": c.ItemTitle},
+		}
+		if board, ok := where[c.RepoID]; ok {
+			row["board"] = board
+		}
+		out = append(out, row)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"comments": out})
+}
+
 // handleModerateComment publishes one, or hides it.
 //
 // Authorised through the report it hangs on: the rules are written about

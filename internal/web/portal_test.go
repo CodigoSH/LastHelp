@@ -1164,3 +1164,85 @@ func TestTheWaitingCountStopsAtTheDoor(t *testing.T) {
 			"board next door has one too, and they cannot open it", got)
 	}
 }
+
+// TestTheQueueThatSpansBoardsStopsAtTheDoor.
+//
+// The queue without a board in its address is the one that makes the panel
+// usable: five boards used to mean asking five times to find the one with
+// something waiting. Spanning boards is exactly what makes it worth checking
+// where it stops — a message from a place this account cannot open must not
+// appear in it, and neither must the name of that place.
+func TestTheQueueThatSpansBoardsStopsAtTheDoor(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	team.createRepo("codigosh", "lastdav")
+
+	accounts := account.Store{DB: team.db()}
+	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var boardID int64
+	if err := team.db().QueryRow(`SELECT id FROM repository WHERE slug = 'lastboard'`).Scan(&boardID); err != nil {
+		t.Fatal(err)
+	}
+	if err := accounts.Grant(helper.ID, authz.Repository(boardID, 0), authz.RoleCollaborator, team.now()); err != nil {
+		t.Fatal(err)
+	}
+
+	// A published report on each board, with a message waiting on each.
+	public := team.anonymous()
+	for _, board := range []struct{ repo, title, message string }{
+		{"lastboard", "dark mode", "mine: it happens on the phone too"},
+		{"lastdav", "next door", "theirs: this one is not yours to read"},
+	} {
+		id, _ := public.submit("codigosh", board.repo, "idea", board.title)
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+		resp = public.do(http.MethodPost, "/api/items/"+id+"/comments", map[string]string{"body": board.message})
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("commenting on %s returned %d", board.repo, resp.StatusCode)
+		}
+	}
+
+	read := func(c *instance, who string) []any {
+		t.Helper()
+		body := decode(t, c.do(http.MethodGet, "/api/panel/comments", nil))
+		comments, _ := body["comments"].([]any)
+		return comments
+	}
+
+	// The administrator sees both, each naming its board.
+	all := read(team, "the administrator")
+	if len(all) != 2 {
+		t.Fatalf("the administrator was shown %d messages, want 2", len(all))
+	}
+	for _, c := range all {
+		row, _ := c.(map[string]any)
+		board, _ := row["board"].(map[string]any)
+		if board["repository"] == nil {
+			t.Error("a message did not say which board it came from")
+		}
+	}
+
+	helperClient := team.anonymous()
+	resp := helperClient.do(http.MethodPost, "/api/session", map[string]string{
+		"username": "helper", "password": "a good long passphrase",
+	})
+	_ = resp.Body.Close()
+
+	mine := read(helperClient, "the collaborator")
+	if len(mine) != 1 {
+		t.Fatalf("the collaborator was shown %d messages, want 1", len(mine))
+	}
+	row, _ := mine[0].(map[string]any)
+	if body, _ := row["body"].(string); !strings.HasPrefix(body, "mine:") {
+		t.Errorf("the collaborator was shown the message from next door: %q", body)
+	}
+	if board, _ := row["board"].(map[string]any); board["repository"] != "lastboard" {
+		t.Errorf("the message came back on board %v, want lastboard", board["repository"])
+	}
+}

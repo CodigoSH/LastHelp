@@ -1540,7 +1540,24 @@ async function showReports(): Promise<void> {
     return;
   }
 
+  // The messages waiting, across every board this account may triage. Failing
+  // softly: the reports are what somebody came to this screen for, and a queue
+  // that cannot be read is not a reason to show them nothing.
+  //
+  // Only on the unfiltered view. The filters on this screen are about reports —
+  // kind, status, moderation — and none of them mean anything to a message, so
+  // showing the same messages under every combination would make them look like
+  // they answer a question they do not.
+  const untouched = !filters.moderation && !filters.kind && !filters.status && !filters.board && !filters.q;
+  if (untouched) {
+    const waiting = await api
+      .get<{ comments: views.WaitingComment[] }>("/api/panel/comments")
+      .catch(() => ({ comments: [] as views.WaitingComment[] }));
+    data.comments = waiting.comments ?? [];
+  }
+
   await showInShell(views.reportsScreen(data, filters, text), "/panel/reports");
+  bindCommentDecisions();
 
   // One place that turns "what is on screen" into an address, so a control
   // added later cannot forget half of it.
@@ -1860,6 +1877,31 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
  * the whole list after every decision would throw away the scroll position of
  * somebody working down a long queue.
  */
+/**
+ * Approve or hide a message, wherever the row is being shown.
+ *
+ * Bound by both the queue of one board and the queue that spans them. The row
+ * is removed rather than the list redrawn: somebody working down a queue keeps
+ * their place, and a redraw after every decision throws it away.
+ */
+function bindCommentDecisions(): void {
+  root?.querySelectorAll<HTMLButtonElement>("[data-comment-act]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const entry = button.closest<HTMLLIElement>("li[data-comment]");
+      const id = entry?.dataset.comment;
+      if (!id) return;
+      try {
+        await api.post(`/api/comments/${encodeURIComponent(id)}/moderation`, {
+          state: button.dataset.commentAct,
+        });
+        entry?.remove();
+      } catch (err) {
+        report(err);
+      }
+    }),
+  );
+}
+
 async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
@@ -1892,21 +1934,7 @@ async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
     `/${orgSlug}/${repoSlug}/queue`,
   );
 
-  root?.querySelectorAll<HTMLButtonElement>("[data-comment-act]").forEach((button) =>
-    button.addEventListener("click", async () => {
-      const entry = button.closest<HTMLLIElement>("li[data-comment]");
-      const id = entry?.dataset.comment;
-      if (!id) return;
-      try {
-        await api.post(`/api/comments/${encodeURIComponent(id)}/moderation`, {
-          state: button.dataset.commentAct,
-        });
-        entry?.remove();
-      } catch (err) {
-        report(err);
-      }
-    }),
-  );
+  bindCommentDecisions();
 
   root?.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((button) =>
     button.addEventListener("click", async () => {

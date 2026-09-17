@@ -1,6 +1,7 @@
 package item
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -115,6 +116,49 @@ type Waiting struct {
 	Comment
 	ItemPublicID string
 	ItemTitle    string
+
+	// RepoID, because the queue that spans boards has to say which board each
+	// message came from. A decision about a message whose place the reader
+	// cannot identify is a decision taken blind.
+	RepoID int64
+}
+
+// WaitingCommentsOn is the same queue across several boards at once.
+//
+// The panel had a queue per board and nothing above them, so finding the board
+// with a message waiting meant opening every board to look. The count beside
+// Reports knows which ones have something; this is what lets a person act on it
+// without going to fetch it board by board.
+//
+// The caller decides which boards: this package is not the one that knows who
+// may read what. An empty list is an empty answer rather than every board,
+// because "no boards" and "all boards" must not be one keystroke apart.
+func (s Store) WaitingCommentsOn(repoIDs []int64, limit int) ([]Waiting, error) {
+	if len(repoIDs) == 0 {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+
+	holes := strings.TrimSuffix(strings.Repeat("?,", len(repoIDs)), ",")
+	args := make([]any, 0, len(repoIDs)+2)
+	for _, id := range repoIDs {
+		args = append(args, id)
+	}
+	args = append(args, string(Pending), limit)
+
+	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, c.author_ref, c.body,
+		c.moderation_state, c.created_at, i.public_id, i.title, i.repo_id
+		FROM comment c
+		JOIN item i ON i.id = c.item_id
+		WHERE i.repo_id IN (`+holes+`) AND c.moderation_state = ?
+		ORDER BY c.created_at DESC, c.id DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("reading the comment queue: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	return scanWaiting(rows)
 }
 
 func (s Store) WaitingComments(repoID int64, limit int) ([]Waiting, error) {
@@ -122,7 +166,7 @@ func (s Store) WaitingComments(repoID int64, limit int) ([]Waiting, error) {
 		limit = 50
 	}
 	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, c.author_ref, c.body,
-		c.moderation_state, c.created_at, i.public_id, i.title
+		c.moderation_state, c.created_at, i.public_id, i.title, i.repo_id
 		FROM comment c
 		JOIN item i ON i.id = c.item_id
 		WHERE i.repo_id = ? AND c.moderation_state = ?
@@ -132,7 +176,15 @@ func (s Store) WaitingComments(repoID int64, limit int) ([]Waiting, error) {
 		return nil, fmt.Errorf("reading the comment queue: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
+	return scanWaiting(rows)
+}
 
+// scanWaiting reads the ten columns both queues select.
+//
+// Shared rather than written twice: the two queries differ in their WHERE and
+// in nothing else, and a second copy of this loop is a second place to forget a
+// column the day one is added.
+func scanWaiting(rows *sql.Rows) ([]Waiting, error) {
 	var out []Waiting
 	for rows.Next() {
 		var (
@@ -142,7 +194,7 @@ func (s Store) WaitingComments(repoID int64, limit int) ([]Waiting, error) {
 			created int64
 		)
 		if err := rows.Scan(&w.ID, &w.ItemID, &author, &w.AuthorRef, &w.Body, &mod, &created,
-			&w.ItemPublicID, &w.ItemTitle); err != nil {
+			&w.ItemPublicID, &w.ItemTitle, &w.RepoID); err != nil {
 			return nil, fmt.Errorf("reading the comment queue: %w", err)
 		}
 		w.Author = Author(author)

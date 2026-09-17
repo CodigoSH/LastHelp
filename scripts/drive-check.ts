@@ -563,8 +563,41 @@ async function main() {
   await sleep(800);
   const queued2 = await evaluate(`return document.querySelectorAll("li[data-comment]").length`);
   check("it waits in the queue beside the reports", queued2 === 1, `rows=${queued2}`);
+  // The same message, on the screen that does not make you name a board first.
+  // That is the whole point of it: five boards used to mean asking five times
+  // to find the one with something in it. The row has to name its board, or a
+  // decision is taken about a message from nowhere.
+  await evaluate(`history.pushState({}, "", "/panel/reports"); dispatchEvent(new PopStateEvent("popstate"));`);
+  await sleep(1400);
+  const spanning = await evaluate(`
+    const first = document.querySelector("li[data-comment]");
+    return {
+      rows: document.querySelectorAll("li[data-comment]").length,
+      board: first?.querySelector(".chip")?.textContent?.trim() ?? "",
+      approve: !!first?.querySelector('[data-comment-act="published"]'),
+    };
+  `);
+  check(
+    "a message waiting is on the reports screen too, naming its board",
+    spanning.rows === 1 && spanning.board !== "" && spanning.approve === true,
+    JSON.stringify(spanning),
+  );
+
+  // And decided there. Approved from this screen rather than from the board's
+  // own queue, so what follows — the comment appearing on the public page — is
+  // the proof that the decision taken here is the same decision.
   await evaluate(`document.querySelector("li[data-comment] [data-comment-act='published']").click()`);
-  await sleep(700);
+  await sleep(900);
+  const cleared = await evaluate(`
+    const r = await fetch("/api/panel/comments", { headers: { accept: "application/json" } });
+    const body = await r.json();
+    return { onScreen: document.querySelectorAll("li[data-comment]").length, stillWaiting: (body.comments ?? []).length };
+  `);
+  check(
+    "and approving it there leaves the queue empty on both sides",
+    cleared.onScreen === 0 && cleared.stillWaiting === 0,
+    JSON.stringify(cleared),
+  );
 
   await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(800);

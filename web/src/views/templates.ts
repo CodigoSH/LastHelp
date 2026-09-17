@@ -1154,6 +1154,47 @@ export interface WaitingComment {
   body: string;
   created_at: number;
   item: { public_id: string; title: string };
+  /**
+   * Which board it came from. Absent on the queue of one board, where the
+   * answer is the page itself; present on the one that spans them, where a
+   * decision without it would be taken about a message from nowhere.
+   */
+  board?: { organization?: string; repository?: string; name?: string };
+}
+
+/**
+ * The messages waiting, wherever they are being shown.
+ *
+ * One function for both screens rather than two that drift: the queue of one
+ * board and the queue that spans boards differ in a chip, and the day the
+ * buttons change they have to change in one place. The row carries
+ * data-comment, which is what the handlers bind to.
+ */
+export function waitingComments(comments: WaitingComment[], text: Text): string {
+  if (comments.length === 0) return "";
+  return `<h2 class="queue-head">${escapeHTML(text.t("panel.commentsWaiting", { count: comments.length }))}</h2>
+    <ul class="queue">${comments
+      .map(
+        (c) => `<li class="bento-card" data-comment="${escapeAttr(String(c.id))}">
+          <p class="meta">
+            <span class="who-badge">${escapeHTML(text.t(`comment.${c.author}`))}</span>
+            ${
+              c.board?.name
+                ? `<span class="chip">${escapeHTML(c.board.name)}</span>`
+                : ""
+            }
+            <span class="when">${escapeHTML(text.date(c.created_at))}</span>
+          </p>
+          <p class="body">${escapeHTML(c.body)}</p>
+          <a class="on" href="/i/${escapeAttr(c.item.public_id)}"
+             title="${escapeAttr(text.t("panel.commentOn"))}">${icons.open(14)}<span>${escapeHTML(c.item.title)}</span></a>
+          <div class="actions">
+            <button class="button primary with-icon" data-comment-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+            <button class="button ghost with-icon" data-comment-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+          </div>
+        </li>`,
+      )
+      .join("")}</ul>`;
 }
 
 export function queueScreen(
@@ -1183,27 +1224,7 @@ export function queueScreen(
   // The comments waiting, which is a second queue on the same board and not a
   // second screen: somebody triaging works through what has arrived, and what
   // has arrived is both kinds.
-  const commentQueue =
-    comments.length === 0
-      ? ""
-      : `<h2 class="queue-head">${escapeHTML(text.t("panel.commentsWaiting", { count: comments.length }))}</h2>
-        <ul class="queue">${comments
-          .map(
-            (c) => `<li class="bento-card" data-comment="${escapeAttr(String(c.id))}">
-              <p class="meta">
-                <span class="who-badge">${escapeHTML(text.t(`comment.${c.author}`))}</span>
-                <span class="when">${escapeHTML(text.date(c.created_at))}</span>
-              </p>
-              <p class="body">${escapeHTML(c.body)}</p>
-              <a class="on" href="/i/${escapeAttr(c.item.public_id)}"
-                 title="${escapeAttr(text.t("panel.commentOn"))}">${icons.open(14)}<span>${escapeHTML(c.item.title)}</span></a>
-              <div class="actions">
-                <button class="button primary with-icon" data-comment-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
-                <button class="button ghost with-icon" data-comment-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
-              </div>
-            </li>`,
-          )
-          .join("")}</ul>`;
+  const commentQueue = waitingComments(comments, text);
 
   if (items.length === 0) {
     return `${header}${commentQueue}
@@ -2129,6 +2150,13 @@ export interface ReportRow extends Brief {
 
 export interface ReportsData {
   items: ReportRow[];
+  /**
+   * The messages waiting across every board this account may triage. Here
+   * rather than on a screen of their own: somebody working through what has
+   * arrived does not care which of the two kinds it is, and a second screen is
+   * a second place to remember to look.
+   */
+  comments?: WaitingComment[];
   boards: { org: string; repo: string; name: string; organization: string }[];
   counts: {
     moderation: Record<string, number>;
@@ -2271,9 +2299,15 @@ export function reportsScreen(data: ReportsData, filters: ReportFilters, text: T
                placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
       </label>
     </div>
+    ${waitingComments(data.comments ?? [], text)}
     ${
       data.items.length === 0
-        ? emptyState(text.t("reports.empty"), icons.queue(28))
+        ? // With messages waiting this screen is not empty, whatever the report
+          // filters say — saying "nothing here" above a queue of them would be
+          // the screen contradicting itself.
+          (data.comments ?? []).length === 0
+          ? emptyState(text.t("reports.empty"), icons.queue(28))
+          : ""
         : `<ul class="items reports">${data.items.map(row).join("")}</ul>`
     }`;
 }

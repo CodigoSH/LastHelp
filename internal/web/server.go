@@ -208,6 +208,10 @@ func (s *Server) routes() {
 	private("GET /api/orgs/{org}/repos/{repo}/queue", s.handleQueue)
 	private("GET /api/server", s.handleServerInfo)
 	private("GET /api/orgs/{org}/repos/{repo}/comments", s.handleCommentQueue)
+
+	// The same queue without having to name a board first. The per-board one
+	// stays: it is what somebody working on one board wants.
+	private("GET /api/panel/comments", s.handleAllWaitingComments)
 	private("GET /api/orgs/{org}/repos/{repo}/export", s.handleExport)
 
 	private("POST /api/items/{id}/moderation", s.handleModerate)
