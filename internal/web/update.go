@@ -91,14 +91,20 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 
 		release, err := s.updater().Latest(ctx, s.wantsBeta(r))
-		if err != nil {
+		switch {
+		case errors.Is(err, updater.ErrNoRelease):
+			// Reached, and there is nothing on this channel — which is what
+			// every installation saw while only betas existed. Saying it could
+			// not be reached sends somebody to check a firewall that is fine.
+			body["reason"] = "error.update_none"
+		case err != nil:
 			slog.Warn("checking for updates", "error", err)
 			body["reason"] = "error.update_unreachable"
-			break
+		default:
+			body["latest"] = release.Tag
+			body["notes"] = release.Notes
+			body["available"] = s.updater().Available(release)
 		}
-		body["latest"] = release.Tag
-		body["notes"] = release.Notes
-		body["available"] = s.updater().Available(release)
 	}
 
 	writeJSON(w, http.StatusOK, body)
@@ -162,19 +168,38 @@ func (s *Server) handleUpdatePerform(w http.ResponseWriter, r *http.Request) {
 // comes from a request. If exec fails there is nothing sensible left to do but
 // exit and let whatever supervises this start it again, which is what a systemd
 // unit with Restart=on-failure is for.
+//
+// Which is why it exits NON-ZERO. This said os.Exit(0) while the comment above
+// it said what it says now, and the two disagreed in the worst possible place:
+// `Restart=on-failure` does not restart a unit that exited successfully. The
+// operator pressed update, was told it worked, and the service stopped and
+// stayed stopped — on the one path that runs when an update has already gone
+// wrong.
 func restart() {
 	time.Sleep(500 * time.Millisecond)
 
-	path, err := os.Executable()
+	path, err := executablePath()
 	if err != nil {
 		slog.Error("could not find our own binary to restart", "error", err)
-		os.Exit(0)
+		exitProcess(1)
+		return
 	}
-	if err := syscall.Exec(path, os.Args, os.Environ()); err != nil {
+	if err := execSelf(path, os.Args, os.Environ()); err != nil {
 		slog.Error("could not restart; exiting for the supervisor", "error", err)
-		os.Exit(0)
+		exitProcess(1)
+		return
 	}
 }
+
+// Variables so a test can watch what this decides. Calling the real ones in a
+// test either replaces the test binary or ends the run, and the thing worth
+// asserting is the exit code: it is what decides whether the service comes
+// back.
+var (
+	executablePath = os.Executable
+	execSelf       = syscall.Exec
+	exitProcess    = os.Exit
+)
 
 func keyForUpdateError(err error) string {
 	switch {

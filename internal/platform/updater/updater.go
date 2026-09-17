@@ -77,6 +77,15 @@ var (
 // plain binary rather than an archive: there is nothing to decompress.
 const MaxBinaryBytes = 200 << 20
 
+// statusError carries the code, because 404 means something different from
+// every other answer: nothing is published, rather than nothing is reachable.
+type statusError struct {
+	url  string
+	code int
+}
+
+func (e statusError) Error() string { return fmt.Sprintf("%s answered %d", e.url, e.code) }
+
 // Release is what could be installed.
 type Release struct {
 	Tag        string `json:"tag"`
@@ -136,6 +145,16 @@ func (u Updater) Latest(ctx context.Context, includeBeta bool) (Release, error) 
 
 	body, err := u.fetch(ctx, endpoint, 1<<20)
 	if err != nil {
+		// A forge with nothing published on this channel answers 404, and that
+		// is not a failure to reach it. Reported as a transport error it became
+		// "could not reach the release server" in the panel, which is the one
+		// sentence that sends an operator to look at their network — while
+		// every install was in exactly this state: three betas and no stable,
+		// so the stable channel had nothing to find.
+		var status statusError
+		if errors.As(err, &status) && status.code == http.StatusNotFound {
+			return Release{}, ErrNoRelease
+		}
 		return Release{}, err
 	}
 
@@ -380,7 +399,7 @@ func (u Updater) fetch(ctx context.Context, url string, limit int64) ([]byte, er
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s answered %d", url, resp.StatusCode)
+		return nil, statusError{url: url, code: resp.StatusCode}
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, limit))
 }

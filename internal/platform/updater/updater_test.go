@@ -353,3 +353,49 @@ func assertNotReplaced(t *testing.T, running string) {
 		t.Error("a candidate binary was left next to the running one")
 	}
 }
+
+// TestNothingPublishedIsNotTheSameAsUnreachable.
+//
+// A forge with no stable release answers 404 on /releases/latest. That was
+// reported as a transport failure, and the panel turned it into "could not
+// reach the release server" — the one sentence that sends an operator to go
+// looking at a firewall that is working.
+//
+// It was not a corner case. Every installation of this product was in exactly
+// that state: three betas published and no stable, so the default channel had
+// nothing to find and said the server was unreachable.
+func TestNothingPublishedIsNotTheSameAsUnreachable(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, `{"errors":["no release found"]}`, http.StatusNotFound)
+	})
+
+	u, _ := updaterFor(t, f, []string{public}, 2)
+	_, err := u.Latest(context.Background(), false)
+	if !errors.Is(err, ErrNoRelease) {
+		t.Errorf("a 404 came back as %v, want ErrNoRelease.\n\n"+
+			"The two are different answers: nothing is published, versus nothing\n"+
+			"is reachable. Only one of them is the operator's problem.", err)
+	}
+}
+
+// TestAServerThatIsActuallyBrokenStillSaysSo is the other half. Making 404 mean
+// "nothing published" must not turn every failure into that: a forge answering
+// 500, or refusing the connection, is unreachable and has to keep saying so.
+func TestAServerThatIsActuallyBrokenStillSaysSo(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	f.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	})
+
+	u, _ := updaterFor(t, f, []string{public}, 2)
+	_, err := u.Latest(context.Background(), false)
+	if err == nil {
+		t.Fatal("a 500 was treated as a successful check")
+	}
+	if errors.Is(err, ErrNoRelease) {
+		t.Error("a 500 was reported as 'nothing published', which hides a broken server")
+	}
+}
