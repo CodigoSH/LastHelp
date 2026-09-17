@@ -37,15 +37,15 @@ func TestAnUnsetLayoutIsThePageThatWasThereBefore(t *testing.T) {
 // seeing part of it, and having no way to tell whether the rest failed to save
 // or failed to draw.
 func TestAModuleNobodyCanDrawIsRefused(t *testing.T) {
-	_, err := Parse(`{"modules":[{"id":"a","kind":"iframe","width":"full"}]}`)
+	_, err := Parse(`{"modules":[{"id":"a","kind":"iframe","x":1,"y":1,"w":12,"h":2}]}`)
 	if !errors.Is(err, ErrUnknownKind) {
 		t.Errorf("an unknown module came back as %v, want ErrUnknownKind", err)
 	}
 
 	// And one bad module refuses the whole layout, not just itself.
 	mixed, err := Parse(`{"modules":[
-		{"id":"a","kind":"hero","width":"full"},
-		{"id":"b","kind":"iframe","width":"full"}]}`)
+		{"id":"a","kind":"hero","x":1,"y":1,"w":12,"h":4},
+		{"id":"b","kind":"iframe","x":1,"y":5,"w":12,"h":2}]}`)
 	if err == nil {
 		t.Errorf("a layout with one bad module was accepted as %d modules", len(mixed.Modules))
 	}
@@ -54,12 +54,16 @@ func TestAModuleNobodyCanDrawIsRefused(t *testing.T) {
 func TestTheThingsAPageCannotBe(t *testing.T) {
 	for _, tc := range []struct{ name, layout string }{
 		{"no modules at all", `{"modules":[]}`},
-		{"a module with no id", `{"modules":[{"id":"","kind":"hero","width":"full"}]}`},
+		{"a module with no id", `{"modules":[{"id":"","kind":"hero","x":1,"y":1,"w":12,"h":4}]}`},
 		{"two modules sharing an id", `{"modules":[
-			{"id":"a","kind":"hero","width":"full"},
-			{"id":"a","kind":"intro","width":"full"}]}`},
-		{"a width nothing can lay out", `{"modules":[{"id":"a","kind":"hero","width":"three-quarters"}]}`},
-		{"words on a module that has none", `{"modules":[{"id":"a","kind":"hero","width":"full","body":"hello"}]}`},
+			{"id":"a","kind":"hero","x":1,"y":1,"w":12,"h":4},
+			{"id":"a","kind":"intro","x":1,"y":5,"w":12,"h":2}]}`},
+		{"a module off the right-hand edge", `{"modules":[{"id":"a","kind":"hero","x":9,"y":1,"w":8,"h":2}]}`},
+		{"a module narrower than the smallest", `{"modules":[{"id":"a","kind":"hero","x":1,"y":1,"w":1,"h":2}]}`},
+		{"two modules in the same cells", `{"modules":[
+			{"id":"a","kind":"hero","x":1,"y":1,"w":6,"h":2},
+			{"id":"b","kind":"intro","x":4,"y":1,"w":6,"h":2}]}`},
+		{"words on a module that has none", `{"modules":[{"id":"a","kind":"hero","x":1,"y":1,"w":12,"h":4,"body":"hello"}]}`},
 		{"not json at all", `hello`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,9 +77,9 @@ func TestTheThingsAPageCannotBe(t *testing.T) {
 // TestALayoutSurvivesTheRoundTrip: what was saved is what comes back, in order.
 func TestALayoutSurvivesTheRoundTrip(t *testing.T) {
 	original := Layout{Modules: []Module{
-		{ID: "words", Kind: Text, Width: Half, Body: "We read everything."},
-		{ID: "orgs", Kind: Organisations, Width: Half},
-		{ID: "top", Kind: Hero, Width: Full},
+		{ID: "words", Kind: Text, X: 1, Y: 1, W: 6, H: 2, Body: "We read everything."},
+		{ID: "orgs", Kind: Organisations, X: 7, Y: 1, W: 6, H: 2},
+		{ID: "top", Kind: Hero, X: 1, Y: 3, W: 12, H: 4},
 	}}
 
 	stored, err := original.Encode()
@@ -100,12 +104,12 @@ func TestALayoutSurvivesTheRoundTrip(t *testing.T) {
 // layout that can be written and not read is a page that breaks on the next
 // visit rather than when it was saved.
 func TestEncodeRefusesWhatParseWouldRefuse(t *testing.T) {
-	bad := Layout{Modules: []Module{{ID: "a", Kind: "carousel", Width: Full}}}
+	bad := Layout{Modules: []Module{{ID: "a", Kind: "carousel", X: 1, Y: 1, W: 12, H: 2}}}
 	if _, err := bad.Encode(); err == nil {
 		t.Fatal("an unknown module was written")
 	}
 
-	tooLong := Layout{Modules: []Module{{ID: "a", Kind: Text, Width: Full, Body: strings.Repeat("x", maxTextBody+1)}}}
+	tooLong := Layout{Modules: []Module{{ID: "a", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: strings.Repeat("x", maxTextBody+1)}}}
 	if _, err := tooLong.Encode(); err == nil {
 		t.Error("a text module longer than the limit was written")
 	}
@@ -120,7 +124,7 @@ func TestEncodeRefusesWhatParseWouldRefuse(t *testing.T) {
 func TestTextIsStoredAsWordsAndNotAsMarkup(t *testing.T) {
 	const sneaky = `<script>alert(1)</script>`
 	stored, err := Layout{Modules: []Module{
-		{ID: "a", Kind: Text, Width: Full, Body: sneaky},
+		{ID: "a", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: sneaky},
 	}}.Encode()
 	if err != nil {
 		t.Fatal(err)
@@ -137,5 +141,60 @@ func TestTextIsStoredAsWordsAndNotAsMarkup(t *testing.T) {
 	}
 	if back.Modules[0].Body != sneaky {
 		t.Errorf("the words changed on the way through: %q", back.Modules[0].Body)
+	}
+}
+
+// TestAPageComposedBeforeThereWasAGridStillComesBack.
+//
+// The first version of this stored a coarse width and no position. Those
+// layouts exist in installations that arranged a page between one release and
+// the next, and the grid arriving must not turn somebody's front page into an
+// error. Full becomes the twelve columns it meant, half becomes six, and they
+// keep the order they were written in.
+func TestAPageComposedBeforeThereWasAGridStillComesBack(t *testing.T) {
+	old := `{"modules":[
+		{"id":"words","kind":"text","width":"half","body":"We read everything."},
+		{"id":"orgs","kind":"organisations","width":"full"}]}`
+
+	got, err := Parse(old)
+	if err != nil {
+		t.Fatalf("a page composed before the grid came back as an error: %v", err)
+	}
+	if len(got.Modules) != 2 {
+		t.Fatalf("%d modules came back, want 2", len(got.Modules))
+	}
+
+	words, orgs := got.Modules[0], got.Modules[1]
+	if words.W != Columns/2 {
+		t.Errorf("half became %d columns, want %d", words.W, Columns/2)
+	}
+	if orgs.W != Columns {
+		t.Errorf("full became %d columns, want %d", orgs.W, Columns)
+	}
+	if words.Body != "We read everything." {
+		t.Errorf("the words were lost on the way: %q", words.Body)
+	}
+	if !(words.Y < orgs.Y) {
+		t.Errorf("the order changed: words at row %d, organisations at row %d", words.Y, orgs.Y)
+	}
+	if words.Overlaps(orgs) {
+		t.Error("the two ended up on top of each other")
+	}
+
+	// And once saved again it is an ordinary layout: the old width is gone and
+	// nothing has to guess a second time.
+	again, err := got.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(again, `"width"`) {
+		t.Errorf("the old width was written back out: %s", again)
+	}
+	reread, err := Parse(again)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reread.Modules[0] != got.Modules[0] {
+		t.Errorf("a second read moved it: %+v then %+v", got.Modules[0], reread.Modules[0])
 	}
 }

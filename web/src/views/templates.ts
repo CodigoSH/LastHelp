@@ -51,9 +51,16 @@ export interface Text {
 export interface LandingModule {
   id: string;
   kind: "hero" | "intro" | "organisations" | "text";
-  width: "full" | "half";
+  /** One-based, the way CSS grid lines are. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
   body?: string;
 }
+
+/** Twelve columns, which is the dashboard's grid and now this page's. */
+export const LANDING_COLUMNS = 12;
 
 /**
  * The public front page, composed.
@@ -120,9 +127,9 @@ export function landing(
     modules && modules.length > 0
       ? modules
       : ([
-          { id: "hero", kind: "hero", width: "full" },
-          { id: "intro", kind: "intro", width: "full" },
-          { id: "organisations", kind: "organisations", width: "full" },
+          { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 4 },
+          { id: "intro", kind: "intro", x: 1, y: 5, w: 12, h: 2 },
+          { id: "organisations", kind: "organisations", x: 1, y: 7, w: 12, h: 3 },
         ] as LandingModule[]);
 
   // In edit mode a module that draws nothing still has to be there: an empty
@@ -159,8 +166,22 @@ export function landing(
            </div>`
         : "";
 
-      return `<div class="landing-cell ${m.width === "half" ? "half" : "full"}"
-                   data-module="${escapeAttr(m.id)}">${tools}${inner || `<p class="hint">${escapeHTML(text.t("landing.moduleText"))}</p>`}</div>`;
+      // Placed by the same custom properties the dashboard uses, so the
+      // stylesheet does the arithmetic and nothing here computes pixels.
+      const handle = editing
+        ? `<span class="resize-handle" data-resize="${escapeAttr(m.id)}"
+             aria-hidden="true"></span>`
+        : "";
+      // No style attribute. This product serves `style-src 'self'` without
+      // unsafe-inline — it is the one place the house is stricter than the
+      // dashboard this grid comes from — so the browser would drop it and every
+      // module would land in cell one. The coordinates go in through the
+      // CSSOM instead, which the policy does not govern, which is the same way
+      // this product already does an accent colour and a tooltip position.
+      return `<div class="landing-cell" data-module="${escapeAttr(m.id)}"
+                   ${editing ? 'draggable="true"' : ""}>${tools}${
+                     inner || `<p class="hint">${escapeHTML(text.t("landing.moduleText"))}</p>`
+                   }${handle}</div>`;
     })
     .join("");
 
@@ -187,7 +208,10 @@ export function landing(
 
   return `<div class="page">
     ${bar}
-    <div class="landing-grid${editing ? " editing" : ""}">${drawn}</div>
+    <div class="landing-grid${editing ? " editing" : ""}">
+      ${drawn}
+      ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
+    </div>
     ${editing ? moduleModal(text) : ""}
   </div>`;
 }
@@ -206,14 +230,10 @@ function moduleModal(text: Text): string {
       title: text.t("landing.compose"),
       formClass: "module-config",
       submit: text.t("panel.save"),
+      // No size here. The size is dragged from the corner of the module, which
+      // is where the dashboard puts it and is the only place it can be changed
+      // while looking at what it does to the page.
       body: `<input type="hidden" name="id" />
-        <div class="field">
-          <label for="module-width">${escapeHTML(text.t("landing.widthFull"))}</label>
-          <select id="module-width" name="width">
-            <option value="full">${escapeHTML(text.t("landing.widthFull"))}</option>
-            <option value="half">${escapeHTML(text.t("landing.widthHalf"))}</option>
-          </select>
-        </div>
         <div class="field" data-for-text hidden>
           <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
           <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>

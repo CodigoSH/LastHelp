@@ -1085,6 +1085,157 @@ async function main() {
     JSON.stringify(composing),
   );
 
+  await evaluate(`
+    document.querySelector("[data-edit-page]").click();
+    await new Promise(r => setTimeout(r, 600));
+  `);
+  // The ghost, which is the whole of the feedback while something is being
+  // carried: green where it would land, red where it would sit on top of
+  // another module. Driven with real drag events rather than by calling the
+  // handler, because what is being checked is that the page answers a gesture.
+  const carried = await evaluate(`
+    const grid = document.querySelector(".landing-grid.editing");
+    const first = grid.querySelector(".landing-cell");
+    const box = first.getBoundingClientRect();
+    const gridBox = grid.getBoundingClientRect();
+
+    const dt = new DataTransfer();
+    first.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt,
+      clientX: box.left + 10, clientY: box.top + 10 }));
+
+    // Somewhere empty, well below everything that is placed.
+    grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt,
+      clientX: gridBox.left + 10, clientY: gridBox.top + 1400 }));
+    await new Promise(r => setTimeout(r, 120));
+    const ghost = document.querySelector(".landing-ghost");
+    const ghostBox = ghost.getBoundingClientRect();
+    const free = { shown: !ghost.hidden, invalid: ghost.classList.contains("invalid"),
+                   border: getComputedStyle(ghost).borderTopColor,
+                   // The ghost stands for the module being carried, so it has to
+                   // be that module's size. Reading only its colour let it pass
+                   // while it drew as a four-pixel line: an empty grid item with
+                   // align-items:start above it sizes to the nothing it holds.
+                   alto: Math.round(ghostBox.height), ancho: Math.round(ghostBox.width) };
+    const llevado = { alto: Math.round(box.height), ancho: Math.round(box.width) };
+
+    // And on top of another module, which is a no.
+    const other = grid.querySelectorAll(".landing-cell")[1];
+    const otherBox = other.getBoundingClientRect();
+    grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt,
+      clientX: otherBox.left + 12, clientY: otherBox.top + 12 }));
+    await new Promise(r => setTimeout(r, 120));
+    const taken = { invalid: ghost.classList.contains("invalid"),
+                    border: getComputedStyle(ghost).borderTopColor };
+
+    first.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
+    return { free, llevado, taken, hiddenAfter: ghost.hidden };
+  `);
+  check(
+    "what is being carried shows where it would land, and where it would not",
+    carried.free.shown === true && carried.free.invalid === false &&
+      carried.free.border === "rgb(0, 255, 0)" &&
+      carried.free.alto === carried.llevado.alto &&
+      carried.free.ancho === carried.llevado.ancho &&
+      carried.taken.invalid === true && carried.taken.border === "rgb(255, 0, 0)" &&
+      carried.hiddenAfter === true,
+    JSON.stringify(carried),
+  );
+
+  // And where it actually lands, down the page. Colour alone never saw this:
+  // the vertical arithmetic divided by the column width, so a module dropped
+  // one row lower landed several rows lower. Rows are 100px, columns are about
+  // 45, and the two axes needed their own divisor.
+  const dropped = await evaluate(`
+    const grid = document.querySelector(".landing-grid.editing");
+    const before = await fetch("/api/landing").then(r => r.json());
+    const was = before.modules.slice().sort((a, b) => (b.y + b.h) - (a.y + a.h))[0];
+    const cellEl = grid.querySelector('[data-module="' + was.id + '"]');
+    const box = cellEl.getBoundingClientRect();
+    const dt = new DataTransfer();
+
+    cellEl.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt,
+      clientX: box.left + 10, clientY: box.top + 10 }));
+    // Exactly one row further down: one row plus one gap. A row is as tall as a
+    // column is wide — the cells are square, which is what lets the drag use one
+    // divisor for both axes — so the step is measured, never written down.
+    const gridBox = grid.getBoundingClientRect();
+    const fila = (gridBox.width - 11 * 16) / 12;
+    // One row down and a third of a row into it. Landing on the exact boundary
+    // put the pointer at 8.0000 cells and let floating point pick the row: the
+    // same gesture read as row eight or row nine depending on the numbers. A
+    // hand never aims at the seam, and neither should this.
+    const lower = { clientX: box.left + 10, clientY: box.top + 10 + fila + 16 + fila / 3 };
+    grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt, ...lower }));
+    await new Promise(r => setTimeout(r, 60));
+    const fantasma = getComputedStyle(document.querySelector(".landing-ghost")).gridRow;
+    const arriba = Math.round(box.top - grid.getBoundingClientRect().top);
+    grid.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, ...lower }));
+    await new Promise(r => setTimeout(r, 500));
+    cellEl.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
+
+    const after = await fetch("/api/landing").then(r => r.json());
+    const now = after.modules.find(m => m.id === was.id);
+    return { id: was.id, antes: was.y, esperado: was.y + 1, ahora: now.y,
+             fantasma, ocupado: after.modules.map(m => m.id + "@" + m.y + "+" + m.h).join(" ") };
+  `);
+  check(
+    "a module dropped one row lower is one row lower",
+    dropped.ahora === dropped.esperado,
+    JSON.stringify(dropped),
+  );
+
+  // Dragging the bottom-right corner, the way Lastboard does it. This one goes
+  // all the way to the stored layout: a corner that only moves a ghost and
+  // forgets on reload would pass any check that stopped at the screen.
+  const corner = await evaluate(`
+    const grid = document.querySelector(".landing-grid.editing");
+    const before = await fetch("/api/landing").then(r => r.json());
+    // The bottom-most module, because growing downwards into an occupied cell is
+    // refused — correctly. Picking the top one measured the refusal, not the
+    // corner, and the layout came back unchanged for the right reason.
+    const was = before.modules.slice().sort((a, b) => (b.y + b.h) - (a.y + a.h))[0];
+    const id = was.id;
+    const cellEl = grid.querySelector('[data-module="' + id + '"]');
+
+    const handle = cellEl.querySelector("[data-resize]");
+    const box = cellEl.getBoundingClientRect();
+    const gridBox = grid.getBoundingClientRect();
+    const colWidth = (gridBox.width - 11 * 16) / 12;
+    const fila = colWidth;
+    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
+
+    handle.dispatchEvent(new PointerEvent("pointerdown", { ...opts,
+      clientX: box.right, clientY: box.bottom }));
+    // Exactly one cell shorter and one row taller: a module that spans the whole
+    // grid cannot grow sideways, so shrinking is the move that proves the axis.
+    window.dispatchEvent(new PointerEvent("pointermove", { ...opts,
+      clientX: box.right - (colWidth + 16), clientY: box.bottom + (fila + 16) }));
+    await new Promise(r => setTimeout(r, 120));
+    const ghost = document.querySelector(".landing-ghost");
+    const ghostBox = ghost.getBoundingClientRect();
+    const mientras = { alto: Math.round(ghostBox.height), visible: !ghost.hidden };
+    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
+      clientX: box.right - (colWidth + 16), clientY: box.bottom + (fila + 16) }));
+    await new Promise(r => setTimeout(r, 400));
+
+    const after = await fetch("/api/landing").then(r => r.json());
+    const now = after.modules.find(m => m.id === id);
+    return { id, antes: { w: was.w, h: was.h }, ahora: { w: now.w, h: now.h },
+             mientras, altoEsperado: Math.round((was.h + 1) * fila + was.h * 16) };
+  `);
+  check(
+    "a module is resized from its bottom-right corner, and stays resized",
+    corner.ahora.w === corner.antes.w - 1 && corner.ahora.h === corner.antes.h + 1 &&
+      corner.mientras.visible === true && corner.mientras.alto === corner.altoEsperado,
+    JSON.stringify(corner),
+  );
+
+  await evaluate(`
+    document.querySelector("[data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 500));
+  `);
+
+
   const frontPage = await evaluate(`
     return {
       cells: document.querySelectorAll(".landing-cell").length,

@@ -142,7 +142,52 @@ function renderNav(): void {
 let landingModules: views.LandingModule[] = [];
 let landingEditing = false;
 
+/**
+ * Where each module sits, as a rule rather than an attribute.
+ *
+ * The dashboard writes these four numbers into a style attribute. Here that
+ * would be dropped on the floor: the content policy this product serves has no
+ * unsafe-inline, so every module would fall back to cell one and stack. Same
+ * numbers, same custom properties, delivered the way the policy allows.
+ */
+/**
+ * The cells are square, which is what lets one divisor serve both axes when
+ * something is dragged: a row is as tall as a column is wide, so the same
+ * arithmetic reads a sideways drag and a downwards one. The stylesheet cannot
+ * know the width, so the row height is synced from here — through the sheet
+ * rather than the element, because this product's content policy drops style
+ * attributes. It runs on every draw and on resize, not only while arranging:
+ * a visitor who never edits anything still has to see square cells.
+ */
+function squareLandingCells(): void {
+  const grid = root?.querySelector<HTMLElement>(".landing-grid");
+  if (!grid) return;
+  const width = (grid.getBoundingClientRect().width - (views.LANDING_COLUMNS - 1) * 16) /
+    views.LANDING_COLUMNS;
+  if (width > 0) setRule("landing-rows", `.landing-grid{--row-height:${width}px}`);
+}
+
+window.addEventListener("resize", squareLandingCells);
+
+function placeLandingModules(modules: views.LandingModule[]): void {
+  setRule(
+    "landing-modules",
+    modules
+      .map(
+        (m) =>
+          `.landing-cell[data-module="${cssEscape(m.id)}"]{--x:${m.x};--y:${m.y};--w:${m.w};--h:${m.h}}`,
+      )
+      .join("\n"),
+  );
+}
+
+/** An id is ours, but it reaches a selector, so it is escaped like one. */
+function cssEscape(value: string): string {
+  return value.replace(/["\\]/g, "\\$&");
+}
+
 function drawLanding(orgs: OrganizationSummary[]): void {
+  placeLandingModules(landingModules);
   show(
     views.landing(
       orgs,
@@ -153,6 +198,11 @@ function drawLanding(orgs: OrganizationSummary[]): void {
       landingEditing,
     ),
   );
+  // After the markup is on the page, never before: the row height is measured
+  // from the grid, and a grid that has not been written yet measures nothing.
+  // Placed before, this silently left the public page on the fallback height
+  // and only the second draw ever looked right.
+  squareLandingCells();
   wireLanding(orgs);
 }
 
@@ -169,7 +219,7 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     try {
       await api.put("/api/landing", {
         modules: landingModules.map((m) =>
-          m.kind === "text" ? m : { id: m.id, kind: m.kind, width: m.width },
+          m.kind === "text" ? m : { id: m.id, kind: m.kind, x: m.x, y: m.y, w: m.w, h: m.h },
         ),
       });
     } catch (err) {
@@ -189,10 +239,16 @@ function wireLanding(orgs: OrganizationSummary[]): void {
   root?.querySelector<HTMLButtonElement>("[data-add-module]")?.addEventListener("click", async () => {
     const kind = (root?.querySelector<HTMLSelectElement>("[data-add-kind]")?.value ??
       "text") as views.LandingModule["kind"];
+    // Under everything, full width: the one place a new module is certainly
+    // not on top of another one, whatever the page already looks like.
+    const bottom = landingModules.reduce((low, m) => Math.max(low, m.y + m.h), 1);
     const added: views.LandingModule = {
       id: `${kind}-${Date.now().toString(36)}`,
       kind,
-      width: "full",
+      x: 1,
+      y: bottom,
+      w: views.LANDING_COLUMNS,
+      h: kind === "hero" ? 4 : kind === "organisations" ? 3 : 2,
       body: "",
     };
     landingModules = [...landingModules, added];
@@ -241,6 +297,8 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     }),
   );
 
+  if (landingEditing) wireLandingGrid(orgs, save);
+
   // One dialog, filled for whichever module opened it.
   const dialog = root?.querySelector<HTMLFormElement>("form.module-config");
   dialog?.addEventListener("submit", async () => {
@@ -248,10 +306,172 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     const id = String(data.get("id") ?? "");
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
-    target.width = String(data.get("width")) === "half" ? "half" : "full";
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
     await save();
     drawLanding(orgs);
+  });
+}
+
+/**
+ * Dragging and resizing, ported from the dashboard rather than re-derived.
+ *
+ * The arithmetic is theirs: the cell under the TOP-LEFT corner of what is being
+ * carried, not under the pointer, because dragging a wide module by its middle
+ * and having it land where the pointer is puts it somewhere nobody aimed. The
+ * snap is strict — floor to a cell, clamp inside the grid — and the ghost shows
+ * where it would land before the mouse is let go.
+ *
+ * Green means it fits. Red means it overlaps something, and the drop is
+ * refused: the grid has no opinion about two modules in one cell, so this is
+ * the only thing between an operator and a page with a module hidden under
+ * another one.
+ */
+function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>): void {
+  const grid = root?.querySelector<HTMLElement>(".landing-grid.editing");
+  const ghost = root?.querySelector<HTMLElement>(".landing-ghost");
+  if (!grid || !ghost) return;
+
+  const GAP = 16;
+  const cols = views.LANDING_COLUMNS;
+  const cell = () => {
+    const box = grid.getBoundingClientRect();
+    return { box, width: (box.width - (cols - 1) * GAP) / cols };
+  };
+
+  const fits = (id: string, x: number, y: number, w: number, h: number) =>
+    x >= 1 && y >= 1 && x + w - 1 <= cols &&
+    !landingModules.some(
+      (m) => m.id !== id && x < m.x + m.w && m.x < x + w && y < m.y + m.h && m.y < y + h,
+    );
+
+  // Lastboard damps the ghost to about 60fps rather than answering every move
+  // event: each update rewrites a rule in the sheet, and a pointer produces far
+  // more events than a screen has frames.
+  let damped: ReturnType<typeof setTimeout> | null = null;
+  const damp = (run: () => void) => {
+    if (damped) return;
+    damped = setTimeout(() => {
+      damped = null;
+      run();
+    }, 16);
+  };
+
+  const showGhost = (x: number, y: number, w: number, h: number, ok: boolean) => {
+    ghost.hidden = false;
+    // Through the sheet, like the modules: setProperty on the element writes
+    // the style attribute, which this product's content policy drops.
+    // Under the grid in the selector, so it outscores the stylesheet's own
+    // `.landing-ghost` rather than tying with it and depending on sheet order.
+    setRule(
+      "landing-ghost",
+      `.landing-grid .landing-ghost{--x:${x};--y:${y};--w:${w};--h:${h}}`,
+    );
+    ghost.classList.toggle("invalid", !ok);
+  };
+  const hideGhost = () => {
+    ghost.hidden = true;
+    ghost.classList.remove("invalid");
+    setRule("landing-ghost");
+  };
+
+  let carrying: views.LandingModule | null = null;
+  let grabX = 0;
+  let grabY = 0;
+
+  grid.querySelectorAll<HTMLElement>(".landing-cell").forEach((cellEl) => {
+    cellEl.addEventListener("dragstart", (event) => {
+      const id = cellEl.dataset.module ?? "";
+      carrying = landingModules.find((m) => m.id === id) ?? null;
+      if (!carrying) return;
+      const box = cellEl.getBoundingClientRect();
+      // Where inside the module it was picked up, so it lands under the hand
+      // rather than jumping so its corner is at the pointer.
+      grabX = (event as DragEvent).clientX - box.left;
+      grabY = (event as DragEvent).clientY - box.top;
+      cellEl.classList.add("carrying");
+      (event as DragEvent).dataTransfer?.setData("text/plain", id);
+    });
+    cellEl.addEventListener("dragend", () => {
+      cellEl.classList.remove("carrying");
+      carrying = null;
+      hideGhost();
+    });
+  });
+
+  const targetCell = (event: DragEvent) => {
+    const { box, width } = cell();
+    const topLeftX = event.clientX - grabX - box.left;
+    const topLeftY = event.clientY - grabY - box.top;
+    const x = Math.max(1, Math.min(cols - (carrying?.w ?? 1) + 1, Math.floor(topLeftX / (width + GAP)) + 1));
+    const y = Math.max(1, Math.floor(topLeftY / (width + GAP)) + 1);
+    return { x, y };
+  };
+
+  grid.addEventListener("dragover", (event) => {
+    if (!carrying) return;
+    event.preventDefault();
+    const moved = event as DragEvent;
+    damp(() => {
+      if (!carrying) return;
+      const { x, y } = targetCell(moved);
+      showGhost(x, y, carrying.w, carrying.h, fits(carrying.id, x, y, carrying.w, carrying.h));
+    });
+  });
+
+  grid.addEventListener("drop", async (event) => {
+    if (!carrying) return;
+    event.preventDefault();
+    const { x, y } = targetCell(event as DragEvent);
+    const moving = carrying;
+    hideGhost();
+    if (!fits(moving.id, x, y, moving.w, moving.h)) return;
+    moving.x = x;
+    moving.y = y;
+    await save();
+    drawLanding(orgs);
+  });
+
+  // Resizing, from the corner. The pointer arithmetic is in physical pixels and
+  // the handle is drawn with borders, so this corner stays the bottom-right one
+  // in every reading direction: turning only the triangle would leave the
+  // cursor and the shape disagreeing.
+  grid.querySelectorAll<HTMLElement>("[data-resize]").forEach((handle) => {
+    handle.addEventListener("pointerdown", (event) => {
+      const id = handle.dataset.resize ?? "";
+      const target = landingModules.find((m) => m.id === id);
+      if (!target) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const fromW = target.w;
+      const fromH = target.h;
+      let w = fromW;
+      let h = fromH;
+      // Lastboard draws the ghost on the way down, before anything has moved, so
+      // taking the corner already says what is being resized.
+      showGhost(target.x, target.y, fromW, fromH, true);
+
+      const move = (moved: PointerEvent) => damp(() => {
+        const { width } = cell();
+        w = Math.max(2, Math.min(cols - target.x + 1, fromW + Math.round((moved.clientX - startX) / (width + GAP))));
+        h = Math.max(1, fromH + Math.round((moved.clientY - startY) / (width + GAP)));
+        showGhost(target.x, target.y, w, h, fits(target.id, target.x, target.y, w, h));
+      });
+      const done = async () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", done);
+        hideGhost();
+        if (!fits(target.id, target.x, target.y, w, h)) return;
+        target.w = w;
+        target.h = h;
+        await save();
+        drawLanding(orgs);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", done);
+    });
   });
 }
 
@@ -261,7 +481,6 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   if (!target || !form) return;
 
   form.querySelector<HTMLInputElement>("[name=id]")!.value = target.id;
-  form.querySelector<HTMLSelectElement>("[name=width]")!.value = target.width;
 
   // Only a text module has words, so only it is asked for them. A dialog that
   // offers a field the module ignores is a dialog that lies about what it does.

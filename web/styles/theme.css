@@ -3892,20 +3892,36 @@ a.stat:hover .stat-go {
  */
 .landing-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Twelve, the dashboard's. A number in the stylesheet rather than a
+     custom property set from the page: it never changes at runtime, and a
+     value that never changes does not need a channel that can be blocked. */
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: var(--row-height, 100px);
   /*
-   * The same 1.5rem `.page` itself uses. That is not a coincidence to be
-   * matched later: this grid sits where `.page`'s own grid used to space these
-   * blocks, so any other number moves the whole front page. Two tries with a
-   * gap of my own choosing moved it 32px and then 192px, and the pixel
-   * comparison against the old page is what said so both times.
+   * 16px, because that is the number the drag arithmetic uses. It is not a
+   * taste: the code that works out which cell the pointer is over divides by
+   * the column width plus this gap, so a stylesheet that says 24 and a
+   * calculation that says 16 disagree by a growing amount across the row, and
+   * the ghost lands one cell off at the far end. That is exactly how it first
+   * behaved — a module dropped on another one was reported as free.
    */
-  gap: 1.5rem;
-  align-items: start;
+  gap: 16px;
+  /*
+   * No align-items. It was `start` in the version of this that stacked blocks,
+   * and it survived into the grid where it meant every module sized to its
+   * content instead of filling the cells it was given — which also made the
+   * drag ghost, whose whole job is to be an empty rectangle, four pixels tall.
+   */
 }
 
-.landing-cell.full { grid-column: 1 / -1; }
-.landing-cell.half { grid-column: span 1; }
+/* Placed the way the dashboard places a tile: the numbers the domain stores
+   are the numbers the grid lines use, so nothing converts on the way in. */
+.landing-cell {
+  grid-column: var(--x, 1) / span var(--w, 12);
+  grid-row: var(--y, 1) / span var(--h, 1);
+  min-inline-size: 0;
+  overflow: auto;
+}
 
 .landing-text p {
   margin: 0;
@@ -3914,9 +3930,20 @@ a.stat:hover .stat-go {
   white-space: normal;
 }
 
+/*
+ * A twelve column grid on a phone is twelve columns of four characters. Below
+ * the width where a half-width module still reads, every module takes the row
+ * and they stack in the order they were placed.
+ */
 @media (max-width: 720px) {
-  .landing-grid { grid-template-columns: minmax(0, 1fr); }
-  .landing-cell.half { grid-column: 1 / -1; }
+  .landing-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+  }
+  .landing-cell {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
 }
 
 
@@ -4065,3 +4092,74 @@ a.stat:hover .stat-go {
 
 .kebab-item:hover { background: rgba(128, 128, 128, 0.15); }
 .kebab-item.menu-delete:hover { color: var(--danger-color); }
+
+
+/*
+ * Where a module would land, shown before the hand lets go.
+ *
+ * The dashboard's colours, taken as they are: green when it fits, red when it
+ * would sit on something. Flat #00ff00 and #ff0000 rather than the theme's
+ * tokens, and deliberately — this is not part of the page's palette, it is a
+ * yes or a no, and it has to read as one against every accent an operator might
+ * have chosen.
+ */
+.landing-ghost {
+  grid-column: var(--x, 1) / span var(--w, 1);
+  grid-row: var(--y, 1) / span var(--h, 1);
+  background: rgba(0, 255, 0, 0.1);
+  border: 2px dashed #00ff00;
+  border-radius: var(--radius-lg);
+  /* Lastboard states these, and they are not decoration: a grid item with no
+     content of its own has no height to inherit, and the ghost is empty by
+     definition. Without them it draws as a line and every check that reads its
+     colour still passes. */
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 100;
+  will-change: grid-column, grid-row;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+.landing-ghost.invalid {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: #ff0000;
+}
+
+.landing-ghost[hidden] { display: none; }
+
+/* What is being carried, so the ghost is what you read and not this. */
+.landing-cell.carrying { opacity: 0.4; }
+.landing-grid.editing .landing-cell { cursor: grab; }
+.landing-grid.editing .landing-cell:active { cursor: grabbing; }
+
+/*
+ * The corner you pull. A solid triangle drawn with borders, the dashboard's
+ * shape and its accent.
+ *
+ * bottom and right, not the logical pair, and that is the decision rather than
+ * an oversight: the drag arithmetic is in physical pixels, and turning only the
+ * corner in a right-to-left page leaves the cursor pointing one way and the
+ * triangle the other. It is written down in the house notes because it was
+ * found the hard way.
+ */
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  cursor: nwse-resize;
+  z-index: 20;
+  border-style: solid;
+  border-width: 0 0 12px 12px;
+  border-color: transparent transparent var(--accent) transparent;
+  opacity: 0.8;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.resize-handle:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}

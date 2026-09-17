@@ -150,9 +150,9 @@ func (s *Server) handleSetLanding(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
-	var in landing.Layout
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, http.StatusBadRequest, "error.bad_request")
+	in, err := landing.Submitted(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_layout")
 		return
 	}
 
