@@ -1005,6 +1005,40 @@ async function main() {
   check("the team can reply and merge from the item", triage.reply === true && triage.merge === true,
     JSON.stringify(triage));
 
+  // And rewrite it. A title that says "its broken" is the normal case, and
+  // until now the only way to fix one was to ask the person who wrote it.
+  // Checked on the page rather than through the API: the form has to be
+  // reachable, prefilled with what is actually there, and the heading has to
+  // end up saying the new thing.
+  const rewritable = await evaluate(`
+    const form = document.querySelector("form.rewrite");
+    return {
+      form: !!form,
+      prefilled: form?.querySelector("input[name=title]")?.value ?? "",
+      heading: document.querySelector(".detail h1")?.textContent?.trim() ?? "",
+    };
+  `);
+  check(
+    "and is offered the report's own words, as they are",
+    rewritable.form === true && rewritable.prefilled !== "" && rewritable.prefilled === rewritable.heading,
+    JSON.stringify(rewritable),
+  );
+
+  await evaluate(`
+    const form = document.querySelector("form.rewrite");
+    form.querySelector("input[name=title]").value = "Importing a folder crashes on the second run";
+    form.requestSubmit();
+  `);
+  await sleep(1600);
+  const rewritten = await evaluate(`
+    return { heading: document.querySelector(".detail h1")?.textContent?.trim() ?? "" };
+  `);
+  check(
+    "and rewriting it changes what the page says",
+    rewritten.heading === "Importing a folder crashes on the second run",
+    JSON.stringify(rewritten),
+  );
+
   // 13. Right to left, which is where a stylesheet written in left and right
   //     falls apart.
   // Changed where somebody actually changes it, now that the top bar carries no

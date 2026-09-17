@@ -556,3 +556,41 @@ func (s Store) ForgetEmail(itemID int64) error {
 	}
 	return nil
 }
+
+// Edit rewrites the title and the description.
+//
+// The team's, not the reporter's: somebody triaging fixes a title that says
+// "it's broken", or trims a description with half a stack trace pasted twice.
+// The same limits the public form applies, because a report the team edits into
+// a shape the form would have refused is a report nothing else in this product
+// expects to see.
+//
+// It does not touch the kind, the status or the moderation state. Those have
+// their own doors, each with its own rules, and a single endpoint that could
+// change everything is one where an authorisation mistake costs everything.
+func (s Store) Edit(id int64, title, body string, now time.Time) error {
+	title = strings.TrimSpace(title)
+	body = strings.TrimSpace(body)
+	if title == "" {
+		return errors.New("a report needs a title")
+	}
+	if len(title) > maxTitle {
+		return fmt.Errorf("the title is longer than %d characters", maxTitle)
+	}
+	if len(body) > maxBody {
+		return fmt.Errorf("the description is longer than %d characters", maxBody)
+	}
+
+	// body_hash goes with it. It is what the flood of copy-paste spam is caught
+	// by, and leaving it pointing at text that is no longer there would make
+	// every edited report look like a stranger to that check.
+	res, err := s.DB.Exec(`UPDATE item SET title = ?, body = ?, body_hash = ? WHERE id = ?`,
+		title, body, BodyHash(title, body), id)
+	if err != nil {
+		return fmt.Errorf("editing the report: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

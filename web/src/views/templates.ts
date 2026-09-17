@@ -439,10 +439,19 @@ export function connectionForms(
     <ul class="bento wide">${forgeCard}${address}${channelCard}</ul>`;
 }
 
-/** The team's triage controls on one item: reply, and merge a duplicate away. */
-export function triageControls(text: Text): string {
+/** The team's triage controls on one item: rewrite, reply, and merge a duplicate away. */
+export function triageControls(text: Text, current: { title: string; body: string }): string {
   return `
     <section class="triage">
+      <h2>${escapeHTML(text.t("panel.rewrite"))}</h2>
+      <p class="hint">${escapeHTML(text.t("panel.rewriteHelp"))}</p>
+      <form class="rewrite">
+        <input name="title" value="${escapeAttr(current.title)}" maxlength="200" required
+               aria-label="${escapeAttr(text.t("form.title"))}" />
+        <textarea name="body" rows="5" aria-label="${escapeAttr(text.t("form.body"))}">${escapeHTML(current.body)}</textarea>
+        <button class="button" type="submit">${escapeHTML(text.t("panel.save"))}</button>
+      </form>
+
       <h2>${escapeHTML(text.t("panel.reply"))}</h2>
       <form class="team-reply">
         <textarea name="body" rows="3" placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>

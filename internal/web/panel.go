@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
@@ -182,6 +183,50 @@ func (s *Server) triageTarget(w http.ResponseWriter, r *http.Request) (item.Item
 
 type moderationChange struct {
 	State string `json:"state"`
+}
+
+type textChange struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+}
+
+// handleEditItem rewrites the title and the description of a report.
+//
+// Somebody triaging fixes a title that says "it's broken", or trims a
+// description with half a stack trace pasted twice. Behind the same door as
+// every other decision about a report — Triage on the board it belongs to —
+// and it changes nothing else: not the kind, not the status, not whether it is
+// published.
+//
+// The domain applies the same limits the public form does. A report the team
+// edits into a shape the form would have refused is a report nothing else here
+// expects to see, and the check being in one place is what stops the two
+// drifting.
+func (s *Server) handleEditItem(w http.ResponseWriter, r *http.Request) {
+	it, _, ok := s.triageTarget(w, r)
+	if !ok {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, reportBodyLimit)
+	var in textChange
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	if err := s.items().Edit(it.ID, in.Title, in.Body, s.now()); err != nil {
+		if errors.Is(err, item.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "error.not_found")
+			return
+		}
+		// A refusal from the domain is about what was typed, not about the
+		// server: too long, or nothing at all.
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"title": strings.TrimSpace(in.Title)})
 }
 
 // handleModerate approves, rejects or marks as spam.

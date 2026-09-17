@@ -1246,3 +1246,80 @@ func TestTheQueueThatSpansBoardsStopsAtTheDoor(t *testing.T) {
 		t.Errorf("the message came back on board %v, want lastboard", board["repository"])
 	}
 }
+
+// TestTheTeamCanRewriteAReportAndOnlyOnTheirOwnBoard.
+//
+// Editing somebody else's words is the kind of power that has to sit behind the
+// same door as every other decision about a report, not a wider one. So this
+// checks the two halves together: that it works at all, and that it stops where
+// moderation stops.
+func TestTheTeamCanRewriteAReportAndOnlyOnTheirOwnBoard(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	team.createRepo("codigosh", "lastdav")
+
+	public := team.anonymous()
+	mine, _ := public.submit("codigosh", "lastboard", "bug", "its broken")
+	theirs, _ := public.submit("codigosh", "lastdav", "bug", "next door")
+
+	// The team fixes a title that says nothing.
+	resp := team.do(http.MethodPatch, "/api/items/"+mine, map[string]string{
+		"title": "Importing a folder crashes on the second run",
+		"body":  "Steps: import twice.",
+	})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the team could not edit a report: %d", resp.StatusCode)
+	}
+
+	body := decode(t, team.do(http.MethodGet, "/api/items/"+mine, nil))
+	if body["title"] != "Importing a folder crashes on the second run" {
+		t.Errorf("the title came back as %v", body["title"])
+	}
+	if body["body"] != "Steps: import twice." {
+		t.Errorf("the description came back as %v", body["body"])
+	}
+
+	// An empty title is refused, the same as on the public form.
+	resp = team.do(http.MethodPatch, "/api/items/"+mine, map[string]string{"title": "  ", "body": "x"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("an empty title was accepted: %d", resp.StatusCode)
+	}
+
+	// And a collaborator of one board cannot rewrite the one next door.
+	accounts := account.Store{DB: team.db()}
+	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var boardID int64
+	if err := team.db().QueryRow(`SELECT id FROM repository WHERE slug = 'lastboard'`).Scan(&boardID); err != nil {
+		t.Fatal(err)
+	}
+	if err := accounts.Grant(helper.ID, authz.Repository(boardID, 0), authz.RoleCollaborator, team.now()); err != nil {
+		t.Fatal(err)
+	}
+	helperClient := team.anonymous()
+	resp = helperClient.do(http.MethodPost, "/api/session", map[string]string{
+		"username": "helper", "password": "a good long passphrase",
+	})
+	_ = resp.Body.Close()
+
+	resp = helperClient.do(http.MethodPatch, "/api/items/"+theirs, map[string]string{
+		"title": "rewritten from next door", "body": "x",
+	})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("a collaborator rewrote a report on a board they do not triage: %d", resp.StatusCode)
+	}
+
+	// And nobody without a session at all.
+	resp = public.do(http.MethodPatch, "/api/items/"+mine, map[string]string{"title": "x", "body": "y"})
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized && resp.StatusCode != http.StatusForbidden {
+		t.Errorf("a stranger rewrote a report: %d", resp.StatusCode)
+	}
+}

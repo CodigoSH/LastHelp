@@ -215,6 +215,10 @@ func (s *Server) routes() {
 	private("GET /api/orgs/{org}/repos/{repo}/export", s.handleExport)
 
 	private("POST /api/items/{id}/moderation", s.handleModerate)
+
+	// Separate from moderation on purpose: one endpoint that could change the
+	// text and the state is one where an authorisation mistake costs both.
+	private("PATCH /api/items/{id}", s.handleEditItem)
 	private("POST /api/comments/{id}/moderation", s.handleModerateComment)
 	private("GET /api/items/{id}/statuses", s.handleStatuses)
 	private("POST /api/items/{id}/status", s.handleSetStatus)

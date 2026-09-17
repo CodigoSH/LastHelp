@@ -1021,7 +1021,7 @@ async function showItem(publicID: string): Promise<void> {
       });
 
       wireIssueControl(publicID, item.issue ?? null);
-      wireTriage(publicID);
+      wireTriage(publicID, { title: item.title ?? "", body: item.body ?? "" });
     }
   }
 
@@ -1153,8 +1153,31 @@ function wireIssueControl(publicID: string, linked: { number: number; url: strin
 }
 
 /** Replying as the team, and merging a duplicate away. */
-function wireTriage(publicID: string): void {
-  root?.querySelector(".team-tools .tools")?.insertAdjacentHTML("beforeend", views.triageControls(text));
+function wireTriage(publicID: string, current: { title: string; body: string }): void {
+  root?.querySelector(".team-tools .tools")?.insertAdjacentHTML(
+    "beforeend",
+    views.triageControls(text, current),
+  );
+
+  // Rewriting the report. The page is re-rendered afterwards rather than the
+  // heading patched in place: the title appears in more than one spot on this
+  // screen, and updating the one that was easy to reach is how the two start
+  // disagreeing.
+  const rewrite = root?.querySelector<HTMLFormElement>("form.rewrite");
+  rewrite?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(rewrite);
+    try {
+      await api.patch(`/api/items/${encodeURIComponent(publicID)}`, {
+        title: String(data.get("title") ?? ""),
+        body: String(data.get("body") ?? ""),
+      });
+      toast(i18n.t("panel.saved"));
+      await render();
+    } catch (err) {
+      report(err);
+    }
+  });
 
   const reply = root?.querySelector<HTMLFormElement>("form.team-reply");
   reply?.addEventListener("submit", async (event) => {
