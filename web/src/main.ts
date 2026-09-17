@@ -292,7 +292,9 @@ function wireLanding(orgs: OrganizationSummary[]): void {
       // the defaults for the page itself are: a button is a button, not a band
       // across the page.
       w: kind === "call_to_action" ? 4 : views.LANDING_COLUMNS,
-      h: kind === "hero" ? 3 : kind === "call_to_action" ? 1 : 2,
+      // Two rows for the button, not one: at one row the words and the board
+      // they lead to did not both fit, and the board's name came out sliced.
+      h: kind === "hero" ? 3 : 2,
       body: "",
     };
     landingModules = [...landingModules, added];

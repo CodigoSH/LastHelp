@@ -3920,7 +3920,29 @@ a.stat:hover .stat-go {
   grid-column: var(--x, 1) / span var(--w, 12);
   grid-row: var(--y, 1) / span var(--h, 1);
   min-inline-size: 0;
+  /*
+   * A module lives inside the box it was given. Scrolls rather than clips so a
+   * list that outgrows a short module is a scroll away instead of gone, and so
+   * nothing a module draws can land on top of its neighbour.
+   */
   overflow: auto;
+}
+
+/*
+ * Room for the pill that names a section.
+ *
+ * It is drawn sitting on the section's top border, half of it above the box, so
+ * a section flush against the top of its module had its name sliced in half by
+ * the scroll box above.
+ *
+ * Measured rather than guessed: the pill renders 25px tall, so it hangs 12.5px
+ * over the edge and needs at least that much. The first attempt at this was
+ * 0.6rem — 9.6px — which moved the pill down and left it clipped by two pixels,
+ * which looks like the fix not working rather than like being three pixels
+ * short.
+ */
+.landing-cell > .section {
+  margin-block-start: 0.85rem;
 }
 
 .landing-text p {

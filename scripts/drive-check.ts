@@ -1324,6 +1324,23 @@ async function main() {
     JSON.stringify({ vacio: conDatos.sinHechas, roto: conDatos.hechasRotas }),
   );
 
+  // The pill that names a section is drawn sitting on the section's top border,
+  // half of it above the box. Inside a module — which scrolls, so it clips —
+  // that half was being sliced off, and a name cut through the middle reads as
+  // a broken page rather than as a tight fit. Two pixels short looked exactly
+  // like the fix not working, so this measures the clearance.
+  const pildora = await evaluate(`
+    const cell = document.querySelector('.landing-cell[data-module^="boards-"]');
+    const pill = cell.querySelector(".section-legend");
+    const cb = cell.getBoundingClientRect(), pb = pill.getBoundingClientRect();
+    return { holgura: Math.round(pb.top - cb.top), alto: Math.round(pb.height) };
+  `);
+  check(
+    "a section's name is not sliced by the module it sits in",
+    pildora.holgura >= 0 && pildora.alto > 10,
+    JSON.stringify(pildora),
+  );
+
   // Pointed at a board that is not there any more — which is what an operator
   // is left with after deleting one they had composed a page around. The module
   // has to come back empty, not quietly show every board instead: showing
