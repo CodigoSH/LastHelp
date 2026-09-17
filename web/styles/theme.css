@@ -705,6 +705,19 @@ ul { list-style: none; margin: 0; padding: 0; }
   overflow: visible;
 }
 
+/*
+ * Written as a child selector on purpose, and this is not decoration.
+ *
+ * `.section-legend` alone scores (0,1,0) and `.admin-main h2` scores (0,1,1),
+ * so inside the panel the pill quietly took the panel's heading size: 18.4px
+ * instead of 10.4, which made it 35px tall instead of 25 and dropped it off its
+ * own border and on top of the first row. The three places this component was
+ * used before were all public pages, so it had never met that rule and looked
+ * perfect everywhere it had been tried.
+ *
+ * `.section > .section-legend` scores (0,2,0) and wins wherever it is put.
+ */
+.section > .section-legend,
 .section-legend {
   margin: 0;
   font-size: 0.65rem;
@@ -3905,3 +3918,150 @@ a.stat:hover .stat-go {
   .landing-grid { grid-template-columns: minmax(0, 1fr); }
   .landing-cell.half { grid-column: 1 / -1; }
 }
+
+
+/*
+ * The front page editor: one row per module, in the order they are drawn.
+ *
+ * The up and down arrows are the chevron turned a quarter. Fixed rotations, and
+ * that is correct here rather than an oversight: up and down are the same in
+ * every reading direction. It is left and right that need --rtl-flip.
+ */
+.turn-up { display: inline-flex; transform: rotate(-90deg); }
+.turn-down { display: inline-flex; transform: rotate(90deg); }
+
+.landing-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.landing-row {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 0.6rem 0.7rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.landing-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* The controls to the far end of the row, whichever end that is. */
+.landing-row-actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.landing-row textarea {
+  inline-size: 100%;
+  resize: vertical;
+}
+
+.landing-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-block-start: 0.8rem;
+}
+
+
+/*
+ * Arranging the front page, on the front page.
+ *
+ * The dashed outline and the tools on each module are what tell somebody they
+ * are in a mode: the page is the same page, so if nothing about it changes the
+ * mode is invisible and the first click is a guess.
+ */
+.landing-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.landing-grid.editing .landing-cell {
+  position: relative;
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--radius-lg);
+  padding: 0.5rem;
+  min-block-size: 3.5rem;
+}
+
+/*
+ * A module's actions, behind one button. The recipe is the dashboard's, copied
+ * rather than approximated: 28 square at the inline end, its own surface so it
+ * reads over whatever the module draws, and the accent on hover.
+ */
+.kebab-btn {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  z-index: 4;
+  inline-size: 28px;
+  block-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.kebab-btn:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  transform: scale(1.1);
+}
+
+.kebab-menu {
+  position: absolute;
+  inset-block-start: 36px;
+  inset-inline-end: 4px;
+  z-index: 5;
+  min-inline-size: 170px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kebab-menu[hidden] { display: none; }
+
+.kebab-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: start;
+  cursor: pointer;
+}
+
+.kebab-item:hover { background: rgba(128, 128, 128, 0.15); }
+.kebab-item.menu-delete:hover { color: var(--danger-color); }

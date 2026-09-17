@@ -763,11 +763,20 @@ async function main() {
   for (const [name, path] of [["profile", "/panel/account"], ["personalisation", "/panel/personalization"]]) {
     await evaluate(`history.pushState({}, "", ${JSON.stringify(path)}); dispatchEvent(new PopStateEvent("popstate"));`);
     await sleep(900);
+    // Counted inside the field that holds the image, and outside the common
+    // control within it. It used to count every button on the page with that
+    // wording, which caught the thing it was written for and also anything else
+    // that ever says "Remove" — the front page editor says it once per module.
+    // The question it is asking is "did this image picker get migrated", and
+    // that question lives in that field.
     const same = await evaluate(`
+      const pick = document.querySelector(".avatar-pick");
+      const field = pick?.closest(".field") ?? document.body;
       return {
-        pick: !!document.querySelector(".avatar-pick"),
-        old: [...document.querySelectorAll("button")]
-          .filter(b => /Elige|Choose|Quitar|Remove/.test(b.textContent)).length,
+        pick: !!pick,
+        old: [...field.querySelectorAll("button")]
+          .filter(b => /Elige|Choose|Quitar|Remove/.test(b.textContent))
+          .filter(b => !b.closest(".avatar-pick")).length,
       };
     `);
     check(`${name} picks an image the same way the wizard does`, same.pick === true && same.old === 0,
@@ -1043,21 +1052,39 @@ async function main() {
   // already had — proved elsewhere by comparing the pixels — and composing it
   // actually changes what a visitor sees. Without the second half this is a
   // setting that saves and does nothing.
-  const composed = await evaluate(`
-    const r = await fetch("/api/landing", {
-      method: "PUT",
-      headers: { "content-type": "application/json", "x-csrf-token": document.cookie.match(/lasthelp_csrf=([^;]+)/)?.[1] ?? "" },
-      body: JSON.stringify({ modules: [
-        { id: "words", kind: "text", width: "full", body: "We read everything that arrives." },
-        { id: "orgs", kind: "organisations", width: "full" },
-      ]}),
-    });
-    return { saved: r.status };
-  `);
-  check("the front page can be composed", composed.saved === 200, JSON.stringify(composed));
-
+  // The front page, arranged on the front page. Not by calling the API: the
+  // whole point of this is that somebody does it with the page in front of
+  // them, and an editor tested through fetch is an editor nobody has used.
   await evaluate(`history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));`);
   await sleep(1400);
+  const composing = await evaluate(`
+    document.querySelector("[data-edit-page]").click();
+    await new Promise(r => setTimeout(r, 600));
+
+    const outlined = getComputedStyle(document.querySelector(".landing-cell")).borderStyle;
+    const kebabs = document.querySelectorAll(".kebab-btn").length;
+
+    // Add words, and the module opens its own dialog the moment it exists.
+    document.querySelector("[data-add-kind]").value = "text";
+    document.querySelector("[data-add-module]").click();
+    await new Promise(r => setTimeout(r, 900));
+    const opened = document.querySelector("#module-config")?.open === true;
+
+    const form = document.querySelector("form.module-config");
+    form.querySelector("[name=body]").value = "We read everything that arrives.";
+    form.requestSubmit();
+    await new Promise(r => setTimeout(r, 900));
+
+    document.querySelector("[data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 600));
+    return { outlined, kebabs, opened };
+  `);
+  check(
+    "the front page is arranged on the front page",
+    composing.outlined === "dashed" && composing.kebabs >= 3 && composing.opened === true,
+    JSON.stringify(composing),
+  );
+
   const frontPage = await evaluate(`
     return {
       cells: document.querySelectorAll(".landing-cell").length,
@@ -1067,8 +1094,8 @@ async function main() {
     };
   `);
   check(
-    "and what was composed is what a visitor is shown",
-    frontPage.cells === 2 && frontPage.words === true && frontPage.hero === false && frontPage.orgs === true,
+    "and what was arranged is what a visitor is shown",
+    frontPage.cells === 4 && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
     JSON.stringify(frontPage),
   );
 

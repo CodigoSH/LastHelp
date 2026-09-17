@@ -132,6 +132,149 @@ function renderNav(): void {
   });
 }
 
+/**
+ * The front page while it is being arranged.
+ *
+ * Kept in module scope because editing is a mode the page is in, not a thing
+ * one render knows about: a module saved from the modal has to redraw the page
+ * it is on, and the page has to come back in the same mode.
+ */
+let landingModules: views.LandingModule[] = [];
+let landingEditing = false;
+
+function drawLanding(orgs: OrganizationSummary[]): void {
+  show(
+    views.landing(
+      orgs,
+      me?.admin === true,
+      text,
+      { name: instanceName, logo: instanceLogo },
+      landingModules,
+      landingEditing,
+    ),
+  );
+  wireLanding(orgs);
+}
+
+/**
+ * Arranging the page, on the page.
+ *
+ * Every change is saved as it is made rather than collected behind a button.
+ * The page under it is the thing being changed, so it is already showing what
+ * would be saved, and a separate save turns that into a question about whether
+ * what you are looking at is real.
+ */
+function wireLanding(orgs: OrganizationSummary[]): void {
+  const save = async () => {
+    try {
+      await api.put("/api/landing", {
+        modules: landingModules.map((m) =>
+          m.kind === "text" ? m : { id: m.id, kind: m.kind, width: m.width },
+        ),
+      });
+    } catch (err) {
+      report(err);
+    }
+  };
+
+  root?.querySelector<HTMLButtonElement>("[data-edit-page]")?.addEventListener("click", () => {
+    landingEditing = true;
+    drawLanding(orgs);
+  });
+  root?.querySelector<HTMLButtonElement>("[data-edit-done]")?.addEventListener("click", () => {
+    landingEditing = false;
+    drawLanding(orgs);
+  });
+
+  root?.querySelector<HTMLButtonElement>("[data-add-module]")?.addEventListener("click", async () => {
+    const kind = (root?.querySelector<HTMLSelectElement>("[data-add-kind]")?.value ??
+      "text") as views.LandingModule["kind"];
+    const added: views.LandingModule = {
+      id: `${kind}-${Date.now().toString(36)}`,
+      kind,
+      width: "full",
+      body: "",
+    };
+    landingModules = [...landingModules, added];
+    await save();
+    drawLanding(orgs);
+    // Opened straight away, the way the dashboard does it: a module you just
+    // added with nothing in it is a module you were about to configure.
+    openModuleConfig(added.id, orgs);
+  });
+
+  // The menu opens one at a time, and anything else closes it: a second menu
+  // left open behind the first is two sets of actions on screen for two
+  // different modules.
+  const closeMenus = () =>
+    root?.querySelectorAll<HTMLElement>(".kebab-menu").forEach((menu) => {
+      menu.hidden = true;
+      root
+        ?.querySelector<HTMLButtonElement>(`[data-module-menu="${menu.dataset.menuFor}"]`)
+        ?.setAttribute("aria-expanded", "false");
+    });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-module-menu]").forEach((button) =>
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const id = button.dataset.moduleMenu ?? "";
+      const menu = root?.querySelector<HTMLElement>(`.kebab-menu[data-menu-for="${id}"]`);
+      const wasOpen = menu ? !menu.hidden : false;
+      closeMenus();
+      if (menu && !wasOpen) {
+        menu.hidden = false;
+        button.setAttribute("aria-expanded", "true");
+      }
+    }),
+  );
+  document.addEventListener("click", closeMenus, { once: true });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-edit-module]").forEach((button) =>
+    button.addEventListener("click", () => openModuleConfig(button.dataset.editModule ?? "", orgs)),
+  );
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-remove-module]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      landingModules = landingModules.filter((m) => m.id !== button.dataset.removeModule);
+      await save();
+      drawLanding(orgs);
+    }),
+  );
+
+  // One dialog, filled for whichever module opened it.
+  const dialog = root?.querySelector<HTMLFormElement>("form.module-config");
+  dialog?.addEventListener("submit", async () => {
+    const data = new FormData(dialog);
+    const id = String(data.get("id") ?? "");
+    const target = landingModules.find((m) => m.id === id);
+    if (!target) return;
+    target.width = String(data.get("width")) === "half" ? "half" : "full";
+    if (target.kind === "text") target.body = String(data.get("body") ?? "");
+    await save();
+    drawLanding(orgs);
+  });
+}
+
+function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
+  const target = landingModules.find((m) => m.id === id);
+  const form = root?.querySelector<HTMLFormElement>("form.module-config");
+  if (!target || !form) return;
+
+  form.querySelector<HTMLInputElement>("[name=id]")!.value = target.id;
+  form.querySelector<HTMLSelectElement>("[name=width]")!.value = target.width;
+
+  // Only a text module has words, so only it is asked for them. A dialog that
+  // offers a field the module ignores is a dialog that lies about what it does.
+  const words = form.querySelector<HTMLElement>("[data-for-text]");
+  const area = form.querySelector<HTMLTextAreaElement>("[name=body]");
+  if (words && area) {
+    words.hidden = target.kind !== "text";
+    area.value = target.body ?? "";
+  }
+  void orgs;
+  openModal("module-config");
+}
+
 function show(html: string): void {
   document.body.classList.remove("admin-view");
   if (root) root.innerHTML = html;
@@ -755,15 +898,8 @@ async function showOrganizations(): Promise<void> {
     .get<{ modules: views.LandingModule[] }>("/api/landing")
     .catch(() => ({ modules: [] as views.LandingModule[] }));
 
-  show(
-    views.landing(
-      organizations ?? [],
-      me?.admin === true,
-      text,
-      { name: instanceName, logo: instanceLogo },
-      composed.modules ?? [],
-    ),
-  );
+  landingModules = composed.modules ?? [];
+  drawLanding(organizations ?? []);
 }
 
 async function showRepositories(orgSlug: string): Promise<void> {

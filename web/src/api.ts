@@ -75,6 +75,7 @@ export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
+  put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
   /** A multipart upload. Not JSON, so it does not go through request(). */
   upload: async <T>(path: string, form: FormData): Promise<T> => {
     const response = await fetch(path, {

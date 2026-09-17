@@ -17,7 +17,20 @@ function stroke(paths: string, size = 16): string {
     aria-hidden="true" focusable="false">${paths}</svg>`;
 }
 
+/**
+ * The one icon in this set that is filled rather than stroked.
+ *
+ * Three dots at a 2px stroke are three tiny rings, which read as noise at 16px.
+ * It is the same mark the dashboard in this house uses, copied rather than
+ * approximated so a module's menu and a tile's menu are the same button.
+ */
+function dotsIcon(size = 16): string {
+  return `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}"
+    fill="currentColor" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>`;
+}
+
 export const icons = {
+  dots: dotsIcon,
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
   /* The arrow on anything that leads somewhere. It points along the line, and
      the line runs the other way in three of the twenty languages: the flip is

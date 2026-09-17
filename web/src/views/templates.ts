@@ -16,7 +16,7 @@ import type {
 import { escapeAttr, escapeHTML } from "../escape";
 import { areaChart, donut } from "./charts";
 import { icons } from "./icons";
-import { actionButton, iconButton } from "./modal";
+import { actionButton, iconButton, modal } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
 export { field, choiceField, areaField } from "./wizard";
@@ -76,6 +76,7 @@ export function landing(
   text: Text,
   instance?: { name?: string; logo?: string },
   modules?: LandingModule[],
+  editing = false,
 ): string {
   const point = (icon: string, words: string) =>
     `<li><span class="point-icon">${icon}</span><span>${escapeHTML(words)}</span></li>`;
@@ -124,6 +125,9 @@ export function landing(
           { id: "organisations", kind: "organisations", width: "full" },
         ] as LandingModule[]);
 
+  // In edit mode a module that draws nothing still has to be there: an empty
+  // text module is exactly the one somebody needs to open and write in, and a
+  // module that vanishes because it has no content yet cannot be edited back.
   const drawn = shown
     .map((m) => {
       const inner =
@@ -136,11 +140,87 @@ export function landing(
               : m.kind === "text"
                 ? words(m.body ?? "")
                 : "";
-      return inner === "" ? "" : `<div class="landing-cell ${m.width === "half" ? "half" : "full"}">${inner}</div>`;
+      if (inner === "" && !editing) return "";
+
+      // One button, not two. The dashboard in this house puts a module's
+      // actions behind a single kebab with a tooltip, and two loose icons
+      // floating over content is both a different look and one more thing
+      // overlapping whatever the module is showing.
+      const tools = editing
+        ? `<button type="button" class="kebab-btn" data-module-menu="${escapeAttr(m.id)}"
+             title="${escapeAttr(text.t("action.edit"))}"
+             aria-label="${escapeAttr(text.t("action.edit"))}"
+             aria-haspopup="menu" aria-expanded="false">${icons.dots()}</button>
+           <div class="kebab-menu" data-menu-for="${escapeAttr(m.id)}" role="menu" hidden>
+             <button type="button" class="kebab-item" role="menuitem" data-edit-module="${escapeAttr(m.id)}">
+               ${icons.edit(15)}<span>${escapeHTML(text.t("action.edit"))}</span></button>
+             <button type="button" class="kebab-item menu-delete" role="menuitem" data-remove-module="${escapeAttr(m.id)}">
+               ${icons.remove(15)}<span>${escapeHTML(text.t("action.remove"))}</span></button>
+           </div>`
+        : "";
+
+      return `<div class="landing-cell ${m.width === "half" ? "half" : "full"}"
+                   data-module="${escapeAttr(m.id)}">${tools}${inner || `<p class="hint">${escapeHTML(text.t("landing.moduleText"))}</p>`}</div>`;
     })
     .join("");
 
-  return `<div class="page"><div class="landing-grid">${drawn}</div></div>`;
+  // The bar that turns editing on, and the controls that only exist while it
+  // is. Modelled on the dashboard this house already has: you arrange the page
+  // on the page, not in a settings screen somewhere else.
+  const bar = !isAdmin
+    ? ""
+    : `<div class="landing-bar">
+         ${
+           editing
+             ? `<select data-add-kind aria-label="${escapeAttr(text.t("landing.add"))}">
+                  <option value="text">${escapeHTML(text.t("landing.moduleText"))}</option>
+                  <option value="hero">${escapeHTML(text.t("landing.moduleHero"))}</option>
+                  <option value="intro">${escapeHTML(text.t("landing.moduleIntro"))}</option>
+                  <option value="organisations">${escapeHTML(text.t("shell.organizations"))}</option>
+                </select>
+                <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>
+                <button type="button" class="button primary" data-edit-done>${escapeHTML(text.t("action.done"))}</button>`
+             : `<button type="button" class="button ghost with-icon" data-edit-page>
+                  ${icons.edit()}<span>${escapeHTML(text.t("landing.compose"))}</span></button>`
+         }
+       </div>`;
+
+  return `<div class="page">
+    ${bar}
+    <div class="landing-grid${editing ? " editing" : ""}">${drawn}</div>
+    ${editing ? moduleModal(text) : ""}
+  </div>`;
+}
+
+/**
+ * One modal for every module, told which one it is when it opens.
+ *
+ * The same shape the dashboard in this house uses: not a form per kind, but one
+ * dialog whose body is filled for the module being edited. A module that grows
+ * a setting later adds a field here rather than a screen somewhere.
+ */
+function moduleModal(text: Text): string {
+  return modal(
+    {
+      id: "module-config",
+      title: text.t("landing.compose"),
+      formClass: "module-config",
+      submit: text.t("panel.save"),
+      body: `<input type="hidden" name="id" />
+        <div class="field">
+          <label for="module-width">${escapeHTML(text.t("landing.widthFull"))}</label>
+          <select id="module-width" name="width">
+            <option value="full">${escapeHTML(text.t("landing.widthFull"))}</option>
+            <option value="half">${escapeHTML(text.t("landing.widthHalf"))}</option>
+          </select>
+        </div>
+        <div class="field" data-for-text hidden>
+          <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
+          <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
+        </div>`,
+    },
+    text,
+  );
 }
 
 /**
