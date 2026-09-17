@@ -12,6 +12,16 @@ coverage
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+
+# Same list as .gitignore, and for the same reason: running the binary from
+# here leaves an instance's files in the working copy, and the build context is
+# another way for one of them to leave the machine. The Dockerfile copies named
+# directories rather than the whole context, so this is the second lock on a
+# door that is already shut — which is what you want on the door that was
+# already left open once.
+*.key
+*.pem
 *.log
 .env
 .env.*

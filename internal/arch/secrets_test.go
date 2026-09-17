@@ -1,6 +1,7 @@
 package arch
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -54,5 +55,51 @@ func TestNoInstanceSecretIsTracked(t *testing.T) {
 			"Nothing belonging to a running instance goes in the repository. If this\n"+
 			"has been pushed, the secret is public: it has to be treated as\n"+
 			"compromised and rotated, not only deleted.", path, what)
+	}
+}
+
+// TestBothIgnoreListsRefuseTheSameThings.
+//
+// An instance's files are kept out of the repository by .gitignore and out of
+// the build context by .dockerignore, and the two were written months apart.
+// The first learned about *.key the expensive way — a key sat in the public
+// history for eight days — and the second never heard about it.
+//
+// Two lists that mean the same thing and are edited separately drift, and the
+// one nobody is looking at is the one that matters on the day it does.
+func TestBothIgnoreListsRefuseTheSameThings(t *testing.T) {
+	root := repoRoot(t)
+
+	read := func(name string) string {
+		body, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		return string(body)
+	}
+	gitIgnore, dockerIgnore := read(".gitignore"), read(".dockerignore")
+
+	// The patterns that exist because of what a running instance leaves behind.
+	// Not the whole of either file: the two have different jobs otherwise.
+	instance := []string{"*.key", "*.pem", "*.db", "*.sqlite"}
+
+	has := func(body, pattern string) bool {
+		for _, line := range strings.Split(body, "\n") {
+			if strings.TrimSpace(line) == pattern {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, pattern := range instance {
+		if !has(gitIgnore, pattern) {
+			t.Errorf("\n.gitignore does not refuse %s, and a file like that in the\n"+
+				"working copy is one commit away from being published.", pattern)
+		}
+		if !has(dockerIgnore, pattern) {
+			t.Errorf("\n.dockerignore does not refuse %s, so a file like that in the\n"+
+				"working copy is uploaded with the build context.", pattern)
+		}
 	}
 }

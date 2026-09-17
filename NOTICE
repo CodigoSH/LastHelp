@@ -19,9 +19,10 @@ THIRD-PARTY COMPONENTS
 
 1. Go modules compiled into the released binaries and container images
 
-   This list is kept honest by an architecture test: adding a module to go.mod
-   without adding it here fails the build. `go version -m lasthelp` prints the
-   same inventory out of a binary you already have.
+   This list is kept honest by an architecture test, and it asks the linker
+   rather than go.mod: a module can be required and never end up in anything
+   we publish. `go version -m lasthelp` prints the same inventory out of a
+   binary you already have.
 
    SQLite driver, pure Go — no cgo, which is why the binary is a single static
    file:
@@ -30,18 +31,27 @@ THIRD-PARTY COMPONENTS
      modernc.org/libc                    BSD 3-Clause
      modernc.org/mathutil                BSD 3-Clause
      modernc.org/memory                  BSD 3-Clause
-     github.com/dustin/go-humanize       MIT
-     github.com/google/uuid              BSD 3-Clause
-     github.com/mattn/go-isatty          MIT
-     github.com/ncruces/go-strftime      MIT
      github.com/remyoudompheng/bigfft    BSD 3-Clause
+     github.com/google/uuid              BSD 3-Clause
      golang.org/x/sys                    BSD 3-Clause
+
+   Sizes and durations written the way a person reads them:
+
+     github.com/dustin/go-humanize       MIT
 
    Password hashing (argon2id):
 
      golang.org/x/crypto                 BSD 3-Clause
 
    Everything else this binary does uses the Go standard library.
+
+   Required by go.mod and NOT in what we publish. The SQLite driver lists them
+   for platforms this project does not build for, and the linker leaves them
+   out of the Linux binaries and images, which are the only artefacts released.
+   Named here because the requirement is real even though the code is absent:
+
+     github.com/mattn/go-isatty          MIT
+     github.com/ncruces/go-strftime      BSD 3-Clause
 
 2. Build-time only, not redistributed
 
