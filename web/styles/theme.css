@@ -4011,6 +4011,42 @@ a.stat:hover .stat-go {
   scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
 }
 
+/*
+ * The name at the foot instead of the head.
+ *
+ * The whole box is reversed rather than the header moved, so the separator ends
+ * up on the correct side of it without a second rule, and the header sticks to
+ * the bottom edge for the same reason it sticks to the top: a scrolled module
+ * still has to say what it is.
+ */
+.landing-scroll.label-bottom {
+  flex-direction: column-reverse;
+}
+
+.landing-scroll.label-bottom .module-header {
+  border-block-end: 0;
+  border-block-start: 1px solid var(--border);
+  padding: 10px 14px 14px;
+  inset-block-start: auto;
+  inset-block-end: 0;
+}
+
+/*
+ * Room for a name asked to sit on the border.
+ *
+ * Only when there is one: giving every cell this padding would move every
+ * module down by a name most of them do not wear. Measured — the pill renders
+ * 25px, so it hangs 12.5px over the edge and needs at least that much.
+ */
+.landing-cell.has-pill {
+  padding-block-start: 0.85rem;
+  overflow: visible;
+}
+
+.landing-cell.has-pill > .section-legend {
+  inset-block-start: 0.85rem;
+}
+
 /* The rows sit inside the padding the header already establishes. */
 .landing-scroll > :not(.module-header) {
   padding: 0.9rem;

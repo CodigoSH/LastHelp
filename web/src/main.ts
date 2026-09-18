@@ -260,6 +260,7 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           h: m.h,
           ...(m.kind === "text" || m.kind === "call_to_action" ? { body: m.body ?? "" } : {}),
           ...(m.scope ? { scope: m.scope } : {}),
+      ...(m.label ? { label: m.label } : {}),
         })),
       });
       if (refresh) await fetchLanding();
@@ -355,6 +356,9 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
     if (target.kind === "call_to_action") target.body = String(data.get("label") ?? "").trim();
     if (usesData(target.kind)) target.scope = String(data.get("scope") ?? "");
+    if (usesHeader(target.kind)) {
+      target.label = String(data.get("labelAt") ?? "top") as views.LandingModule["label"];
+    }
     // Reread: pointing a module at a different board changes what goes in it,
     // and the words of a text module are the only thing this dialog can change
     // that the page already knows.
@@ -551,6 +555,14 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     scope.value = target.scope ?? "";
   }
 
+  // And only a module that draws a name is asked where to keep it.
+  const puts = form.querySelector<HTMLElement>("[data-for-label-at]");
+  const at = form.querySelector<HTMLSelectElement>("[name=labelAt]");
+  if (puts && at) {
+    puts.hidden = !usesHeader(target.kind);
+    at.value = target.label ?? "top";
+  }
+
   // And only the button is asked for a label. Left empty it says what the rest
   // of the product says on that button, which is the right answer often enough
   // that asking for it as a required field would be asking for nothing.
@@ -562,6 +574,13 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   }
   void orgs;
   openModal("module-config");
+}
+
+/** The kinds that draw a name of their own, and so can be told where to put it. */
+function usesHeader(kind: views.LandingModule["kind"]): boolean {
+  return (
+    kind === "organisations" || kind === "boards" || kind === "most_voted" || kind === "recently_done"
+  );
 }
 
 /** The kinds that draw out of the database, and so have a board to be told. */

@@ -328,3 +328,48 @@ func TestOnlyWhatHasSomewhereToPutWordsMayCarryThem(t *testing.T) {
 		t.Errorf("a button could not carry its own label: %v", err)
 	}
 }
+
+// TestWhereAModuleKeepsItsName.
+//
+// Four places, and the empty value is the top — so a page composed before there
+// was a choice keeps the look it had rather than losing its headings to a zero
+// value nobody wrote.
+func TestWhereAModuleKeepsItsName(t *testing.T) {
+	page := func(m Module) string {
+		out, _ := json.Marshal(Layout{Modules: []Module{m}})
+		return string(out)
+	}
+
+	for _, at := range []LabelAt{"", LabelTop, LabelBottom, LabelPill, LabelOff} {
+		m := Module{ID: "b", Kind: Boards, X: 1, Y: 1, W: 12, H: 3, Label: at}
+		got, err := Parse(page(m))
+		if err != nil {
+			t.Fatalf("%q was refused: %v", at, err)
+		}
+		if got.Modules[0].Label != at {
+			t.Errorf("%q came back as %q", at, got.Modules[0].Label)
+		}
+	}
+
+	// Somewhere that is not one of the four.
+	bad := Module{ID: "b", Kind: Boards, X: 1, Y: 1, W: 12, H: 3, Label: "middle"}
+	if _, err := Parse(page(bad)); err == nil {
+		t.Error("a module was allowed to put its name nowhere")
+	}
+
+	// And a module that draws no name is not asked where to put one: a hero is
+	// its own name, a paragraph has none. Accepting it would store a setting
+	// whose dialog never shows it and nothing ever reads.
+	for _, kind := range []Kind{Hero, Intro, Text, CallToAction} {
+		m := Module{ID: "m", Kind: kind, X: 1, Y: 1, W: 12, H: 2, Label: LabelPill}
+		if kind == Text || kind == CallToAction {
+			m.Body = "hello"
+		}
+		if kind == CallToAction {
+			m.Scope = "acme/atlas"
+		}
+		if _, err := Parse(page(m)); err == nil {
+			t.Errorf("%q was asked where to put a name it does not draw", kind)
+		}
+	}
+}

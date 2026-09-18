@@ -85,6 +85,54 @@ func (k Kind) usesData() bool {
 // paragraph, and the label on the button.
 func (k Kind) usesWords() bool { return k == Text || k == CallToAction }
 
+// usesHeader is the modules that draw a name of their own, and so are the ones
+// a label position means anything to. A hero is its own name and a paragraph
+// has none, so neither is asked where to put one.
+func (k Kind) usesHeader() bool {
+	switch k {
+	case Organisations, Boards, MostVoted, RecentlyDone:
+		return true
+	}
+	return false
+}
+
+// LabelAt is where a module's name sits.
+//
+// The four the dashboard offers on its own items, so an operator who has
+// arranged one board already knows this control. What each one looks like is
+// not identical across the two products and that is deliberate: a bookmark
+// there is a square with an icon, so its name sits straight against it, while a
+// module here is a box holding a list and its name needs a line under it or it
+// reads as the first row.
+type LabelAt string
+
+const (
+	// LabelTop is the default, and what every module drew before there was a
+	// choice. The zero value means this, so a layout written earlier keeps the
+	// look it had.
+	LabelTop LabelAt = "top"
+
+	// LabelBottom is the same header at the foot of the module.
+	LabelBottom LabelAt = "bottom"
+
+	// LabelPill is the name on the module's top border, the same pill a section
+	// wears. Chosen by the operator, never given out by the product: handing it
+	// to every module automatically is what made this page read as a row of
+	// containers with their contents missing.
+	LabelPill LabelAt = "pill"
+
+	// LabelOff draws no name at all.
+	LabelOff LabelAt = "off"
+)
+
+func (l LabelAt) valid() bool {
+	switch l {
+	case "", LabelTop, LabelBottom, LabelPill, LabelOff:
+		return true
+	}
+	return false
+}
+
 // The grid, ported from the dashboard this house already runs.
 //
 // Twelve columns and rows of a fixed height, each module placed at a cell and
@@ -124,6 +172,10 @@ type Module struct {
 
 	// Body is the words of a Text module, and empty for every other kind.
 	Body string `json:"body,omitempty"`
+
+	// Label is where this module's name sits. Empty means the top, which is
+	// what every module drew before there was anywhere else to put it.
+	Label LabelAt `json:"label,omitempty"`
 
 	// Scope is which board a data module draws from, as "org/board", and empty
 	// for all of them. It is stored as slugs rather than as row ids because a
@@ -407,6 +459,12 @@ func (l Layout) validate() error {
 		}
 		if err := m.validateScope(); err != nil {
 			return err
+		}
+		if !m.Label.valid() {
+			return fmt.Errorf("module %q puts its name at %q, which is nowhere", m.ID, m.Label)
+		}
+		if m.Label != "" && !m.Kind.usesHeader() {
+			return fmt.Errorf("module %q says where to put a name it does not draw", m.ID)
 		}
 	}
 	return nil

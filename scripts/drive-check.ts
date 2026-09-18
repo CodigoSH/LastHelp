@@ -1359,6 +1359,55 @@ async function main() {
     JSON.stringify(nombre),
   );
 
+  // The four places a name can go, driven through the dialog. The pill is the
+  // one that matters most: it is the mark the operator may CHOOSE, and the
+  // whole point is that the product never hands it out by itself.
+  const donde = await evaluate(`
+    // Back into edit mode: the block above left it, and the kebab that opens a
+    // module's dialog only exists while the page is being arranged.
+    document.querySelector("[data-edit-page]").click();
+    await new Promise(r => setTimeout(r, 600));
+
+    const leer = () => {
+      const cell = document.querySelector('.landing-cell[data-module^="boards-"]');
+      const head = cell.querySelector(".module-header");
+      const cb = cell.getBoundingClientRect();
+      return {
+        cabecera: !!head,
+        pildora: !!cell.querySelector(".section-legend"),
+        alPie: cell.querySelector(".landing-scroll")?.classList.contains("label-bottom") ?? false,
+        // Where the header actually sits inside the module, not which class it
+        // carries: a class says what was asked for, a box says what happened.
+        mitad: head ? (head.getBoundingClientRect().top - cb.top) > cb.height / 2 : null,
+      };
+    };
+
+    const poner = async (valor) => {
+      document.querySelector('.landing-cell[data-module^="boards-"] [data-module-menu]').click();
+      await new Promise(r => setTimeout(r, 200));
+      document.querySelector('.landing-cell[data-module^="boards-"] [data-edit-module]').click();
+      await new Promise(r => setTimeout(r, 400));
+      const form = document.querySelector("form.module-config");
+      const ofrecido = !document.querySelector("[data-for-label-at]").hidden;
+      form.querySelector("[name=labelAt]").value = valor;
+      form.requestSubmit();
+      await new Promise(r => setTimeout(r, 900));
+      return { ofrecido, ...leer() };
+    };
+
+    return { arriba: leer(), abajo: await poner("bottom"),
+             enPildora: await poner("pill"), sinNombre: await poner("off") };
+  `);
+  check(
+    "a module's name goes where the operator puts it, in four places",
+    donde.arriba.cabecera === true && donde.arriba.pildora === false && donde.arriba.mitad === false &&
+      donde.abajo.ofrecido === true && donde.abajo.alPie === true && donde.abajo.mitad === true &&
+      donde.enPildora.pildora === true && donde.enPildora.cabecera === false &&
+      donde.sinNombre.pildora === false && donde.sinNombre.cabecera === false,
+    JSON.stringify(donde),
+  );
+
+
   // Pointed at a board that is not there any more — which is what an operator
   // is left with after deleting one they had composed a page around. The module
   // has to come back empty, not quietly show every board instead: showing

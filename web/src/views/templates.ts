@@ -67,6 +67,8 @@ export interface LandingModule {
   body?: string;
   /** Which board a data module draws from, as "org/board". Empty for all. */
   scope?: string;
+  /** Where this module's name sits. Empty means the top. */
+  label?: "top" | "bottom" | "pill" | "off";
 }
 
 /** A board as the front page shows it, without going through its organisation. */
@@ -155,17 +157,41 @@ export function landing(
     }
   </section>`;
 
+  /**
+   * What a module calls itself, in one place.
+   *
+   * Read twice — once to draw the header inside the box and once to draw the
+   * pill on its border — and a module whose two names drifted apart would be
+   * the kind of fault nobody looks for.
+   */
+  const heading = (m: LandingModule): { icon: string; title: string; count: string } | null => {
+    const rows = content[m.id];
+    const many = Array.isArray(rows) ? rows.length : 0;
+    switch (m.kind) {
+      case "organisations":
+        return { icon: icons.organization(16), title: text.t("shell.organizations"), count: text.number(orgs.length) };
+      case "boards":
+        return { icon: icons.repository(16), title: text.t("portal.boards"), count: text.number(many) };
+      case "most_voted":
+        return { icon: icons.idea(16), title: text.t("landing.moduleVoted"), count: text.number(many) };
+      case "recently_done":
+        return { icon: icons.queue(16), title: text.t("landing.moduleDone"), count: text.number(many) };
+      default:
+        return null;
+    }
+  };
+
   const intro = `<ul class="points">
     ${point(icons.person(18), text.t("landing.pointNoAccount"))}
     ${point(icons.idea(18), text.t("landing.pointVotes"))}
     ${point(icons.open(18), text.t("landing.pointForge"))}
   </ul>`;
 
-  const organisations =
+  const organisations = (head: string, at: string) =>
     orgs.length === 0
       ? emptyState(text.t(isAdmin ? "landing.emptyOperator" : "portal.empty"), icons.organization(28))
-      : `<section class="landing-scroll">
-          ${moduleHead(icons.organization(16), text.t("shell.organizations"), text.number(orgs.length))}
+      : `<section class="landing-scroll ${labelClass(at)}">
+          ${head}
           ${organizationList(orgs, text)}
         </section>`;
 
@@ -176,11 +202,11 @@ export function landing(
    * reinvented, with the organisation's name added underneath: on a front page
    * that lists boards from everywhere, "web" on its own does not say whose.
    */
-  const boards = (rows: LandingBoard[]) =>
+  const boards = (rows: LandingBoard[], head: string, at: string) =>
     rows.length === 0
       ? emptyState(text.t("landing.noBoards"), icons.repository(28))
-      : `<section class="landing-scroll">
-          ${moduleHead(icons.repository(16), text.t("portal.boards"), text.number(rows.length))}
+      : `<section class="landing-scroll ${labelClass(at)}">
+          ${head}
           <ul class="cards">${rows
             .map(
               (b) => `<li><a class="card" href="/${escapeAttr(b.org)}/${escapeAttr(b.slug)}">
@@ -207,11 +233,11 @@ export function landing(
    * the dashboard's, votes and all, so a visitor and the team read the same
    * thing in the same shape.
    */
-  const voted = (rows: LandingReport[]) =>
+  const voted = (rows: LandingReport[], head: string, at: string) =>
     rows.length === 0
       ? emptyState(text.t("landing.noVotes"), icons.idea(28))
-      : `<section class="landing-scroll">
-          ${moduleHead(icons.idea(16), text.t("landing.moduleVoted"), text.number(rows.length))}
+      : `<section class="landing-scroll ${labelClass(at)}">
+          ${head}
           <ul class="briefs">${rows
             .map(
               (v) => `<li><a class="brief" href="/i/${escapeAttr(v.public_id)}">
@@ -231,11 +257,11 @@ export function landing(
    * it finished — without a date this is just a list of things that are done,
    * and "done in 2019" and "done last week" say opposite things.
    */
-  const finished = (rows: LandingReport[]) =>
+  const finished = (rows: LandingReport[], head: string, at: string) =>
     rows.length === 0
       ? emptyState(text.t("landing.noneDone"), icons.queue(28))
-      : `<section class="landing-scroll">
-          ${moduleHead(icons.queue(16), text.t("landing.moduleDone"), text.number(rows.length))}
+      : `<section class="landing-scroll ${labelClass(at)}">
+          ${head}
           <ul class="briefs">${rows
             .map(
               (r) => `<li><a class="brief" href="/i/${escapeAttr(r.public_id)}">
@@ -290,24 +316,35 @@ export function landing(
   // module that vanishes because it has no content yet cannot be edited back.
   const drawn = shown
     .map((m) => {
+      // Where this module keeps its name. Empty is the top, which is what every
+      // module drew before there was anywhere else to put it.
+      const at = m.label ?? "top";
+      const name = heading(m);
+      const head = name ? moduleHead(name.icon, name.title, name.count, at) : "";
+
       const inner =
         m.kind === "hero"
           ? hero
           : m.kind === "intro"
             ? intro
             : m.kind === "organisations"
-              ? organisations
+              ? organisations(head, at)
               : m.kind === "text"
                 ? words(m.body ?? "")
                 : m.kind === "boards"
-                  ? boards((content[m.id] as LandingBoard[]) ?? [])
+                  ? boards((content[m.id] as LandingBoard[]) ?? [], head, at)
                   : m.kind === "most_voted"
-                    ? voted((content[m.id] as LandingReport[]) ?? [])
+                    ? voted((content[m.id] as LandingReport[]) ?? [], head, at)
                     : m.kind === "recently_done"
-                      ? finished((content[m.id] as LandingReport[]) ?? [])
+                      ? finished((content[m.id] as LandingReport[]) ?? [], head, at)
                       : m.kind === "call_to_action"
                         ? action((content[m.id] as LandingDestination) ?? null, m.body ?? "")
                         : "";
+
+      // The pill lives outside the scrolling box, as a child of the cell: it
+      // hangs over the border, and a box that scrolls clips whatever hangs over
+      // its edge. The cell leaves room for it with padding.
+      const pill = at === "pill" && name && inner !== "" ? modulePill(name.title, name.count) : "";
       if (inner === "" && !editing) return "";
 
       // One button, not two. The dashboard in this house puts a module's
@@ -339,8 +376,8 @@ export function landing(
       // module would land in cell one. The coordinates go in through the
       // CSSOM instead, which the policy does not govern, which is the same way
       // this product already does an accent colour and a tooltip position.
-      return `<div class="landing-cell" data-module="${escapeAttr(m.id)}"
-                   ${editing ? 'draggable="true"' : ""}>${tools}${
+      return `<div class="landing-cell${pill ? " has-pill" : ""}" data-module="${escapeAttr(m.id)}"
+                   ${editing ? 'draggable="true"' : ""}>${pill}${tools}${
                      inner || `<p class="hint">${escapeHTML(text.t("landing.moduleText"))}</p>`
                    }${handle}</div>`;
     })
@@ -419,6 +456,15 @@ function moduleModal(text: Text, boards: LandingBoard[] = []): string {
           <input id="module-label" name="label" type="text" maxlength="80"
                  placeholder="${escapeAttr(text.t("board.report"))}" />
         </div>
+        <div class="field" data-for-label-at hidden>
+          <label for="module-label-at">${escapeHTML(text.t("landing.labelAt"))}</label>
+          <select id="module-label-at" name="labelAt">
+            <option value="top">${escapeHTML(text.t("landing.labelTop"))}</option>
+            <option value="bottom">${escapeHTML(text.t("landing.labelBottom"))}</option>
+            <option value="pill">${escapeHTML(text.t("landing.labelPill"))}</option>
+            <option value="off">${escapeHTML(text.t("landing.labelOff"))}</option>
+          </select>
+        </div>
         <div class="field" data-for-scope hidden>
           <label for="module-scope">${escapeHTML(text.t("landing.scope"))}</label>
           <select id="module-scope" name="scope">${options}</select>
@@ -479,12 +525,29 @@ export function sectionHead(title: string, count?: string): string {
  * A module is that dashboard's widget, not its section, so it names itself the
  * way a widget does: its icon and its name inside the box, at the top.
  */
-function moduleHead(icon: string, title: string, count?: string): string {
+function moduleHead(icon: string, title: string, count?: string, at: string = "top"): string {
+  // The pill is drawn outside this box, as a child of the cell: it sits on the
+  // border, and this box scrolls, so anything hanging over its edge would be
+  // clipped by the very thing that keeps a long list inside its module.
+  if (at === "pill" || at === "off") return "";
   return `<header class="module-header">
     <span class="module-icon" aria-hidden="true">${icon}</span>
     <h2>${escapeHTML(title)}</h2>
     ${count !== undefined ? `<span class="count-chip">${escapeHTML(count)}</span>` : ""}
   </header>`;
+}
+
+/** The class that puts a module's header where the operator asked for it. */
+function labelClass(at: string): string {
+  return at === "bottom" ? "label-bottom" : "";
+}
+
+/** The name on the border, for a module whose operator asked for it there. */
+function modulePill(title: string, count?: string): string {
+  return `<h2 class="section-legend">
+    <span>${escapeHTML(title)}</span>
+    ${count !== undefined ? `<span class="count-chip">${escapeHTML(count)}</span>` : ""}
+  </h2>`;
 }
 
 /** The mark in front of a name: two letters of the thing itself. */
