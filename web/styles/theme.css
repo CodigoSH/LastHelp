@@ -3920,6 +3920,7 @@ a.stat:hover .stat-go {
   grid-column: var(--x, 1) / span var(--w, 12);
   grid-row: var(--y, 1) / span var(--h, 1);
   min-inline-size: 0;
+  position: relative;
   /*
    * A module lives inside the box it was given. Scrolls rather than clips so a
    * list that outgrows a short module is a scroll away instead of gone, and so
@@ -3929,20 +3930,91 @@ a.stat:hover .stat-go {
 }
 
 /*
- * Room for the pill that names a section.
+ * How a module names itself, copied from the dashboard's widget header.
  *
- * It is drawn sitting on the section's top border, half of it above the box, so
- * a section flush against the top of its module had its name sliced in half by
- * the scroll box above.
+ * NOT the section pill. Over there that pill is drawn by one thing only — a
+ * section, which is a container you drag items into — so wearing it made every
+ * module here read as a container with modules missing from inside it. A module
+ * is the dashboard's widget, not its section: same grid, same drag, its own
+ * content. So it names itself the way a widget does, and the pill stays
+ * reserved for what it means.
  *
- * Measured rather than guessed: the pill renders 25px tall, so it hangs 12.5px
- * over the edge and needs at least that much. The first attempt at this was
- * 0.6rem — 9.6px — which moved the pill down and left it clipped by two pixels,
- * which looks like the fix not working rather than like being three pixels
- * short.
+ * Sticky, like the original: the module scrolls, and a name that scrolls away
+ * leaves a list of rows belonging to nothing.
  */
-.landing-cell > .section {
-  margin-block-start: 0.85rem;
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 14px 10px;
+  flex-shrink: 0;
+  border-block-end: 1px solid var(--border);
+  background: var(--surface);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+
+.module-header .module-icon {
+  inline-size: 16px;
+  block-size: 16px;
+  flex-shrink: 0;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.module-header .module-icon svg {
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+.module-header h2 {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The count, kept as the chip the rest of the product uses. */
+.module-header .count-chip {
+  flex-shrink: 0;
+}
+
+/*
+ * A module that draws content is a card, the same recipe a section box uses,
+ * put on the module itself rather than on something inside it.
+ *
+ * It used to be an inner `.section`, which brought the pill with it — and the
+ * pill means "container you drag items into" in the dashboard this grid comes
+ * from. The box was never the problem; the name on it was.
+ */
+.landing-scroll {
+  block-size: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  box-shadow: var(--card-shadow);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
+}
+
+/* The rows sit inside the padding the header already establishes. */
+.landing-scroll > :not(.module-header) {
+  padding: 0.9rem;
+  margin: 0;
 }
 
 .landing-text p {
@@ -4161,13 +4233,7 @@ a.stat:hover .stat-go {
  * answer for a list is its own scroll, so a short module shows three of eight
  * and the other five are a scroll away instead of gone.
  */
-.landing-scroll {
-  max-block-size: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
-}
+
 
 /*
  * The button module: the one thing this page exists to make happen, so it is

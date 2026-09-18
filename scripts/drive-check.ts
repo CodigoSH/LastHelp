@@ -1324,21 +1324,39 @@ async function main() {
     JSON.stringify({ vacio: conDatos.sinHechas, roto: conDatos.hechasRotas }),
   );
 
-  // The pill that names a section is drawn sitting on the section's top border,
-  // half of it above the box. Inside a module — which scrolls, so it clips —
-  // that half was being sliced off, and a name cut through the middle reads as
-  // a broken page rather than as a tight fit. Two pixels short looked exactly
-  // like the fix not working, so this measures the clearance.
-  const pildora = await evaluate(`
+  // How a module names itself, which is a question about two products rather
+  // than about this page. The pill mounted on a border means "a container you
+  // drag items into" in the dashboard this grid comes from, so a module wearing
+  // one reads as a container with its contents missing — and reads that way
+  // hardest to the people most likely to recognise it. A module is that
+  // dashboard's widget, so it wears a widget's header: inside the box, at the
+  // top, and still there after the module is scrolled.
+  const nombre = await evaluate(`
     const cell = document.querySelector('.landing-cell[data-module^="boards-"]');
-    const pill = cell.querySelector(".section-legend");
-    const cb = cell.getBoundingClientRect(), pb = pill.getBoundingClientRect();
-    return { holgura: Math.round(pb.top - cb.top), alto: Math.round(pb.height) };
+    const head = cell.querySelector(".module-header");
+    const cb = cell.getBoundingClientRect();
+    // Tolerant on purpose: a mutation that brings the container pill back
+    // leaves no header at all, and a probe that assumes one throws and takes
+    // the whole pass down instead of naming what changed.
+    if (!head) return { pildora: !!cell.querySelector(".section-legend"), cabecera: false };
+    const antes = Math.round(head.getBoundingClientRect().top - cb.top);
+    cell.querySelector(".landing-scroll")?.scrollTo(0, 400);
+    await new Promise(r => setTimeout(r, 120));
+    return {
+      cabecera: true,
+      pildora: !!cell.querySelector(".section-legend"),
+      dentro: antes >= 0,
+      texto: head.querySelector("h2")?.textContent?.trim() ?? "",
+      icono: !!head.querySelector(".module-icon svg"),
+      trasDesplazar: Math.round(head.getBoundingClientRect().top - cb.top),
+    };
   `);
   check(
-    "a section's name is not sliced by the module it sits in",
-    pildora.holgura >= 0 && pildora.alto > 10,
-    JSON.stringify(pildora),
+    "a module names itself the way a widget does, not the way a container does",
+    nombre.cabecera === true && nombre.pildora === false &&
+      nombre.dentro === true && nombre.icono === true &&
+      nombre.texto !== "" && nombre.trasDesplazar >= 0 && nombre.trasDesplazar < 8,
+    JSON.stringify(nombre),
   );
 
   // Pointed at a board that is not there any more — which is what an operator

@@ -164,8 +164,8 @@ export function landing(
   const organisations =
     orgs.length === 0
       ? emptyState(text.t(isAdmin ? "landing.emptyOperator" : "portal.empty"), icons.organization(28))
-      : `<section class="section">
-          ${sectionHead(text.t("shell.organizations"), text.number(orgs.length))}
+      : `<section class="landing-scroll">
+          ${moduleHead(icons.organization(16), text.t("shell.organizations"), text.number(orgs.length))}
           ${organizationList(orgs, text)}
         </section>`;
 
@@ -179,8 +179,8 @@ export function landing(
   const boards = (rows: LandingBoard[]) =>
     rows.length === 0
       ? emptyState(text.t("landing.noBoards"), icons.repository(28))
-      : `<section class="section landing-scroll">
-          ${sectionHead(text.t("portal.boards"), text.number(rows.length))}
+      : `<section class="landing-scroll">
+          ${moduleHead(icons.repository(16), text.t("portal.boards"), text.number(rows.length))}
           <ul class="cards">${rows
             .map(
               (b) => `<li><a class="card" href="/${escapeAttr(b.org)}/${escapeAttr(b.slug)}">
@@ -210,8 +210,8 @@ export function landing(
   const voted = (rows: LandingReport[]) =>
     rows.length === 0
       ? emptyState(text.t("landing.noVotes"), icons.idea(28))
-      : `<section class="section landing-scroll">
-          ${sectionHead(text.t("landing.moduleVoted"), text.number(rows.length))}
+      : `<section class="landing-scroll">
+          ${moduleHead(icons.idea(16), text.t("landing.moduleVoted"), text.number(rows.length))}
           <ul class="briefs">${rows
             .map(
               (v) => `<li><a class="brief" href="/i/${escapeAttr(v.public_id)}">
@@ -234,8 +234,8 @@ export function landing(
   const finished = (rows: LandingReport[]) =>
     rows.length === 0
       ? emptyState(text.t("landing.noneDone"), icons.queue(28))
-      : `<section class="section landing-scroll">
-          ${sectionHead(text.t("landing.moduleDone"), text.number(rows.length))}
+      : `<section class="landing-scroll">
+          ${moduleHead(icons.queue(16), text.t("landing.moduleDone"), text.number(rows.length))}
           <ul class="briefs">${rows
             .map(
               (r) => `<li><a class="brief" href="/i/${escapeAttr(r.public_id)}">
@@ -465,6 +465,26 @@ export function sectionHead(title: string, count?: string): string {
     <span>${escapeHTML(title)}</span>
     ${count !== undefined ? `<span class="count-chip">${escapeHTML(count)}</span>` : ""}
   </h2>`;
+}
+
+/**
+ * How a module in the front page's grid names itself.
+ *
+ * Deliberately not sectionHead. That draws the pill mounted on the border, and
+ * in the dashboard this grid comes from that pill belongs to one thing only: a
+ * section, which is a container other items are dragged into. A module wearing
+ * it reads as a container with its contents missing — and to somebody who knows
+ * the dashboard, as a container they should be able to drop a module into.
+ *
+ * A module is that dashboard's widget, not its section, so it names itself the
+ * way a widget does: its icon and its name inside the box, at the top.
+ */
+function moduleHead(icon: string, title: string, count?: string): string {
+  return `<header class="module-header">
+    <span class="module-icon" aria-hidden="true">${icon}</span>
+    <h2>${escapeHTML(title)}</h2>
+    ${count !== undefined ? `<span class="count-chip">${escapeHTML(count)}</span>` : ""}
+  </header>`;
 }
 
 /** The mark in front of a name: two letters of the thing itself. */
