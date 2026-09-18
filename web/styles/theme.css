@@ -4032,6 +4032,43 @@ a.stat:hover .stat-go {
 }
 
 /*
+ * A section: its own grid, as many columns and rows as the section is wide and
+ * tall. A child at 3,2 of a six-by-two section lands in that section's third
+ * column and second row, which is what lets the section be dragged elsewhere
+ * without touching anything inside it.
+ *
+ * Same gap as the page's grid, because the drag arithmetic in here divides by
+ * it exactly as it does out there.
+ */
+.landing-group {
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 45%, transparent);
+  padding: 12px;
+}
+
+.landing-section {
+  display: grid;
+  grid-template-columns: repeat(var(--w, 1), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--h, 1), minmax(0, 1fr));
+  gap: 16px;
+  block-size: 100%;
+}
+
+/* What is being dragged is going in here. Same green the ghost uses, on the
+   box rather than in it, so the answer is readable before letting go. */
+.landing-group.drop-target {
+  border-color: #00ff00;
+  background: rgba(0, 255, 0, 0.06);
+}
+
+/* An empty section still has to look like a place things go into. */
+.landing-grid.editing .landing-section:empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+/*
  * Room for a name asked to sit on the border.
  *
  * Only when there is one: giving every cell this padding would move every

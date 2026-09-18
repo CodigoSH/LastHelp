@@ -1408,6 +1408,194 @@ async function main() {
   );
 
 
+  // Sections: a box that holds modules, ported from the dashboard. Four things
+  // have to be true for one to be worth having — something can be dropped in,
+  // what is in it is placed in ITS grid and not the page's, it can be taken
+  // back out, and shrinking one puts out what no longer fits.
+  //
+  // The page it runs on is written through the API first. That is setup, not
+  // the thing being checked: the default page is all full-width modules, so
+  // there is nowhere on it to drop anything, and a drag that has nowhere to
+  // land proves nothing about dragging.
+  const seccion = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const capa = () => fetch("/api/landing").then(r => r.json());
+    const escribir = (modules) => fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules }) }).then(r => r.status);
+
+    // The page as the checks after this one expect to find it. A journey is one
+    // story with accumulated state: writing a layout of my own here and leaving
+    // it took three later checks down with it.
+    window.__paginaAntes = (await capa()).modules;
+
+    const puesto = await escribir([
+      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 3 },
+      { id: "group", kind: "section", x: 1, y: 4, w: 6, h: 3, body: "My projects" },
+      { id: "loose", kind: "boards", x: 7, y: 4, w: 4, h: 2 },
+    ]);
+
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    const conPildora = !!document.querySelector(
+      '.landing-cell[data-module="group"] .section-legend');
+
+    // The point is worked out by the caller, in page coordinates. Aiming at a
+    // fraction of some element kept landing on top of another module, and a
+    // drop that collides is correctly refused — so the check was measuring the
+    // collision rule, not the drag.
+    const arrastrar = async (id, punto) => {
+      const celda = document.querySelector('[data-module="' + id + '"]');
+      const caja = celda.getBoundingClientRect();
+      const dt = new DataTransfer();
+      celda.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt,
+        clientX: caja.left + 8, clientY: caja.top + 8 }));
+      const grid = document.querySelector(".landing-grid.editing");
+      grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt, ...punto }));
+      await new Promise(r => setTimeout(r, 140));
+      const senales = {
+        resaltado: !!document.querySelector(".landing-group.drop-target"),
+        fantasmaDentro: !!document.querySelector(".landing-section .landing-ghost"),
+        valido: !document.querySelector(".landing-ghost")?.classList.contains("invalid"),
+        celda: (() => {
+          const g = document.querySelector(".landing-ghost");
+          const cs = getComputedStyle(g);
+          return cs.gridColumn + " / " + cs.gridRow;
+        })(),
+      };
+      grid.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, ...punto }));
+      await new Promise(r => setTimeout(r, 900));
+      celda.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
+      return senales;
+    };
+
+    // In, aimed at the section's own first cell.
+    const dentroDe = document.querySelector('.landing-section[data-section="group"]').getBoundingClientRect();
+    const senales = await arrastrar("loose",
+      { clientX: dentroDe.left + 10, clientY: dentroDe.top + 10 });
+    const hijo = (await capa()).modules.find(m => m.id === "loose");
+    const dibujadoDentro = !!document.querySelector(
+      '.landing-section[data-section="group"] [data-module="loose"]');
+
+    // Shrink the section under it, through the API rather than the corner: the
+    // corner is checked elsewhere, and what is being measured here is what the
+    // page does with a child that no longer fits.
+    await escribir([
+      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 3 },
+      { id: "group", kind: "section", x: 1, y: 4, w: 6, h: 3, body: "My projects" },
+      { id: "loose", kind: "boards", x: 1, y: 1, w: 4, h: 2, parent: "group" },
+    ]);
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    // Out again, into the empty columns beside the section — the only free
+    // space on this page, and the reason the page was written this way.
+    const caja = document.querySelector('.landing-cell[data-module="group"]').getBoundingClientRect();
+    const salida = await arrastrar("loose", { clientX: caja.right + 30, clientY: caja.top + 10 });
+    const fuera = (await capa()).modules.find(m => m.id === "loose");
+
+    document.querySelector("[data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+    return { puesto, conPildora, ...senales, dibujadoDentro,
+             dentro: { parent: hijo.parent ?? "", x: hijo.x, y: hijo.y },
+             fuera: { parent: fuera.parent ?? "", x: fuera.x, y: fuera.y, ...salida } };
+  `);
+  check(
+    "a module dropped into a section is placed in the section's own grid",
+    seccion.puesto === 200 && seccion.dentro.parent === "group" &&
+      seccion.dentro.x === 1 && seccion.dentro.y === 1 && seccion.dibujadoDentro === true,
+    JSON.stringify(seccion.dentro),
+  );
+  check(
+    "and the page says where it is going before it is let go",
+    seccion.resaltado === true && seccion.fantasmaDentro === true && seccion.valido === true,
+    JSON.stringify({ resaltado: seccion.resaltado, fantasma: seccion.fantasmaDentro }),
+  );
+  check(
+    "a section wears its name on its border, or wears none",
+    seccion.conPildora === true,
+    JSON.stringify({ pildora: seccion.conPildora }),
+  );
+  check(
+    "and a module can be taken back out of a section",
+    seccion.fuera.parent === "",
+    JSON.stringify(seccion.fuera),
+  );
+
+  // Shrinking a section under what is inside it. The dashboard this comes from
+  // compares HOW MANY children there are against how many cells are left, so a
+  // section with one child shrunk under that child ejects nothing and draws it
+  // outside the box meant to contain it. Here the question is where each child
+  // is, so this is the case that separates the two.
+  const encoger = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: [
+        { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 3 },
+        { id: "group", kind: "section", x: 1, y: 4, w: 6, h: 3, body: "My projects" },
+        { id: "loose", kind: "boards", x: 3, y: 1, w: 4, h: 2, parent: "group" },
+      ] }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    // One child, sitting at the section's third column and four wide, so it
+    // ends at the sixth. Take three columns away and it no longer fits — and
+    // counting children would say one child against nine cells and keep it.
+    const grid = document.querySelector(".landing-grid.editing");
+    const gridBox = grid.getBoundingClientRect();
+    const col = (gridBox.width - 11 * 16) / 12;
+    const celda = document.querySelector('.landing-cell[data-module="group"]');
+    const caja = celda.getBoundingClientRect();
+    // The section's OWN corner. Without :scope this finds the child's handle
+    // first — it is a descendant too — and the drag resized the child from four
+    // columns to one while the section stayed exactly as it was.
+    const asa = celda.querySelector(":scope > [data-resize]");
+    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
+
+    asa.dispatchEvent(new PointerEvent("pointerdown", { ...opts,
+      clientX: caja.right, clientY: caja.bottom }));
+    window.dispatchEvent(new PointerEvent("pointermove", { ...opts,
+      clientX: caja.right - 3 * (col + 16), clientY: caja.bottom }));
+    await new Promise(r => setTimeout(r, 140));
+    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
+      clientX: caja.right - 3 * (col + 16), clientY: caja.bottom }));
+    await new Promise(r => setTimeout(r, 1100));
+
+    const capa = await fetch("/api/landing").then(r => r.json());
+    const seccion = capa.modules.find(m => m.id === "group");
+    const hijo = capa.modules.find(m => m.id === "loose");
+    const dentroDelDibujo = !!document.querySelector(
+      '.landing-section[data-section="group"] [data-module="loose"]');
+
+    // And the page goes back to what it was, for whatever runs after this.
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: window.__paginaAntes }) });
+    document.querySelector("[data-edit-done]")?.click();
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+
+    return { ancho: seccion.w, hijo: { parent: hijo.parent ?? "", x: hijo.x, y: hijo.y, w: hijo.w },
+             dentroDelDibujo,
+             devuelta: (await fetch("/api/landing").then(r => r.json())).modules.length };
+  `);
+  check(
+    "shrinking a section puts out what no longer fits in it",
+    encoger.ancho === 3 && encoger.hijo.parent === "" && encoger.dentroDelDibujo === false &&
+      encoger.devuelta > 3,
+    JSON.stringify(encoger),
+  );
+
   // Pointed at a board that is not there any more — which is what an operator
   // is left with after deleting one they had composed a page around. The module
   // has to come back empty, not quietly show every board instead: showing

@@ -16,6 +16,7 @@ landing.labelPill
 landing.labelTop
 landing.moduleAction
 landing.moduleDone
+landing.moduleSection
 landing.moduleVoted
 landing.noBoards
 landing.noVotes

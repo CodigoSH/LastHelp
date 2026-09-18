@@ -58,7 +58,8 @@ export interface LandingModule {
     | "boards"
     | "most_voted"
     | "recently_done"
-    | "call_to_action";
+    | "call_to_action"
+    | "section";
   /** One-based, the way CSS grid lines are. */
   x: number;
   y: number;
@@ -69,6 +70,13 @@ export interface LandingModule {
   scope?: string;
   /** Where this module's name sits. Empty means the top. */
   label?: "top" | "bottom" | "pill" | "off";
+  /**
+   * The id of the section holding this module, empty for one on the page.
+   *
+   * A child's x, y, w and h are in ITS SECTION's grid, not the page's: a child
+   * at 1,1 is the top-left cell of its section, wherever that section is.
+   */
+  parent?: string;
 }
 
 /** A board as the front page shows it, without going through its organisation. */
@@ -294,6 +302,21 @@ export function landing(
           <span class="card-sub">${escapeHTML(to.name)}</span>
         </section>`;
 
+  /**
+   * A section: a box with its own grid, and the modules the operator put in it.
+   *
+   * As many columns and rows as the section is wide and tall, so a child at 3,2
+   * of a six-by-two section lands in that section's third column and second
+   * row. The dashboard this comes from does exactly this, and it is what lets a
+   * section be dragged elsewhere without touching anything inside it.
+   */
+  const group = (m: LandingModule, inside: LandingModule[]) =>
+    `<div class="landing-section" data-section="${escapeAttr(m.id)}">${
+      inside.length === 0 && !editing
+        ? ""
+        : inside.map((child) => cell(child)).join("")
+    }</div>`;
+
   // The operator's own words. Escaped and shown as written, line breaks and
   // all: this module takes text, not markup, and the domain stores it that way
   // for the same reason.
@@ -314,8 +337,20 @@ export function landing(
   // In edit mode a module that draws nothing still has to be there: an empty
   // text module is exactly the one somebody needs to open and write in, and a
   // module that vanishes because it has no content yet cannot be edited back.
-  const drawn = shown
-    .map((m) => {
+  // A section holds modules, so the page draws the sections and each section
+  // draws what is inside it. The children are not in this list: they are placed
+  // in their section's own grid, in their section's own coordinates.
+  const childrenOf = (id: string) => shown.filter((m) => m.parent === id);
+
+  /**
+   * One module as a cell of whichever grid it belongs to.
+   *
+   * Named rather than written inline in the loop because a section calls it for
+   * its own children: a child is drawn by exactly the same recipe as a module
+   * on the page, which is what makes dragging one out of a section produce the
+   * same thing it was before it went in.
+   */
+  const cell = (m: LandingModule): string => {
       // Where this module keeps its name. Empty is the top, which is what every
       // module drew before there was anywhere else to put it.
       const at = m.label ?? "top";
@@ -339,7 +374,24 @@ export function landing(
                       ? finished((content[m.id] as LandingReport[]) ?? [], head, at)
                       : m.kind === "call_to_action"
                         ? action((content[m.id] as LandingDestination) ?? null, m.body ?? "")
-                        : "";
+                        : m.kind === "section"
+                          ? group(m, childrenOf(m.id))
+                          : "";
+
+      // A section is not a box with a name at the top: its name is always the
+      // pill on its border, or nothing at all, which is what it is in the
+      // dashboard this comes from and is the whole of what makes it readable as
+      // a container rather than as one more module.
+      if (m.kind === "section") {
+        const title = (m.body ?? "").trim();
+        const tools = editing ? kebab(m.id, text) : "";
+        const handle = editing ? resizeHandle(m.id) : "";
+        return `<div class="landing-cell landing-group${title ? " has-pill" : ""}"
+                     data-module="${escapeAttr(m.id)}"
+                     ${editing ? 'draggable="true"' : ""}>${
+                       title ? modulePill(title) : ""
+                     }${tools}${inner}${handle}</div>`;
+      }
 
       // The pill lives outside the scrolling box, as a child of the cell: it
       // hangs over the border, and a box that scrolls clips whatever hangs over
@@ -351,25 +403,11 @@ export function landing(
       // actions behind a single kebab with a tooltip, and two loose icons
       // floating over content is both a different look and one more thing
       // overlapping whatever the module is showing.
-      const tools = editing
-        ? `<button type="button" class="kebab-btn" data-module-menu="${escapeAttr(m.id)}"
-             title="${escapeAttr(text.t("action.edit"))}"
-             aria-label="${escapeAttr(text.t("action.edit"))}"
-             aria-haspopup="menu" aria-expanded="false">${icons.dots()}</button>
-           <div class="kebab-menu" data-menu-for="${escapeAttr(m.id)}" role="menu" hidden>
-             <button type="button" class="kebab-item" role="menuitem" data-edit-module="${escapeAttr(m.id)}">
-               ${icons.edit(15)}<span>${escapeHTML(text.t("action.edit"))}</span></button>
-             <button type="button" class="kebab-item menu-delete" role="menuitem" data-remove-module="${escapeAttr(m.id)}">
-               ${icons.remove(15)}<span>${escapeHTML(text.t("action.remove"))}</span></button>
-           </div>`
-        : "";
+      const tools = editing ? kebab(m.id, text) : "";
 
       // Placed by the same custom properties the dashboard uses, so the
       // stylesheet does the arithmetic and nothing here computes pixels.
-      const handle = editing
-        ? `<span class="resize-handle" data-resize="${escapeAttr(m.id)}"
-             aria-hidden="true"></span>`
-        : "";
+      const handle = editing ? resizeHandle(m.id) : "";
       // No style attribute. This product serves `style-src 'self'` without
       // unsafe-inline — it is the one place the house is stricter than the
       // dashboard this grid comes from — so the browser would drop it and every
@@ -380,7 +418,11 @@ export function landing(
                    ${editing ? 'draggable="true"' : ""}>${pill}${tools}${
                      inner || `<p class="hint">${escapeHTML(text.t("landing.moduleText"))}</p>`
                    }${handle}</div>`;
-    })
+  };
+
+  const drawn = shown
+    .filter((m) => !m.parent)
+    .map(cell)
     .join("");
 
   // The bar that turns editing on, and the controls that only exist while it
@@ -400,6 +442,7 @@ export function landing(
                   <option value="most_voted">${escapeHTML(text.t("landing.moduleVoted"))}</option>
                   <option value="recently_done">${escapeHTML(text.t("landing.moduleDone"))}</option>
                   <option value="call_to_action">${escapeHTML(text.t("landing.moduleAction"))}</option>
+                  <option value="section">${escapeHTML(text.t("landing.moduleSection"))}</option>
                 </select>
                 <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>
                 <button type="button" class="button primary" data-edit-done>${escapeHTML(text.t("action.done"))}</button>`
@@ -535,6 +578,34 @@ function moduleHead(icon: string, title: string, count?: string, at: string = "t
     <h2>${escapeHTML(title)}</h2>
     ${count !== undefined ? `<span class="count-chip">${escapeHTML(count)}</span>` : ""}
   </header>`;
+}
+
+/**
+ * One button, not two. The dashboard in this house puts a module's actions
+ * behind a single kebab with a tooltip, and two loose icons floating over
+ * content is both a different look and one more thing overlapping whatever the
+ * module is showing.
+ *
+ * Written once because a section wears it too: two copies of this would be two
+ * menus that drift apart, and the one on the rarer element is the one that
+ * would be left behind.
+ */
+function kebab(id: string, text: Text): string {
+  return `<button type="button" class="kebab-btn" data-module-menu="${escapeAttr(id)}"
+       title="${escapeAttr(text.t("action.edit"))}"
+       aria-label="${escapeAttr(text.t("action.edit"))}"
+       aria-haspopup="menu" aria-expanded="false">${icons.dots()}</button>
+     <div class="kebab-menu" data-menu-for="${escapeAttr(id)}" role="menu" hidden>
+       <button type="button" class="kebab-item" role="menuitem" data-edit-module="${escapeAttr(id)}">
+         ${icons.edit(15)}<span>${escapeHTML(text.t("action.edit"))}</span></button>
+       <button type="button" class="kebab-item menu-delete" role="menuitem" data-remove-module="${escapeAttr(id)}">
+         ${icons.remove(15)}<span>${escapeHTML(text.t("action.remove"))}</span></button>
+     </div>`;
+}
+
+/** The corner a module is resized from. */
+function resizeHandle(id: string): string {
+  return `<span class="resize-handle" data-resize="${escapeAttr(id)}" aria-hidden="true"></span>`;
 }
 
 /** The class that puts a module's header where the operator asked for it. */

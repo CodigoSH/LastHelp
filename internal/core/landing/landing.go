@@ -53,6 +53,19 @@ const (
 	// showed one. A promise a page makes and does not keep reads as broken.
 	MostVoted Kind = "most_voted"
 
+	// Section is a box that holds other modules.
+	//
+	// The dashboard's own, and the reason it exists there is the reason it
+	// exists here: once a module shows one thing — this board, this
+	// organisation — a page with eight of them is eight loose boxes, and the
+	// only thing that makes them read as a group is a box around them.
+	//
+	// A section has its own grid inside it, as wide and as tall as the section
+	// is, and its children are placed in THAT grid. A section never holds
+	// another section: two levels is a layout somebody arranged, three is a
+	// layout nobody can drag.
+	Section Kind = "section"
+
 	// RecentlyDone is what was put right lately.
 	//
 	// The strongest thing this page can say to somebody deciding whether it is
@@ -83,7 +96,7 @@ func (k Kind) usesData() bool {
 
 // usesWords is the modules that carry words of their own: the operator's own
 // paragraph, and the label on the button.
-func (k Kind) usesWords() bool { return k == Text || k == CallToAction }
+func (k Kind) usesWords() bool { return k == Text || k == CallToAction || k == Section }
 
 // usesHeader is the modules that draw a name of their own, and so are the ones
 // a label position means anything to. A hero is its own name and a paragraph
@@ -173,6 +186,15 @@ type Module struct {
 	// Body is the words of a Text module, and empty for every other kind.
 	Body string `json:"body,omitempty"`
 
+	// Parent is the id of the section holding this module, and empty for a
+	// module sitting straight on the page.
+	//
+	// A child's X, Y, W and H are in ITS SECTION's grid, not the page's: a
+	// child at 1,1 is the top-left cell of its section wherever that section
+	// happens to be. Keeping them relative is what lets a section be dragged
+	// somewhere else without rewriting everything inside it.
+	Parent string `json:"parent,omitempty"`
+
 	// Label is where this module's name sits. Empty means the top, which is
 	// what every module drew before there was anywhere else to put it.
 	Label LabelAt `json:"label,omitempty"`
@@ -246,6 +268,69 @@ func (l Layout) NeedsData() bool {
 		}
 	}
 	return false
+}
+
+// validatePlacement checks where a module sits, in whichever grid it sits in.
+//
+// Two grids, two sets of bounds. A module on the page is measured against the
+// twelve columns of the page; a module in a section is measured against that
+// section, because its coordinates are that section's. Mixing the two is how a
+// child ends up drawn outside the box that is supposed to contain it — the
+// dashboard this comes from checks only how MANY children there are, and lets a
+// child sit past the edge of a section that shrank under it.
+func (l Layout) validatePlacement(m Module) error {
+	if m.X < 1 || m.Y < 1 {
+		return fmt.Errorf("module %q starts at %d,%d", m.ID, m.X, m.Y)
+	}
+	if m.H < 1 {
+		return fmt.Errorf("module %q is %d rows tall", m.ID, m.H)
+	}
+
+	if m.Parent == "" {
+		if m.W < MinSpan {
+			return fmt.Errorf("module %q is %d columns wide, and the narrowest a module may be is %d",
+				m.ID, m.W, MinSpan)
+		}
+		if m.X+m.W-1 > Columns {
+			// Off the right-hand edge is not a layout the grid can draw: the
+			// module would be cut, and cut silently.
+			return fmt.Errorf("module %q runs past column %d", m.ID, Columns)
+		}
+		return nil
+	}
+
+	if m.Kind == Section {
+		// Two levels is a layout somebody arranged. Three is a layout nobody
+		// can drag, and every rule here would need a third set of coordinates.
+		return fmt.Errorf("section %q is inside another section", m.ID)
+	}
+	// A single column of a section is already narrow, so the page's minimum
+	// does not apply in here: it is a bound about the page's twelve columns.
+	if m.W < 1 {
+		return fmt.Errorf("module %q is %d columns wide", m.ID, m.W)
+	}
+
+	parent, ok := l.find(m.Parent)
+	if !ok {
+		return fmt.Errorf("module %q is inside %q, which is not on this page", m.ID, m.Parent)
+	}
+	if parent.Kind != Section {
+		return fmt.Errorf("module %q is inside %q, which is not a section", m.ID, m.Parent)
+	}
+	if m.X+m.W-1 > parent.W || m.Y+m.H-1 > parent.H {
+		return fmt.Errorf("module %q sticks out of the section %q holding it", m.ID, m.Parent)
+	}
+	return nil
+}
+
+// find is the module with this id, if the page has one.
+func (l Layout) find(id string) (Module, bool) {
+	for _, m := range l.Modules {
+		if m.ID == id {
+			return m, true
+		}
+	}
+	return Module{}, false
 }
 
 // validateScope checks what a data module was pointed at.
@@ -421,27 +506,19 @@ func (l Layout) validate() error {
 		seen[m.ID] = true
 
 		switch m.Kind {
-		case Hero, Intro, Organisations, Text, Boards, MostVoted, RecentlyDone, CallToAction:
+		case Hero, Intro, Organisations, Text, Boards, MostVoted, RecentlyDone, CallToAction, Section:
 		default:
 			return fmt.Errorf("%w: %q", ErrUnknownKind, m.Kind)
 		}
-		if m.X < 1 || m.X > Columns {
-			return fmt.Errorf("module %q starts at column %d, outside a %d column grid", m.ID, m.X, Columns)
-		}
-		if m.Y < 1 {
-			return fmt.Errorf("module %q starts at row %d", m.ID, m.Y)
-		}
-		if m.W < MinSpan || m.H < 1 {
-			return fmt.Errorf("module %q is %dx%d, and the smallest a module may be is %dx1",
-				m.ID, m.W, m.H, MinSpan)
-		}
-		if m.X+m.W-1 > Columns {
-			// Off the right-hand edge is not a layout the grid can draw: the
-			// module would be cut, and cut silently.
-			return fmt.Errorf("module %q runs past column %d", m.ID, Columns)
+		if err := l.validatePlacement(m); err != nil {
+			return err
 		}
 		for _, other := range l.Modules[i+1:] {
-			if m.Overlaps(other) {
+			// Only against what shares its grid. A child and a module on the
+			// page are measured in different coordinates, so asking whether
+			// they overlap is asking a question with no meaning — and answering
+			// it would refuse layouts that are perfectly drawable.
+			if m.Parent == other.Parent && m.Overlaps(other) {
 				return fmt.Errorf("modules %q and %q sit on top of each other", m.ID, other.ID)
 			}
 		}
@@ -451,7 +528,7 @@ func (l Layout) validate() error {
 		// A button's label is a label. Bounded separately from a paragraph
 		// because four thousand characters on a button is not a long label, it
 		// is a layout nobody can use and a page nobody can read past.
-		if m.Kind == CallToAction && len([]rune(m.Body)) > maxLabel {
+		if (m.Kind == CallToAction || m.Kind == Section) && len([]rune(m.Body)) > maxLabel {
 			return fmt.Errorf("module %q has a label longer than %d characters", m.ID, maxLabel)
 		}
 		if len(m.Body) > maxTextBody {

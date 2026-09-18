@@ -258,9 +258,12 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           y: m.y,
           w: m.w,
           h: m.h,
-          ...(m.kind === "text" || m.kind === "call_to_action" ? { body: m.body ?? "" } : {}),
+          ...(m.kind === "text" || m.kind === "call_to_action" || m.kind === "section"
+            ? { body: m.body ?? "" }
+            : {}),
           ...(m.scope ? { scope: m.scope } : {}),
-      ...(m.label ? { label: m.label } : {}),
+          ...(m.label ? { label: m.label } : {}),
+          ...(m.parent ? { parent: m.parent } : {}),
         })),
       });
       if (refresh) await fetchLanding();
@@ -295,7 +298,9 @@ function wireLanding(orgs: OrganizationSummary[]): void {
       w: kind === "call_to_action" ? 4 : views.LANDING_COLUMNS,
       // Two rows for the button, not one: at one row the words and the board
       // they lead to did not both fit, and the board's name came out sliced.
-      h: kind === "hero" ? 3 : 2,
+      // A section arrives with room for something: at one row tall it would be
+      // a container nothing can be dropped into, which reads as broken.
+      h: kind === "hero" || kind === "section" ? 3 : 2,
       body: "",
     };
     landingModules = [...landingModules, added];
@@ -338,7 +343,14 @@ function wireLanding(orgs: OrganizationSummary[]): void {
 
   root?.querySelectorAll<HTMLButtonElement>("[data-remove-module]").forEach((button) =>
     button.addEventListener("click", async () => {
-      landingModules = landingModules.filter((m) => m.id !== button.dataset.removeModule);
+      const gone = button.dataset.removeModule ?? "";
+      // What was inside a removed section comes out onto the page rather than
+      // being removed with it: those are modules somebody composed, and a
+      // container disappearing is not a decision to throw away its contents.
+      // Left pointing at a section that is not there, the layout would be
+      // refused outright and the whole page would fail to save.
+      landingModules = landingModules.filter((m) => m.id !== gone);
+      spillOnto(landingModules.filter((m) => m.parent === gone));
       await save(true);
       drawLanding(orgs);
     }),
@@ -354,7 +366,9 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
-    if (target.kind === "call_to_action") target.body = String(data.get("label") ?? "").trim();
+    if (target.kind === "call_to_action" || target.kind === "section") {
+      target.body = String(data.get("label") ?? "").trim();
+    }
     if (usesData(target.kind)) target.scope = String(data.get("scope") ?? "");
     if (usesHeader(target.kind)) {
       target.label = String(data.get("labelAt") ?? "top") as views.LandingModule["label"];
@@ -393,11 +407,41 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
     return { box, width: (box.width - (cols - 1) * GAP) / cols };
   };
 
-  const fits = (id: string, x: number, y: number, w: number, h: number) =>
-    x >= 1 && y >= 1 && x + w - 1 <= cols &&
-    !landingModules.some(
-      (m) => m.id !== id && x < m.x + m.w && m.x < x + w && y < m.y + m.h && m.y < y + h,
+  /**
+   * Does this fit, in whichever grid it is being dropped into?
+   *
+   * Two grids, two sets of bounds: the page is twelve columns, a section is as
+   * many as it is wide. And a module is only measured against what shares its
+   * grid — a child at 1,1 of a section and a module at 1,1 of the page are not
+   * on top of each other, and asking whether they are is asking a question with
+   * no meaning.
+   */
+  const fits = (
+    id: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    parent = "",
+  ): boolean => {
+    if (x < 1 || y < 1) return false;
+    if (parent === "") {
+      if (x + w - 1 > cols) return false;
+    } else {
+      const holder = landingModules.find((m) => m.id === parent);
+      if (!holder || holder.kind !== "section") return false;
+      if (x + w - 1 > holder.w || y + h - 1 > holder.h) return false;
+    }
+    return !landingModules.some(
+      (m) =>
+        m.id !== id &&
+        (m.parent ?? "") === parent &&
+        x < m.x + m.w &&
+        m.x < x + w &&
+        y < m.y + m.h &&
+        m.y < y + h,
     );
+  };
 
   // Lastboard damps the ghost to about 60fps rather than answering every move
   // event: each update rewrites a rule in the sheet, and a pointer produces far
@@ -411,7 +455,18 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
     }, 16);
   };
 
-  const showGhost = (x: number, y: number, w: number, h: number, ok: boolean) => {
+  const showGhost = (x: number, y: number, w: number, h: number, ok: boolean, parent = "") => {
+    // The ghost is moved into whichever grid it is describing. Its rule places
+    // it from --x and --y, and those mean the page's columns out here and the
+    // section's columns in there, so the same element says the right thing in
+    // both once it is in the right parent.
+    const host = parent
+      ? grid.querySelector<HTMLElement>(`.landing-section[data-section="${cssEscape(parent)}"]`)
+      : grid;
+    if (host && ghost.parentElement !== host) host.appendChild(ghost);
+    grid.querySelectorAll(".landing-group").forEach((el) =>
+      el.classList.toggle("drop-target", parent !== "" && el.getAttribute("data-module") === parent),
+    );
     ghost.hidden = false;
     // Through the sheet, like the modules: setProperty on the element writes
     // the style attribute, which this product's content policy drops.
@@ -424,6 +479,10 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
     ghost.classList.toggle("invalid", !ok);
   };
   const hideGhost = () => {
+    if (ghost.parentElement !== grid) grid.appendChild(ghost);
+    grid.querySelectorAll(".landing-group.drop-target").forEach((el) =>
+      el.classList.remove("drop-target"),
+    );
     ghost.hidden = true;
     ghost.classList.remove("invalid");
     setRule("landing-ghost");
@@ -435,6 +494,11 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
 
   grid.querySelectorAll<HTMLElement>(".landing-cell").forEach((cellEl) => {
     cellEl.addEventListener("dragstart", (event) => {
+      // The innermost module wins. A child sits inside its section's own cell,
+      // and both are draggable, so without this the event reaches the section
+      // afterwards and the section decides it is the thing being carried —
+      // picking up a module out of a group would pick up the group.
+      event.stopPropagation();
       const id = cellEl.dataset.module ?? "";
       carrying = landingModules.find((m) => m.id === id) ?? null;
       if (!carrying) return;
@@ -446,20 +510,69 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
       cellEl.classList.add("carrying");
       (event as DragEvent).dataTransfer?.setData("text/plain", id);
     });
-    cellEl.addEventListener("dragend", () => {
+    cellEl.addEventListener("dragend", (event) => {
+      event.stopPropagation();
       cellEl.classList.remove("carrying");
       carrying = null;
       hideGhost();
     });
   });
 
+  /**
+   * Which section, if any, the carried module's top-left corner is over.
+   *
+   * A section is never dropped into a section, so one is never looking for a
+   * home. The corner rather than the pointer, for the same reason every other
+   * measurement here uses it: what lands somewhere is the module, not the hand.
+   */
+  const sectionUnder = (cornerX: number, cornerY: number): HTMLElement | null => {
+    if (!carrying || carrying.kind === "section") return null;
+    for (const el of grid.querySelectorAll<HTMLElement>(".landing-section")) {
+      const box = el.getBoundingClientRect();
+      if (cornerX >= box.left && cornerX <= box.right && cornerY >= box.top && cornerY <= box.bottom) {
+        return el;
+      }
+    }
+    return null;
+  };
+
+  /**
+   * The cell the carried module would land in, and the grid it would land in.
+   *
+   * Two grids. The page's cells are measured from the page's grid, a section's
+   * from that section's own box — measured, not derived by subtracting the
+   * section's position from a page coordinate. The dashboard this comes from
+   * derives it, and that is only right while a section has no padding: its own
+   * has twelve pixels of it, so its inner cells are narrower than the page's
+   * and the two drift apart across the section.
+   */
   const targetCell = (event: DragEvent) => {
+    const cornerX = event.clientX - grabX;
+    const cornerY = event.clientY - grabY;
+    const w = carrying?.w ?? 1;
+    const h = carrying?.h ?? 1;
+
+    const host = sectionUnder(cornerX, cornerY);
+    if (host) {
+      const parent = host.dataset.section ?? "";
+      const holder = landingModules.find((m) => m.id === parent);
+      const box = host.getBoundingClientRect();
+      if (holder) {
+        const colWidth = (box.width - (holder.w - 1) * GAP) / holder.w;
+        const rowHeight = (box.height - (holder.h - 1) * GAP) / holder.h;
+        const x = Math.max(1, Math.min(holder.w - w + 1,
+          Math.floor((cornerX - box.left) / (colWidth + GAP)) + 1));
+        const y = Math.max(1, Math.min(holder.h - h + 1,
+          Math.floor((cornerY - box.top) / (rowHeight + GAP)) + 1));
+        return { x, y, parent };
+      }
+    }
+
     const { box, width } = cell();
-    const topLeftX = event.clientX - grabX - box.left;
-    const topLeftY = event.clientY - grabY - box.top;
-    const x = Math.max(1, Math.min(cols - (carrying?.w ?? 1) + 1, Math.floor(topLeftX / (width + GAP)) + 1));
-    const y = Math.max(1, Math.floor(topLeftY / (width + GAP)) + 1);
-    return { x, y };
+    const x = Math.max(1, Math.min(cols - w + 1,
+      Math.floor((cornerX - box.left) / (width + GAP)) + 1));
+    const y = Math.max(1, Math.floor((cornerY - box.top) / (width + GAP)) + 1);
+    return { x, y, parent: "" };
   };
 
   grid.addEventListener("dragover", (event) => {
@@ -468,21 +581,29 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
     const moved = event as DragEvent;
     damp(() => {
       if (!carrying) return;
-      const { x, y } = targetCell(moved);
-      showGhost(x, y, carrying.w, carrying.h, fits(carrying.id, x, y, carrying.w, carrying.h));
+      const { x, y, parent } = targetCell(moved);
+      showGhost(x, y, carrying.w, carrying.h,
+        fits(carrying.id, x, y, carrying.w, carrying.h, parent), parent);
     });
   });
 
   grid.addEventListener("drop", async (event) => {
     if (!carrying) return;
     event.preventDefault();
-    const { x, y } = targetCell(event as DragEvent);
+    const { x, y, parent } = targetCell(event as DragEvent);
     const moving = carrying;
     hideGhost();
-    if (!fits(moving.id, x, y, moving.w, moving.h)) return;
+    if (!fits(moving.id, x, y, moving.w, moving.h, parent)) return;
     moving.x = x;
     moving.y = y;
+    // Into a section, out of one, or from one to another. The coordinates are
+    // already in the grid it is landing in, so the move is the same three
+    // numbers either way.
+    const changedGrid = (moving.parent ?? "") !== parent;
+    if (parent === "") delete moving.parent;
+    else moving.parent = parent;
     await save();
+    if (changedGrid) await fetchLanding();
     drawLanding(orgs);
   });
 
@@ -510,18 +631,31 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
 
       const move = (moved: PointerEvent) => damp(() => {
         const { width } = cell();
-        w = Math.max(2, Math.min(cols - target.x + 1, fromW + Math.round((moved.clientX - startX) / (width + GAP))));
+        const parent = target.parent ?? "";
+        const holder = parent ? landingModules.find((m) => m.id === parent) : null;
+        const most = holder ? holder.w : cols;
+        const least = parent ? 1 : 2;
+        w = Math.max(least, Math.min(most - target.x + 1,
+          fromW + Math.round((moved.clientX - startX) / (width + GAP))));
         h = Math.max(1, fromH + Math.round((moved.clientY - startY) / (width + GAP)));
-        showGhost(target.x, target.y, w, h, fits(target.id, target.x, target.y, w, h));
+        if (holder) h = Math.min(h, holder.h - target.y + 1);
+        showGhost(target.x, target.y, w, h,
+          fits(target.id, target.x, target.y, w, h, parent), parent);
       });
       const done = async () => {
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", done);
         hideGhost();
-        if (!fits(target.id, target.x, target.y, w, h)) return;
+        const parent = target.parent ?? "";
+        if (!fits(target.id, target.x, target.y, w, h, parent)) return;
         target.w = w;
         target.h = h;
+        // A section that shrank may no longer hold everything it did. What no
+        // longer fits comes out onto the page rather than being drawn past the
+        // edge of the box that is supposed to contain it.
+        const ejected = target.kind === "section" ? evict(target) : 0;
         await save();
+        if (ejected > 0) await fetchLanding();
         drawLanding(orgs);
       };
       window.addEventListener("pointermove", move);
@@ -569,11 +703,53 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   const naming = form.querySelector<HTMLElement>("[data-for-label]");
   const label = form.querySelector<HTMLInputElement>("[name=label]");
   if (naming && label) {
-    naming.hidden = target.kind !== "call_to_action";
-    label.value = target.kind === "call_to_action" ? (target.body ?? "") : "";
+    // The button's words, and a section's name. A section with no name draws no
+    // pill at all, which is what it does in the dashboard too, so this is left
+    // empty on purpose rather than filled with something.
+    const named = target.kind === "call_to_action" || target.kind === "section";
+    naming.hidden = !named;
+    label.value = named ? (target.body ?? "") : "";
   }
   void orgs;
   openModal("module-config");
+}
+
+/**
+ * What a shrunken section can no longer hold comes out onto the page.
+ *
+ * Which children, decided by WHERE they are and not by how many there are: the
+ * dashboard this comes from compares the number of children against the number
+ * of cells, so a section with two children shrunk under the second one ejects
+ * nothing and draws that child outside the box meant to contain it. A child
+ * that no longer fits is one whose far edge is past the section's new one.
+ *
+ * Each one goes under everything on the page, one below the next, which is the
+ * one place a module is certainly not on top of something else.
+ */
+function evict(section: views.LandingModule): number {
+  const out = landingModules.filter(
+    (m) => m.parent === section.id && (m.x + m.w - 1 > section.w || m.y + m.h - 1 > section.h),
+  );
+  spillOnto(out);
+  return out.length;
+}
+
+/**
+ * Put these modules on the page, one under the other, below everything.
+ *
+ * Under everything is the one place a module is certainly not on top of another
+ * one. The width is widened to the page's minimum: a module one column wide is
+ * fine inside a section and is not a module out here.
+ */
+function spillOnto(modules: views.LandingModule[]): void {
+  let row = landingModules.reduce((low, m) => (m.parent ? low : Math.max(low, m.y + m.h)), 1);
+  for (const child of modules) {
+    delete child.parent;
+    child.x = 1;
+    child.y = row;
+    child.w = Math.max(2, Math.min(views.LANDING_COLUMNS, child.w));
+    row += child.h;
+  }
 }
 
 /** The kinds that draw a name of their own, and so can be told where to put it. */

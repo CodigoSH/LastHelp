@@ -373,3 +373,104 @@ func TestWhereAModuleKeepsItsName(t *testing.T) {
 		}
 	}
 }
+
+// TestASectionHoldsModulesInItsOwnGrid.
+//
+// A child's coordinates belong to its section, not to the page. That is what
+// lets a section be dragged somewhere else without rewriting everything inside
+// it, and it is also the thing most likely to be got wrong later: the two kinds
+// of coordinate look identical in the stored layout.
+func TestASectionHoldsModulesInItsOwnGrid(t *testing.T) {
+	page := func(ms ...Module) string {
+		out, _ := json.Marshal(Layout{Modules: ms})
+		return string(out)
+	}
+	section := Module{ID: "group", Kind: Section, X: 1, Y: 1, W: 6, H: 2, Body: "My projects"}
+
+	// A child at the section's own top-left, which in the page's coordinates is
+	// where the section itself begins. Both are 1,1 and both are correct.
+	inside := Module{ID: "a", Kind: Boards, X: 1, Y: 1, W: 3, H: 1, Parent: "group"}
+	if _, err := Parse(page(section, inside)); err != nil {
+		t.Fatalf("a child at its section's first cell was refused: %v", err)
+	}
+
+	// Two children side by side inside a six-wide section. On the page they
+	// would be nowhere near the section's own column six.
+	second := Module{ID: "b", Kind: MostVoted, X: 4, Y: 1, W: 3, H: 1, Parent: "group"}
+	if _, err := Parse(page(section, inside, second)); err != nil {
+		t.Fatalf("two children sharing a section were refused: %v", err)
+	}
+
+	// And a child that would stick out of it.
+	past := Module{ID: "c", Kind: Boards, X: 5, Y: 1, W: 3, H: 1, Parent: "group"}
+	if _, err := Parse(page(section, past)); err == nil {
+		t.Error("a child was allowed to stick out of its section")
+	}
+
+	// Children of one section may not sit on each other.
+	clash := Module{ID: "d", Kind: Boards, X: 2, Y: 1, W: 3, H: 1, Parent: "group"}
+	if _, err := Parse(page(section, inside, clash)); err == nil {
+		t.Error("two children were allowed to share a cell")
+	}
+}
+
+// TestAChildAndAPageModuleAreNotMeasuredAgainstEachOther.
+//
+// The one that would be easy to get wrong in the other direction: a child at
+// 1,1 of its section and a module at 1,1 of the page are not on top of each
+// other, and refusing that pair would refuse almost every page with a section
+// on it.
+func TestAChildAndAPageModuleAreNotMeasuredAgainstEachOther(t *testing.T) {
+	out, _ := json.Marshal(Layout{Modules: []Module{
+		{ID: "top", Kind: Hero, X: 1, Y: 1, W: 12, H: 3},
+		{ID: "group", Kind: Section, X: 1, Y: 4, W: 6, H: 2},
+		{ID: "a", Kind: Boards, X: 1, Y: 1, W: 3, H: 1, Parent: "group"},
+	}})
+	if _, err := Parse(string(out)); err != nil {
+		t.Errorf("a child was measured against the page: %v", err)
+	}
+}
+
+// TestASectionDoesNotGoInsideASection.
+//
+// Two levels is a layout somebody arranged; three is a layout nobody can drag,
+// and every rule about coordinates would need a third set.
+func TestASectionDoesNotGoInsideASection(t *testing.T) {
+	out, _ := json.Marshal(Layout{Modules: []Module{
+		{ID: "outer", Kind: Section, X: 1, Y: 1, W: 8, H: 4},
+		{ID: "inner", Kind: Section, X: 1, Y: 1, W: 2, H: 1, Parent: "outer"},
+	}})
+	if _, err := Parse(string(out)); err == nil {
+		t.Error("a section was nested inside another")
+	}
+}
+
+// TestAModuleInsideSomethingThatIsNotThere.
+//
+// A parent that was deleted, or a section that never existed. Refused rather
+// than drawn on the page at coordinates belonging to a grid that is not there.
+func TestAModuleInsideSomethingThatIsNotThere(t *testing.T) {
+	gone, _ := json.Marshal(Layout{Modules: []Module{
+		{ID: "a", Kind: Boards, X: 1, Y: 1, W: 2, H: 1, Parent: "group"},
+	}})
+	_, err := Parse(string(gone))
+	if err == nil {
+		t.Fatal("a module was allowed inside a section that is not on the page")
+	}
+	// And it has to SAY that, which is the whole of this guard: a missing
+	// parent measures nothing by nothing, so the bounds check refuses it too —
+	// with "sticks out of the section holding it", about a section that is not
+	// there. Removing the guard leaves the layout refused and the operator
+	// looking for a box that does not exist.
+	if !strings.Contains(err.Error(), "not on this page") {
+		t.Errorf("a missing section was reported as %q", err)
+	}
+
+	notASection, _ := json.Marshal(Layout{Modules: []Module{
+		{ID: "words", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: "hello"},
+		{ID: "a", Kind: Boards, X: 1, Y: 1, W: 2, H: 1, Parent: "words"},
+	}})
+	if _, err := Parse(string(notASection)); err == nil {
+		t.Error("a module was allowed inside something that is not a section")
+	}
+}
