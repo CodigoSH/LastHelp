@@ -4055,6 +4055,12 @@ a.stat:hover .stat-go {
   block-size: 100%;
 }
 
+/* While the page is being arranged, the control that says so wears the accent,
+   the way the dashboard's own edit toggle does. */
+.icon-button.composing {
+  color: var(--accent);
+}
+
 /* What is being dragged is going in here. Same green the ghost uses, on the
    box rather than in it, so the answer is readable before letting go. */
 .landing-group.drop-target {

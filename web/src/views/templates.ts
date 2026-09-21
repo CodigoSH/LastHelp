@@ -591,30 +591,27 @@ export function landing(
   // The bar that turns editing on, and the controls that only exist while it
   // is. Modelled on the dashboard this house already has: you arrange the page
   // on the page, not in a settings screen somewhere else.
-  const bar = !isAdmin
+  // Only while arranging, and only what belongs to arranging. Turning it on and
+  // off is in the bar above the page: a control for the operator sitting in the
+  // middle of the page every visitor sees was one thing too many on it.
+  const bar = !isAdmin || !editing
     ? ""
     : `<div class="landing-bar">
-         ${
-           editing
-             ? `<select data-add-kind aria-label="${escapeAttr(text.t("landing.add"))}">
-                  <option value="text">${escapeHTML(text.t("landing.moduleText"))}</option>
-                  <option value="hero">${escapeHTML(text.t("landing.moduleHero"))}</option>
-                  <option value="intro">${escapeHTML(text.t("landing.moduleIntro"))}</option>
-                  <option value="organisations">${escapeHTML(text.t("shell.organizations"))}</option>
-                  <option value="boards">${escapeHTML(text.t("portal.boards"))}</option>
-                  <option value="most_voted">${escapeHTML(text.t("landing.moduleVoted"))}</option>
-                  <option value="recently_done">${escapeHTML(text.t("landing.moduleDone"))}</option>
-                  <option value="call_to_action">${escapeHTML(text.t("landing.moduleAction"))}</option>
-                  <option value="recent_activity">${escapeHTML(text.t("landing.moduleActivity"))}</option>
-                  <option value="roadmap">${escapeHTML(text.t("landing.moduleRoadmap"))}</option>
-                  <option value="statistics">${escapeHTML(text.t("landing.moduleStats"))}</option>
-                  <option value="section">${escapeHTML(text.t("landing.moduleSection"))}</option>
-                </select>
-                <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>
-                <button type="button" class="button primary" data-edit-done>${escapeHTML(text.t("action.done"))}</button>`
-             : `<button type="button" class="button ghost with-icon" data-edit-page>
-                  ${icons.edit()}<span>${escapeHTML(text.t("landing.compose"))}</span></button>`
-         }
+         <select data-add-kind aria-label="${escapeAttr(text.t("landing.add"))}">
+           <option value="text">${escapeHTML(text.t("landing.moduleText"))}</option>
+           <option value="hero">${escapeHTML(text.t("landing.moduleHero"))}</option>
+           <option value="intro">${escapeHTML(text.t("landing.moduleIntro"))}</option>
+           <option value="organisations">${escapeHTML(text.t("shell.organizations"))}</option>
+           <option value="boards">${escapeHTML(text.t("portal.boards"))}</option>
+           <option value="most_voted">${escapeHTML(text.t("landing.moduleVoted"))}</option>
+           <option value="recently_done">${escapeHTML(text.t("landing.moduleDone"))}</option>
+           <option value="call_to_action">${escapeHTML(text.t("landing.moduleAction"))}</option>
+           <option value="recent_activity">${escapeHTML(text.t("landing.moduleActivity"))}</option>
+           <option value="roadmap">${escapeHTML(text.t("landing.moduleRoadmap"))}</option>
+           <option value="statistics">${escapeHTML(text.t("landing.moduleStats"))}</option>
+           <option value="section">${escapeHTML(text.t("landing.moduleSection"))}</option>
+         </select>
+         <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>
        </div>`;
 
   return `<div class="page">

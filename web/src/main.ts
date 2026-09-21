@@ -96,15 +96,33 @@ function renderNav(): void {
   // reading their browser's language, and somebody who wants a different one
   // sets it once — in the wizard on the first run, or under Appearance — rather
   // than being offered a list of twenty on every page of the product.
-  // Two controls rather than two words: the panel is somewhere to go, so it is
-  // a button, and leaving is a single well-known mark with its name on it for
-  // anybody who cannot see the shape. Side by side as plain links they read as
-  // the leftovers of a page that was styled once and then again.
+  /**
+   * Arranging the front page, from the bar above it.
+   *
+   * One control that turns into the other, which is how the dashboard in this
+   * house does it: a pencil while the page is just a page, a tick in the accent
+   * colour while it is being arranged. It used to be a button inside the page
+   * itself, which put a control for the operator in the middle of the thing
+   * every visitor sees.
+   *
+   * Only on the front page, and only for somebody who can change it.
+   */
+  const compose =
+    me?.admin === true && location.pathname === "/"
+      ? landingEditing
+        ? `<button class="icon-button composing" data-edit-done
+                   title="${escapeAttr(i18n.t("action.done"))}"
+                   aria-label="${escapeAttr(i18n.t("action.done"))}">${icons.check(16)}</button>`
+        : `<button class="icon-button" data-edit-page
+                   title="${escapeAttr(i18n.t("landing.compose"))}"
+                   aria-label="${escapeAttr(i18n.t("landing.compose"))}">${icons.edit(16)}</button>`
+      : "";
+
+  // The panel is somewhere to go, so it is a button. Leaving is NOT here: the
+  // panel's own sidebar carries it, and a red control in the bar of every
+  // public page is the one thing on that bar nobody came for.
   const account = me
-    ? `<a class="button small with-icon" href="/panel">${icons.overview(14)}<span>${escapeHTML(i18n.t("nav.panel"))}</span></a>
-       <button class="icon-button sign-out" data-signout
-               title="${escapeAttr(i18n.t("nav.signOut"))}"
-               aria-label="${escapeAttr(i18n.t("nav.signOut"))}">${icons.signOut(16)}</button>`
+    ? `<a class="button small with-icon" href="/panel">${icons.overview(14)}<span>${escapeHTML(i18n.t("nav.panel"))}</span></a>${compose}`
     : // Not on the sign-in page itself: a link to where you already are is the
       // third thing on that screen saying the same word.
       location.pathname === "/sign-in"
@@ -228,6 +246,9 @@ function drawLanding(orgs: OrganizationSummary[]): void {
   // Placed before, this silently left the public page on the fallback height
   // and only the second draw ever looked right.
   squareLandingCells();
+  // The bar above the page carries the control that turns arranging on and off,
+  // so it has to be redrawn when that changes: the pencil becomes a tick.
+  renderNav();
   wireLanding(orgs);
 }
 
@@ -272,11 +293,13 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     }
   };
 
-  root?.querySelector<HTMLButtonElement>("[data-edit-page]")?.addEventListener("click", () => {
+  // Looked up in the document, not in the page: the control lives in the bar
+  // above it now, which is outside what this view draws.
+  document.querySelector<HTMLButtonElement>("[data-edit-page]")?.addEventListener("click", () => {
     landingEditing = true;
     drawLanding(orgs);
   });
-  root?.querySelector<HTMLButtonElement>("[data-edit-done]")?.addEventListener("click", () => {
+  document.querySelector<HTMLButtonElement>("[data-edit-done]")?.addEventListener("click", () => {
     landingEditing = false;
     drawLanding(orgs);
   });

@@ -1089,7 +1089,7 @@ async function main() {
   // them, and an editor tested through fetch is an editor nobody has used.
   await goTo("/", ".landing-grid");
   const composing = await evaluate(`
-    document.querySelector("[data-edit-page]").click();
+    document.querySelector("[data-edit-page]")?.click();
     await new Promise(r => setTimeout(r, 600));
 
     const outlined = getComputedStyle(document.querySelector(".landing-cell")).borderStyle;
@@ -1117,7 +1117,7 @@ async function main() {
   );
 
   await evaluate(`
-    document.querySelector("[data-edit-page]").click();
+    document.querySelector("[data-edit-page]")?.click();
     await new Promise(r => setTimeout(r, 600));
   `);
   // The ghost, which is the whole of the feedback while something is being
@@ -1298,7 +1298,7 @@ async function main() {
     form.requestSubmit();
     await new Promise(r => setTimeout(r, 1100));
 
-    document.querySelector("[data-edit-done]").click();
+    document.querySelector("[data-edit-done]")?.click();
     await new Promise(r => setTimeout(r, 800));
 
     const tableros = [...document.querySelectorAll(".landing-cell .cards .card")]
@@ -1396,7 +1396,7 @@ async function main() {
   const donde = await evaluate(`
     // Back into edit mode: the block above left it, and the kebab that opens a
     // module's dialog only exists while the page is being arranged.
-    document.querySelector("[data-edit-page]").click();
+    document.querySelector("[data-edit-page]")?.click();
     await new Promise(r => setTimeout(r, 600));
 
     const leer = () => {
@@ -1557,6 +1557,52 @@ async function main() {
     "and a module can be taken back out of a section",
     seccion.fuera.parent === "",
     JSON.stringify(seccion.fuera),
+  );
+
+  // The bar above the page, which is the only thing a signed-in operator sees
+  // on every public screen. Two things had to come off it and one had to go on.
+  const barra = await evaluate(`
+    const bar = document.querySelector("body > nav");
+    const leer = () => ({
+      salir: !!bar.querySelector("[data-signout]"),
+      lapiz: !!bar.querySelector("[data-edit-page]"),
+      hecho: !!bar.querySelector("[data-edit-done]"),
+      enLaPagina: !!document.querySelector("#app [data-edit-page], #app [data-edit-done]"),
+      panel: !!bar.querySelector('a[href="/panel"]'),
+    });
+
+    // Tolerant on purpose. A mutation that stops the control changing leaves no
+    // "done" button at all, and a probe that assumes one throws and takes the
+    // whole pass down instead of saying which half broke.
+    const quieto = leer();
+    bar.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 900));
+    const componiendo = leer();
+    const hecho = bar.querySelector("[data-edit-done]");
+    const acento = hecho ? getComputedStyle(hecho).color : "";
+    hecho?.click();
+    await new Promise(r => setTimeout(r, 900));
+    return { quieto, componiendo, acento, vuelta: leer() };
+  `);
+  check(
+    "leaving is not in the bar of every public page",
+    barra.quieto.salir === false && barra.componiendo.salir === false &&
+      barra.quieto.panel === true,
+    JSON.stringify(barra.quieto),
+  );
+  check(
+    "and arranging the page is one control in that bar, not a button on the page",
+    barra.quieto.lapiz === true && barra.quieto.hecho === false &&
+      barra.componiendo.hecho === true && barra.componiendo.lapiz === false &&
+      barra.quieto.enLaPagina === false && barra.componiendo.enLaPagina === false &&
+      barra.vuelta.lapiz === true,
+    JSON.stringify({ quieto: barra.quieto.lapiz, componiendo: barra.componiendo.hecho,
+                     enLaPagina: barra.componiendo.enLaPagina, vuelta: barra.vuelta.lapiz }),
+  );
+  check(
+    "and it wears the accent while the page is being arranged",
+    barra.acento.replace(/\s/g, "") === "rgb(232,82,14)",
+    barra.acento,
   );
 
   // One of three blocks that write their own page: the section checks capture
