@@ -66,3 +66,58 @@ func TestWhatIsFinishedComesBackNewestFirst(t *testing.T) {
 		t.Error("a finished report came back without a time it finished")
 	}
 }
+
+// TestCountingWhatCameInAndWhereItGot.
+//
+// Three numbers a front page can show, and the one thing that would make them
+// lie: counting something refused as either open or done. A report that was
+// declined is not waiting on anybody and was not put right, so it is in
+// "received" and in neither of the others.
+func TestCountingWhatCameInAndWhereItGot(t *testing.T) {
+	s := store(t)
+
+	open1, _ := report(t, s, Idea, "dark mode", "the white is bright")
+	open2, _ := report(t, s, Bug, "search ignores accents", "nothing comes back")
+	done1, _ := report(t, s, Idea, "keyboard shortcuts", "for the queue")
+	done2, _ := report(t, s, Bug, "the sidebar forgets", "on every reload")
+	refused, _ := report(t, s, Idea, "a themed mascot", "with a hat")
+	waiting, _ := report(t, s, Idea, "an export button", "as csv")
+
+	// Everything but the last one is let through. The last stays in the queue,
+	// so it must not be counted as received: nobody has read it.
+	for _, it := range []Item{open1, open2, done1, done2, refused} {
+		if err := s.setModeration(it.ID, Published, epoch); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = waiting
+
+	for _, at := range []struct {
+		it     Item
+		status Status
+	}{
+		{open1, StatusPlanned},
+		{open2, StatusConfirmed},
+		{done1, StatusDone},
+		{done2, StatusClosed},
+		{refused, StatusDeclined},
+	} {
+		if err := s.SetStatus(at.it.ID, at.status, epoch); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := s.Count([]int64{1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Counts{Received: 5, Open: 2, Done: 2}
+	if got != want {
+		t.Errorf("counted %+v, want %+v", got, want)
+	}
+
+	// No boards is not an error and not a guess: it is nought of everything.
+	if empty, err := s.Count(nil); err != nil || empty != (Counts{}) {
+		t.Errorf("counting nothing gave %+v, %v", empty, err)
+	}
+}

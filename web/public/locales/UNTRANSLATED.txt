@@ -8,6 +8,9 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+landing.countDone
+landing.countOpen
+landing.countReceived
 landing.label
 landing.labelAt
 landing.labelBottom
@@ -15,11 +18,17 @@ landing.labelOff
 landing.labelPill
 landing.labelTop
 landing.moduleAction
+landing.moduleActivity
 landing.moduleDone
+landing.moduleRoadmap
 landing.moduleSection
+landing.moduleStats
 landing.moduleVoted
 landing.noBoards
 landing.noVotes
+landing.noneComing
+landing.noneCounted
 landing.noneDone
+landing.noneYet
 landing.scope
 landing.scopeAll

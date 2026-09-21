@@ -150,7 +150,8 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	body := map[string]any{"modules": layout.Modules}
 	boards, needed := s.boardsForLanding(layout, composer)
 	if needed {
-		body["content"] = landingContentFrom(layout, boards, s.mostVotedIn, s.recentlyDoneIn)
+		body["content"] = landingContentFrom(layout, boards,
+			s.mostVotedIn, s.recentlyDoneIn, s.latelyIn, s.comingIn, s.countedIn)
 	}
 	if composer {
 		body["boards"] = describeBoards(boards)
@@ -181,7 +182,9 @@ func (s *Server) boardsForLanding(layout landing.Layout, composer bool) ([]org.B
 // an error because one module could not be filled is a front page that goes
 // down when a board is deleted.
 func landingContentFrom(layout landing.Layout, boards []org.Board,
-	voted, done func([]org.Board) []map[string]any) map[string]any {
+	voted, done, lately func([]org.Board) []map[string]any,
+	coming func([]org.Board) map[string]any,
+	counted func([]org.Board) map[string]any) map[string]any {
 	content := map[string]any{}
 	for _, m := range layout.Modules {
 		switch m.Kind {
@@ -193,6 +196,12 @@ func landingContentFrom(layout landing.Layout, boards []org.Board,
 			content[m.ID] = done(inScope(boards, m.Scope))
 		case landing.CallToAction:
 			content[m.ID] = whereItGoes(inScope(boards, m.Scope))
+		case landing.RecentActivity:
+			content[m.ID] = lately(inScope(boards, m.Scope))
+		case landing.Roadmap:
+			content[m.ID] = coming(inScope(boards, m.Scope))
+		case landing.Statistics:
+			content[m.ID] = counted(inScope(boards, m.Scope))
 		}
 	}
 	return content
@@ -283,6 +292,87 @@ func (s *Server) recentlyDoneIn(boards []org.Board) []map[string]any {
 // silently included bugs would be ranking things that all have nought.
 func (s *Server) mostVotedIn(boards []org.Board) []map[string]any {
 	return s.reportsIn(boards, item.Filter{Kind: item.Idea, SortByVote: true})
+}
+
+// latelyIn is what has arrived recently, newest first.
+//
+// Published only, like everything else here: the front page must never be where
+// something unreviewed appears, and the default the item store keeps is exactly
+// that.
+func (s *Server) latelyIn(boards []org.Board) []map[string]any {
+	return s.reportsIn(boards, item.Filter{})
+}
+
+// comingIn is the roadmap: what is planned, in progress, and done.
+//
+// The same three columns a board's own roadmap uses. A visitor who reads one
+// and then the other should not have to learn a second vocabulary for the same
+// three states.
+func (s *Server) comingIn(boards []org.Board) map[string]any {
+	out := map[string]any{}
+	for _, column := range item.Columns {
+		out[string(column)] = []map[string]any{}
+	}
+	if len(boards) == 0 {
+		return out
+	}
+
+	ids := make([]int64, 0, len(boards))
+	byID := make(map[int64]org.Board, len(boards))
+	for _, b := range boards {
+		ids = append(ids, b.ID)
+		byID[b.ID] = b
+	}
+
+	columns, err := s.items().RoadmapAcross(ids, roadmapOnTheFrontPage)
+	if err != nil {
+		slog.Error("reading the roadmap for the front page", "error", err)
+		return out
+	}
+	for column, items := range columns {
+		rows := make([]map[string]any, 0, len(items))
+		for _, it := range items {
+			rows = append(rows, map[string]any{
+				"public_id": it.PublicID,
+				"title":     it.Title,
+				"kind":      string(it.Kind),
+				"votes":     it.VoteCount,
+				"board":     byID[it.RepoID].Name,
+			})
+		}
+		out[string(column)] = rows
+	}
+	return out
+}
+
+// roadmapOnTheFrontPage is how many of each column one module carries. Short,
+// because three columns of eight is a page of its own and this is a box on a
+// front page.
+const roadmapOnTheFrontPage = 4
+
+// countedIn is how much came in and where it got to.
+//
+// Nothing at all when nothing has been published: three zeroes on a fresh
+// installation tell the first person who ever looks that nothing happens here,
+// which is both untrue and the worst thing this page could say.
+func (s *Server) countedIn(boards []org.Board) map[string]any {
+	ids := make([]int64, 0, len(boards))
+	for _, b := range boards {
+		ids = append(ids, b.ID)
+	}
+	counts, err := s.items().Count(ids)
+	if err != nil {
+		slog.Error("counting reports for the front page", "error", err)
+		return nil
+	}
+	if counts.Received == 0 {
+		return nil
+	}
+	return map[string]any{
+		"received": counts.Received,
+		"open":     counts.Open,
+		"done":     counts.Done,
+	}
 }
 
 // reportsIn answers one of the report modules.

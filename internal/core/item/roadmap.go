@@ -57,11 +57,26 @@ func ColumnFor(kind Kind, status Status) (Column, bool) {
 // consistent snapshot of the same instant, or an item that moves while the page
 // is being built appears twice or not at all.
 func (s Store) Roadmap(repoID int64, limitPerColumn int) (map[Column][]Item, error) {
+	return s.RoadmapAcross([]int64{repoID}, limitPerColumn)
+}
+
+// RoadmapAcross is the same for several boards at once, which is what the front
+// page needs: a roadmap module there can be pointed at one board, at an
+// organisation, or at everything, and three separate queries would be three
+// snapshots of three different instants.
+func (s Store) RoadmapAcross(repoIDs []int64, limitPerColumn int) (map[Column][]Item, error) {
 	if limitPerColumn <= 0 {
 		limitPerColumn = 25
 	}
+	if len(repoIDs) == 0 {
+		out := map[Column][]Item{}
+		for _, column := range Columns {
+			out[column] = []Item{}
+		}
+		return out, nil
+	}
 
-	all, err := s.List(Filter{RepoID: repoID, SortByVote: true, Limit: 200})
+	all, err := s.List(Filter{RepoIDs: repoIDs, SortByVote: true, Limit: 200})
 	if err != nil {
 		return nil, err
 	}

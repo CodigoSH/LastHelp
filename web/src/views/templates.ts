@@ -59,6 +59,9 @@ export interface LandingModule {
     | "most_voted"
     | "recently_done"
     | "call_to_action"
+    | "recent_activity"
+    | "roadmap"
+    | "statistics"
     | "section";
   /** One-based, the way CSS grid lines are. */
   x: number;
@@ -101,6 +104,20 @@ export interface LandingReport {
   closed_at?: number;
 }
 
+/** The three roadmap columns, each holding a few reports. */
+export interface LandingRoadmap {
+  planned: LandingReport[];
+  in_progress: LandingReport[];
+  done: LandingReport[];
+}
+
+/** How much came in and where it got to, or null when nothing has. */
+export interface LandingCounts {
+  received: number;
+  open: number;
+  done: number;
+}
+
 /** Where a call-to-action button goes, or null when there is nowhere to go. */
 export interface LandingDestination {
   org: string;
@@ -117,7 +134,13 @@ export interface LandingDestination {
  */
 export type LandingContent = Record<
   string,
-  LandingBoard[] | LandingReport[] | LandingDestination | null | undefined
+  | LandingBoard[]
+  | LandingReport[]
+  | LandingDestination
+  | LandingRoadmap
+  | LandingCounts
+  | null
+  | undefined
 >;
 
 /** Twelve columns, which is the dashboard's grid and now this page's. */
@@ -172,7 +195,7 @@ export function landing(
    * pill on its border — and a module whose two names drifted apart would be
    * the kind of fault nobody looks for.
    */
-  const heading = (m: LandingModule): { icon: string; title: string; count: string } | null => {
+  const heading = (m: LandingModule): { icon: string; title: string; count?: string } | null => {
     const rows = content[m.id];
     const many = Array.isArray(rows) ? rows.length : 0;
     switch (m.kind) {
@@ -184,6 +207,12 @@ export function landing(
         return { icon: icons.idea(16), title: text.t("landing.moduleVoted"), count: text.number(many) };
       case "recently_done":
         return { icon: icons.queue(16), title: text.t("landing.moduleDone"), count: text.number(many) };
+      case "recent_activity":
+        return { icon: icons.queue(16), title: text.t("landing.moduleActivity"), count: text.number(many) };
+      case "roadmap":
+        return { icon: icons.open(16), title: text.t("landing.moduleRoadmap") };
+      case "statistics":
+        return { icon: icons.idea(16), title: text.t("landing.moduleStats") };
       default:
         return null;
     }
@@ -320,6 +349,91 @@ export function landing(
             .join("")}</ul>
         </section>`;
 
+  /** What has arrived lately, newest first. The board's own row, unchanged. */
+  const lately = (rows: LandingReport[], head: string, at: string) =>
+    rows.length === 0
+      ? emptyState(text.t("landing.noneYet"), icons.queue(28))
+      : `<section class="landing-scroll ${labelClass(at)}">
+          ${head}
+          <ul class="briefs">${rows
+            .map(
+              (r) => `<li><a class="brief" href="/i/${escapeAttr(r.public_id)}">
+                ${kindMark(r.kind)}
+                <span class="brief-title">${escapeHTML(r.title)}</span>
+                <span class="card-sub">${escapeHTML(r.board)}</span>
+              </a></li>`,
+            )
+            .join("")}</ul>
+        </section>`;
+
+  /**
+   * What is coming, being worked on, and done.
+   *
+   * The same three columns the board's own roadmap uses, stacked rather than
+   * side by side: a module is a box on a page, and three columns inside one are
+   * three columns of two words each.
+   */
+  const coming = (columns: LandingRoadmap | null, head: string, at: string) => {
+    const names: Array<[keyof LandingRoadmap, string]> = [
+      ["planned", text.t("roadmap.planned")],
+      ["in_progress", text.t("roadmap.in_progress")],
+      ["done", text.t("roadmap.done")],
+    ];
+    const any = names.some(([key]) => (columns?.[key]?.length ?? 0) > 0);
+    if (!columns || !any) return emptyState(text.t("landing.noneComing"), icons.queue(28));
+
+    return `<section class="landing-scroll ${labelClass(at)}">
+      ${head}
+      <div class="landing-columns">${names
+        .map(([key, title]) => {
+          const rows = columns[key] ?? [];
+          if (rows.length === 0) return "";
+          return `<div class="landing-column">
+            <p class="column-name">${escapeHTML(title)}</p>
+            <ul class="briefs">${rows
+              .map(
+                (r) => `<li><a class="brief" href="/i/${escapeAttr(r.public_id)}">
+                  ${kindMark(r.kind)}
+                  <span class="brief-title">${escapeHTML(r.title)}</span>
+                </a></li>`,
+              )
+              .join("")}</ul>
+          </div>`;
+        })
+        .join("")}</div>
+    </section>`;
+  };
+
+  /**
+   * How much came in and where it got to.
+   *
+   * What is avoided is the three zeroes, not the module. A fresh installation
+   * showing "0 received, 0 open, 0 done" tells the first person who ever looks
+   * that nothing happens here, which is untrue — so the server sends nothing
+   * and this says there is nothing to count yet, the same way every other
+   * module says it has nothing to show.
+   *
+   * It does not vanish. A module that disappears leaves a hole where the
+   * operator put something, and reappears in edit mode, which reads as a page
+   * that failed rather than as a page with nothing in it yet.
+   */
+  const counted = (counts: LandingCounts | null, head: string, at: string) => {
+    if (!counts) return emptyState(text.t("landing.noneCounted"), icons.idea(28));
+    const figure = (value: number, label: string) =>
+      `<div class="landing-figure">
+        <span class="figure-number">${escapeHTML(text.number(value))}</span>
+        <span class="figure-label">${escapeHTML(label)}</span>
+      </div>`;
+    return `<section class="landing-scroll ${labelClass(at)}">
+      ${head}
+      <div class="landing-figures">
+        ${figure(counts.received, text.t("landing.countReceived"))}
+        ${figure(counts.open, text.t("landing.countOpen"))}
+        ${figure(counts.done, text.t("landing.countDone"))}
+      </div>
+    </section>`;
+  };
+
   /**
    * The one thing this page exists to make happen.
    *
@@ -417,9 +531,15 @@ export function landing(
                       ? finished((content[m.id] as LandingReport[]) ?? [], head, at)
                       : m.kind === "call_to_action"
                         ? action((content[m.id] as LandingDestination) ?? null, m.body ?? "")
-                        : m.kind === "section"
-                          ? group(m, childrenOf(m.id))
-                          : "";
+                        : m.kind === "recent_activity"
+                          ? lately((content[m.id] as LandingReport[]) ?? [], head, at)
+                          : m.kind === "roadmap"
+                            ? coming((content[m.id] as LandingRoadmap) ?? null, head, at)
+                            : m.kind === "statistics"
+                              ? counted((content[m.id] as LandingCounts) ?? null, head, at)
+                              : m.kind === "section"
+                                ? group(m, childrenOf(m.id))
+                                : "";
 
       // A section is not a box with a name at the top: its name is always the
       // pill on its border, or nothing at all, which is what it is in the
@@ -485,6 +605,9 @@ export function landing(
                   <option value="most_voted">${escapeHTML(text.t("landing.moduleVoted"))}</option>
                   <option value="recently_done">${escapeHTML(text.t("landing.moduleDone"))}</option>
                   <option value="call_to_action">${escapeHTML(text.t("landing.moduleAction"))}</option>
+                  <option value="recent_activity">${escapeHTML(text.t("landing.moduleActivity"))}</option>
+                  <option value="roadmap">${escapeHTML(text.t("landing.moduleRoadmap"))}</option>
+                  <option value="statistics">${escapeHTML(text.t("landing.moduleStats"))}</option>
                   <option value="section">${escapeHTML(text.t("landing.moduleSection"))}</option>
                 </select>
                 <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>

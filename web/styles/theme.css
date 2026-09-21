@@ -4116,6 +4116,56 @@ a.stat:hover .stat-go {
   flex: 1;
 }
 
+/*
+ * The roadmap's three columns, stacked rather than side by side: a module is a
+ * box on a page, and three columns inside one are three columns of two words
+ * each. The column names carry the weight instead.
+ */
+.landing-columns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.landing-column .column-name {
+  margin: 0 0 0.3rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-family: var(--font-mono, monospace);
+}
+
+/* Three numbers, side by side while there is room for them. */
+.landing-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.landing-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-inline-size: 4.5rem;
+}
+
+.landing-figure .figure-number {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-main);
+}
+
+.landing-figure .figure-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
 /* The rows sit inside the padding the header already establishes. */
 .landing-scroll > :not(.module-header) {
   padding: 0.9rem;

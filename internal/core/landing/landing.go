@@ -53,6 +53,27 @@ const (
 	// showed one. A promise a page makes and does not keep reads as broken.
 	MostVoted Kind = "most_voted"
 
+	// RecentActivity is what has arrived lately.
+	//
+	// Useful only where there is a flow of it: on a quiet portal a list of the
+	// same three reports for a month says less than nothing. It is offered and
+	// not placed by default for exactly that reason.
+	RecentActivity Kind = "recent_activity"
+
+	// Roadmap is what is coming, being worked on, and done.
+	//
+	// The same three columns the board's own roadmap uses, because a visitor
+	// who reads one and then the other should not have to learn a second
+	// vocabulary.
+	Roadmap Kind = "roadmap"
+
+	// Statistics is how much has come in and how much is finished.
+	//
+	// The most dangerous of these on a fresh installation: three zeroes say
+	// "nothing happens here" to the first person who ever looks. It draws
+	// nothing at all until there is something to count.
+	Statistics Kind = "statistics"
+
 	// Section is a box that holds other modules.
 	//
 	// The dashboard's own, and the reason it exists there is the reason it
@@ -92,7 +113,7 @@ const (
 // Putting it here cost exactly that, and a test said so.
 func (k Kind) usesData() bool {
 	switch k {
-	case Boards, MostVoted, RecentlyDone, CallToAction:
+	case Boards, MostVoted, RecentlyDone, CallToAction, RecentActivity, Roadmap, Statistics:
 		return true
 	}
 	return false
@@ -113,7 +134,7 @@ func (k Kind) usesWords() bool { return k == Text || k == CallToAction || k == S
 // has none, so neither is asked where to put one.
 func (k Kind) usesHeader() bool {
 	switch k {
-	case Organisations, Boards, MostVoted, RecentlyDone:
+	case Organisations, Boards, MostVoted, RecentlyDone, RecentActivity, Roadmap, Statistics:
 		return true
 	}
 	return false
@@ -540,7 +561,8 @@ func (l Layout) validate() error {
 		seen[m.ID] = true
 
 		switch m.Kind {
-		case Hero, Intro, Organisations, Text, Boards, MostVoted, RecentlyDone, CallToAction, Section:
+		case Hero, Intro, Organisations, Text, Boards, MostVoted, RecentlyDone, CallToAction,
+			RecentActivity, Roadmap, Statistics, Section:
 		default:
 			return fmt.Errorf("%w: %q", ErrUnknownKind, m.Kind)
 		}

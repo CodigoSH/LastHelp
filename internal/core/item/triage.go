@@ -1,6 +1,7 @@
 package item
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -315,4 +316,63 @@ func (s Store) Counts(repoIDs []int64, column string) (map[string]int, error) {
 		out[key] = n
 	}
 	return out, rows.Err()
+}
+
+// Counts is how much has come in and where it got to.
+//
+// Three numbers and no more. "Received" is everything a person let through,
+// "Done" is what was actually put right, and "Open" is what is still waiting on
+// somebody. Anything refused is in neither of the last two on purpose: it is
+// not open and it was not done, and counting it as either would be the page
+// saying something that is not so.
+type Counts struct {
+	Received int
+	Open     int
+	Done     int
+}
+
+// Count answers all three in one query.
+//
+// One query rather than three because this runs on the public front page, and
+// because three would be three snapshots of three different instants: a report
+// published between the first and the third would be received and not counted
+// anywhere else.
+func (s Store) Count(repoIDs []int64) (Counts, error) {
+	var out Counts
+	if len(repoIDs) == 0 {
+		return out, nil
+	}
+
+	args := make([]any, 0, len(repoIDs)+6)
+	for _, id := range repoIDs {
+		args = append(args, id)
+	}
+	for _, st := range []Status{StatusDone, StatusClosed} {
+		args = append(args, string(st))
+	}
+	for _, st := range []Status{StatusDone, StatusClosed, StatusDeclined, StatusNotReproducible} {
+		args = append(args, string(st))
+	}
+
+	query := `SELECT
+			count(*),
+			sum(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END),
+			sum(CASE WHEN status NOT IN (?, ?, ?, ?) THEN 1 ELSE 0 END)
+		FROM item
+		WHERE merged_into IS NULL AND moderation_state = '` + string(Published) + `'
+		  AND repo_id IN (` + placeholders(len(repoIDs)) + `)`
+
+	// The repository ids come first in the WHERE, so they go first in the args.
+	ordered := make([]any, 0, len(args))
+	ordered = append(ordered, args[len(repoIDs):]...)
+	ordered = append(ordered, args[:len(repoIDs)]...)
+
+	var done, open sql.NullInt64
+	err := s.DB.QueryRow(query, ordered...).Scan(&out.Received, &done, &open)
+	if err != nil {
+		return Counts{}, fmt.Errorf("counting reports: %w", err)
+	}
+	out.Done = int(done.Int64)
+	out.Open = int(open.Int64)
+	return out, nil
 }

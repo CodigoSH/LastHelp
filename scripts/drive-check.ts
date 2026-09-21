@@ -1586,6 +1586,79 @@ async function main() {
     JSON.stringify({ tarjeta: singular.orgEsTarjeta, enlace: singular.orgEnlaza }),
   );
 
+  // The three that only make sense on an installation with some history: what
+  // arrived lately, what is coming, and how it is going. The last of those is
+  // the one worth being careful with — three zeroes on a fresh installation
+  // tell the first visitor that nothing happens here.
+  const historia = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const escribir = (modules) => fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules }) }).then(r => r.status);
+    const dibujar = async () => {
+      history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+      await new Promise(r => setTimeout(r, 1300));
+    };
+
+    await escribir([
+      { id: "lately", kind: "recent_activity", x: 1, y: 1, w: 6, h: 3 },
+      { id: "soon", kind: "roadmap", x: 7, y: 1, w: 6, h: 3 },
+      { id: "figures", kind: "statistics", x: 1, y: 4, w: 6, h: 2 },
+    ]);
+    await dibujar();
+
+    const conDatos = {
+      recientes: document.querySelectorAll('[data-module="lately"] .brief').length,
+      columnas: [...document.querySelectorAll('[data-module="soon"] .column-name')]
+        .map(el => el.textContent.trim()),
+      cifras: [...document.querySelectorAll('[data-module="figures"] .figure-number')]
+        .map(el => el.textContent.trim()),
+      // The numbers have to agree with the reports the page itself lists, or
+      // they are three numbers from somewhere else.
+      recibidos: Number(document.querySelector('[data-module="figures"] .figure-number')?.textContent ?? "0"),
+    };
+
+    // Now the same three on an installation where nothing has been published.
+    // The scope names a board that is not there, which is the same thing to
+    // every one of them: no boards, so nothing counted.
+    await escribir([
+      { id: "lately", kind: "recent_activity", x: 1, y: 1, w: 6, h: 3, scope: "codigosh/gone" },
+      { id: "soon", kind: "roadmap", x: 7, y: 1, w: 6, h: 3, scope: "codigosh/gone" },
+      { id: "figures", kind: "statistics", x: 1, y: 4, w: 6, h: 2, scope: "codigosh/gone" },
+    ]);
+    await dibujar();
+
+    const enBlanco = {
+      recientesVacio: !!document.querySelector('[data-module="lately"] .empty'),
+      roadmapVacio: !!document.querySelector('[data-module="soon"] .empty'),
+      cifras: document.querySelectorAll('[data-module="figures"] .figure-number').length,
+      // And the statistics module keeps its place instead of collapsing.
+      cajaEstadisticas: Math.round(
+        document.querySelector('[data-module="figures"]').getBoundingClientRect().height),
+    };
+    return { conDatos, enBlanco };
+  `);
+  check(
+    "the front page can show what arrived lately and what is coming",
+    historia.conDatos.recientes >= 1 &&
+      historia.conDatos.columnas.length >= 1 &&
+      historia.conDatos.cifras.length === 3,
+    JSON.stringify(historia.conDatos),
+  );
+  check(
+    "and the numbers count what was actually published",
+    historia.conDatos.recibidos >= historia.conDatos.recientes,
+    JSON.stringify({ recibidos: historia.conDatos.recibidos, listados: historia.conDatos.recientes }),
+  );
+  check(
+    "with nothing to count, no numbers are shown at all",
+    historia.enBlanco.cifras === 0 &&
+      historia.enBlanco.recientesVacio === true && historia.enBlanco.roadmapVacio === true &&
+      historia.enBlanco.cajaEstadisticas > 10,
+    JSON.stringify(historia.enBlanco),
+  );
+
   // Shrinking a section under what is inside it. The dashboard this comes from
   // compares HOW MANY children there are against how many cells are left, so a
   // section with one child shrunk under that child ejects nothing and draws it
