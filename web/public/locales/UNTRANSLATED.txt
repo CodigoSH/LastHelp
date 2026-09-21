@@ -8,6 +8,19 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+landing.aboutAction
+landing.aboutActivity
+landing.aboutBoards
+landing.aboutDone
+landing.aboutHero
+landing.aboutIntro
+landing.aboutOrgs
+landing.aboutRoadmap
+landing.aboutStats
+landing.aboutText
+landing.aboutVoted
+landing.addModule
+landing.addSection
 landing.countDone
 landing.countOpen
 landing.countReceived

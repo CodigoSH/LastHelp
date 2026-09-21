@@ -107,10 +107,26 @@ function renderNav(): void {
    *
    * Only on the front page, and only for somebody who can change it.
    */
+  const composing = me?.admin === true && location.pathname === "/" && landingEditing;
   const compose =
     me?.admin === true && location.pathname === "/"
-      ? landingEditing
-        ? `<button class="icon-button composing" data-edit-done
+      ? composing
+        ? // While arranging: a plus that opens a short menu, and the tick that
+          // finishes. The dashboard's shape exactly — adding is two decisions,
+          // a module or a group, and only the first needs a picker.
+          `<div class="add-wrap">
+             <button class="icon-button" data-add-menu
+                     title="${escapeAttr(i18n.t("landing.add"))}"
+                     aria-label="${escapeAttr(i18n.t("landing.add"))}"
+                     aria-haspopup="menu" aria-expanded="false">${icons.add(16)}</button>
+             <div class="kebab-menu add-menu" role="menu" hidden>
+               <button type="button" class="kebab-item" role="menuitem" data-open-modal="module-picker">
+                 ${icons.overview(15)}<span>${escapeHTML(i18n.t("landing.addModule"))}</span></button>
+               <button type="button" class="kebab-item" role="menuitem" data-add-section>
+                 ${icons.repository(15)}<span>${escapeHTML(i18n.t("landing.addSection"))}</span></button>
+             </div>
+           </div>
+           <button class="icon-button composing" data-edit-done
                    title="${escapeAttr(i18n.t("action.done"))}"
                    aria-label="${escapeAttr(i18n.t("action.done"))}">${icons.check(16)}</button>`
         : `<button class="icon-button" data-edit-page
@@ -304,9 +320,14 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     drawLanding(orgs);
   });
 
-  root?.querySelector<HTMLButtonElement>("[data-add-module]")?.addEventListener("click", async () => {
-    const kind = (root?.querySelector<HTMLSelectElement>("[data-add-kind]")?.value ??
-      "text") as views.LandingModule["kind"];
+  /**
+   * Put a new module on the page.
+   *
+   * Called from the picker, which is a grid of cards saying what each one
+   * draws, and from the menu beside it for a group. Both end here: a module is
+   * a module whichever door it came through.
+   */
+  const add = async (kind: views.LandingModule["kind"]) => {
     // Under everything: the one place a new module is certainly not on top of
     // another one, whatever the page already looks like.
     const bottom = landingModules.reduce((low, m) => Math.max(low, m.y + m.h), 1);
@@ -330,17 +351,47 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     // Opened straight away, the way the dashboard does it: a module you just
     // added with nothing in it is a module you were about to configure.
     openModuleConfig(added.id, orgs);
+  };
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-pick]").forEach((card) =>
+    card.addEventListener("click", async () => {
+      card.closest("dialog")?.close();
+      await add((card.dataset.pick ?? "text") as views.LandingModule["kind"]);
+    }),
+  );
+
+  // A group comes straight from the menu: there is only one of it, so there is
+  // nothing to pick.
+  document.querySelector<HTMLButtonElement>("[data-add-section]")?.addEventListener("click", async () => {
+    closeMenus();
+    await add("section");
+  });
+
+  // The plus, and its short menu.
+  const adder = document.querySelector<HTMLButtonElement>("[data-add-menu]");
+  adder?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const menu = adder.parentElement?.querySelector<HTMLElement>(".add-menu");
+    const wasOpen = menu ? !menu.hidden : false;
+    closeMenus();
+    if (menu && !wasOpen) {
+      menu.hidden = false;
+      adder.setAttribute("aria-expanded", "true");
+    }
   });
 
   // The menu opens one at a time, and anything else closes it: a second menu
   // left open behind the first is two sets of actions on screen for two
   // different modules.
+  // Across the document, not just the page: the menu that adds things lives in
+  // the bar above it, and a menu left open up there while another opens down
+  // here is two sets of actions on screen for two different things.
   const closeMenus = () =>
-    root?.querySelectorAll<HTMLElement>(".kebab-menu").forEach((menu) => {
+    document.querySelectorAll<HTMLElement>(".kebab-menu").forEach((menu) => {
       menu.hidden = true;
-      root
-        ?.querySelector<HTMLButtonElement>(`[data-module-menu="${menu.dataset.menuFor}"]`)
-        ?.setAttribute("aria-expanded", "false");
+      document
+        .querySelectorAll<HTMLButtonElement>("[data-module-menu], [data-add-menu]")
+        .forEach((button) => button.setAttribute("aria-expanded", "false"));
     });
 
   root?.querySelectorAll<HTMLButtonElement>("[data-module-menu]").forEach((button) =>

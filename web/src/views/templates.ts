@@ -591,36 +591,12 @@ export function landing(
   // The bar that turns editing on, and the controls that only exist while it
   // is. Modelled on the dashboard this house already has: you arrange the page
   // on the page, not in a settings screen somewhere else.
-  // Only while arranging, and only what belongs to arranging. Turning it on and
-  // off is in the bar above the page: a control for the operator sitting in the
-  // middle of the page every visitor sees was one thing too many on it.
-  const bar = !isAdmin || !editing
-    ? ""
-    : `<div class="landing-bar">
-         <select data-add-kind aria-label="${escapeAttr(text.t("landing.add"))}">
-           <option value="text">${escapeHTML(text.t("landing.moduleText"))}</option>
-           <option value="hero">${escapeHTML(text.t("landing.moduleHero"))}</option>
-           <option value="intro">${escapeHTML(text.t("landing.moduleIntro"))}</option>
-           <option value="organisations">${escapeHTML(text.t("shell.organizations"))}</option>
-           <option value="boards">${escapeHTML(text.t("portal.boards"))}</option>
-           <option value="most_voted">${escapeHTML(text.t("landing.moduleVoted"))}</option>
-           <option value="recently_done">${escapeHTML(text.t("landing.moduleDone"))}</option>
-           <option value="call_to_action">${escapeHTML(text.t("landing.moduleAction"))}</option>
-           <option value="recent_activity">${escapeHTML(text.t("landing.moduleActivity"))}</option>
-           <option value="roadmap">${escapeHTML(text.t("landing.moduleRoadmap"))}</option>
-           <option value="statistics">${escapeHTML(text.t("landing.moduleStats"))}</option>
-           <option value="section">${escapeHTML(text.t("landing.moduleSection"))}</option>
-         </select>
-         <button type="button" class="button" data-add-module>${escapeHTML(text.t("landing.add"))}</button>
-       </div>`;
-
   return `<div class="page">
-    ${bar}
     <div class="landing-grid${editing ? " editing" : ""}">
       ${drawn}
       ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
     </div>
-    ${editing ? moduleModal(text, allBoards, orgs) : ""}
+    ${editing ? modulePicker(text) + moduleModal(text, allBoards, orgs) : ""}
   </div>`;
 }
 
@@ -631,6 +607,51 @@ export function landing(
  * dialog whose body is filled for the module being edited. A module that grows
  * a setting later adds a field here rather than a screen somewhere.
  */
+/**
+ * Choosing what to add, as a grid of cards.
+ *
+ * The dashboard's own picker: every kind laid out with its mark, its name and a
+ * line saying what it draws, and you pick one. It was a dropdown and an Add
+ * button sitting on the page — two controls that told you nothing about what
+ * you were about to get, and that lived in the middle of the thing every
+ * visitor sees.
+ *
+ * A group is not in here. It goes in the menu beside this, because it is not a
+ * module that draws something: it is the box the others go into.
+ */
+function modulePicker(text: Text): string {
+  const kinds: Array<[string, string, string, string]> = [
+    ["hero", icons.overview(22), text.t("landing.moduleHero"), text.t("landing.aboutHero")],
+    ["intro", icons.info(22), text.t("landing.moduleIntro"), text.t("landing.aboutIntro")],
+    ["text", icons.edit(22), text.t("landing.moduleText"), text.t("landing.aboutText")],
+    ["call_to_action", icons.add(22), text.t("landing.moduleAction"), text.t("landing.aboutAction")],
+    ["organisations", icons.organization(22), text.t("shell.organizations"), text.t("landing.aboutOrgs")],
+    ["boards", icons.repository(22), text.t("portal.boards"), text.t("landing.aboutBoards")],
+    ["most_voted", icons.idea(22), text.t("landing.moduleVoted"), text.t("landing.aboutVoted")],
+    ["recently_done", icons.check(22), text.t("landing.moduleDone"), text.t("landing.aboutDone")],
+    ["recent_activity", icons.queue(22), text.t("landing.moduleActivity"), text.t("landing.aboutActivity")],
+    ["roadmap", icons.open(22), text.t("landing.moduleRoadmap"), text.t("landing.aboutRoadmap")],
+    ["statistics", icons.monitor(22), text.t("landing.moduleStats"), text.t("landing.aboutStats")],
+  ];
+
+  return `<dialog class="modal wide" id="module-picker">
+    <div class="modal-head">
+      <h2>${escapeHTML(text.t("landing.add"))}</h2>
+      <button type="button" class="icon-button" data-close
+        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+    </div>
+    <div class="picker-grid">${kinds
+      .map(
+        ([kind, icon, name, about]) => `<button type="button" class="picker-card" data-pick="${escapeAttr(kind)}">
+          <span class="picker-icon" aria-hidden="true">${icon}</span>
+          <span class="picker-name">${escapeHTML(name)}</span>
+          <span class="picker-about">${escapeHTML(about)}</span>
+        </button>`,
+      )
+      .join("")}</div>
+  </dialog>`;
+}
+
 function moduleModal(
   text: Text,
   boards: LandingBoard[] = [],

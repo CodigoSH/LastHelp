@@ -3922,11 +3922,17 @@ a.stat:hover .stat-go {
   min-inline-size: 0;
   position: relative;
   /*
-   * A module lives inside the box it was given. Scrolls rather than clips so a
-   * list that outgrows a short module is a scroll away instead of gone, and so
-   * nothing a module draws can land on top of its neighbour.
+   * Clipped, never scrolled. This is the dashboard's own rule for a tile, and
+   * copying it rather than inventing one is what fixes two symptoms at once:
+   * the corner handle is positioned against these edges, and while the cell
+   * scrolled, the handle pushed its scrollable area out — a scrollbar appeared,
+   * the content narrowed, the handle moved, and the whole thing flickered with
+   * nothing being dragged. A box that cannot scroll has no bar to show.
+   *
+   * What needs to scroll scrolls inside itself, which is what a widget does
+   * over there and what .landing-scroll does here.
    */
-  overflow: auto;
+  overflow: hidden;
 }
 
 /*
@@ -4124,6 +4130,53 @@ a.stat:hover .stat-go {
   align-items: center;
 }
 
+/*
+ * Picking what to add: a grid of cards, each with its mark, its name and a line
+ * saying what it draws. Copied from the dashboard's own picker, down to the
+ * track — cards that fit themselves to the width rather than a fixed number of
+ * columns, so the same dialog works on a laptop and on a phone.
+ */
+.modal.wide {
+  inline-size: min(52rem, 92vw);
+  max-inline-size: none;
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.9rem;
+  margin-block-start: 1rem;
+}
+
+.picker-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 1.1rem 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.picker-card:hover {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  transform: translateY(-2px);
+}
+
+.picker-icon { color: var(--accent); }
+.picker-name { font-weight: 600; }
+.picker-about { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+
+/* The menu the plus opens, anchored under it. */
+.add-wrap { position: relative; display: inline-flex; }
+.add-wrap .add-menu { inset-block-start: calc(100% + 6px); inset-inline-end: 0; }
+
 /* What is being dragged is going in here. Same green the ghost uses, on the
    box rather than in it, so the answer is readable before letting go. */
 .landing-group.drop-target {
@@ -4144,6 +4197,8 @@ a.stat:hover .stat-go {
  * module down by a name most of them do not wear. Measured — the pill renders
  * 25px, so it hangs 12.5px over the edge and needs at least that much.
  */
+/* The one exception, and the dashboard makes the same one: a name that sits on
+   the border has to be allowed over the edge. */
 .landing-cell.has-pill {
   padding-block-start: 0.85rem;
   overflow: visible;

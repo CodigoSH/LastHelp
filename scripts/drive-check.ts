@@ -654,6 +654,10 @@ async function main() {
   //
   //    The control is drawn only if the server says this person may use it, so
   //    this also checks that asking is the check rather than the drawing.
+  // Its own wait: the navigation above stops at the count, and the team's
+  // controls arrive with a second read. Without this the check failed about one
+  // run in ten, saying the product had lost a control it had not lost.
+  await waitFor("#status-select");
   const statusControl = await evaluate(`return !!document.querySelector("#status-select")`);
   check("the team sees the status control", statusControl === true);
 
@@ -1096,8 +1100,11 @@ async function main() {
     const kebabs = document.querySelectorAll(".kebab-btn").length;
 
     // Add words, and the module opens its own dialog the moment it exists.
-    document.querySelector("[data-add-kind]").value = "text";
-    document.querySelector("[data-add-module]").click();
+    document.querySelector("[data-add-menu]").click();
+    await new Promise(r => setTimeout(r, 200));
+    document.querySelector('[data-open-modal="module-picker"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    document.querySelector('[data-pick="text"]').click();
     await new Promise(r => setTimeout(r, 900));
     const opened = document.querySelector("#module-config")?.open === true;
 
@@ -1272,8 +1279,11 @@ async function main() {
     let opciones = [];
     let ofrecido = false;
     const add = async (kind) => {
-      document.querySelector("[data-add-kind]").value = kind;
-      document.querySelector("[data-add-module]").click();
+      document.querySelector("[data-add-menu]").click();
+      await new Promise(r => setTimeout(r, 200));
+      document.querySelector('[data-open-modal="module-picker"]').click();
+      await new Promise(r => setTimeout(r, 400));
+      document.querySelector('[data-pick="' + kind + '"]').click();
       await new Promise(r => setTimeout(r, 1100));
       opciones = [...document.querySelectorAll("#module-scope option")].map(o => o.value);
       ofrecido = !document.querySelector("[data-for-scope]").hidden;
@@ -1289,8 +1299,11 @@ async function main() {
     // The button, with a label typed into its dialog rather than left default:
     // what is being checked is that the words reach the button, not that a
     // fallback exists.
-    document.querySelector("[data-add-kind]").value = "call_to_action";
-    document.querySelector("[data-add-module]").click();
+    document.querySelector("[data-add-menu]").click();
+    await new Promise(r => setTimeout(r, 200));
+    document.querySelector('[data-open-modal="module-picker"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    document.querySelector('[data-pick="call_to_action"]').click();
     await new Promise(r => setTimeout(r, 1100));
     const etiquetaOfrecida = !document.querySelector("[data-for-label]").hidden;
     const form = document.querySelector("form.module-config");
@@ -1442,6 +1455,96 @@ async function main() {
     JSON.stringify(registro),
   );
 
+  // Adding, the way the dashboard does it: a plus in the bar that opens a short
+  // menu — a module, or a group — and the module one opens a picker of cards
+  // saying what each kind draws. It was a dropdown and an Add button sitting on
+  // the page: two controls that said nothing about what you were about to get,
+  // in the middle of the thing every visitor sees.
+  const anadir = await evaluate(`
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 900));
+
+    const enLaPagina = !!document.querySelector("#app [data-add-kind], #app .landing-bar");
+    const mas = document.querySelector("body > nav [data-add-menu]");
+    mas.click();
+    await new Promise(r => setTimeout(r, 300));
+    const menu = [...document.querySelectorAll("body > nav .add-menu .kebab-item")]
+      .map(b => b.textContent.trim());
+
+    document.querySelector('[data-open-modal="module-picker"]').click();
+    await new Promise(r => setTimeout(r, 400));
+    const dlg = document.querySelector("#module-picker");
+    const tarjetas = [...dlg.querySelectorAll("[data-pick]")].map(c => c.dataset.pick);
+    const conTexto = [...dlg.querySelectorAll(".picker-card")]
+      .every(c => c.querySelector(".picker-name")?.textContent.trim() &&
+                  c.querySelector(".picker-about")?.textContent.trim() &&
+                  c.querySelector(".picker-icon svg"));
+    const abierto = dlg.open === true;
+    dlg.querySelector("[data-close]").click();
+    await new Promise(r => setTimeout(r, 300));
+
+    return { enLaPagina, menu, tarjetas, conTexto, abierto, cerrado: dlg.open === false,
+             // And the way out of arranging is still one click in the same bar.
+             hecho: !!document.querySelector("body > nav [data-edit-done]") };
+  `);
+  check(
+    "adding is a menu in the bar and a picker of cards, not two controls on the page",
+    anadir.enLaPagina === false && anadir.menu.length === 2 &&
+      anadir.abierto === true && anadir.cerrado === true && anadir.hecho === true,
+    JSON.stringify({ enLaPagina: anadir.enLaPagina, menu: anadir.menu }),
+  );
+  check(
+    "and the picker offers every module, each saying what it draws",
+    anadir.tarjetas.length === 11 && anadir.conTexto === true &&
+      anadir.tarjetas.includes("roadmap") && anadir.tarjetas.includes("hero") &&
+      // A group is not a module that draws something, so it is not in here.
+      !anadir.tarjetas.includes("section"),
+    JSON.stringify(anadir.tarjetas),
+  );
+
+  // Taking hold of a corner must not change the page around it. The handle is
+  // positioned against the cell's edges, and while the cell was the thing that
+  // scrolled, the handle pushed its scrollable area out: a scrollbar appeared,
+  // the content narrowed, the handle moved, and it flickered without anything
+  // being dragged.
+  const esquina = await evaluate(`
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 900));
+
+    const celda = document.querySelector(".landing-cell");
+    const cuerpo = celda;
+    const asa = celda.querySelector(":scope > [data-resize]");
+    const foto = () => ({
+      barras: cuerpo.scrollWidth > cuerpo.clientWidth || cuerpo.scrollHeight > cuerpo.clientHeight,
+      caja: Math.round(celda.getBoundingClientRect().width) + "x" +
+            Math.round(celda.getBoundingClientRect().height),
+      asa: Math.round(asa.getBoundingClientRect().left) + "," +
+           Math.round(asa.getBoundingClientRect().top),
+    });
+
+    const antes = foto();
+    const caja = celda.getBoundingClientRect();
+    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
+    asa.dispatchEvent(new PointerEvent("pointerdown", { ...opts,
+      clientX: caja.right, clientY: caja.bottom }));
+    await new Promise(r => setTimeout(r, 400));
+    const agarrada = foto();
+    await new Promise(r => setTimeout(r, 600));
+    const quieta = foto();
+    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
+      clientX: caja.right, clientY: caja.bottom }));
+    await new Promise(r => setTimeout(r, 600));
+    return { antes, agarrada, quieta };
+  `);
+  check(
+    "taking hold of a corner adds no scrollbars and moves nothing",
+    esquina.antes.barras === false && esquina.agarrada.barras === false &&
+      esquina.agarrada.caja === esquina.antes.caja &&
+      esquina.quieta.caja === esquina.agarrada.caja &&
+      esquina.quieta.asa === esquina.agarrada.asa,
+    JSON.stringify(esquina),
+  );
+
   // Sizes. Every module used to arrive twelve columns wide and refuse to go
   // below two, so a page was a stack of bands whatever the operator did. A
   // module is a tile like any other in this house: it arrives at a size that
@@ -1451,8 +1554,11 @@ async function main() {
     await new Promise(r => setTimeout(r, 700));
 
     const anadir = async (kind) => {
-      document.querySelector("[data-add-kind]").value = kind;
-      document.querySelector("[data-add-module]").click();
+      document.querySelector("[data-add-menu]").click();
+      await new Promise(r => setTimeout(r, 200));
+      document.querySelector('[data-open-modal="module-picker"]').click();
+      await new Promise(r => setTimeout(r, 400));
+      document.querySelector('[data-pick="' + kind + '"]').click();
       await new Promise(r => setTimeout(r, 1100));
       document.querySelector("#module-config")?.close();
       await new Promise(r => setTimeout(r, 300));
