@@ -104,6 +104,57 @@ async function main() {
     return result?.result?.value;
   };
 
+  /**
+   * Wait until something is on the page, rather than for a length of time.
+   *
+   * Every navigation used to be followed by a fixed sleep, and a fixed sleep is
+   * a bet that the page renders inside it. It is a bet that is won almost every
+   * time, which is the problem: a pass that fails once in twenty is a pass
+   * nobody believes, and the three checks that failed together one evening had
+   * all read a page that had not finished arriving.
+   *
+   * Loud when it gives up. A check that quietly carried on with an empty page
+   * would report the absence as a fault in the product.
+   */
+  const waitFor = async (selector: string, within = 10_000) => {
+    const until = Date.now() + within;
+    for (;;) {
+      const there = await evaluate(
+        `return !!document.querySelector(${JSON.stringify(selector)})`,
+      );
+      if (there) return;
+      if (Date.now() > until) {
+        throw new Error(`nothing matched ${selector} after ${within}ms`);
+      }
+      await sleep(80);
+    }
+  };
+
+  /**
+   * Go somewhere and wait for the thing that says you have arrived.
+   *
+   * Two conditions, and the second one is the one that is easy to miss: the
+   * screen being left is still on the page while the next one fetches what it
+   * needs, so a marker can match the page you are walking away from. That is
+   * not hypothetical — waiting for "the queue or an empty state" matched the
+   * empty state of the board screen before it, instantly, and the check read a
+   * queue that was not there yet.
+   *
+   * So what is on the page now is tagged first, and the wait is for that tag to
+   * be gone AND the marker to be there. The application replaces the whole of
+   * #app when it draws a screen, so the tag cannot survive the change.
+   */
+  const goTo = async (path: string, marker: string) => {
+    await evaluate(`
+      const app = document.getElementById("app");
+      app?.firstElementChild?.setAttribute("data-leaving", "1");
+      history.pushState({}, "", ${JSON.stringify(path)});
+      dispatchEvent(new PopStateEvent("popstate"));
+    `);
+    await waitFor("#app > :not([data-leaving])");
+    await waitFor(marker);
+  };
+
   const check = (label: string, ok: boolean, detail = "") => {
     console.log(`  ${ok ? "✓" : "✗"} ${label}${detail ? ` — ${detail}` : ""}`);
     if (!ok) process.exitCode = 1;
@@ -121,8 +172,7 @@ async function main() {
   check("lang and dir are stamped", Boolean(lang) && Boolean(dir), `lang=${lang} dir=${dir}`);
 
   // 3. Sign in through the form, as a person would.
-  await evaluate(`history.pushState({}, "", "/sign-in"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  await goTo("/sign-in", "form.setup-preferences");
   // A fresh instance opens the wizard rather than a bare login: the first
   // screen has to carry its own progress, or nobody knows how many more there
   // are. The dots are read from the markup, not from the shape.
@@ -255,8 +305,7 @@ async function main() {
 
   // 4b. An organisation and a repository, made the way an operator makes them:
   //     from a modal on the screen that lists them.
-  await evaluate(`history.pushState({}, "", "/panel/organizations"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1200);
+  await goTo("/panel/organizations", "[data-add-org]");
   const started = await evaluate(`
     document.querySelector("[data-add-org]").click();
     await new Promise(r => setTimeout(r, 300));
@@ -275,8 +324,7 @@ async function main() {
     JSON.stringify(started),
   );
 
-  await evaluate(`history.pushState({}, "", "/panel/codigosh"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1200);
+  await goTo("/panel/codigosh", "[data-add-repo]");
   const boards = await evaluate(`
     document.querySelector("[data-add-repo]").click();
     await new Promise(r => setTimeout(r, 300));
@@ -294,8 +342,7 @@ async function main() {
   );
 
   // 5. Report something through the form, with no account.
-  await evaluate(`history.pushState({}, "", "/codigosh/lastboard/new"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(500);
+  await goTo("/codigosh/lastboard/new", "form.report");
   const formThere = await evaluate(`return !!document.querySelector("form.report")`);
   check("the report form is on screen", formThere === true);
 
@@ -415,14 +462,12 @@ async function main() {
   );
 
   // 6. Nothing waiting is on the public board.
-  await evaluate(`history.pushState({}, "", "/codigosh/lastboard"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(500);
+  await goTo("/codigosh/lastboard", ".items, .empty");
   const beforeApproval = await evaluate(`return document.querySelectorAll(".items li").length`);
   check("nothing waiting is public", beforeApproval === 0, `rows=${beforeApproval}`);
 
   // 7. The queue shows it, and publishing works from the panel.
-  await evaluate(`history.pushState({}, "", "/codigosh/lastboard/queue"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(500);
+  await goTo("/codigosh/lastboard/queue", ".queue, .empty");
   const queued = await evaluate(`return document.querySelectorAll(".queue li").length`);
   check("the queue shows it", queued === 1, `rows=${queued}`);
 
@@ -432,8 +477,7 @@ async function main() {
   check("publishing removes it from the queue", emptied === 0, `rows=${emptied}`);
 
   // 8. Now it is public and votable.
-  await evaluate(`history.pushState({}, "", "/codigosh/lastboard"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(600);
+  await goTo("/codigosh/lastboard", ".items, .empty");
   const afterApproval = await evaluate(`return document.querySelectorAll(".items li").length`);
   check("it is on the public board", afterApproval === 1, `rows=${afterApproval}`);
 
@@ -481,8 +525,7 @@ async function main() {
   await sleep(300);
 
   const href = await evaluate(`return document.querySelector(".items a")?.getAttribute("href") ?? ""`);
-  await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(600);
+  await goTo(String(href), "[data-vote]");
   await evaluate(`document.querySelector("[data-vote]")?.click()`);
   await sleep(500);
   const voteCount = await evaluate(`return document.querySelector("[data-vote] .count")?.textContent ?? ""`);
@@ -559,16 +602,14 @@ async function main() {
   check("a comment is taken and held for a person", heldBack.told === true && heldBack.shown === false,
     JSON.stringify(heldBack));
 
-  await evaluate(`history.pushState({}, "", "/codigosh/lastboard/queue"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(800);
+  await goTo("/codigosh/lastboard/queue", ".queue, .empty");
   const queued2 = await evaluate(`return document.querySelectorAll("li[data-comment]").length`);
   check("it waits in the queue beside the reports", queued2 === 1, `rows=${queued2}`);
   // The same message, on the screen that does not make you name a board first.
   // That is the whole point of it: five boards used to mean asking five times
   // to find the one with something in it. The row has to name its board, or a
   // decision is taken about a message from nowhere.
-  await evaluate(`history.pushState({}, "", "/panel/reports"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1400);
+  await goTo("/panel/reports", ".queue-row, .empty");
   const spanning = await evaluate(`
     const first = document.querySelector("li[data-comment]");
     return {
@@ -599,8 +640,7 @@ async function main() {
     JSON.stringify(cleared),
   );
 
-  await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(800);
+  await goTo(String(href), ".count-chip");
   const published = await evaluate(`
     return {
       shown: document.body.textContent.includes("it happens on the phone too"),
@@ -624,8 +664,7 @@ async function main() {
   `);
   await sleep(600);
 
-  await evaluate(`history.pushState({}, "", "/codigosh/lastboard/roadmap"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(700);
+  await goTo("/codigosh/lastboard/roadmap", ".roadmap");
   const roadmap = await evaluate(`
     return {
       columns: document.querySelectorAll(".roadmap .column").length,
@@ -645,8 +684,7 @@ async function main() {
   // 10. The bridge control. There is no forge connected in this run, so what
   //     is checked is that the control is there for the team and that asking
   //     for an issue answers rather than failing silently.
-  await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(700);
+  await goTo(String(href), "[data-create-issue]");
   const bridgeControl = await evaluate(`return !!document.querySelector("[data-create-issue]")`);
   check("the team sees the bridge control", bridgeControl === true);
 
@@ -673,8 +711,7 @@ async function main() {
   // Updates have a section of their own in the sidebar now. They used to hang
   // off the bottom of the panel's front page, under a form, which is not where
   // anybody looks for them.
-  await evaluate(`history.pushState({}, "", "/panel/updates"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1100);
+  await goTo("/panel/updates", ".running");
   const updates = await evaluate(`
     const body = document.body.textContent;
     return {
@@ -696,8 +733,7 @@ async function main() {
     const csrf = () => document.cookie.split("; ").find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
     await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
   `);
-  await evaluate(`history.pushState({}, "", "/sign-in"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  await goTo("/sign-in", ".signin-go");
 
   // One action, one word for it, the mark above it, and an eye on the password.
   // It was a heading, a button and a link in the bar all reading "Sign in".
@@ -736,8 +772,7 @@ async function main() {
   );
 
   // 11b. About, which is the page somebody keeping a server running opens.
-  await evaluate(`history.pushState({}, "", "/panel/about"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  await goTo("/panel/about", ".bento-card");
   const about = await evaluate(`
     return {
       cards: document.querySelectorAll(".bento-card").length,
@@ -760,9 +795,12 @@ async function main() {
   // The same control on the screens that are not the wizard, which is the half
   // that kept being forgotten: a change made in one place and nowhere else is
   // work handed back to whoever has to find the other three.
-  for (const [name, path] of [["profile", "/panel/account"], ["personalisation", "/panel/personalization"]]) {
-    await evaluate(`history.pushState({}, "", ${JSON.stringify(path)}); dispatchEvent(new PopStateEvent("popstate"));`);
-    await sleep(900);
+  const imagePickers: Array<[string, string]> = [
+    ["profile", "/panel/account"],
+    ["personalisation", "/panel/personalization"],
+  ];
+  for (const [name, path] of imagePickers) {
+    await goTo(path, ".avatar-pick");
     // Counted inside the field that holds the image, and outside the common
     // control within it. It used to count every button on the page with that
     // wording, which caught the thing it was written for and also anything else
@@ -784,8 +822,7 @@ async function main() {
   }
 
   // The panel uses the window rather than a column on the left of it.
-  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
   const room = await evaluate(`
     const main = document.querySelector(".admin-main");
     const cards = [...document.querySelectorAll(".dash-card")].map(c => c.getBoundingClientRect());
@@ -820,8 +857,7 @@ async function main() {
   // is the installation — its name and its mark — rather than the name of the
   // software running it, which is on the About screen where an operator looks
   // for it.
-  await evaluate(`history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1100);
+  await goTo("/", ".landing-grid");
   const front = await evaluate(`
     const mark = document.querySelector(".hero-mark img");
     return {
@@ -839,8 +875,7 @@ async function main() {
 
   // Back to the panel: what follows reads the sidebar, and a check that leaves
   // the walk on another screen breaks the next one rather than its own.
-  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
 
   const sidebar = await evaluate(`
     return {
@@ -904,8 +939,7 @@ async function main() {
   // beats it — and the element sits in the layout wearing a correct `hidden`.
   // Reading the attribute would say everything is fine.
   // The forge fields live in the organisation wizard now, not on the panel.
-  await evaluate(`history.pushState({}, "", "/panel/new"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(600);
+  await goTo("/panel/new", ".forge-fields");
   const reallyHidden = await evaluate(`
     const fields = document.querySelector(".forge-fields");
     if (!fields) return "there are no forge fields";
@@ -933,8 +967,7 @@ async function main() {
   //     Each one was a screen naming something it could not do — the same
   //     failure as a panel that says nothing is configured and offers nothing
   //     to configure, which is how an operator ends up in a terminal.
-  await evaluate(`history.pushState({}, "", "/panel/codigosh"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  await goTo("/panel/codigosh", "[data-add-repo]");
   const orgPanel = await evaluate(`
     return {
       addBoard: !!document.querySelector("[data-add-repo]"),
@@ -1003,8 +1036,7 @@ async function main() {
   `);
   check("and it is still there on the next visit", String(revisit).includes("/hooks/"), String(revisit).slice(0, 56));
 
-  await evaluate(`history.pushState({}, "", ${JSON.stringify(String(href))}); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(800);
+  await goTo(String(href), "form.team-reply");
   const triage = await evaluate(`
     return {
       reply: !!document.querySelector("form.team-reply"),
@@ -1055,8 +1087,7 @@ async function main() {
   // The front page, arranged on the front page. Not by calling the API: the
   // whole point of this is that somebody does it with the page in front of
   // them, and an editor tested through fetch is an editor nobody has used.
-  await evaluate(`history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1400);
+  await goTo("/", ".landing-grid");
   const composing = await evaluate(`
     document.querySelector("[data-edit-page]").click();
     await new Promise(r => setTimeout(r, 600));
@@ -1781,8 +1812,7 @@ async function main() {
   // Changed where somebody actually changes it, now that the top bar carries no
   // picker: under Appearance, which is also the path that stores the choice on
   // the account rather than in this browser.
-  await evaluate(`history.pushState({}, "", "/panel/appearance"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(900);
+  await goTo("/panel/appearance", ".admin-main");
   await evaluate(`
     const select = document.querySelector("#appearance-language");
     select.value = "ar";
@@ -1795,8 +1825,7 @@ async function main() {
   // Back to the board, where a counter and a tab are on screen, and check for
   // strings only the Arabic catalogue has. Checking the brand would prove
   // nothing: "LastHelp" is the same word in all twenty.
-  await evaluate(`history.pushState({}, "", "/codigosh/lastboard"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(700);
+  await goTo("/codigosh/lastboard", ".items, .empty");
   const arabic = await evaluate(`
     const body = document.body.textContent;
     return { votes: body.includes("الأصوات"), everything: body.includes("الكل"), sample: body.slice(0, 60) };
@@ -1823,8 +1852,7 @@ async function main() {
   //      the endpoint that stored a layout is not there any more. A feature
   //      removed from a screen but left in the server is a feature that comes
   //      back the next time somebody wires a button.
-  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1300);
+  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
 
   const overview = await evaluate(`
     return {
@@ -1955,8 +1983,7 @@ async function main() {
         fields: { version: "1.4.2", steps: "1. search for a word with an accent" }, token: form.token }),
     });
   `);
-  await evaluate(`history.pushState({}, "", "/panel/reports"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1400);
+  await goTo("/panel/reports", ".queue-row, .empty");
 
   const listing = await evaluate(`
     return {
@@ -2110,8 +2137,7 @@ async function main() {
     JSON.stringify(reading),
   );
 
-  await evaluate(`history.pushState({}, "", "/panel/reports?moderation=pending"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1300);
+  await goTo("/panel/reports?moderation=pending", ".queue-row, .empty");
   await evaluate(`document.querySelector('.queue-row [data-act="published"]').click()`);
   await sleep(1400);
   const triaged = await evaluate(`
@@ -2145,8 +2171,7 @@ async function main() {
     await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
     await post("/api/session", { username: "olivia", password: "una contraseña larga de verdad" });
   `);
-  await evaluate(`history.pushState({}, "", "/panel/withforge"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1500);
+  await goTo("/panel/withforge", ".admin-main .cards, .empty");
 
   const owner = await evaluate(`
     return {
@@ -2191,8 +2216,7 @@ async function main() {
     await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
     await post("/api/session", { username: "ana", password: "una contraseña larga de verdad" });
   `);
-  await evaluate(`history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1400);
+  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
 
   const collaborator = await evaluate(`
     return {
@@ -2216,8 +2240,7 @@ async function main() {
   //      administrator uses, and the whole question is whether what it shows
   //      comes from the roles this account holds rather than from the address
   //      it was asked for.
-  await evaluate(`history.pushState({}, "", "/panel/reports"); dispatchEvent(new PopStateEvent("popstate"));`);
-  await sleep(1400);
+  await goTo("/panel/reports", ".queue-row, .empty");
   const theirs = await evaluate(`
     return {
       rows: document.querySelectorAll(".queue-row").length,

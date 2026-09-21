@@ -4,8 +4,23 @@
 # left running holds a debugging port that the next run cannot bind.
 set -euo pipefail
 
-PORT="${PORT:-8099}"
-CDP="${CDP:-9222}"
+# A port nobody else is on, rather than the same two every time.
+#
+# Two passes running at once used to fight over 8099 and 9222 — the second one's
+# browser would attach to the first one's instance, or the instance would fail
+# to bind and the journey would read an empty page. Every "flaky" failure chased
+# in this suite turned out to be that: two passes started by the same person in
+# the same minute, not a fault in the product.
+free_port() {
+    candidate="$1"
+    while ss -ltn 2>/dev/null | grep -q ":${candidate} "; do
+        candidate=$((candidate + 1))
+    done
+    echo "$candidate"
+}
+
+PORT="${PORT:-$(free_port $((8100 + $$ % 400)))}"
+CDP="${CDP:-$(free_port $((9300 + $$ % 400)))}"
 WORK="$(mktemp -d)"
 
 cleanup() {
