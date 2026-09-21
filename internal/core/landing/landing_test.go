@@ -231,7 +231,12 @@ func TestAModuleThatShowsBoardsCanBeToldWhichOnes(t *testing.T) {
 // are going to get. Neither is something to discover by looking at the page.
 func TestAScopeThatNamesNothingUsableIsRefused(t *testing.T) {
 	cases := map[string]string{
-		"no board named":      `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"acme"}]}`,
+		// A button goes to one report form, so an organisation is not an answer
+		// it can act on. Every other module narrows to a set, and one
+		// organisation is a set — so "acme" on a boards module is fine now, and
+		// this case used to be that, refused.
+		"an organisation where one board is needed": `{"modules":[{"id":"v","kind":"call_to_action",` +
+			`"x":1,"y":1,"w":4,"h":2,"scope":"acme"}]}`,
 		"empty half":          `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"acme/"}]}`,
 		"not a slug":          `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"Acme/At las"}]}`,
 		"a path, not a board": `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"../../etc"}]}`,

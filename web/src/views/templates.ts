@@ -234,6 +234,45 @@ export function landing(
         </section>`;
 
   /**
+   * One board, as the module itself.
+   *
+   * A module that shows one thing is that thing: a list of one row inside a box
+   * with a heading saying "boards" is three pieces of furniture around a single
+   * card. This is the shape that makes eight boards in a section read as eight
+   * boards rather than as eight lists.
+   */
+  const oneBoard = (rows: LandingBoard[]) => {
+    const b = rows[0];
+    if (!b) return emptyState(text.t("landing.noBoards"), icons.repository(28));
+    return `<a class="landing-one" href="/${escapeAttr(b.org)}/${escapeAttr(b.slug)}">
+      <span class="card-mark" aria-hidden="true">${escapeHTML(initials(b.name))}</span>
+      <span class="card-body">
+        <span class="card-title">${escapeHTML(b.name)}</span>
+        <span class="card-sub">${escapeHTML(b.org_name)}</span>
+        <span class="chips">
+          ${b.accepts_bugs ? `<span class="chip">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
+          ${b.accepts_ideas ? `<span class="chip">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
+        </span>
+      </span>
+      <span class="card-go" aria-hidden="true">${icons.chevron(18)}</span>
+    </a>`;
+  };
+
+  /** One organisation, the same way. */
+  const oneOrg = (scope: string) => {
+    const o = orgs.find((each) => each.slug === scope);
+    if (!o) return emptyState(text.t("portal.empty"), icons.organization(28));
+    return `<a class="landing-one" href="/${escapeAttr(o.slug)}">
+      <span class="card-mark" aria-hidden="true">${escapeHTML(initials(o.name))}</span>
+      <span class="card-body">
+        <span class="card-title">${escapeHTML(o.name)}</span>
+        <span class="card-sub">/${escapeHTML(o.slug)}</span>
+      </span>
+      <span class="card-go" aria-hidden="true">${icons.chevron(18)}</span>
+    </a>`;
+  };
+
+  /**
    * The ideas people asked for most.
    *
    * The page has promised this since it existed — "ideas collect votes, which
@@ -363,11 +402,15 @@ export function landing(
           : m.kind === "intro"
             ? intro
             : m.kind === "organisations"
-              ? organisations(head, at)
+              ? showsOne(m)
+                ? oneOrg(m.scope ?? "")
+                : organisations(head, at)
               : m.kind === "text"
                 ? words(m.body ?? "")
                 : m.kind === "boards"
-                  ? boards((content[m.id] as LandingBoard[]) ?? [], head, at)
+                  ? showsOne(m)
+                    ? oneBoard((content[m.id] as LandingBoard[]) ?? [])
+                    : boards((content[m.id] as LandingBoard[]) ?? [], head, at)
                   : m.kind === "most_voted"
                     ? voted((content[m.id] as LandingReport[]) ?? [], head, at)
                     : m.kind === "recently_done"
@@ -457,7 +500,7 @@ export function landing(
       ${drawn}
       ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
     </div>
-    ${editing ? moduleModal(text, allBoards) : ""}
+    ${editing ? moduleModal(text, allBoards, orgs) : ""}
   </div>`;
 }
 
@@ -468,15 +511,26 @@ export function landing(
  * dialog whose body is filled for the module being edited. A module that grows
  * a setting later adds a field here rather than a screen somewhere.
  */
-function moduleModal(text: Text, boards: LandingBoard[] = []): string {
-  // Every board in the installation, and "all of them" first. Written from what
-  // the page was actually given rather than fetched again: this dialog opens
-  // over a page that already knows which boards there are.
+function moduleModal(
+  text: Text,
+  boards: LandingBoard[] = [],
+  orgs: OrganizationSummary[] = [],
+): string {
+  // Three levels: everything, one organisation, one board. Marked with what
+  // each one is, because not every module can use every level — a button goes
+  // to one report form, and the organisations module has no use for a board.
+  // Which are offered is decided when the dialog opens, by the module opening
+  // it.
   const options = [
-    `<option value="">${escapeHTML(text.t("landing.scopeAll"))}</option>`,
+    `<option value="" data-level="all">${escapeHTML(text.t("landing.scopeAll"))}</option>`,
+    ...orgs.map(
+      (o) => `<option value="${escapeAttr(o.slug)}" data-level="org">${escapeHTML(o.name)}</option>`,
+    ),
     ...boards.map(
       (b) =>
-        `<option value="${escapeAttr(b.org + "/" + b.slug)}">${escapeHTML(b.org_name + " / " + b.name)}</option>`,
+        `<option value="${escapeAttr(b.org + "/" + b.slug)}" data-level="board">${escapeHTML(
+          b.org_name + " / " + b.name,
+        )}</option>`,
     ),
   ].join("");
 
@@ -606,6 +660,19 @@ function kebab(id: string, text: Text): string {
 /** The corner a module is resized from. */
 function resizeHandle(id: string): string {
   return `<span class="resize-handle" data-resize="${escapeAttr(id)}" aria-hidden="true"></span>`;
+}
+
+/**
+ * Was this module pointed at a single thing?
+ *
+ * What it was ASKED for, not what came back. An installation that happens to
+ * have one organisation should not find its list quietly turned into a tile,
+ * and then turned back the day it has two.
+ */
+function showsOne(m: LandingModule): boolean {
+  if (!m.scope) return false;
+  const deeper = m.scope.includes("/");
+  return m.kind === "organisations" ? !deeper : deeper;
 }
 
 /** The class that puts a module's header where the operator asked for it. */

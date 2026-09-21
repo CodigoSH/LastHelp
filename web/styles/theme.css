@@ -4084,6 +4084,38 @@ a.stat:hover .stat-go {
   inset-block-start: 0.85rem;
 }
 
+/*
+ * A module that shows one thing IS that thing: the card fills the module rather
+ * than sitting inside a box with a heading over it. Same recipe as the card in
+ * a list, because it is the same card — what changes is that nothing surrounds
+ * it.
+ */
+.landing-one {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  block-size: 100%;
+  padding: 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  box-shadow: var(--card-shadow);
+  text-decoration: none;
+  color: inherit;
+}
+
+.landing-one:hover {
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
+
+.landing-one .card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-inline-size: 0;
+  flex: 1;
+}
+
 /* The rows sit inside the padding the header already establishes. */
 .landing-scroll > :not(.module-header) {
   padding: 0.9rem;

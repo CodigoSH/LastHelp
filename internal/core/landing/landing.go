@@ -83,9 +83,13 @@ const (
 	CallToAction Kind = "call_to_action"
 )
 
-// usesData is the modules that draw something out of the database rather than
-// out of their own configuration. They are the only ones a scope means anything
-// to — including the button, which needs the board list to know where it goes.
+// usesData is the modules whose content has to be read out of the database and
+// sent with the page: the boards, the reports, and the button's destination.
+//
+// Deliberately NOT the organisations module. It draws the same list the page
+// already carries for its own navigation, so a front page of a mark, some words
+// and the organisations still reads neither the board table nor the item table.
+// Putting it here cost exactly that, and a test said so.
 func (k Kind) usesData() bool {
 	switch k {
 	case Boards, MostVoted, RecentlyDone, CallToAction:
@@ -93,6 +97,12 @@ func (k Kind) usesData() bool {
 	}
 	return false
 }
+
+// takesScope is the modules that can be pointed at one place. A wider set than
+// usesData: where a module's content comes from and whether it can be narrowed
+// are two different questions, and answering them with one predicate is how the
+// default page started reading tables it has no use for.
+func (k Kind) takesScope() bool { return k == Organisations || k.usesData() }
 
 // usesWords is the modules that carry words of their own: the operator's own
 // paragraph, and the label on the button.
@@ -344,14 +354,38 @@ func (m Module) validateScope() error {
 	if m.Scope == "" {
 		return nil
 	}
-	if !m.Kind.usesData() {
-		return fmt.Errorf("module %q names a board and is not a module that shows one", m.ID)
+	if !m.Kind.takesScope() {
+		return fmt.Errorf("module %q names a place and is not a module that shows one", m.ID)
 	}
-	org, board, found := strings.Cut(m.Scope, "/")
-	if !found || !isSlug(org) || !isSlug(board) {
-		return fmt.Errorf("module %q names %q, which is not an organisation and a board", m.ID, m.Scope)
+	org, board, deeper := strings.Cut(m.Scope, "/")
+	if !isSlug(org) || (deeper && !isSlug(board)) {
+		return fmt.Errorf("module %q names %q, which is not an organisation or a board", m.ID, m.Scope)
+	}
+	// A button goes to one report form, so "somewhere in this organisation" is
+	// not an answer it can act on. Every other module narrows to a set, and one
+	// organisation is a perfectly good set.
+	if m.Kind == CallToAction && !deeper {
+		return fmt.Errorf("module %q is a button and %q is not one board", m.ID, m.Scope)
 	}
 	return nil
+}
+
+// ShowsOne says whether this module was pointed at a single thing, which is
+// what decides how it draws: a module showing one board is that board, a module
+// showing a set of them is a list of them.
+//
+// The presentation follows what was ASKED FOR, not what came back. An
+// installation that happens to have one organisation should not find its list
+// silently turned into a tile the day it has two.
+func (m Module) ShowsOne() bool {
+	if m.Scope == "" {
+		return false
+	}
+	_, _, deeper := strings.Cut(m.Scope, "/")
+	if m.Kind == Organisations {
+		return !deeper
+	}
+	return deeper
 }
 
 // isSlug is the shape of the slugs the rest of the product hands out. Kept

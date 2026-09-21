@@ -207,10 +207,16 @@ func inScope(boards []org.Board, scope string) []org.Board {
 	if scope == "" {
 		return boards
 	}
-	orgSlug, boardSlug, _ := strings.Cut(scope, "/")
+	orgSlug, boardSlug, deeper := strings.Cut(scope, "/")
 	out := make([]org.Board, 0, 1)
 	for _, b := range boards {
-		if b.OrgSlug == orgSlug && b.Slug == boardSlug {
+		if b.OrgSlug != orgSlug {
+			continue
+		}
+		// A scope naming only an organisation is every board in it, which is
+		// what somebody who runs one organisation and four projects actually
+		// wants to put on a page.
+		if !deeper || b.Slug == boardSlug {
 			out = append(out, b)
 		}
 	}

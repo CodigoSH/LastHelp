@@ -1528,6 +1528,64 @@ async function main() {
     JSON.stringify(seccion.fuera),
   );
 
+  // One of three blocks that write their own page: the section checks capture
+  // what was here, this one and the next write over it, and the last one puts
+  // it back. They are a sequence, not three independent checks — moving one out
+  // of the middle leaves the page rewritten for everything after it, which is
+  // how three later checks went down the first time.
+  //
+  // A module pointed at one thing IS that thing, rather than a list of one row
+  // inside a box with a heading over it. This is what makes eight boards in a
+  // section read as eight boards, and it is the reason sections were worth
+  // building at all.
+  const singular = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: [
+        { id: "group", kind: "section", x: 1, y: 1, w: 8, h: 2, body: "My projects" },
+        { id: "one", kind: "boards", x: 1, y: 1, w: 4, h: 2, scope: "codigosh/lastboard", parent: "group" },
+        { id: "many", kind: "boards", x: 1, y: 3, w: 6, h: 3 },
+        { id: "org", kind: "organisations", x: 7, y: 3, w: 6, h: 2, scope: "codigosh" },
+      ] }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1300));
+
+    const uno = document.querySelector('[data-module="one"]');
+    const muchos = document.querySelector('[data-module="many"]');
+    const unaOrg = document.querySelector('[data-module="org"]');
+    return {
+      // One board: the card is the module, with no heading and no list around it.
+      unoEsTarjeta: !!uno.querySelector(".landing-one"),
+      unoSinCabecera: !uno.querySelector(".module-header"),
+      unoEnlaza: uno.querySelector(".landing-one")?.getAttribute("href") ?? "",
+      unoDentroDeSeccion: !!document.querySelector(
+        '.landing-section[data-section="group"] [data-module="one"]'),
+      // All of them: still the list it was, which is what an installation that
+      // never chose anything keeps showing.
+      muchosEsLista: !!muchos.querySelector(".cards") && !!muchos.querySelector(".module-header"),
+      orgEsTarjeta: !!unaOrg.querySelector(".landing-one"),
+      orgEnlaza: unaOrg.querySelector(".landing-one")?.getAttribute("href") ?? "",
+    };
+  `);
+  check(
+    "a module pointed at one board is that board, not a list holding it",
+    singular.unoEsTarjeta === true && singular.unoSinCabecera === true &&
+      singular.unoEnlaza === "/codigosh/lastboard" && singular.unoDentroDeSeccion === true,
+    JSON.stringify(singular),
+  );
+  check(
+    "and one pointed at everything is still the listing it was",
+    singular.muchosEsLista === true,
+    JSON.stringify({ lista: singular.muchosEsLista }),
+  );
+  check(
+    "the same for an organisation",
+    singular.orgEsTarjeta === true && singular.orgEnlaza === "/codigosh",
+    JSON.stringify({ tarjeta: singular.orgEsTarjeta, enlace: singular.orgEnlaza }),
+  );
+
   // Shrinking a section under what is inside it. The dashboard this comes from
   // compares HOW MANY children there are against how many cells are left, so a
   // section with one child shrunk under that child ejects nothing and draws it

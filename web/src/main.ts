@@ -369,14 +369,14 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     if (target.kind === "call_to_action" || target.kind === "section") {
       target.body = String(data.get("label") ?? "").trim();
     }
-    if (usesData(target.kind)) target.scope = String(data.get("scope") ?? "");
+    if (takesScope(target.kind)) target.scope = String(data.get("scope") ?? "");
     if (usesHeader(target.kind)) {
       target.label = String(data.get("labelAt") ?? "top") as views.LandingModule["label"];
     }
     // Reread: pointing a module at a different board changes what goes in it,
     // and the words of a text module are the only thing this dialog can change
     // that the page already knows.
-    await save(usesData(target.kind));
+    await save(takesScope(target.kind));
     drawLanding(orgs);
   });
 }
@@ -685,8 +685,27 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   const where = form.querySelector<HTMLElement>("[data-for-scope]");
   const scope = form.querySelector<HTMLSelectElement>("[name=scope]");
   if (where && scope) {
-    where.hidden = !usesData(target.kind);
+    where.hidden = !takesScope(target.kind);
+    // Which levels this module can use. A button goes to one report form, so
+    // "everything" and "an organisation" are not answers it can act on; the
+    // organisations module has no use for a board. Offering a level a module
+    // cannot use is offering a choice that quietly does nothing.
+    const allowed =
+      target.kind === "call_to_action"
+        ? ["board"]
+        : target.kind === "organisations"
+          ? ["all", "org"]
+          : ["all", "org", "board"];
+    scope.querySelectorAll<HTMLOptionElement>("option").forEach((option) => {
+      option.hidden = !allowed.includes(option.dataset.level ?? "");
+    });
     scope.value = target.scope ?? "";
+    // A module whose stored level is no longer on offer falls back to the first
+    // one that is, rather than showing a blank control.
+    if (scope.selectedIndex < 0 || scope.options[scope.selectedIndex]?.hidden) {
+      const first = [...scope.options].find((option) => !option.hidden);
+      if (first) scope.value = first.value;
+    }
   }
 
   // And only a module that draws a name is asked where to keep it.
@@ -757,6 +776,17 @@ function usesHeader(kind: views.LandingModule["kind"]): boolean {
   return (
     kind === "organisations" || kind === "boards" || kind === "most_voted" || kind === "recently_done"
   );
+}
+
+/**
+ * The kinds that can be pointed at one place.
+ *
+ * Wider than usesData: where a module's content comes from and whether it can
+ * be narrowed are two different questions. The organisations module draws the
+ * list the page already carries, and is still something you can aim at one.
+ */
+function takesScope(kind: views.LandingModule["kind"]): boolean {
+  return kind === "organisations" || usesData(kind);
 }
 
 /** The kinds that draw out of the database, and so have a board to be told. */
