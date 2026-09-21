@@ -195,9 +195,16 @@ const (
 
 	Columns = 12
 
-	// A module may not be narrower than this. One column of a twelve column
-	// grid is about eighty pixels, which is not a module, it is a mistake.
-	MinSpan = 2
+	// The narrowest a module may be, in columns.
+	//
+	// One, like the dashboard's own items. It was two, on the grounds that
+	// eighty pixels is not a module — which was true while every module was a
+	// band of content across the page. It stopped being true when a module
+	// became able to show one board, one organisation or one button: those are
+	// cards, and a card in a single column is exactly what the dashboard puts
+	// in one. How small is useful is the operator's judgement, not a number
+	// decided here.
+	MinSpan = 1
 )
 
 // Module is one block on the page, and where it sits.
@@ -274,16 +281,19 @@ type Layout struct {
 
 // Default is the front page of an installation that never composes one.
 //
-// The spans are the measured height of what each module draws, not round
-// numbers: a row is as tall as a column is wide, so a span too generous shows
-// as a band of nothing between the modules and a span too mean lets the words
-// out of their box. Measured at a 1080px grid, where a row is 75px: the hero
-// draws 250, the three cards 103, the list of organisations 115.
+// The spans are what each module draws, not round numbers: a row is as tall as
+// a column is wide, so a span too generous shows as a band of nothing between
+// the modules and a span too mean lets the words out of their box.
+//
+// The hero is one row now. It was three, from when it was the sign-in screen's
+// composition without the card — a centred mark, a display-sized name and a
+// third of the window of air. Laid along the top of its module it is a banner,
+// and a banner is one row.
 func Default() Layout {
 	return Layout{Modules: []Module{
-		{ID: "hero", Kind: Hero, X: 1, Y: 1, W: 12, H: 3},
-		{ID: "intro", Kind: Intro, X: 1, Y: 4, W: 12, H: 2},
-		{ID: "organisations", Kind: Organisations, X: 1, Y: 6, W: 12, H: 2},
+		{ID: "hero", Kind: Hero, X: 1, Y: 1, W: 12, H: 1},
+		{ID: "intro", Kind: Intro, X: 1, Y: 2, W: 12, H: 2},
+		{ID: "organisations", Kind: Organisations, X: 1, Y: 4, W: 12, H: 2},
 	}}
 }
 

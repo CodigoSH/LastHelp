@@ -1390,6 +1390,152 @@ async function main() {
     JSON.stringify(nombre),
   );
 
+  // The front page is the register that SHOWS things, not the one that asks for
+  // one thing. The difference is not a matter of taste and it is measurable:
+  // the sign-in stacks the mark above a display-sized name down the middle of
+  // the window, and the front page used to do exactly that — it was the sign-in
+  // without its card. In a module the mark sits BESIDE the name, on one line.
+  const registro = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const escribir = (modules) => fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules }) });
+    const dibujar = async () => {
+      history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+      await new Promise(r => setTimeout(r, 1300));
+    };
+
+    // This block writes a page of its own, so it puts back the one it found.
+    // Leaving a rewritten layout behind took the checks after it down — for the
+    // third time in this file, which is why it is spelled out here.
+    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
+
+    await escribir([
+      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 1 },
+      { id: "intro", kind: "intro", x: 1, y: 2, w: 12, h: 2 },
+    ]);
+    await dibujar();
+
+    const celda = document.querySelector('[data-module="hero"]');
+    const marca = celda.querySelector(".hero-mark").getBoundingClientRect();
+    const nombre = celda.querySelector("h1").getBoundingClientRect();
+    const intro = document.querySelector('[data-module="intro"]');
+    const lista = intro.querySelector(".points").getBoundingClientRect();
+    const medido = {
+      alLado: Math.round(marca.right) <= Math.round(nombre.left),
+      // And on one line: their middles within a few pixels of each other.
+      mismaLinea: Math.abs((marca.top + marca.bottom) / 2 - (nombre.top + nombre.bottom) / 2) < 20,
+      tamanoNombre: Math.round(parseFloat(getComputedStyle(celda.querySelector("h1")).fontSize)),
+      // The content of a module fills the module: the slack between them is what
+      // made this page read as bands with air between them.
+      holgura: Math.round(intro.getBoundingClientRect().height - lista.height),
+    };
+    await escribir(previa);
+    await dibujar();
+    return medido;
+  `);
+  check(
+    "the front page shows things rather than asking for one, as the dashboard does",
+    registro.alLado === true && registro.mismaLinea === true &&
+      registro.tamanoNombre <= 34 && registro.holgura <= 8,
+    JSON.stringify(registro),
+  );
+
+  // Sizes. Every module used to arrive twelve columns wide and refuse to go
+  // below two, so a page was a stack of bands whatever the operator did. A
+  // module is a tile like any other in this house: it arrives at a size that
+  // suits it and can be dragged down to a single cell.
+  const tamanos = await evaluate(`
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    const anadir = async (kind) => {
+      document.querySelector("[data-add-kind]").value = kind;
+      document.querySelector("[data-add-module]").click();
+      await new Promise(r => setTimeout(r, 1100));
+      document.querySelector("#module-config")?.close();
+      await new Promise(r => setTimeout(r, 300));
+      const capa = await fetch("/api/landing").then(r => r.json());
+      const puesto = capa.modules.filter(m => m.kind === kind).pop();
+      return { w: puesto.w, h: puesto.h, id: puesto.id };
+    };
+
+    const boton = await anadir("call_to_action");
+    const cifras = await anadir("statistics");
+
+    // And down to one column, from the corner.
+    const celda = document.querySelector('[data-module="' + cifras.id + '"]');
+    const caja = celda.getBoundingClientRect();
+    const grid = document.querySelector(".landing-grid.editing").getBoundingClientRect();
+    const col = (grid.width - 11 * 16) / 12;
+    const asa = celda.querySelector(":scope > [data-resize]");
+    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
+    asa.dispatchEvent(new PointerEvent("pointerdown", { ...opts, clientX: caja.right, clientY: caja.bottom }));
+    window.dispatchEvent(new PointerEvent("pointermove", { ...opts,
+      clientX: caja.right - 5 * (col + 16), clientY: caja.bottom - 2 * (col + 16) }));
+    await new Promise(r => setTimeout(r, 160));
+    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
+      clientX: caja.right - 5 * (col + 16), clientY: caja.bottom - 2 * (col + 16) }));
+    await new Promise(r => setTimeout(r, 1100));
+
+    const despues = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === cifras.id);
+    return { boton, cifras, encogido: { w: despues.w, h: despues.h } };
+  `);
+  check(
+    "a module arrives at a size that suits it, not the width of the page",
+    tamanos.boton.w < 12 && tamanos.cifras.w < 12,
+    JSON.stringify({ boton: tamanos.boton.w, cifras: tamanos.cifras.w }),
+  );
+  check(
+    "and can be dragged down to a single cell",
+    tamanos.encogido.w === 1 && tamanos.encogido.h === 1,
+    JSON.stringify(tamanos.encogido),
+  );
+
+  // A module's dialog, and its three ways out. The × and Cancel had no listener
+  // at all on this page: the wiring that gives every dialog in the product its
+  // close buttons ran on three panel screens and not on this one, so the only
+  // way out of a module's settings was the keyboard.
+  const salidas = await evaluate(`
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    const abrir = async () => {
+      document.querySelector('.landing-cell[data-module^="boards-"] [data-module-menu]').click();
+      await new Promise(r => setTimeout(r, 200));
+      document.querySelector('.landing-cell[data-module^="boards-"] [data-edit-module]').click();
+      await new Promise(r => setTimeout(r, 400));
+      return document.querySelector("#module-config");
+    };
+    const abierto = () => document.querySelector("#module-config")?.open === true;
+
+    const dlg = await abrir();
+    const seAbre = abierto();
+    dlg.querySelector(".modal-head [data-close]").click();
+    await new Promise(r => setTimeout(r, 300));
+    const trasLaEquis = abierto();
+
+    await abrir();
+    document.querySelector(".modal-foot [data-close]").click();
+    await new Promise(r => setTimeout(r, 300));
+    const trasCancelar = abierto();
+
+    await abrir();
+    document.querySelector("#module-config [type=submit]").click();
+    await new Promise(r => setTimeout(r, 900));
+    const trasGuardar = abierto();
+
+    return { seAbre, trasLaEquis, trasCancelar, trasGuardar };
+  `);
+  check(
+    "a module's dialog closes by the cross, by cancel, and by saving",
+    salidas.seAbre === true && salidas.trasLaEquis === false &&
+      salidas.trasCancelar === false && salidas.trasGuardar === false,
+    JSON.stringify(salidas),
+  );
+
   // The four places a name can go, driven through the dialog. The pill is the
   // one that matters most: it is the mark the operator may CHOOSE, and the
   // whole point is that the product never hands it out by itself.
@@ -1838,17 +1984,23 @@ async function main() {
   `);
 
 
+  // Against what is stored, not against a number written here. This counted a
+  // fixed eight and had to be edited every time another block added a module,
+  // which means it was measuring the journey rather than the page. What it is
+  // for is that everything arranged is drawn, and nothing else is.
   const frontPage = await evaluate(`
+    const stored = await fetch("/api/landing").then(r => r.json());
     return {
       cells: document.querySelectorAll(".landing-cell").length,
+      arranged: stored.modules.length,
       words: document.body.textContent.includes("We read everything that arrives."),
       hero: !!document.querySelector(".hero"),
-      orgs: !!document.querySelector(".section"),
+      orgs: !!document.querySelector(".landing-scroll"),
     };
   `);
   check(
     "and what was arranged is what a visitor is shown",
-    frontPage.cells === 8 && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
+    frontPage.cells === frontPage.arranged && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
     JSON.stringify(frontPage),
   );
 

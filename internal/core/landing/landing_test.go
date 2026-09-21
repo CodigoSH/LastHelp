@@ -63,7 +63,11 @@ func TestTheThingsAPageCannotBe(t *testing.T) {
 			{"id":"a","kind":"hero","x":1,"y":1,"w":12,"h":4},
 			{"id":"a","kind":"intro","x":1,"y":5,"w":12,"h":2}]}`},
 		{"a module off the right-hand edge", `{"modules":[{"id":"a","kind":"hero","x":9,"y":1,"w":8,"h":2}]}`},
-		{"a module narrower than the smallest", `{"modules":[{"id":"a","kind":"hero","x":1,"y":1,"w":1,"h":2}]}`},
+		// A negative width, not a zero one: one column is the narrowest a module
+		// may be now, and a zero is not refusable at all — it is how a layout
+		// written before there were coordinates says "no width given", and it
+		// gets filled in rather than thrown out.
+		{"a module of negative width", `{"modules":[{"id":"a","kind":"hero","x":1,"y":1,"w":-1,"h":2}]}`},
 		{"two modules in the same cells", `{"modules":[
 			{"id":"a","kind":"hero","x":1,"y":1,"w":6,"h":2},
 			{"id":"b","kind":"intro","x":4,"y":1,"w":6,"h":2}]}`},
@@ -477,5 +481,21 @@ func TestAModuleInsideSomethingThatIsNotThere(t *testing.T) {
 	}})
 	if _, err := Parse(string(notASection)); err == nil {
 		t.Error("a module was allowed inside something that is not a section")
+	}
+}
+
+// TestAModuleMayBeOneColumnWide.
+//
+// The dashboard's own items go down to a single cell, and a module here can be
+// one board, one organisation or one button — all of which are cards, and a
+// card is what a single column holds. How small is useful is the operator's
+// judgement; this only says the grid will draw it.
+func TestAModuleMayBeOneColumnWide(t *testing.T) {
+	out, _ := json.Marshal(Layout{Modules: []Module{
+		{ID: "one", Kind: Boards, X: 1, Y: 1, W: 1, H: 1, Scope: "acme/atlas"},
+		{ID: "two", Kind: Boards, X: 2, Y: 1, W: 1, H: 1, Scope: "acme/web"},
+	}})
+	if _, err := Parse(string(out)); err != nil {
+		t.Errorf("two single-column modules side by side were refused: %v", err)
 	}
 }

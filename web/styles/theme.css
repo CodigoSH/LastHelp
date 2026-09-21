@@ -4061,6 +4061,69 @@ a.stat:hover .stat-go {
   color: var(--accent);
 }
 
+/*
+ * The hero, inside a module, is a banner — not the sign-in screen without its
+ * card.
+ *
+ * On the sign-in and the wizard the centred mark, the display-sized name and
+ * the air around them are right: those screens ask for one thing and the empty
+ * space IS the design. The front page is the other register — it shows things —
+ * and wearing the first one made it read as a login with the form missing.
+ *
+ * Same pieces, same mark, laid along the top of its module instead of down the
+ * middle of the window. Scoped to the grid so the screens that ask for one
+ * thing keep what suits them.
+ */
+.landing-cell .hero {
+  grid-template-columns: auto 1fr;
+  align-content: center;
+  justify-items: start;
+  text-align: start;
+  column-gap: 1rem;
+  row-gap: 0.1rem;
+  padding-block: 0;
+  block-size: 100%;
+}
+
+.landing-cell .hero-mark {
+  grid-row: 1 / span 2;
+  inline-size: 3rem;
+  block-size: 3rem;
+}
+
+.landing-cell .hero h1 {
+  font-size: clamp(1.35rem, 1rem + 1.1vw, 1.9rem);
+  line-height: 1.15;
+}
+
+.landing-cell .hero .lead {
+  font-size: 0.95rem;
+}
+
+.landing-cell .hero-actions {
+  grid-column: 2;
+  margin-block-start: 0.5rem;
+}
+
+/*
+ * The three sentences fill the module they were given, rather than sitting at
+ * the top of it with the rest of the box empty.
+ *
+ * Measured: at a 75px row the cards drew 80 and the module was 167, so 87
+ * pixels of nothing sat between them and whatever came next — which is what
+ * made the page read as a stack of bands with air between them rather than as
+ * an arrangement. Integer rows are not the problem and cannot be argued with;
+ * content that ignores its box is.
+ */
+.landing-cell .points {
+  block-size: 100%;
+  align-content: stretch;
+}
+
+.landing-cell .points > li {
+  align-items: center;
+}
+
 /* What is being dragged is going in here. Same green the ghost uses, on the
    box rather than in it, so the answer is readable before letting go. */
 .landing-group.drop-target {

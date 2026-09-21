@@ -315,15 +315,13 @@ function wireLanding(orgs: OrganizationSummary[]): void {
       kind,
       x: 1,
       y: bottom,
-      // Sized from what each one draws rather than from a round number, the way
-      // the defaults for the page itself are: a button is a button, not a band
-      // across the page.
-      w: kind === "call_to_action" ? 4 : views.LANDING_COLUMNS,
-      // Two rows for the button, not one: at one row the words and the board
-      // they lead to did not both fit, and the board's name came out sliced.
-      // A section arrives with room for something: at one row tall it would be
-      // a container nothing can be dropped into, which reads as broken.
-      h: kind === "hero" || kind === "section" ? 3 : 2,
+      // Sized from what each one draws, not from the width of the page.
+      //
+      // Everything used to arrive twelve columns wide, so a page of modules was
+      // a stack of bands and the only way to get anything else was to drag every
+      // corner. Now each kind arrives at a size that suits it, and the corner is
+      // for changing your mind — which is the way round the dashboard has it.
+      ...sizeFor(kind),
       body: "",
     };
     landingModules = [...landingModules, added];
@@ -657,7 +655,8 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
         const parent = target.parent ?? "";
         const holder = parent ? landingModules.find((m) => m.id === parent) : null;
         const most = holder ? holder.w : cols;
-        const least = parent ? 1 : 2;
+        // One column everywhere, in a section and on the page alike.
+        const least = 1;
         w = Math.max(least, Math.min(most - target.x + 1,
           fromW + Math.round((moved.clientX - startX) / (width + GAP))));
         h = Math.max(1, fromH + Math.round((moved.clientY - startY) / (width + GAP)));
@@ -799,6 +798,39 @@ function usesHeader(kind: views.LandingModule["kind"]): boolean {
   return (
     kind === "organisations" || kind === "boards" || kind === "most_voted" || kind === "recently_done"
   );
+}
+
+/**
+ * How big a module arrives.
+ *
+ * A first size, not a rule: every one of these can be dragged to anything from
+ * a single cell upwards. What it is for is that a module lands looking like the
+ * thing it is — a button is a button, a list is a column, a banner is a banner —
+ * instead of as one more band across the page.
+ */
+function sizeFor(kind: views.LandingModule["kind"]): { w: number; h: number } {
+  switch (kind) {
+    // The two that really are the width of the page: the mark and name at the
+    // top, and the sentence under it.
+    case "hero":
+      return { w: views.LANDING_COLUMNS, h: 3 };
+    case "intro":
+      return { w: views.LANDING_COLUMNS, h: 2 };
+    // A button and three numbers are small things. Two rows for the button, not
+    // one: at one row its words and the board they lead to did not both fit.
+    case "call_to_action":
+      return { w: 3, h: 2 };
+    case "statistics":
+      return { w: 4, h: 2 };
+    // A box other modules go into, with room for a few of them. At one row tall
+    // it would be a container nothing can be dropped into, which reads as
+    // broken rather than as empty.
+    case "section":
+      return { w: 6, h: 3 };
+    // Lists: half the page, tall enough to be worth scrolling.
+    default:
+      return { w: 6, h: 3 };
+  }
 }
 
 /**
@@ -962,16 +994,34 @@ function openModal(id: string): void {
   root?.querySelector<HTMLDialogElement>("#" + id)?.showModal();
 }
 
-function wireModalOpeners(): void {
-  // One attribute opens any of them. Screens used to wire their own opener and
-  // one of them forgot, which is a button that looks right and does nothing —
-  // the kind of bug that only a walk through the browser finds.
-  root?.querySelectorAll<HTMLElement>("[data-open-modal]").forEach((button) =>
-    button.addEventListener("click", () => openModal(button.dataset.openModal ?? "")),
-  );
-  root?.querySelectorAll<HTMLButtonElement>("[data-close]").forEach((button) =>
-    button.addEventListener("click", () => button.closest("dialog")?.close()),
-  );
+/**
+ * Opening and closing a dialog, wired once for the whole product.
+ *
+ * It used to be a function each screen called after drawing itself, and the
+ * comment on it said screens had forgotten before. One did again: the front
+ * page never called it, so a module's settings had a cross and a cancel that
+ * did nothing and the only way out was the keyboard.
+ *
+ * Delegated from the document instead, so there is nothing left to forget. It
+ * is attached once, not per draw, or every redraw would stack another copy and
+ * a single click would close the dialog as many times as the page had been
+ * drawn.
+ */
+function wireDialogs(): void {
+  document.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+
+    const opener = target?.closest<HTMLElement>("[data-open-modal]");
+    if (opener) {
+      openModal(opener.dataset.openModal ?? "");
+      return;
+    }
+
+    // closest, not the target itself: these buttons carry an icon, and a click
+    // lands on the svg inside them.
+    const closer = target?.closest<HTMLElement>("[data-close]");
+    if (closer) closer.closest("dialog")?.close();
+  });
 }
 
 /**
@@ -1198,7 +1248,6 @@ async function showPeople(): Promise<void> {
     "/panel/people",
   );
 
-  wireModalOpeners();
   onSubmit("form.person-form", async (data) => {
     await api.post("/api/people", {
       username: String(data.get("username") ?? ""),
@@ -2347,7 +2396,6 @@ async function showOrganizationsPanel(): Promise<void> {
     "/panel/organizations",
   );
 
-  wireModalOpeners();
 
   onSubmit("form.org-form", async (data) => {
     await api.post("/api/organizations", {
@@ -2545,7 +2593,6 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
     }
   });
   wireChannel(orgSlug);
-  wireModalOpeners();
 
   root?.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((button) =>
     button.addEventListener("click", () => go(button.dataset.open ?? "/")),
@@ -2703,5 +2750,7 @@ void (async () => {
   me = await api.get<Me>("/api/me").catch(() => null);
   await applyAccountLanguage();
   i18n.subscribe(() => renderNav());
+  // Once, for every dialog the product will ever draw.
+  wireDialogs();
   await render();
 })();
