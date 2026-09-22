@@ -4308,6 +4308,197 @@ a.stat:hover .stat-go {
   cursor: default;
 }
 
+/* A block of words, and the box it lives in.
+ *
+ * The box used to be sized by its contents and pushed down by a top margin, so
+ * it floated somewhere inside its module with a band of nothing above it. It
+ * fills the module now and keeps five pixels off the border all round, which is
+ * what separates the two edges without reading as a second frame. */
+/* The module stops adding its own inset for this one kind of content: the box
+   provides the whole gap, so the five pixels asked for are the five pixels
+   measured rather than five plus whatever the tile was already adding.
+ *
+ * Written at the arranging level too, and that is not belt and braces: while
+ * the page is being arranged the tile takes half a rem of its own, which
+ * out-specifies the plain selector and was the whole of the difference — the
+ * gap measured fourteen instead of six, and reading the file said five. */
+.landing-cell:has(> .words),
+.landing-grid.editing .landing-cell:has(> .words) {
+  padding: 0;
+}
+
+.words {
+  block-size: 100%;
+  inline-size: 100%;
+  padding: 5px;
+  box-sizing: border-box;
+  /* The writing bar is placed inside this, so this is what it is placed
+     against. */
+  position: relative;
+}
+
+.words-box {
+  block-size: 100%;
+  box-sizing: border-box;
+  padding: 0.95rem 1.05rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  box-shadow: var(--card-shadow);
+  color: var(--text-main);
+  line-height: 1.6;
+  /* Whatever is written can be longer than the module is tall, and the tile
+     itself never scrolls — that is the dashboard's rule and the reason the
+     resize handle stays put. So it scrolls in here. */
+  overflow: auto;
+}
+
+/* The things somebody can write, dressed once. Margins collapse to nothing at
+   the ends so the first line sits where the padding puts it. */
+.words-box > :first-child { margin-block-start: 0; }
+.words-box > :last-child { margin-block-end: 0; }
+.words-box p { margin: 0 0 0.6rem; }
+.words-box h1 { font-size: 1.9rem; margin: 0 0 0.5rem; line-height: 1.2; }
+.words-box h2 { font-size: 1.35rem; margin: 0.9rem 0 0.4rem; }
+.words-box h3 { font-size: 1.1rem; margin: 0.8rem 0 0.3rem; }
+.words-box ul,
+.words-box ol { margin: 0 0 0.6rem; padding-inline-start: 1.4rem; }
+.words-box blockquote {
+  margin: 0 0 0.6rem;
+  padding-inline-start: 0.9rem;
+  border-inline-start: 3px solid var(--accent-line);
+  color: var(--text-dim);
+}
+.words-box code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface-dim);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.words-box a { color: var(--accent-alt); }
+.words-box .lead { color: var(--text-dim); font-size: 1.05rem; }
+.words-box .hero-mark-line { margin-block-end: 0.4rem; }
+
+/* Alignment and colour, as classes rather than as inline styles.
+ *
+ * Not a style choice: this page is served with style-src 'self' and no
+ * unsafe-inline, so a style attribute written by an editing command is dropped
+ * by the browser without a word. These are the same names the server accepts,
+ * and the set is closed on both sides. */
+.words-box .align-center { text-align: center; }
+.words-box .align-end { text-align: end; }
+.words-box .align-justify { text-align: justify; }
+
+.words-box .ink-plain { color: var(--text-main); }
+.words-box .ink-dim { color: var(--text-dim); }
+.words-box .ink-accent { color: var(--accent-alt); }
+.words-box .ink-danger { color: var(--danger-color); }
+.words-box .ink-success { color: var(--success-color); }
+.words-box .ink-warning { color: var(--warning-color); }
+.words-box .ink-info { color: var(--info-color); }
+
+/* What an untouched block says while the page is being arranged. */
+.words-prompt { color: var(--text-dim); font-style: italic; }
+
+.words-box[contenteditable="true"] {
+  cursor: text;
+  outline: none;
+  border-style: dashed;
+}
+
+.words-box[contenteditable="true"]:focus-within,
+.words-box[contenteditable="true"]:focus {
+  border-color: var(--accent-line);
+  border-style: solid;
+  box-shadow: var(--accent-glow);
+}
+
+/* The bar that follows the cursor. It sits at the foot of the block being
+   written rather than being positioned against the window: a module that
+   scrolls takes it along, and nothing has to be recalculated as the page
+   moves. */
+.words-bar {
+  position: absolute;
+  inset-inline: 10px;
+  inset-block-end: 10px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 5px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lg);
+}
+
+.words-bar[hidden] { display: none; }
+
+.words-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.words-group + .words-group {
+  padding-inline-start: 5px;
+  border-inline-start: 1px solid var(--border);
+}
+
+.words-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 26px;
+  block-size: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s var(--ease);
+}
+
+.words-tool.wide { inline-size: 30px; }
+.words-tool:hover { background: var(--accent-wash); color: var(--accent); }
+
+/* The palette. A swatch shows its own colour, which is the only label a colour
+   needs; the name is in the tooltip for anybody who cannot tell them apart. */
+.words-ink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.words-ink span {
+  inline-size: 13px;
+  block-size: 13px;
+  border-radius: 50%;
+  border: 1px solid var(--card-border);
+}
+
+.words-ink:hover span { transform: scale(1.15); }
+.words-ink.ink-plain span { background: var(--text-main); }
+.words-ink.ink-dim span { background: var(--text-dim); }
+.words-ink.ink-accent span { background: var(--accent); }
+.words-ink.ink-danger span { background: var(--danger-color); }
+.words-ink.ink-success span { background: var(--success-color); }
+.words-ink.ink-warning span { background: var(--warning-color); }
+.words-ink.ink-info span { background: var(--info-color); }
+
 .picker-grid {
   display: grid;
   /* Theirs says 200. Theirs also has nine cards in three rows and so never

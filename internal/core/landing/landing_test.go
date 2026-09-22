@@ -26,9 +26,9 @@ func TestAnUnsetLayoutIsStillAFrontPage(t *testing.T) {
 		if len(got.Modules) != 5 {
 			t.Fatalf("%q gave %d modules, want 5", stored, len(got.Modules))
 		}
-		// Three points, one module each: the page says the same three things it
+		// Three things worth saying, one module each: the page says what it
 		// always did, and every one of them can be moved, rewritten or removed.
-		for i, want := range []Kind{Hero, Intro, Intro, Intro, Organisations} {
+		for i, want := range []Kind{Hero, Text, Text, Text, Organisations} {
 			if got.Modules[i].Kind != want {
 				t.Errorf("%q: module %d is %q, want %q", stored, i+1, got.Modules[i].Kind, want)
 			}
@@ -125,14 +125,22 @@ func TestEncodeRefusesWhatParseWouldRefuse(t *testing.T) {
 	}
 }
 
-// TestTextIsStoredAsWordsAndNotAsMarkup.
+// TestTextCarriesMarkupAndIsNeverTrustedWithIt.
 //
-// Plain text is the decision, and this is what holds it: the body goes in and
-// comes out unchanged, tags and all, so whatever renders it has to escape them.
-// The day somebody makes this module accept markup, this test is the one that
-// has to be argued with.
-func TestTextIsStoredAsWordsAndNotAsMarkup(t *testing.T) {
-	const sneaky = `<script>alert(1)</script>`
+// This test used to say the opposite, and left a note saying that the day
+// somebody made this module accept markup it was the test to argue with. The
+// argument, for whoever reads this next: plain text made the module useless
+// for the one thing it exists for — the operator could not write a heading, a
+// list or a link on their own front page — and the safety it bought is bought
+// better by a policy that is written down, exported and asserted exactly
+// (clean.go), because "we escape everything" is only true until one caller
+// forgets.
+//
+// So markup goes in, and what comes back is what the policy allows and nothing
+// else. The body is still stored as data in a field, not as a fragment of a
+// page.
+func TestTextCarriesMarkupAndIsNeverTrustedWithIt(t *testing.T) {
+	const sneaky = `<h2>Ours</h2><script>alert(1)</script><p onclick="alert(2)">Hello</p>`
 	stored, err := Layout{Modules: []Module{
 		{ID: "a", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: sneaky},
 	}}.Encode()
@@ -140,7 +148,6 @@ func TestTextIsStoredAsWordsAndNotAsMarkup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Stored as data, not as a fragment of a page.
 	var raw map[string]any
 	if err := json.Unmarshal([]byte(stored), &raw); err != nil {
 		t.Fatal(err)
@@ -149,8 +156,12 @@ func TestTextIsStoredAsWordsAndNotAsMarkup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if back.Modules[0].Body != sneaky {
-		t.Errorf("the words changed on the way through: %q", back.Modules[0].Body)
+	body := back.Modules[0].Body
+	if !strings.Contains(body, "<h2>Ours</h2>") {
+		t.Errorf("a heading the operator wrote did not survive: %q", body)
+	}
+	if strings.Contains(body, "script") || strings.Contains(body, "onclick") {
+		t.Errorf("the ways in survived the round trip: %q", body)
 	}
 }
 
@@ -518,27 +529,63 @@ func TestAModuleMayBeOneColumnWide(t *testing.T) {
 	}
 }
 
-// TestAPointIsASentenceAndNotAParagraph.
+// TestAPageWrittenWithPointsStillOpens.
 //
-// Its own bound: longer than a button's label because it is a sentence, shorter
-// than a paragraph because it sits beside a mark on one line. Counted in runes,
-// like every other bound about what fits.
-func TestAPointIsASentenceAndNotAParagraph(t *testing.T) {
-	page := func(body string) string {
-		out, _ := json.Marshal(Layout{Modules: []Module{
-			{ID: "p", Kind: Intro, X: 1, Y: 1, W: 4, H: 1, Body: body},
-		}})
-		return string(out)
+// Intro was a paragraph with a mark beside it and Text was a paragraph. They
+// said the same thing in two shapes, so there is one now — and every page
+// composed before that is full of the value that no longer exists, including
+// the page every installation starts with.
+//
+// A saved layout is somebody's front page. Reading one back as an error, or as
+// a module that draws nothing, is the version of this change that loses
+// people's work.
+func TestAPageWrittenWithPointsStillOpens(t *testing.T) {
+	out, _ := json.Marshal(Layout{Modules: []Module{
+		{ID: "p", Kind: Intro, X: 1, Y: 1, W: 4, H: 1, Body: "Reporting needs no account."},
+	}})
+	layout, err := Parse(string(out))
+	if err != nil {
+		t.Fatalf("a page written with points was refused: %v", err)
 	}
-	if _, err := Parse(page(strings.Repeat("ぜ", maxPoint))); err != nil {
-		t.Errorf("a point of %d characters was refused: %v", maxPoint, err)
+	if got := layout.Modules[0].Kind; got != Text {
+		t.Errorf("a point came back as %q rather than as the block that replaced it", got)
 	}
-	if _, err := Parse(page(strings.Repeat("ぜ", maxPoint+1))); err == nil {
-		t.Error("a point past the bound was accepted")
+	if !strings.Contains(layout.Modules[0].Body, "Reporting needs no account.") {
+		t.Errorf("the words written into it were lost: %q", layout.Modules[0].Body)
 	}
-	// And longer than a label, which is the point of having two bounds.
-	if _, err := Parse(page(strings.Repeat("a", maxLabel+10))); err != nil {
-		t.Errorf("a point was measured as if it were a label: %v", err)
+}
+
+// TestTheWordsOnThePageAreCleanedComingAndGoing.
+//
+// The policy is tested on its own in clean_test.go. This is the other half of
+// it, and the half that has been got wrong before in this repository: a step
+// that one caller can skip is a step that gets skipped. Both doors — what a
+// browser submits and what the database already holds — have to run it, so a
+// page saved under a looser policy stops serving that markup the moment the
+// installation updates.
+func TestTheWordsOnThePageAreCleanedComingAndGoing(t *testing.T) {
+	dirty, _ := json.Marshal(Layout{Modules: []Module{
+		{ID: "w", Kind: Text, X: 1, Y: 1, W: 4, H: 2,
+			Body: `<p onclick="alert(1)">Hello</p><script>alert(2)</script>`},
+	}})
+
+	fromStore, err := Parse(string(dirty))
+	if err != nil {
+		t.Fatal(err)
+	}
+	fromBrowser, err := Submitted(strings.NewReader(string(dirty)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for door, layout := range map[string]Layout{"read back": fromStore, "submitted": fromBrowser} {
+		body := layout.Modules[0].Body
+		if strings.Contains(body, "onclick") || strings.Contains(body, "script") {
+			t.Errorf("%s: the markup reached the page uncleaned: %s", door, body)
+		}
+		if !strings.Contains(body, "Hello") {
+			t.Errorf("%s: cleaning took the words with it: %s", door, body)
+		}
 	}
 }
 

@@ -26,25 +26,33 @@ import (
 type Kind string
 
 const (
-	// Hero is the mark, the name and the tagline of this installation.
+	// Hero is the block that opens the page.
+	//
+	// It drew a fixed mark, a fixed name and a fixed line, and the operator
+	// could change none of them. It is now the same block of words as Text,
+	// seeded with the installation's identity so that a new page opens saying
+	// something rather than nothing, and free from there.
 	Hero Kind = "hero"
 
-	// Intro is one thing worth saying about reporting here, with a mark beside
-	// it.
-	//
-	// It drew three fixed sentences, which were the right three for us and
-	// nobody else's to change. One module is one point now: the operator writes
-	// it, and wanting three means putting three on the page — side by side, one
-	// under the other, or in a block of four, whichever they want. That is the
-	// whole reason this page is a grid.
+	// Intro was one thing worth saying about reporting here. It said the same
+	// as Text in a narrower way, so it is gone and anything stored as one is
+	// read back as Text — see foldOldKinds. The constant stays because that is
+	// the value sitting in saved layouts, and something has to name it.
 	Intro Kind = "intro"
 
 	// Organisations is the list of places somebody can report to.
 	Organisations Kind = "organisations"
 
-	// Text is whatever the operator wants to say. Plain text, not markup:
-	// this renders on a public page, and a module that accepted HTML would be
-	// a way to put script on it that no amount of escaping elsewhere fixes.
+	// Text is whatever the operator wants to say, written where it is seen.
+	//
+	// It used to be plain text, on the grounds that markup on a public page is
+	// a way to put script on it. That reasoning was right about the danger and
+	// wrong about the answer: the words are written by the operator, who is the
+	// one person this page belongs to, and refusing them a heading or a link
+	// made the module useless for the thing it exists for. So it carries
+	// markup, through a list of tags and classes narrow enough to state in one
+	// place — see Clean — and it is cleaned again on the way in rather than
+	// trusted because the browser cleaned it once.
 	Text Kind = "text"
 
 	// Boards is the list of boards themselves, without going through the
@@ -145,6 +153,12 @@ func (k Kind) lists() bool {
 
 // usesWords is the modules that carry words of their own: the operator's own
 // paragraph, and the label on the button.
+// usesMarkup is the modules whose words are written where they are seen, and
+// so arrive as markup. A narrower set than usesWords: a button's label and a
+// section's name are one line of plain text and would be nothing but a way in
+// if they accepted tags.
+func (k Kind) usesMarkup() bool { return k == Text || k == Hero }
+
 func (k Kind) usesWords() bool {
 	return k == Text || k == CallToAction || k == Section || k == Intro || k == Hero
 }
@@ -160,10 +174,13 @@ func (k Kind) usesHeader() bool {
 	return false
 }
 
-// isNamed is the modules that carry a name of their own. Wider than usesHeader
-// by exactly one: the hero has a heading rather than a header, so it is named
-// and there is nowhere to place that name but where it already is.
-func (k Kind) isNamed() bool { return k == Hero || k.usesHeader() }
+// isNamed is the modules that carry a name of their own.
+//
+// A block of words is not one of them, and that includes the block that opens
+// the page. It says what it is in its own words, at whatever size the operator
+// chose; a header drawn above that would be the same thing said twice in two
+// type sizes, and the dialog would be offering a field with nowhere to show.
+func (k Kind) isNamed() bool { return k.usesHeader() }
 
 // LabelAt is where a module's name sits.
 //
@@ -280,11 +297,6 @@ type Module struct {
 	// not want eight of them in it.
 	Rows int `json:"rows,omitempty"`
 
-	// Mark says whether the hero draws the installation's mark beside its name.
-	// A pointer so that "not said" and "said no" are different things: absent
-	// means the mark is drawn, which is what it did before there was a choice.
-	Mark *bool `json:"mark,omitempty"`
-
 	// BorderColor and BorderWidth are how the module's own box looks, and they
 	// are the dashboard's controls with the dashboard's values: ten colours and
 	// three widths. Empty and zero mean the theme decides, which is what every
@@ -344,20 +356,27 @@ type Layout struct {
 // a column is wide, so a span too generous shows as a band of nothing between
 // the modules and a span too mean lets the words out of their box.
 //
-// The hero is one row now. It was three, from when it was the sign-in screen's
-// composition without the card — a centred mark, a display-sized name and a
-// third of the window of air. Laid along the top of its module it is a banner,
-// and a banner is one row.
+// The blocks of words are three rows and two rows, not one.
+//
+// One row was right while they drew a single line of text laid along the top
+// of the module. They are written-in blocks now, inside a box with a border and
+// padding of its own, and a block of that shape in one row shows a scrollbar on
+// a fresh installation — which is the page every operator sees first.
+//
+// The blocks of words arrive empty on purpose. What they say by default is
+// written in the catalogue the browser holds, in the visitor's language; a
+// sentence in English stored here would be the page's language decided once,
+// by whoever installed it, for everybody who ever reads it. The moment the
+// operator writes their own, theirs is what is stored.
 func Default() Layout {
 	return Layout{Modules: []Module{
-		{ID: "hero", Kind: Hero, X: 1, Y: 1, W: 12, H: 1},
-		// Three points side by side, one module each. It was one module drawing
-		// three fixed sentences; three modules is the same page and an operator
-		// who can move, resize, rewrite or remove any one of them.
-		{ID: "point-1", Kind: Intro, X: 1, Y: 2, W: 4, H: 1},
-		{ID: "point-2", Kind: Intro, X: 5, Y: 2, W: 4, H: 1},
-		{ID: "point-3", Kind: Intro, X: 9, Y: 2, W: 4, H: 1},
-		{ID: "organisations", Kind: Organisations, X: 1, Y: 3, W: 12, H: 2},
+		{ID: "hero", Kind: Hero, X: 1, Y: 1, W: 12, H: 2},
+		// Three things worth saying, one module each: an operator who can move,
+		// resize, rewrite or remove any one of them.
+		{ID: "point-1", Kind: Text, X: 1, Y: 3, W: 4, H: 2},
+		{ID: "point-2", Kind: Text, X: 5, Y: 3, W: 4, H: 2},
+		{ID: "point-3", Kind: Text, X: 9, Y: 3, W: 4, H: 2},
+		{ID: "organisations", Kind: Organisations, X: 1, Y: 5, W: 12, H: 2},
 	}}
 }
 
@@ -530,6 +549,8 @@ func Parse(stored string) (Layout, error) {
 	if err := json.Unmarshal([]byte(stored), &layout); err != nil {
 		return Layout{}, fmt.Errorf("reading the layout: %w", err)
 	}
+	layout.foldOldKinds()
+	layout.cleanWords()
 	layout.placeTheUnplaced()
 	if err := layout.validate(); err != nil {
 		return Layout{}, err
@@ -549,6 +570,51 @@ func Parse(stored string) (Layout, error) {
 // meant, half becomes six, and they are stacked in the order they were written.
 // Once read and saved again they carry coordinates like everything else, and
 // this never fires for them a second time.
+// foldOldKinds turns the kinds that no longer exist into the ones that replaced
+// them.
+//
+// Intro was a paragraph with a mark beside it and Text was a paragraph; they
+// did the same thing in two shapes, so there is one now. A saved page is full
+// of the old value, and so is the body of a request from a browser that has
+// not reloaded since the last release — which is the reader this step is really
+// for, because the page comes back either way but a save would be refused.
+//
+// It runs on everything that arrives, not only on what is read from the
+// database, for the reason written on Submitted: a tolerance step that one
+// caller can skip is a tolerance step that gets skipped.
+// cleanWords runs the markup policy over every module that carries any.
+//
+// On both ways in, for the reason the policy exists at all: what is stored was
+// written by some version of this product and what arrives was written by some
+// version of a browser, and neither is a reason to put unchecked markup on a
+// public page. Cleaning what is read also means an installation that saved
+// something under a looser policy stops serving it the moment it updates,
+// without anybody having to go and fix their page.
+func (l *Layout) cleanWords() {
+	for i := range l.Modules {
+		m := &l.Modules[i]
+		if !m.Kind.usesMarkup() || m.Body == "" {
+			continue
+		}
+		// A body that cannot be parsed at all is not markup, so it keeps
+		// nothing: the alternative is putting whatever it was on the page.
+		cleaned, err := Clean(m.Body)
+		if err != nil {
+			m.Body = ""
+			continue
+		}
+		m.Body = cleaned
+	}
+}
+
+func (l *Layout) foldOldKinds() {
+	for i := range l.Modules {
+		if l.Modules[i].Kind == Intro {
+			l.Modules[i].Kind = Text
+		}
+	}
+}
+
 func (l *Layout) placeTheUnplaced() {
 	row := 1
 	for i := range l.Modules {
@@ -607,6 +673,8 @@ func Submitted(r io.Reader) (Layout, error) {
 	if err := json.NewDecoder(r).Decode(&layout); err != nil {
 		return Layout{}, fmt.Errorf("reading the layout: %w", err)
 	}
+	layout.foldOldKinds()
+	layout.cleanWords()
 	layout.placeTheUnplaced()
 	if err := layout.validate(); err != nil {
 		return Layout{}, err
@@ -674,12 +742,6 @@ func (l Layout) validate() error {
 		if (m.Kind == CallToAction || m.Kind == Section) && len([]rune(m.Body)) > maxLabel {
 			return fmt.Errorf("module %q has a label longer than %d characters", m.ID, maxLabel)
 		}
-		if m.Kind == Hero && len([]rune(m.Body)) > maxPoint {
-			return fmt.Errorf("module %q has a tagline longer than %d characters", m.ID, maxPoint)
-		}
-		if m.Kind == Intro && len([]rune(m.Body)) > maxPoint {
-			return fmt.Errorf("module %q says more than %d characters in one point", m.ID, maxPoint)
-		}
 		if len(m.Body) > maxTextBody {
 			return fmt.Errorf("module %q is longer than %d characters", m.ID, maxTextBody)
 		}
@@ -700,9 +762,6 @@ func (l Layout) validate() error {
 		}
 		if m.Rows != 0 && !m.Kind.lists() {
 			return fmt.Errorf("module %q asks for rows and does not list anything", m.ID)
-		}
-		if m.Mark != nil && m.Kind != Hero {
-			return fmt.Errorf("module %q says whether to draw a mark it does not have", m.ID)
 		}
 		if m.BorderColor != "" && !colourPattern.MatchString(m.BorderColor) {
 			return fmt.Errorf("module %q has a border colour of %q", m.ID, m.BorderColor)

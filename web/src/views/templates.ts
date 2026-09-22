@@ -52,7 +52,6 @@ export interface LandingModule {
   id: string;
   kind:
     | "hero"
-    | "intro"
     | "organisations"
     | "text"
     | "boards"
@@ -75,8 +74,6 @@ export interface LandingModule {
   name?: string;
   /** How many things a module that lists them shows. Zero is as many as it has. */
   rows?: number;
-  /** Whether the hero draws the installation's mark. Absent means it does. */
-  mark?: boolean;
   /** The colour of the module's own border, and how thick. */
   border_color?: string;
   border_width?: number;
@@ -185,26 +182,20 @@ export function landing(
 
 
   /**
-   * The mark, a heading and a line under it.
+   * What the block that opens the page says until somebody writes it.
    *
-   * All three were fixed: the installation's mark, the installation's name and
-   * one sentence nobody could change. The words are the operator's now, and
-   * left empty they are what they always were — so a page nobody has touched
-   * says exactly what it said. The mark is the installation's own, set where
-   * the rest of its branding is; what this decides is whether to draw it.
+   * It used to be all this module could say: a fixed mark, a fixed name and a
+   * sentence nobody could change. It is a starting point now — the first thing
+   * typed into the block replaces the lot — so an installation that never
+   * touches its front page still opens saying who it is.
+   *
+   * Built as markup rather than as a component because that is what the block
+   * holds: an operator who edits it is editing exactly this, and can take the
+   * mark out or put their own words around it.
    */
-  const heroBlock = (m: LandingModule) => `<section class="hero">
-    ${m.mark === false ? "" : `<span class="hero-mark">${brandMark(instance?.logo, 44)}</span>`}
-    <h1>${escapeHTML((m.name ?? "").trim() || instance?.name || text.t("app.name"))}</h1>
-    <p class="lead">${escapeHTML((m.body ?? "").trim() || text.t("app.tagline"))}</p>
-    ${
-      orgs.length === 0 && isAdmin
-        ? `<div class="hero-actions">
-             <a class="button primary" href="/panel/new">${escapeHTML(text.t("landing.configure"))}</a>
-           </div>`
-        : ""
-    }
-  </section>`;
+  const heroWords = () => `<p class="hero-mark-line">${brandMark(instance?.logo, 44)}</p>
+    <h1>${escapeHTML(instance?.name || text.t("app.name"))}</h1>
+    <p class="lead">${escapeHTML(text.t("app.tagline"))}</p>`;
 
   /**
    * What a module calls itself, in one place.
@@ -266,10 +257,12 @@ export function landing(
   ];
   const pointsSoFar: string[] = [];
 
-  const intro = (id: string, words: string) => {
+  // Which of the three a block gets is its position among the blocks that have
+  // asked, which is the order they sit on the page.
+  const introWords = (id: string) => {
     if (!pointsSoFar.includes(id)) pointsSoFar.push(id);
     const fallback = spare[Math.min(pointsSoFar.indexOf(id), spare.length - 1)]!;
-    return `<ul class="points">${point(fallback.icon, words.trim() || fallback.words)}</ul>`;
+    return `<ul class="points">${point(fallback.icon, fallback.words)}</ul>`;
   };
 
   const organisations = (head: string, at: string) =>
@@ -521,10 +514,28 @@ export function landing(
   // The operator's own words. Escaped and shown as written, line breaks and
   // all: this module takes text, not markup, and the domain stores it that way
   // for the same reason.
-  const words = (body: string) =>
-    body.trim() === ""
-      ? ""
-      : `<section class="section landing-text"><p>${escapeHTML(body).replace(/\n/g, "<br />")}</p></section>`;
+  /**
+   * A block the operator writes, where they see it.
+   *
+   * The markup is printed rather than escaped, which is the one place on this
+   * page that happens — and it is safe for a reason that has nothing to do with
+   * trusting the browser: the server runs the markup policy over this field on
+   * the way in AND on the way out, so what arrives here has already been
+   * through it twice. See internal/core/landing/clean.go.
+   *
+   * An empty block falls back rather than showing a blank box. The fallbacks
+   * live here, in the catalogue, because they have to be in the visitor's
+   * language and the stored layout cannot carry twenty of them.
+   */
+  const words = (m: LandingModule, fallback: string) => {
+    const written = (m.body ?? "").trim();
+    const inner = written !== "" ? written : fallback;
+    return `<div class="words">
+      <div class="words-box"${
+        editing ? ` contenteditable="true" data-words-body="${escapeAttr(m.id)}"` : ""
+      } data-words-empty="${written === "" ? "1" : "0"}">${inner}</div>
+    </div>`;
+  };
 
   const shown =
     modules && modules.length > 0
@@ -560,15 +571,23 @@ export function landing(
 
       const inner =
         m.kind === "hero"
-          ? heroBlock(m)
-          : m.kind === "intro"
-            ? intro(m.id, m.body ?? "")
-            : m.kind === "organisations"
+          ? words(m, heroWords())
+          : m.kind === "organisations"
               ? showsOne(m)
                 ? oneOrg(m.scope ?? "")
                 : organisations(head, at)
               : m.kind === "text"
-                ? words(m.body ?? "")
+                ? words(
+                    m,
+                    // The three the default page ships with keep their
+                    // sentences; anything the operator added themselves starts
+                    // empty, with a line saying so while they are arranging.
+                    /^point-[123]$/.test(m.id)
+                      ? introWords(m.id)
+                      : editing
+                        ? `<p class="words-prompt">${escapeHTML(text.t("landing.writeHere"))}</p>`
+                        : "",
+                  )
                 : m.kind === "boards"
                   ? showsOne(m)
                     ? oneBoard((content[m.id] as LandingBoard[]) ?? [])
@@ -644,6 +663,7 @@ export function landing(
       ${drawn}
       ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
     </div>
+    ${editing ? wordsBar(text) : ""}
     ${editing ? modulePicker(text) + moduleModal(text, allBoards, orgs) + confirmModal(text) : ""}
   </div>`;
 }
@@ -667,10 +687,70 @@ export function landing(
  * A group is not in here. It goes in the menu beside this, because it is not a
  * module that draws something: it is the box the others go into.
  */
+/**
+ * The bar that follows the cursor while a block of words is being written.
+ *
+ * One bar, moved into whichever block has the cursor, rather than one per
+ * module: a page of eight modules would otherwise rebuild eight of these on
+ * every redraw, and the dashboard this is taken from has one too.
+ *
+ * Alignment and colour are not the browser's own commands. This page is served
+ * with style-src 'self', so an inline style is dropped without a word and those
+ * two buttons would appear to work and change nothing — they write classes out
+ * of the set the server will accept instead. See services/words.ts.
+ */
+function wordsBar(text: Text): string {
+  const tool = (does: string, label: string, icon: string, wide = false) =>
+    `<button type="button" class="words-tool${wide ? " wide" : ""}" data-do="${escapeAttr(does)}"
+      title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${icon}</button>`;
+
+  const ink = (name: string, label: string) =>
+    `<button type="button" class="words-ink ${name}" data-do="ink:${escapeAttr(name)}"
+      title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"><span></span></button>`;
+
+  return `<div class="words-bar" hidden>
+    <div class="words-group">
+      ${tool("undo", text.t("words.undo"), icons.undo(15))}
+      ${tool("redo", text.t("words.redo"), icons.redo(15))}
+    </div>
+    <div class="words-group">
+      ${tool("formatBlock:h1", text.t("words.h1"), "H1", true)}
+      ${tool("formatBlock:h2", text.t("words.h2"), "H2", true)}
+      ${tool("formatBlock:h3", text.t("words.h3"), "H3", true)}
+      ${tool("formatBlock:p", text.t("words.paragraph"), "P", true)}
+    </div>
+    <div class="words-group">
+      ${tool("bold", text.t("words.bold"), icons.bold(15))}
+      ${tool("italic", text.t("words.italic"), icons.italic(15))}
+      ${tool("underline", text.t("words.underline"), icons.underline(15))}
+      ${tool("strikeThrough", text.t("words.strike"), icons.strike(15))}
+    </div>
+    <div class="words-group">
+      ${tool("align:align-start", text.t("words.alignStart"), icons.alignStart(15))}
+      ${tool("align:align-center", text.t("words.alignCenter"), icons.alignCenter(15))}
+      ${tool("align:align-end", text.t("words.alignEnd"), icons.alignEnd(15))}
+      ${tool("align:align-justify", text.t("words.alignJustify"), icons.alignJustify(15))}
+    </div>
+    <div class="words-group">
+      ${tool("insertUnorderedList", text.t("words.bullets"), icons.bullets(15))}
+      ${tool("insertOrderedList", text.t("words.numbers"), icons.numbers(15))}
+      ${tool("link:", text.t("words.link"), icons.link(15))}
+    </div>
+    <div class="words-group">
+      ${ink("ink-plain", text.t("words.inkPlain"))}
+      ${ink("ink-dim", text.t("words.inkDim"))}
+      ${ink("ink-accent", text.t("words.inkAccent"))}
+      ${ink("ink-danger", text.t("words.inkDanger"))}
+      ${ink("ink-success", text.t("words.inkSuccess"))}
+      ${ink("ink-warning", text.t("words.inkWarning"))}
+      ${ink("ink-info", text.t("words.inkInfo"))}
+    </div>
+  </div>`;
+}
+
 function modulePicker(text: Text): string {
   const kinds: Array<[string, string, string, string]> = [
     ["hero", icons.overview(32), text.t("landing.moduleHero"), text.t("landing.aboutHero")],
-    ["intro", icons.info(32), text.t("landing.moduleIntro"), text.t("landing.aboutIntro")],
     ["text", icons.edit(32), text.t("landing.moduleText"), text.t("landing.aboutText")],
     ["call_to_action", icons.add(32), text.t("landing.moduleAction"), text.t("landing.aboutAction")],
     ["organisations", icons.organization(32), text.t("shell.organizations"), text.t("landing.aboutOrgs")],
@@ -888,10 +968,7 @@ function moduleModal(
             <label for="module-scope">${escapeHTML(text.t("landing.scope"))}</label>
             <select id="module-scope" name="scope">${options}</select>
           </div>
-          <div class="field-group" data-for-text hidden>
-            <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
-            <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
-          </div>
+          
           <div class="field-group" data-for-rows hidden>
             <label for="module-rows">${escapeHTML(text.t("landing.rows"))}</label>
             <div class="stepper">
@@ -904,13 +981,7 @@ function moduleModal(
             </div>
             <p class="hint">${escapeHTML(text.t("landing.rowsHelp"))}</p>
           </div>
-          <div class="field-group" data-for-mark hidden>
-            <label class="switch-row">
-              <input type="checkbox" name="mark" />
-              <span>${escapeHTML(text.t("landing.showMark"))}</span>
-            </label>
-            <p class="hint">${escapeHTML(text.t("landing.showMarkHelp"))}</p>
-          </div>
+          
           <div class="field-group" data-for-label hidden>
             <label for="module-label">${escapeHTML(text.t("landing.label"))}</label>
             <input id="module-label" name="label" type="text" maxlength="160"

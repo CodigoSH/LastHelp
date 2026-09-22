@@ -43,6 +43,13 @@ THIRD-PARTY COMPONENTS
 
      golang.org/x/crypto                 BSD 3-Clause
 
+   HTML parsing, for the markup an operator writes into their own front page.
+   A parser rather than a pattern: that content is re-serialised against a
+   stated policy, and a cleaner built on matching text is a cleaner somebody
+   gets past:
+
+     golang.org/x/net                    BSD 3-Clause
+
    Everything else this binary does uses the Go standard library.
 
    Required by go.mod and NOT in what we publish. The SQLite driver lists them

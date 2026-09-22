@@ -872,9 +872,10 @@ async function main() {
   // for it.
   await goTo("/", ".landing-grid");
   const front = await evaluate(`
-    const mark = document.querySelector(".hero-mark img");
+    const hero = document.querySelector('[data-module^="hero"] .words-box');
+    const mark = hero?.querySelector("img");
     return {
-      title: document.querySelector(".hero h1")?.textContent?.trim() ?? "",
+      title: hero?.querySelector("h1")?.textContent?.trim() ?? "",
       mark: mark ? Math.round(mark.getBoundingClientRect().width) : 0,
       points: document.querySelectorAll(".points > li").length,
       boards: document.querySelectorAll(".cards .card").length,
@@ -1125,18 +1126,26 @@ async function main() {
     await new Promise(r => setTimeout(r, 900));
     const opened = document.querySelector("#module-config")?.open === true;
 
-    const form = document.querySelector("form.module-config");
-    form.querySelector("[name=body]").value = "We read everything that arrives.";
-    form.requestSubmit();
-    await new Promise(r => setTimeout(r, 900));
+    document.querySelector("#module-config [data-close]")?.click();
+    await new Promise(r => setTimeout(r, 400));
+
+    // And the words go in on the page, which is the whole point of the change:
+    // the dialog has no field for them any more.
+    const caja = [...document.querySelectorAll("[data-words-body]")].at(-1);
+    caja.focus();
+    caja.innerHTML = "<p>We read everything that arrives.</p>";
+    caja.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 1200));
+    const escrito = caja.textContent.trim();
 
     document.querySelector("[data-edit-done]")?.click();
     await new Promise(r => setTimeout(r, 600));
-    return { outlined, kebabs, opened };
+    return { outlined, kebabs, opened, escrito };
   `);
   check(
     "the front page is arranged on the front page",
-    composing.outlined === "dashed" && composing.kebabs >= 3 && composing.opened === true,
+    composing.outlined === "dashed" && composing.kebabs >= 3 && composing.opened === true &&
+      composing.escrito === "We read everything that arrives.",
     JSON.stringify(composing),
   );
 
@@ -1446,24 +1455,24 @@ async function main() {
     const previa = (await fetch("/api/landing").then(r => r.json())).modules;
 
     await escribir([
-      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 1 },
-      { id: "intro", kind: "intro", x: 1, y: 2, w: 12, h: 2 },
+      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 2 },
+      { id: "block", kind: "text", x: 1, y: 3, w: 12, h: 2 },
     ]);
     await dibujar();
 
     const celda = document.querySelector('[data-module="hero"]');
-    const marca = celda.querySelector(".hero-mark").getBoundingClientRect();
-    const nombre = celda.querySelector("h1").getBoundingClientRect();
-    const intro = document.querySelector('[data-module="intro"]');
-    const lista = intro.querySelector(".points").getBoundingClientRect();
+    const nombre = celda.querySelector("h1");
+    const bloque = document.querySelector('[data-module="block"]');
+    const caja = bloque.querySelector(".words-box").getBoundingClientRect();
     const medido = {
-      alLado: Math.round(marca.right) <= Math.round(nombre.left),
-      // And on one line: their middles within a few pixels of each other.
-      mismaLinea: Math.abs((marca.top + marca.bottom) / 2 - (nombre.top + nombre.bottom) / 2) < 20,
-      tamanoNombre: Math.round(parseFloat(getComputedStyle(celda.querySelector("h1")).fontSize)),
-      // The content of a module fills the module: the slack between them is what
-      // made this page read as bands with air between them.
-      holgura: Math.round(intro.getBoundingClientRect().height - lista.height),
+      // Where the mark goes is the operator's decision now, so it is not
+      // measured here. What is still the product's decision, and is what this
+      // check exists for, is the register: a heading sized for a card that asks
+      // for one thing, and modules whose content fills them rather than sitting
+      // in a band of air.
+      tamanoNombre: Math.round(parseFloat(getComputedStyle(nombre).fontSize)),
+      // The box fills its module but for the gap asked for on each side.
+      holgura: Math.round(bloque.getBoundingClientRect().height - caja.height),
     };
     await escribir(previa);
     await dibujar();
@@ -1471,8 +1480,7 @@ async function main() {
   `);
   check(
     "the front page shows things rather than asking for one, as the dashboard does",
-    registro.alLado === true && registro.mismaLinea === true &&
-      registro.tamanoNombre <= 34 && registro.holgura <= 8,
+    registro.tamanoNombre <= 34 && registro.holgura <= 14,
     JSON.stringify(registro),
   );
 
@@ -1534,7 +1542,9 @@ async function main() {
   );
   check(
     "and the picker offers every module, each saying what it draws",
-    anadir.tarjetas.length === 11 && anadir.conTexto === true &&
+    // Ten, not eleven: the two that drew a paragraph did the same thing in two
+    // shapes and are one block of words now.
+    anadir.tarjetas.length === 10 && anadir.conTexto === true &&
       anadir.tarjetas.includes("roadmap") && anadir.tarjetas.includes("hero") &&
       // A group is not a module that draws something, so it is not in here.
       !anadir.tarjetas.includes("section"),
@@ -1868,34 +1878,41 @@ async function main() {
       return document.querySelector("form.module-config");
     };
 
-    // The hero: its own heading, its own line, and the mark as a choice.
+    // The block that opens the page is written on the page, so the dialog does
+    // NOT ask for its words — a field there would be a second place to change
+    // the same thing, and the one that wins would be whichever was touched
+    // last. What the dialog still offers it is what it is: a name, a border.
+    const bloque = document.querySelector('[data-module="top"] [data-words-body]');
+    bloque.focus();
+    bloque.innerHTML = "<h1>Acme Support</h1><p>Tell us what broke.</p>";
+    bloque.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 1200));
+
     let form = await abrir("top");
     const heroPide = {
       nombre: !form.querySelector("[data-for-name]").hidden,
-      linea: !form.querySelector("[data-for-label]").hidden,
-      marca: !form.querySelector("[data-for-mark]").hidden,
+      palabras: !!form.querySelector("[data-for-text], [name=body]"),
+      marca: !!form.querySelector("[data-for-mark]"),
       filas: !form.querySelector("[data-for-rows]").hidden,
     };
-    // Only what the form actually offers gets filled in: writing into a field
-    // the form keeps hidden would save the value anyway, and the screen would
-    // then show the heading whether or not it was ever on offer.
-    if (heroPide.nombre) form.querySelector("[name=name]").value = "Acme Support";
-    if (heroPide.linea) form.querySelector("[name=label]").value = "Tell us what broke.";
-    if (heroPide.marca) form.querySelector("[name=mark]").checked = false;
-    form.requestSubmit();
-    await new Promise(r => setTimeout(r, 1000));
+    form.querySelector("[data-close]").click();
+    await new Promise(r => setTimeout(r, 400));
 
+    // And it survives the round trip through the server, which is where the
+    // markup policy runs.
+    const guardado = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === "top");
     const heroEnPantalla = {
-      titulo: document.querySelector('[data-module="top"] .hero h1')?.textContent?.trim() ?? "",
-      linea: document.querySelector('[data-module="top"] .hero .lead')?.textContent?.trim() ?? "",
-      marca: !!document.querySelector('[data-module="top"] .hero-mark'),
+      titulo: document.querySelector('[data-module="top"] .words-box h1')?.textContent?.trim() ?? "",
+      linea: document.querySelector('[data-module="top"] .words-box p')?.textContent?.trim() ?? "",
+      enElServidor: (guardado?.body ?? "").includes("Acme Support"),
     };
 
     // A list: told how many, and it shows that many.
     form = await abrir("list");
     const listaPide = {
       filas: !form.querySelector("[data-for-rows]").hidden,
-      marca: !form.querySelector("[data-for-mark]").hidden,
+      marca: !!form.querySelector("[data-for-mark]"),
     };
     // The count is asked for the way a phone asks: minus, the number, plus,
     // and no browser spinners inside the field. At the ends the buttons say so
@@ -1938,14 +1955,84 @@ async function main() {
     return { heroPide, heroEnPantalla, listaPide, contador, sinLimite, filasEnPantalla };
   `);
   check(
-    "the hero is asked for its own words and whether to draw the mark",
-    opciones.heroPide.nombre === true && opciones.heroPide.linea === true &&
-      opciones.heroPide.marca === true && opciones.heroPide.filas === false &&
+    "the block that opens the page is written on the page, not in a dialog",
+    opciones.heroPide.nombre === false && opciones.heroPide.palabras === false &&
+      opciones.heroPide.marca === false && opciones.heroPide.filas === false &&
       opciones.heroEnPantalla.titulo === "Acme Support" &&
       opciones.heroEnPantalla.linea === "Tell us what broke." &&
-      opciones.heroEnPantalla.marca === false,
+      opciones.heroEnPantalla.enElServidor === true,
     JSON.stringify({ pide: opciones.heroPide, enPantalla: opciones.heroEnPantalla }),
   );
+  // The writing bar, driven the way a hand drives it.
+  //
+  // Colour and alignment are the two that cannot be copied from the dashboard:
+  // this page is served with style-src 'self' and no unsafe-inline, so an
+  // inline style written by an editing command is dropped by the browser
+  // without a word — the button would look like it worked and change nothing.
+  // They write classes instead, and the check is that the class is there AFTER
+  // the round trip through the server, because the server has its own list and
+  // a class it does not know is a class it removes.
+  const escribiendo = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: [{ id: "pen", kind: "text", x: 1, y: 1, w: 12, h: 3 }] }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1300));
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    const caja = document.querySelector('[data-module="pen"] [data-words-body]');
+    const barraAntes = document.querySelector(".words-bar")?.hidden !== false;
+    caja.focus();
+    await new Promise(r => setTimeout(r, 250));
+    const barra = document.querySelector(".words-bar");
+    const aparece = barra.hidden === false;
+    const sigue = caja.parentElement.contains(barra);
+
+    caja.innerHTML = "<p>Ours</p>";
+    const elegir = () => {
+      const r = document.createRange();
+      r.selectNodeContents(caja.querySelector("p"));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    };
+    elegir(); barra.querySelector('[data-do="bold"]').click();
+    await new Promise(r => setTimeout(r, 150));
+    elegir(); barra.querySelector('[data-do="ink:ink-accent"]').click();
+    await new Promise(r => setTimeout(r, 150));
+    elegir(); barra.querySelector('[data-do="align:align-center"]').click();
+    await new Promise(r => setTimeout(r, 1400));
+
+    // Nothing was written as an inline style, which the policy would have
+    // thrown away: what the page holds is classes.
+    const enLaPagina = caja.innerHTML;
+    const conEstilo = caja.querySelectorAll("[style]").length;
+    const guardado = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === "pen")?.body ?? "";
+
+    document.querySelector("[data-edit-done]")?.click();
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: previa }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+    return { barraAntes, aparece, sigue, conEstilo, enLaPagina, guardado };
+  `);
+  check(
+    "the bar follows the cursor, and colour and alignment survive the policy",
+    escribiendo.barraAntes === true && escribiendo.aparece === true &&
+      escribiendo.sigue === true && escribiendo.conEstilo === 0 &&
+      escribiendo.guardado.includes("align-center") &&
+      escribiendo.guardado.includes("ink-accent") &&
+      // Bold arrives from the browser as <b> and is stored in one dialect.
+      escribiendo.guardado.includes("<strong>"),
+    JSON.stringify({ barra: { antesOculta: escribiendo.barraAntes, aparece: escribiendo.aparece,
+                              dentro: escribiendo.sigue },
+                     estilosEnLinea: escribiendo.conEstilo, guardado: escribiendo.guardado }),
+  );
+
   // And every one of them, not just the two above. The browser kept its own
   // idea of which modules carry a name and which can be pointed at a board,
   // and it had fallen three behind the server's: recent activity, the roadmap
@@ -1956,7 +2043,7 @@ async function main() {
     const csrf = () => document.cookie.split(";").map(c => c.trim())
       .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
     const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-    const kinds = ["hero", "intro", "text", "call_to_action", "organisations",
+    const kinds = ["hero", "text", "call_to_action", "organisations",
       "boards", "most_voted", "recently_done", "recent_activity", "roadmap",
       "statistics", "section"];
     await fetch("/api/landing", { method: "PUT",
@@ -1977,7 +2064,7 @@ async function main() {
       celda.querySelector("[data-edit-module]").click();
       await new Promise(r => setTimeout(r, 350));
       const form = document.querySelector("form.module-config");
-      ofrece[kind] = ["name", "label", "text", "scope", "rows", "mark"]
+      ofrece[kind] = ["name", "label", "scope", "rows"]
         .filter(f => !form.querySelector("[data-for-" + f + "]").hidden).join(",");
       form.querySelector("[data-close]").click();
       await new Promise(r => setTimeout(r, 250));
@@ -2000,9 +2087,12 @@ async function main() {
   );
 
   const esperado: Record<string, string> = {
-    hero: "name,label,mark",
-    intro: "label",
-    text: "text",
+    // A block of words is asked nothing in the dialog but how its box looks.
+    // Not even a name: it says what it is in its own words, at whatever size
+    // the operator chose, and a header drawn above that would be the same
+    // thing said twice in two type sizes.
+    hero: "",
+    text: "",
     call_to_action: "label,scope",
     organisations: "name,scope,rows",
     boards: "name,scope,rows",
@@ -2019,7 +2109,13 @@ async function main() {
   check(
     "and every module is asked about what it is, the whole table at once",
     desviados.length === 0 &&
-      Object.values(todos).every((ofrecido) => ofrecido !== ""),
+      // Every module that draws something out of the installation is asked
+      // about it. The two blocks of words are the exception and are named as
+      // one, rather than the rule being loosened until it says nothing: what
+      // they show is typed into them, so there is nothing left to ask.
+      Object.entries(todos).every(
+        ([kind, ofrecido]) => ofrecido !== "" || kind === "hero" || kind === "text",
+      ),
     desviados.length === 0 ? JSON.stringify(todos) : desviados.join("; "),
   );
 
@@ -2630,7 +2726,7 @@ async function main() {
       cells: document.querySelectorAll(".landing-cell").length,
       arranged: stored.modules.length,
       words: document.body.textContent.includes("We read everything that arrives."),
-      hero: !!document.querySelector(".hero"),
+      hero: !!document.querySelector('[data-module^="hero"] .words-box'),
       orgs: !!document.querySelector(".landing-scroll"),
     };
   `);

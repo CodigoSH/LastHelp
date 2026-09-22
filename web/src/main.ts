@@ -23,6 +23,7 @@ import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/t
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
+import { wireWords } from "./services/words";
 import { attachChartHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
 import { attachPasswordToggles } from "./services/password";
@@ -321,8 +322,30 @@ function wireLanding(orgs: OrganizationSummary[]): void {
    * one at a different board does — a module that has just appeared has nothing
    * to draw until the server says what goes in it.
    */
+  /**
+   * Writing a block of words, on the page, where it is read.
+   *
+   * Saved as it is typed like everything else here, but not on every keystroke:
+   * a PUT per character would be a request per character. The wait is short
+   * enough that leaving the page straight after typing still lands, and
+   * finishing the arrangement saves whatever is outstanding anyway.
+   */
+  let penWaiting: ReturnType<typeof setTimeout> | undefined;
+  wireWords({
+    root: document,
+    bar: document.querySelector<HTMLElement>(".words-bar"),
+    onChange: (id, html) => {
+      const target = landingModules.find((m) => m.id === id);
+      if (!target) return;
+      target.body = html;
+      clearTimeout(penWaiting);
+      penWaiting = setTimeout(() => void save(), 700);
+    },
+  });
+
   const save = async (refresh = false) => {
     try {
+      clearTimeout(penWaiting);
       await api.put("/api/landing", {
         modules: landingModules.map((m) => ({
           id: m.id,
@@ -331,7 +354,10 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           y: m.y,
           w: m.w,
           h: m.h,
-          ...(m.kind === "text" || m.kind === "call_to_action" || m.kind === "section"
+          ...(m.kind === "text" ||
+          m.kind === "hero" ||
+          m.kind === "call_to_action" ||
+          m.kind === "section"
             ? { body: m.body ?? "" }
             : {}),
           ...(m.scope ? { scope: m.scope } : {}),
@@ -340,7 +366,6 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           ...(m.border_color ? { border_color: m.border_color } : {}),
           ...(m.border_width ? { border_width: m.border_width } : {}),
           ...(m.rows ? { rows: m.rows } : {}),
-          ...(m.kind === "hero" && m.mark === false ? { mark: false } : {}),
           ...(m.parent ? { parent: m.parent } : {}),
         })),
       });
@@ -546,15 +571,13 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     const id = String(data.get("id") ?? "");
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
-    if (target.kind === "text") target.body = String(data.get("body") ?? "");
-    if (target.kind === "call_to_action" || target.kind === "intro" || target.kind === "hero") {
+    // A block of words is written where it is seen, so the dialog does not ask
+    // for it: reading an empty field here would wipe what somebody just typed.
+    if (target.kind === "call_to_action") {
       target.body = String(data.get("label") ?? "").trim();
     }
     if (lists(target.kind)) target.rows = Number(data.get("rows") ?? 0) || 0;
-    if (target.kind === "hero") target.mark = data.get("mark") !== null;
-    if (usesHeader(target.kind) || target.kind === "hero") {
-      target.name = String(data.get("name") ?? "").trim();
-    }
+    if (usesHeader(target.kind)) target.name = String(data.get("name") ?? "").trim();
     // A section's name is its body: it is the pill on its border and nothing
     // else, so there is no second name to keep.
     if (target.kind === "section") target.body = String(data.get("name") ?? "").trim();
@@ -877,14 +900,10 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
 
   form.querySelector<HTMLInputElement>("[name=id]")!.value = target.id;
 
-  // Only a text module has words, so only it is asked for them. A dialog that
-  // offers a field the module ignores is a dialog that lies about what it does.
-  const words = form.querySelector<HTMLElement>("[data-for-text]");
-  const area = form.querySelector<HTMLTextAreaElement>("[name=body]");
-  if (words && area) {
-    words.hidden = target.kind !== "text";
-    area.value = target.body ?? "";
-  }
+  // A block of words has no field here at all: it is written on the page, in
+  // the place it will be read, with the bar that follows the cursor. A textarea
+  // in a dialog was asking somebody to compose their front page through a
+  // letterbox.
 
   // And only a module that draws something out of the database is asked which
   // board to draw it from, for the same reason.
@@ -958,41 +977,24 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     stepRows(counting, rows);
   }
 
-  // And whether the hero draws the installation's mark beside its name.
-  const marking = form.querySelector<HTMLElement>("[data-for-mark]");
-  const mark = form.querySelector<HTMLInputElement>("[name=mark]");
-  if (marking && mark) {
-    marking.hidden = target.kind !== "hero";
-    mark.checked = target.mark !== false;
-  }
 
   // The button's words, a section's name, and a point's sentence. All three are
   // one short line the operator writes, so they are one field.
   const naming = form.querySelector<HTMLElement>("[data-for-label]");
   const label = form.querySelector<HTMLInputElement>("[name=label]");
   if (naming && label) {
-    const named =
-      target.kind === "call_to_action" || target.kind === "intro" || target.kind === "hero";
+    const named = target.kind === "call_to_action";
     naming.hidden = !named;
     label.value = named ? (target.body ?? "") : "";
     const labelText = form.querySelector<HTMLElement>("[data-for-label] label");
-    if (labelText) {
-      labelText.textContent =
-        target.kind === "intro"
-          ? i18n.t("landing.pointWords")
-          : target.kind === "hero"
-            ? i18n.t("landing.tagline")
-            : i18n.t("landing.label");
-    }
+    if (labelText) labelText.textContent = i18n.t("landing.label");
   }
 
   // What the operator calls it, for the modules that draw a name at all.
   const naming2 = form.querySelector<HTMLElement>("[data-for-name]");
   const name = form.querySelector<HTMLInputElement>("[name=name]");
   if (naming2 && name) {
-    // The hero is named and has nowhere to put that name but where it already
-    // is, so it gets the field and not the dropdown beside it.
-    naming2.hidden = !usesHeader(target.kind) && target.kind !== "hero";
+    naming2.hidden = !usesHeader(target.kind);
     name.value = target.name ?? "";
     name.placeholder = defaultNameFor(target.kind);
   }

@@ -34,6 +34,30 @@ export const icons = {
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
   minus: (s?: number) => stroke(`<path d="M5 12h14"/>`, s),
 
+  /* The writing tools. Same geometry as the rest — 24 square, no fill, round
+     caps — so a bar of them reads as one set rather than as a collection. */
+  undo: (s?: number) => stroke(`<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>`, s),
+  redo: (s?: number) => stroke(`<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/>`, s),
+  bold: (s?: number) =>
+    stroke(`<path d="M7 4h6a4 4 0 0 1 0 8H7z"/><path d="M7 12h7a4 4 0 0 1 0 8H7z"/>`, s),
+  italic: (s?: number) => stroke(`<path d="M15 4h-5M14 20H9M15 4l-4 16"/>`, s),
+  underline: (s?: number) => stroke(`<path d="M7 4v7a5 5 0 0 0 10 0V4"/><path d="M5 20h14"/>`, s),
+  strike: (s?: number) =>
+    stroke(`<path d="M5 12h14"/><path d="M8 7a4 3 0 0 1 8 0"/><path d="M16 16a4 3 0 0 1-8 0"/>`, s),
+  alignStart: (s?: number) => stroke(`<path d="M4 6h16M4 12h10M4 18h13"/>`, s),
+  alignCenter: (s?: number) => stroke(`<path d="M4 6h16M7 12h10M6 18h12"/>`, s),
+  alignEnd: (s?: number) => stroke(`<path d="M4 6h16M10 12h10M7 18h13"/>`, s),
+  alignJustify: (s?: number) => stroke(`<path d="M4 6h16M4 12h16M4 18h16"/>`, s),
+  bullets: (s?: number) =>
+    stroke(`<path d="M9 6h11M9 12h11M9 18h11"/><path d="M5 6h.01M5 12h.01M5 18h.01"/>`, s),
+  numbers: (s?: number) =>
+    stroke(`<path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 5h1v4"/><path d="M4 15h2v1H4v2h2"/>`, s),
+  link: (s?: number) =>
+    stroke(
+      `<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>`,
+      s,
+    ),
+
   /**
    * The two marks the add menu uses, copied from the dashboard in this house
    * rather than chosen again: four squares for a thing that goes in the grid,
