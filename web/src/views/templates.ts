@@ -669,17 +669,17 @@ export function landing(
  */
 function modulePicker(text: Text): string {
   const kinds: Array<[string, string, string, string]> = [
-    ["hero", icons.overview(26), text.t("landing.moduleHero"), text.t("landing.aboutHero")],
-    ["intro", icons.info(26), text.t("landing.moduleIntro"), text.t("landing.aboutIntro")],
-    ["text", icons.edit(26), text.t("landing.moduleText"), text.t("landing.aboutText")],
-    ["call_to_action", icons.add(26), text.t("landing.moduleAction"), text.t("landing.aboutAction")],
-    ["organisations", icons.organization(26), text.t("shell.organizations"), text.t("landing.aboutOrgs")],
-    ["boards", icons.repository(26), text.t("portal.boards"), text.t("landing.aboutBoards")],
-    ["most_voted", icons.idea(26), text.t("landing.moduleVoted"), text.t("landing.aboutVoted")],
-    ["recently_done", icons.check(26), text.t("landing.moduleDone"), text.t("landing.aboutDone")],
-    ["recent_activity", icons.queue(26), text.t("landing.moduleActivity"), text.t("landing.aboutActivity")],
-    ["roadmap", icons.open(26), text.t("landing.moduleRoadmap"), text.t("landing.aboutRoadmap")],
-    ["statistics", icons.monitor(26), text.t("landing.moduleStats"), text.t("landing.aboutStats")],
+    ["hero", icons.overview(32), text.t("landing.moduleHero"), text.t("landing.aboutHero")],
+    ["intro", icons.info(32), text.t("landing.moduleIntro"), text.t("landing.aboutIntro")],
+    ["text", icons.edit(32), text.t("landing.moduleText"), text.t("landing.aboutText")],
+    ["call_to_action", icons.add(32), text.t("landing.moduleAction"), text.t("landing.aboutAction")],
+    ["organisations", icons.organization(32), text.t("shell.organizations"), text.t("landing.aboutOrgs")],
+    ["boards", icons.repository(32), text.t("portal.boards"), text.t("landing.aboutBoards")],
+    ["most_voted", icons.idea(32), text.t("landing.moduleVoted"), text.t("landing.aboutVoted")],
+    ["recently_done", icons.check(32), text.t("landing.moduleDone"), text.t("landing.aboutDone")],
+    ["recent_activity", icons.queue(32), text.t("landing.moduleActivity"), text.t("landing.aboutActivity")],
+    ["roadmap", icons.open(32), text.t("landing.moduleRoadmap"), text.t("landing.aboutRoadmap")],
+    ["statistics", icons.monitor(32), text.t("landing.moduleStats"), text.t("landing.aboutStats")],
   ];
 
   return `<dialog class="modal chooser" id="module-picker">
@@ -689,7 +689,7 @@ function modulePicker(text: Text): string {
         <p>${escapeHTML(text.t("landing.newModuleLead"))}</p>
       </div>
       <button type="button" class="picker-close" data-close
-        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close(20)}</button>
     </div>
     <div class="picker-grid">${kinds
       .map(

@@ -119,11 +119,11 @@ function renderNav(): void {
                      title="${escapeAttr(i18n.t("landing.add"))}"
                      aria-label="${escapeAttr(i18n.t("landing.add"))}"
                      aria-haspopup="menu" aria-expanded="false">${icons.add(16)}</button>
-             <div class="kebab-menu add-menu" role="menu" hidden>
-               <button type="button" class="kebab-item" role="menuitem" data-open-modal="module-picker">
-                 ${icons.overview(15)}<span>${escapeHTML(i18n.t("landing.addModule"))}</span></button>
-               <button type="button" class="kebab-item" role="menuitem" data-add-section>
-                 ${icons.repository(15)}<span>${escapeHTML(i18n.t("landing.addSection"))}</span></button>
+             <div class="add-menu" role="menu" hidden>
+               <button type="button" class="add-menu-item" role="menuitem" data-open-modal="module-picker">
+                 ${icons.module(14)}<span>${escapeHTML(i18n.t("landing.addModule"))}</span></button>
+               <button type="button" class="add-menu-item" role="menuitem" data-add-section>
+                 ${icons.section(14)}<span>${escapeHTML(i18n.t("landing.addSection"))}</span></button>
              </div>
            </div>
            <button class="icon-button composing" data-edit-done

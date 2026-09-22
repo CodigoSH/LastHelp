@@ -82,6 +82,10 @@
   --prose: 46rem;
 
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+  /* The dashboard's second curve, for what should overshoot slightly on the
+     way in: a card lifting under the pointer, a dialog arriving. Copied by
+     value so the two products move the same way. */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Physical transforms do not follow reading direction. Anything that slides
      horizontally multiplies its offset by this instead of hardcoding a sign. */
@@ -4177,7 +4181,8 @@ a.stat:hover .stat-go {
  * for duplicate rules can see, which is a fault this project has met before.
  */
 .modal.chooser {
-  inline-size: min(49rem, 94vw);
+  /* 720, which is theirs, not a round number of my own. */
+  inline-size: min(720px, 95vw);
   max-inline-size: none;
   padding: 32px;
   /* Their cap: the dialog never outgrows the window, and what does not fit
@@ -4198,6 +4203,13 @@ a.stat:hover .stat-go {
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.02em;
+  /* Their title fades from the main text colour into the dim one. It is the
+     first thing the eye lands on in that dialog and the reason the header
+     reads as a heading rather than as a label. */
+  background: linear-gradient(135deg, var(--text-main) 0%, var(--text-dim) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .picker-head .title-group p {
@@ -4219,12 +4231,25 @@ a.stat:hover .stat-go {
   transition: all 0.2s;
 }
 
-.picker-close:focus { outline: none; }
-.picker-close:hover { color: var(--text-main); border-color: var(--text-dim); }
+/* A dialog opened with showModal() puts the focus on this button, so the
+   focus-ring rule applies the moment it appears — and that rule sets a radius
+   of its own, which out-specifies the one above and rounds the close to 8
+   where theirs is 12. The shape is restated here rather than dropped from the
+   focus rule, which exists to shape the ring on everything else. */
+.picker-close:focus,
+.picker-close:focus-visible { outline: none; border-radius: 12px; }
+
+.modal-close:focus-visible { border-radius: var(--radius); }
 
 .picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  /* Theirs says 200. Theirs also has nine cards in three rows and so never
+     scrolls; this has eleven, the dialog is capped at the window height, and
+     the scrollbar takes the width back: measured at 639px of usable space
+     against the 640 that three 200px columns need. One pixel short reads as a
+     two-column dialog, which is not what was ported. So the floor drops by ten
+     and the layout is theirs again. */
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 20px;
 }
 
@@ -4233,21 +4258,42 @@ a.stat:hover .stat-go {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 12px;
   padding: 24px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  background: var(--surface-dim);
   color: inherit;
   cursor: pointer;
   font: inherit;
-  transition: all 0.3s var(--ease);
+  /* Their card is not a flat tile that darkens: it lifts eight pixels, grows a
+     little, and lights a wash of accent behind itself. The overshoot is what
+     makes it feel like theirs, so the curve is copied along with the numbers. */
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: all 0.4s var(--ease-bounce);
+}
+
+.picker-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, var(--accent), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.5s;
+  z-index: 0;
 }
 
 .picker-card:hover {
-  border-color: rgba(var(--accent-rgb), 0.45);
-  transform: translateY(-2px);
+  background: rgba(var(--accent-rgb), 0.08);
+  border-color: var(--accent);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow:
+    0 20px 40px -15px rgba(0, 0, 0, 0.2),
+    0 0 20px rgba(var(--accent-rgb), 0.1);
 }
+
+.picker-card:hover::before { opacity: 0.15; }
 
 /* The mark sits in a tile of its own, which is most of why theirs reads as a
    card and mine read as a button with a picture on it. */
@@ -4261,10 +4307,39 @@ a.stat:hover .stat-go {
   align-items: center;
   justify-content: center;
   color: var(--accent);
+  margin-block-end: 20px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+  z-index: 1;
 }
 
-.picker-name { font-weight: 700; font-size: 1.05rem; }
-.picker-about { font-size: 0.82rem; color: var(--text-dim); line-height: 1.45; }
+.picker-icon .icon { inline-size: 32px; block-size: 32px; }
+
+/* The tile turns to the accent and tips five degrees under the pointer. It is
+   a small thing and it is exactly the sort of small thing that makes the two
+   products feel like one. */
+.picker-card:hover .picker-icon {
+  transform: translateY(-4px) rotate(-5deg);
+  background: var(--accent);
+  border-color: #fff;
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(var(--accent-rgb), 0.4);
+}
+
+.picker-name {
+  font-weight: 700;
+  font-size: 18px;
+  margin-block-end: 8px;
+  z-index: 1;
+  color: var(--text-main);
+}
+
+.picker-about {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  z-index: 1;
+}
 
 /* Their close on the settings dialog: a bordered square of 36, not a bare
    mark. */
@@ -4287,7 +4362,21 @@ a.stat:hover .stat-go {
 }
 
 .modal-close:focus { outline: none; }
-.modal-close:hover { color: var(--text-main); border-color: var(--text-dim); }
+/* Their close does not just change colour: it turns a quarter turn into the
+   accent, with a wash behind it. Mine went grey-to-black and stayed put, which
+   is the difference somebody notices without being able to name it. */
+.modal-close:hover,
+.picker-close:hover {
+  background: var(--accent-wash);
+  transform: rotate(90deg);
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-close:hover,
+  .picker-close:hover { transform: none; }
+}
 
 /* And their action: the whole width, outlined, in the accent, in small caps.
    Mine was a small filled button in a corner, which is the single most visible
@@ -4943,6 +5032,62 @@ a.stat:hover .stat-go {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   transform: scale(1.1);
 }
+
+/* The add menu is the dashboard's, not the kebab's.
+ *
+ * It borrowed .kebab-menu, which is a different control: wider, rounder, in
+ * body text. Theirs is a small monospaced list — 4px radius, 4px of padding,
+ * 11px mono, 14px icons at 0.7 opacity — and somebody who has used the
+ * dashboard recognises it before reading it. */
+.add-menu {
+  position: absolute;
+  inset-block-start: 36px;
+  inset-inline-end: 4px;
+  z-index: 5;
+  min-inline-size: 140px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.add-menu[hidden] { display: none; }
+
+.add-menu-item {
+  display: flex;
+  align-items: center;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: start;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+
+.add-menu-item:hover {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.add-menu-item .icon {
+  inline-size: 14px;
+  block-size: 14px;
+  margin-inline-end: 8px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.add-menu-item:hover .icon { opacity: 1; }
 
 .kebab-menu {
   position: absolute;

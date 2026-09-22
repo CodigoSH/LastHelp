@@ -32,6 +32,22 @@ function dotsIcon(size = 16): string {
 export const icons = {
   dots: dotsIcon,
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
+
+  /**
+   * The two marks the add menu uses, copied from the dashboard in this house
+   * rather than chosen again: four squares for a thing that goes in the grid,
+   * and a dashed outline for the thing that holds them. Somebody who has used
+   * the dashboard reads this menu without looking.
+   */
+  module: (s?: number) =>
+    stroke(
+      `<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>`,
+      s,
+    ),
+  section: (s = 16) =>
+    `<svg class="icon" viewBox="0 0 24 24" width="${s}" height="${s}" fill="none"
+    stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"
+    aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`,
   /* The arrow on anything that leads somewhere. It points along the line, and
      the line runs the other way in three of the twenty languages: the flip is
      done in the stylesheet with --rtl-flip rather than by drawing it twice. */

@@ -1489,8 +1489,18 @@ async function main() {
     const mas = document.querySelector("body > nav [data-add-menu]");
     mas.click();
     await new Promise(r => setTimeout(r, 300));
-    const menu = [...document.querySelectorAll("body > nav .add-menu .kebab-item")]
-      .map(b => b.textContent.trim());
+    // The menu is the dashboard's own, not the kebab's: monospaced items of
+    // 11px with a 14px mark each, which is how somebody recognises it without
+    // reading it. Measured, because "the same as theirs" is a number.
+    const items = [...document.querySelectorAll("body > nav .add-menu .add-menu-item")];
+    const menu = items.map(b => b.textContent.trim());
+    const primera = items[0] ? getComputedStyle(items[0]) : null;
+    const forma = {
+      fuente: primera?.fontSize ?? "",
+      mono: (primera?.fontFamily ?? "").includes("mono"),
+      radio: getComputedStyle(document.querySelector("body > nav .add-menu")).borderRadius,
+      marca: Math.round(items[0]?.querySelector("svg")?.getBoundingClientRect().width ?? 0),
+    };
 
     document.querySelector('[data-open-modal="module-picker"]').click();
     await new Promise(r => setTimeout(r, 400));
@@ -1509,15 +1519,18 @@ async function main() {
     dlg.querySelector("[data-close]").click();
     await new Promise(r => setTimeout(r, 300));
 
-    return { enLaPagina, menu, tarjetas, conTexto, abierto, cerrado: dlg.open === false,
+    return { enLaPagina, menu, forma, tarjetas, conTexto, abierto, cerrado: dlg.open === false,
              // And the way out of arranging is still one click in the same bar.
              hecho: !!document.querySelector("body > nav [data-edit-done]") };
   `);
   check(
     "adding is a menu in the bar and a picker of cards, not two controls on the page",
     anadir.enLaPagina === false && anadir.menu.length === 2 &&
-      anadir.abierto === true && anadir.cerrado === true && anadir.hecho === true,
-    JSON.stringify({ enLaPagina: anadir.enLaPagina, menu: anadir.menu }),
+      anadir.abierto === true && anadir.cerrado === true && anadir.hecho === true &&
+      // And it is shaped like theirs, not like the kebab it used to borrow.
+      anadir.forma.fuente === "11px" && anadir.forma.mono === true &&
+      anadir.forma.radio === "4px" && anadir.forma.marca === 14,
+    JSON.stringify({ enLaPagina: anadir.enLaPagina, menu: anadir.menu, forma: anadir.forma }),
   );
   check(
     "and the picker offers every module, each saying what it draws",
