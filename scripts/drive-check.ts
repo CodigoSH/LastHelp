@@ -1171,7 +1171,11 @@ async function main() {
                    // while it drew as a four-pixel line: an empty grid item with
                    // align-items:start above it sizes to the nothing it holds.
                    alto: Math.round(ghostBox.height), ancho: Math.round(ghostBox.width) };
-    const llevado = { alto: Math.round(box.height), ancho: Math.round(box.width) };
+    // Measured at the same instant as the ghost, not at the instant the drag
+    // started: a scrollbar arriving between the two made the two boxes differ
+    // by fifteen pixels and the check call it a fault.
+    const ahora = first.getBoundingClientRect();
+    const llevado = { alto: Math.round(ahora.height), ancho: Math.round(ahora.width) };
 
     // And on top of another module, which is a no.
     const other = grid.querySelectorAll(".landing-cell")[1];
@@ -1612,9 +1616,10 @@ async function main() {
     return { boton, cifras, encogido: { w: despues.w, h: despues.h } };
   `);
   check(
-    "a module arrives at a size that suits it, not the width of the page",
-    tamanos.boton.w < 12 && tamanos.cifras.w < 12,
-    JSON.stringify({ boton: tamanos.boton.w, cifras: tamanos.cifras.w }),
+    "every module arrives three by two, whatever it is",
+    tamanos.boton.w === 3 && tamanos.boton.h === 2 &&
+      tamanos.cifras.w === 3 && tamanos.cifras.h === 2,
+    JSON.stringify({ boton: tamanos.boton, cifras: tamanos.cifras }),
   );
   check(
     "and can be dragged down to a single cell",
@@ -1813,6 +1818,61 @@ async function main() {
                      enPantalla: ajustes.enPantalla }),
   );
 
+  // Removing asks first. It used to go on the click, and a module somebody
+  // spent a minute pointing at the right board is not something to lose to a
+  // stray one.
+  const borrar = await evaluate(`
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+    const antes = (await fetch("/api/landing").then(r => r.json())).modules.length;
+    const celda = document.querySelector('.landing-cell[data-module^="statistics-"]')
+      || document.querySelector('.landing-cell[data-module^="call_to_action-"]');
+    const id = celda.dataset.module;
+
+    celda.querySelector("[data-module-menu]").click();
+    await new Promise(r => setTimeout(r, 200));
+    celda.querySelector("[data-remove-module]").click();
+    await new Promise(r => setTimeout(r, 500));
+
+    const dlg = document.querySelector("#confirm-remove");
+    const pregunta = {
+      abierto: dlg?.open === true,
+      titulo: dlg?.querySelector("[data-confirm-title]")?.textContent?.trim() ?? "",
+      mensaje: dlg?.querySelector("[data-confirm-message]")?.textContent?.trim() ?? "",
+      acciones: dlg ? dlg.querySelectorAll(".modal-foot button").length : 0,
+      sigue: (await fetch("/api/landing").then(r => r.json())).modules.length,
+    };
+
+    // Backing out changes nothing.
+    dlg.querySelector("[data-close]").click();
+    await new Promise(r => setTimeout(r, 500));
+    const trasCerrar = (await fetch("/api/landing").then(r => r.json())).modules.length;
+
+    // And confirming removes it.
+    celda.querySelector("[data-module-menu]").click();
+    await new Promise(r => setTimeout(r, 200));
+    celda.querySelector("[data-remove-module]").click();
+    await new Promise(r => setTimeout(r, 400));
+    document.querySelector("#confirm-remove [data-confirm]").click();
+    await new Promise(r => setTimeout(r, 1100));
+    const despues = (await fetch("/api/landing").then(r => r.json()));
+
+    return { antes, pregunta, trasCerrar, despues: despues.modules.length,
+             sigueAhi: despues.modules.some(m => m.id === id) };
+  `);
+  check(
+    "removing asks first, and backing out changes nothing",
+    borrar.pregunta.abierto === true && borrar.pregunta.titulo !== "" &&
+      borrar.pregunta.mensaje !== "" && borrar.pregunta.acciones === 1 &&
+      borrar.pregunta.sigue === borrar.antes && borrar.trasCerrar === borrar.antes,
+    JSON.stringify(borrar.pregunta),
+  );
+  check(
+    "and confirming is what removes it",
+    borrar.despues === borrar.antes - 1 && borrar.sigueAhi === false,
+    JSON.stringify({ antes: borrar.antes, despues: borrar.despues }),
+  );
+
   // A module's dialog, and its three ways out. The × and Cancel had no listener
   // at all on this page: the wiring that gives every dialog in the product its
   // close buttons ran on three panel screens and not on this one, so the only
@@ -1991,10 +2051,12 @@ async function main() {
     document.querySelector("[data-edit-page]")?.click();
     await new Promise(r => setTimeout(r, 700));
 
-    // Out again, into the empty columns beside the section — the only free
-    // space on this page, and the reason the page was written this way.
-    const caja = document.querySelector('.landing-cell[data-module="group"]').getBoundingClientRect();
-    const salida = await arrastrar("loose", { clientX: caja.right + 30, clientY: caja.top + 10 });
+    // Out again — and aimed at a cell that is TAKEN, which is what a real page
+    // looks like. Refusing a colliding drop is right everywhere else, and here
+    // it left the module trapped in the section for good: there was nowhere
+    // free to aim at. Leaving always works.
+    const encima = document.querySelector('.landing-cell[data-module="hero"]').getBoundingClientRect();
+    const salida = await arrastrar("loose", { clientX: encima.left + 40, clientY: encima.top + 20 });
     const fuera = (await capa()).modules.find(m => m.id === "loose");
 
     document.querySelector("[data-edit-done]")?.click();

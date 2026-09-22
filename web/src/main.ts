@@ -452,20 +452,47 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     button.addEventListener("click", () => openModuleConfig(button.dataset.editModule ?? "", orgs)),
   );
 
-  root?.querySelectorAll<HTMLButtonElement>("[data-remove-module]").forEach((button) =>
-    button.addEventListener("click", async () => {
-      const gone = button.dataset.removeModule ?? "";
+  // Removing asks first, the way it does over there. A module somebody spent a
+  // minute pointing at the right board should not go on one stray click.
+  let pending = "";
+  const confirmRemove = async () => {
+    const gone = pending;
+    pending = "";
       // What was inside a removed section comes out onto the page rather than
       // being removed with it: those are modules somebody composed, and a
       // container disappearing is not a decision to throw away its contents.
       // Left pointing at a section that is not there, the layout would be
       // refused outright and the whole page would fail to save.
-      landingModules = landingModules.filter((m) => m.id !== gone);
-      spillOnto(landingModules.filter((m) => m.parent === gone));
-      await save(true);
-      drawLanding(orgs);
+    landingModules = landingModules.filter((m) => m.id !== gone);
+    spillOnto(landingModules.filter((m) => m.parent === gone));
+    await save(true);
+    drawLanding(orgs);
+  };
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-remove-module]").forEach((button) =>
+    button.addEventListener("click", () => {
+      pending = button.dataset.removeModule ?? "";
+      const target = landingModules.find((m) => m.id === pending);
+      const section = target?.kind === "section";
+      const dialog = root?.querySelector<HTMLDialogElement>("#confirm-remove");
+      const title = dialog?.querySelector<HTMLElement>("[data-confirm-title]");
+      const message = dialog?.querySelector<HTMLElement>("[data-confirm-message]");
+      if (title) title.textContent = i18n.t(section ? "landing.removeSection" : "landing.removeModule");
+      // A section says what happens to what is inside it: those modules come
+      // back onto the page rather than going with it, and somebody about to
+      // click should know that before they do.
+      if (message) {
+        message.textContent = i18n.t(section ? "landing.removeSectionSays" : "landing.removeModuleSays");
+      }
+      closeMenus();
+      openModal("confirm-remove");
     }),
   );
+
+  root?.querySelector<HTMLButtonElement>("[data-confirm]")?.addEventListener("click", async () => {
+    root?.querySelector<HTMLDialogElement>("#confirm-remove")?.close();
+    await confirmRemove();
+  });
 
   if (landingEditing) wireLandingGrid(orgs, () => save());
 
@@ -751,7 +778,21 @@ function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>)
     const { x, y, parent } = targetCell(event as DragEvent);
     const moving = carrying;
     hideGhost();
-    if (!fits(moving.id, x, y, moving.w, moving.h, parent)) return;
+
+    const leaving = (moving.parent ?? "") !== "" && parent === "";
+    if (!fits(moving.id, x, y, moving.w, moving.h, parent)) {
+      // Refusing a drop that collides is right everywhere except here: a module
+      // being taken OUT of a section has nowhere else to go, and on a page with
+      // no free cell — which is most pages — refusing left it trapped inside
+      // for good. Leaving always works; where it lands is below everything if
+      // there was no room under the hand.
+      if (!leaving) return;
+      spillOnto([moving]);
+      await save();
+      await fetchLanding();
+      drawLanding(orgs);
+      return;
+    }
     moving.x = x;
     moving.y = y;
     // Into a section, out of one, or from one to another. The coordinates are
@@ -1052,28 +1093,16 @@ function usesHeader(kind: views.LandingModule["kind"]): boolean {
  * instead of as one more band across the page.
  */
 function sizeFor(kind: views.LandingModule["kind"]): { w: number; h: number } {
-  switch (kind) {
-    // The two that really are the width of the page: the mark and name at the
-    // top, and the sentence under it.
-    case "hero":
-      return { w: views.LANDING_COLUMNS, h: 3 };
-    case "intro":
-      return { w: views.LANDING_COLUMNS, h: 2 };
-    // A button and three numbers are small things. Two rows for the button, not
-    // one: at one row its words and the board they lead to did not both fit.
-    case "call_to_action":
-      return { w: 3, h: 2 };
-    case "statistics":
-      return { w: 4, h: 2 };
-    // A box other modules go into, with room for a few of them. At one row tall
-    // it would be a container nothing can be dropped into, which reads as
-    // broken rather than as empty.
-    case "section":
-      return { w: 6, h: 3 };
-    // Lists: half the page, tall enough to be worth scrolling.
-    default:
-      return { w: 6, h: 3 };
-  }
+  // Three by two, all of them. It was a size per kind, worked out from what
+  // each one draws, which sounds right and is not: what a module should be is
+  // the operator's decision and the corner is how they make it. One arrival
+  // size means a page of new modules is a row of equal tiles to arrange rather
+  // than a stack of things that already decided for themselves.
+  //
+  // A section is the exception, and only just: at three by two it holds one
+  // module, which is a container nothing fits into.
+  void kind;
+  return kind === "section" ? { w: 6, h: 3 } : { w: 3, h: 2 };
 }
 
 /**

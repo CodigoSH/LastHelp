@@ -4310,6 +4310,17 @@ a.stat:hover .stat-go {
   transition: all 0.2s var(--ease);
 }
 
+.modal-message {
+  margin: 0;
+  padding: 24px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* Their danger reads the same as their primary: outlined, in the accent. A red
+   button for something this reversible would be shouting. */
+.modal-foot .save-changes.danger { color: var(--accent); border-color: var(--accent); }
+
 .modal-foot .save-changes:hover { background: rgba(var(--accent-rgb), 0.1); }
 .modal-foot .save-changes:active { transform: translateY(1px); }
 
@@ -4677,15 +4688,32 @@ a.stat:hover .stat-go {
  * module down by a name most of them do not wear. Measured — the pill renders
  * 25px, so it hangs 12.5px over the edge and needs at least that much.
  */
-/* The one exception, and the dashboard makes the same one: a name that sits on
-   the border has to be allowed over the edge. */
+/*
+ * The one exception, and the dashboard makes the same one: a name that sits on
+ * the border has to be allowed over the edge.
+ *
+ * The pill straddles the top border and nothing else moves. It used to be
+ * pushed down by the same amount the content was, which put it inside the box
+ * instead of on its edge — the padding is there to keep the CONTENT clear of a
+ * name on the border, not to move the name.
+ */
 .landing-cell.has-pill {
-  padding-block-start: 0.85rem;
   overflow: visible;
 }
 
 .landing-cell.has-pill > .section-legend {
-  inset-block-start: 0.85rem;
+  inset-block-start: 0;
+  /* Theirs to the pixel: half of itself above the line, and one more so it
+     covers the border rather than sitting a hair below it. */
+  transform: translateY(calc(-50% - 1px));
+}
+
+/* The room the name needs is given to what is under it. */
+.landing-cell.has-pill > .landing-scroll,
+.landing-cell.has-pill > .landing-one,
+.landing-cell.has-pill > .hero,
+.landing-cell.has-pill > .points {
+  margin-block-start: 0.6rem;
 }
 
 /*

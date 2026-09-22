@@ -631,7 +631,7 @@ export function landing(
       ${drawn}
       ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
     </div>
-    ${editing ? modulePicker(text) + moduleModal(text, allBoards, orgs) : ""}
+    ${editing ? modulePicker(text) + moduleModal(text, allBoards, orgs) + confirmModal(text) : ""}
   </div>`;
 }
 
@@ -779,6 +779,27 @@ function appearanceControls(text: Text): string {
       </div>
       <input type="hidden" name="borderWidth" />
     </div>`;
+}
+
+/**
+ * Asking before removing, which the dashboard does and this did not.
+ *
+ * Their shape: a title, a line saying what will happen, and one button in the
+ * danger variant. No cancel — the cross is how you back out, which is the same
+ * rule the settings dialog follows.
+ */
+function confirmModal(text: Text): string {
+  return `<dialog class="modal" id="confirm-remove">
+    <div class="modal-head">
+      <h2 data-confirm-title></h2>
+      <button type="button" class="modal-close" data-close
+        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+    </div>
+    <p class="modal-message" data-confirm-message></p>
+    <div class="modal-foot">
+      <button type="button" class="save-changes danger" data-confirm>${escapeHTML(text.t("action.remove"))}</button>
+    </div>
+  </dialog>`;
 }
 
 function moduleModal(

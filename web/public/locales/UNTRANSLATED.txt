@@ -52,6 +52,10 @@ landing.noneDone
 landing.noneYet
 landing.pointWords
 landing.regular
+landing.removeModule
+landing.removeModuleSays
+landing.removeSection
+landing.removeSectionSays
 landing.saveChanges
 landing.scope
 landing.scopeAll
