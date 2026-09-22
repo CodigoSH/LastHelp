@@ -32,6 +32,7 @@ function dotsIcon(size = 16): string {
 export const icons = {
   dots: dotsIcon,
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
+  minus: (s?: number) => stroke(`<path d="M5 12h14"/>`, s),
 
   /**
    * The two marks the add menu uses, copied from the dashboard in this house

@@ -1897,6 +1897,26 @@ async function main() {
       filas: !form.querySelector("[data-for-rows]").hidden,
       marca: !form.querySelector("[data-for-mark]").hidden,
     };
+    // The count is asked for the way a phone asks: minus, the number, plus,
+    // and no browser spinners inside the field. At the ends the buttons say so
+    // rather than doing nothing.
+    const grupo = form.querySelector("[data-for-rows]");
+    const caja = grupo.querySelector("input[name=rows]");
+    const menos = grupo.querySelector('[data-step="-1"]');
+    const mas = grupo.querySelector('[data-step="1"]');
+    const izquierda = (el) => Math.round(el.getBoundingClientRect().x);
+    caja.value = "0";
+    caja.dispatchEvent(new Event("input", { bubbles: true }));
+    const contador = {
+      orden: izquierda(menos) < izquierda(caja) && izquierda(caja) < izquierda(mas),
+      sinFlechas: getComputedStyle(caja).appearance === "textfield",
+      suelo: menos.disabled === true,
+    };
+    mas.click(); mas.click();
+    contador.subeDe2 = caja.value === "2" && menos.disabled === false;
+    menos.click();
+    contador.baja = caja.value === "1";
+
     const cuenta = () => document.querySelectorAll('[data-module="list"] .cards .card').length;
     const sinLimite = cuenta();
     if (listaPide.filas) form.querySelector("[name=rows]").value = "1";
@@ -1915,7 +1935,7 @@ async function main() {
     history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
     await new Promise(r => setTimeout(r, 1200));
 
-    return { heroPide, heroEnPantalla, listaPide, sinLimite, filasEnPantalla };
+    return { heroPide, heroEnPantalla, listaPide, contador, sinLimite, filasEnPantalla };
   `);
   check(
     "the hero is asked for its own words and whether to draw the mark",
@@ -1971,6 +1991,14 @@ async function main() {
     await new Promise(r => setTimeout(r, 1200));
     return ofrece;
   `);
+  check(
+    "and it is asked the way a phone asks, with the ends saying so",
+    opciones.contador.orden === true && opciones.contador.sinFlechas === true &&
+      opciones.contador.suelo === true && opciones.contador.subeDe2 === true &&
+      opciones.contador.baja === true,
+    JSON.stringify(opciones.contador),
+  );
+
   const esperado: Record<string, string> = {
     hero: "name,label,mark",
     intro: "label",

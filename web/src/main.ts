@@ -955,6 +955,7 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   if (counting && rows) {
     counting.hidden = !lists(target.kind);
     rows.value = String(target.rows ?? 0);
+    stepRows(counting, rows);
   }
 
   // And whether the hero draws the installation's mark beside its name.
@@ -1059,6 +1060,42 @@ function showMark(form: HTMLFormElement, at: string): void {
 }
 
 /** Show one tab of the settings dialog and mark it as the one showing. */
+/**
+ * Wires the minus and plus either side of a count, and keeps them honest: at
+ * nought there is nothing to take away and at the ceiling nothing to add, and
+ * a button that still looks pressable at the end of its range is a button that
+ * lies. Typing into the field still works — the steps are a second way in, not
+ * the only one.
+ */
+function stepRows(group: HTMLElement, field: HTMLInputElement): void {
+  const low = Number(field.min || 0);
+  const high = Number(field.max || 20);
+  const steps = [...group.querySelectorAll<HTMLButtonElement>("[data-step]")];
+
+  const settle = (): void => {
+    const now = Number(field.value || 0);
+    for (const step of steps) {
+      const by = Number(step.dataset.step ?? 0);
+      step.disabled = by < 0 ? now <= low : now >= high;
+    }
+  };
+
+  for (const step of steps) {
+    if (step.dataset.wired === "1") continue;
+    step.dataset.wired = "1";
+    step.addEventListener("click", () => {
+      const by = Number(step.dataset.step ?? 0);
+      field.value = String(Math.min(high, Math.max(low, Number(field.value || 0) + by)));
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+  if (field.dataset.wired !== "1") {
+    field.dataset.wired = "1";
+    field.addEventListener("input", settle);
+  }
+  settle();
+}
+
 function showTab(form: HTMLFormElement, which: string): void {
   form.querySelectorAll<HTMLElement>("[data-panel]").forEach((panel) => {
     panel.hidden = panel.dataset.panel !== which;

@@ -894,7 +894,14 @@ function moduleModal(
           </div>
           <div class="field-group" data-for-rows hidden>
             <label for="module-rows">${escapeHTML(text.t("landing.rows"))}</label>
-            <input id="module-rows" name="rows" type="number" min="0" max="20" step="1" />
+            <div class="stepper">
+              <button type="button" class="stepper-step" data-step="-1"
+                aria-label="${escapeAttr(text.t("landing.rowsFewer"))}">${icons.minus(16)}</button>
+              <input id="module-rows" name="rows" type="number" min="0" max="20" step="1"
+                inputmode="numeric" />
+              <button type="button" class="stepper-step" data-step="1"
+                aria-label="${escapeAttr(text.t("landing.rowsMore"))}">${icons.add(16)}</button>
+            </div>
             <p class="hint">${escapeHTML(text.t("landing.rowsHelp"))}</p>
           </div>
           <div class="field-group" data-for-mark hidden>

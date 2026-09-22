@@ -4241,6 +4241,73 @@ a.stat:hover .stat-go {
 
 .modal-close:focus-visible { border-radius: var(--radius); }
 
+/* A count, the way a phone asks for one: minus, the number, plus.
+ *
+ * It was a number input with the browser's own spinners inside it — two arrows
+ * four pixels tall, stacked, that appear on hover and are a poor target for a
+ * finger and an awkward one for a mouse. Minus on the left and plus on the
+ * right is the order every phone uses, so it is the one somebody's hand already
+ * knows. The field itself keeps the number and nothing else. */
+.stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  inline-size: fit-content;
+}
+
+.stepper input[type="number"] {
+  inline-size: 4.5rem;
+  text-align: center;
+  border-radius: 0;
+  border-inline: none;
+  /* The spinners are the thing being replaced; leaving them would give the
+     same control twice. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.stepper input[type="number"]::-webkit-outer-spin-button,
+.stepper input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 42px;
+  background: var(--surface-dim);
+  border: 1px solid var(--border-strong);
+  color: var(--text-main);
+  cursor: pointer;
+  transition:
+    background-color 0.18s var(--ease),
+    color 0.18s var(--ease);
+}
+
+.stepper-step:first-child {
+  border-start-start-radius: var(--radius-sm);
+  border-end-start-radius: var(--radius-sm);
+}
+
+.stepper-step:last-child {
+  border-start-end-radius: var(--radius-sm);
+  border-end-end-radius: var(--radius-sm);
+}
+
+.stepper-step:hover:not(:disabled) {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+/* At the end of its range the button says so rather than doing nothing. */
+.stepper-step:disabled {
+  color: var(--text-dim);
+  opacity: 0.45;
+  cursor: default;
+}
+
 .picker-grid {
   display: grid;
   /* Theirs says 200. Theirs also has nine cards in three rows and so never
