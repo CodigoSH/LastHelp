@@ -1690,6 +1690,23 @@ async function main() {
       posicion: !form.querySelector("[data-for-label-at]").hidden,
     };
 
+    // What is actually in that tab. It held one sentence saying there was
+    // nothing there; it holds the controls the dashboard's own does: ten
+    // colours and a default, three widths, and where the name goes drawn as
+    // four little diagrams rather than written as four words.
+    const aspecto = {
+      colores: form.querySelectorAll("[data-colour]").length,
+      grosores: form.querySelectorAll("[data-width]").length,
+      posiciones: form.querySelectorAll("[data-at]").length,
+      marcas: [...form.querySelectorAll("[data-at]")].every(b => b.querySelector("svg")),
+      // The chosen tab wears the accent and the other does not. Against the
+      // other tab rather than against a fixed colour: the accent is the
+      // operator's, so a literal here would be measuring this installation.
+      acento: getComputedStyle(form.querySelector("[data-tab=look]")).color,
+      apagada: getComputedStyle(form.querySelector("[data-tab=general]")).color,
+      subrayado: getComputedStyle(form.querySelector("[data-tab=look]"), "::after").content !== "none",
+    };
+
     form.requestSubmit();
     await new Promise(r => setTimeout(r, 1000));
 
@@ -1699,7 +1716,7 @@ async function main() {
       '[data-module="' + celda.dataset.module + '"] .module-header h2')?.textContent.trim();
 
     return { pestanas, enCabecera, primeraActiva, generalVisible, lookOculto,
-             pideNombre, sugerencia, trasCambiar,
+             pideNombre, sugerencia, trasCambiar, aspecto,
              nombreGuardado: guardado.name ?? "", enPantalla,
              acciones: form.querySelectorAll(".modal-foot button").length };
   `);
@@ -1711,6 +1728,14 @@ async function main() {
       ajustes.trasCambiar.look === true && ajustes.trasCambiar.posicion === true &&
       ajustes.acciones === 1,
     JSON.stringify({ pestanas: ajustes.pestanas, acciones: ajustes.acciones }),
+  );
+  check(
+    "the customization tab carries the dashboard's own controls",
+    ajustes.aspecto?.colores === 11 && ajustes.aspecto?.grosores === 3 &&
+      ajustes.aspecto?.posiciones === 4 && ajustes.aspecto?.marcas === true &&
+      ajustes.aspecto?.acento !== ajustes.aspecto?.apagada &&
+      ajustes.aspecto?.subrayado === true,
+    JSON.stringify(ajustes.aspecto),
   );
   check(
     "and a module is called what its operator calls it, not what it draws",
@@ -1790,7 +1815,9 @@ async function main() {
       await new Promise(r => setTimeout(r, 400));
       const form = document.querySelector("form.module-config");
       const ofrecido = !document.querySelector("[data-for-label-at]").hidden;
-      form.querySelector("[name=labelAt]").value = valor;
+      document.querySelector("[data-tab=look]").click();
+      await new Promise(r => setTimeout(r, 200));
+      form.querySelector('[data-at="' + valor + '"]').click();
       form.requestSubmit();
       await new Promise(r => setTimeout(r, 900));
       return { ofrecido, ...leer() };

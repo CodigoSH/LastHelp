@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 )
 
@@ -254,6 +255,13 @@ type Module struct {
 	// tell them apart, and "Repositories" three times tells nobody anything.
 	Name string `json:"name,omitempty"`
 
+	// BorderColor and BorderWidth are how the module's own box looks, and they
+	// are the dashboard's controls with the dashboard's values: ten colours and
+	// three widths. Empty and zero mean the theme decides, which is what every
+	// module looks like until somebody says otherwise.
+	BorderColor string `json:"border_color,omitempty"`
+	BorderWidth int    `json:"border_width,omitempty"`
+
 	// Label is where this module's name sits. Empty means the top, which is
 	// what every module drew before there was anywhere else to put it.
 	Label LabelAt `json:"label,omitempty"`
@@ -445,6 +453,11 @@ func (m Module) ShowsOne() bool {
 	return deeper
 }
 
+// colourPattern is six hex digits and nothing else. This value reaches a
+// stylesheet rule, so anything that is not exactly a colour is refused rather
+// than escaped and hoped about — the same rule the instance accent already has.
+var colourPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
 // isSlug is the shape of the slugs the rest of the product hands out. Kept
 // deliberately narrow: this value is read back and compared, never interpolated
 // into anything, and a narrow shape is one fewer thing to reason about.
@@ -460,6 +473,14 @@ func isSlug(v string) bool {
 		}
 	}
 	return true
+}
+
+// Colours is the palette a module's border may take: the dashboard's ten,
+// copied rather than chosen again, so a border set over there and a border set
+// here are the same colour and not two that nearly match.
+var Colours = []string{
+	"#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+	"#ec4899", "#64748b", "#f8fafc", "#1e293b", "#333333",
 }
 
 // ErrUnknownKind means a module nothing here can draw.
@@ -640,6 +661,12 @@ func (l Layout) validate() error {
 		}
 		if m.Name != "" && !m.Kind.usesHeader() {
 			return fmt.Errorf("module %q carries a name it does not draw", m.ID)
+		}
+		if m.BorderColor != "" && !colourPattern.MatchString(m.BorderColor) {
+			return fmt.Errorf("module %q has a border colour of %q", m.ID, m.BorderColor)
+		}
+		if m.BorderWidth < 0 || m.BorderWidth > 3 {
+			return fmt.Errorf("module %q has a border %d wide", m.ID, m.BorderWidth)
 		}
 		if len([]rune(m.Name)) > maxLabel {
 			return fmt.Errorf("module %q has a name longer than %d characters", m.ID, maxLabel)

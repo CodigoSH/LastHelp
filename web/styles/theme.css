@@ -4199,46 +4199,223 @@ a.stat:hover .stat-go {
 .add-wrap .add-menu { inset-block-start: calc(100% + 6px); inset-inline-end: 0; }
 
 /*
- * A settings dialog whose tabs ARE its header, which is how the dashboard does
- * it: General and Customization on the left, the close on the right, and one
- * action at the foot. Somebody who has configured a widget over there has
- * already used this.
+ * The settings dialog, measured off the dashboard's own rather than styled to
+ * taste: a 56px header whose tabs ARE the header, the active one in the accent
+ * with a glowing underline, a body of 24px padding and 16px between groups, and
+ * one action at the foot.
  */
 .modal-head.tabbed {
-  align-items: stretch;
+  align-items: center;
+  justify-content: space-between;
   gap: 0;
-  padding-block-end: 0;
+  block-size: 56px;
+  padding: 0 24px;
+  margin-block-end: 0;
   border-block-end: 1px solid var(--border);
 }
 
 .modal-head.tabbed .tabs {
   display: flex;
-  gap: 0.25rem;
-  flex: 1;
+  align-items: center;
+  gap: 24px;
+  padding: 0 8px;
+  block-size: 100%;
   min-inline-size: 0;
 }
 
 .modal-head.tabbed .tab-btn {
+  position: relative;
+  background: transparent;
   border: 0;
-  background: none;
-  color: var(--text-dim);
+  padding: 12px 0;
   font: inherit;
-  font-size: 0.9rem;
-  padding: 0.6rem 0.9rem;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dim);
   cursor: pointer;
-  border-block-end: 2px solid transparent;
-  margin-block-end: -1px;
+  opacity: 0.7;
+  letter-spacing: 0.02em;
+  transition: all 0.2s var(--ease);
+}
+
+/* Theirs does this explicitly: the underline says which tab is showing, and a
+   ring around the one you last clicked says something else at the same time. */
+.modal-head.tabbed .tab-btn:focus { outline: none; }
+
+.modal-head.tabbed .tab-btn:hover {
+  color: var(--text-main);
+  opacity: 1;
 }
 
 .modal-head.tabbed .tab-btn.on {
-  color: var(--text-main);
-  border-block-end-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  opacity: 1;
 }
 
-.modal-head.tabbed .icon-button { align-self: center; }
+/* The glowing underline, theirs to the pixel. */
+.modal-head.tabbed .tab-btn.on::after {
+  content: "";
+  position: absolute;
+  inset-block-end: -1px;
+  inset-inline-start: 0;
+  inline-size: 100%;
+  block-size: 2px;
+  background: var(--accent);
+  box-shadow: 0 -2px 10px rgba(var(--accent-rgb), 0.5);
+  border-radius: 2px 2px 0 0;
+  animation: tab-underline 0.3s var(--ease);
+}
 
-.tab-panel { display: grid; gap: 0.9rem; }
+@keyframes tab-underline {
+  from { transform: scaleX(0); opacity: 0; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
 .tab-panel[hidden] { display: none; }
+
+.tab-panel .field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tab-panel .field-group > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+/* The ten colours, as swatches. */
+.colour-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px;
+  margin-block-start: 8px;
+}
+
+.colour-swatch {
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  border: 2px solid rgba(255, 255, 255, 0.05);
+  background-clip: padding-box;
+  transition: all 0.15s var(--ease);
+}
+
+/* The ten, as rules rather than as style attributes: this product serves
+   style-src 'self', and a known set of values belongs in the stylesheet. */
+.colour-swatch[data-colour="#3b82f6"] { background: #3b82f6; }
+.colour-swatch[data-colour="#10b981"] { background: #10b981; }
+.colour-swatch[data-colour="#f59e0b"] { background: #f59e0b; }
+.colour-swatch[data-colour="#ef4444"] { background: #ef4444; }
+.colour-swatch[data-colour="#8b5cf6"] { background: #8b5cf6; }
+.colour-swatch[data-colour="#ec4899"] { background: #ec4899; }
+.colour-swatch[data-colour="#64748b"] { background: #64748b; }
+.colour-swatch[data-colour="#f8fafc"] { background: #f8fafc; }
+.colour-swatch[data-colour="#1e293b"] { background: #1e293b; }
+.colour-swatch[data-colour="#333333"] { background: #333333; }
+
+.segment[data-width="1"] .segment-rule { block-size: 1px; }
+.segment[data-width="2"] .segment-rule { block-size: 2px; }
+.segment[data-width="3"] .segment-rule { block-size: 3px; }
+
+.colour-swatch.none {
+  border-style: dashed;
+  border-color: var(--border);
+}
+
+.colour-swatch:hover {
+  transform: scale(1.1);
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.colour-swatch.on {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text-main);
+}
+
+/* Three widths, as a segmented control. */
+.segmented {
+  display: flex;
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  padding: 4px;
+  border-radius: 8px;
+  margin-block-start: 8px;
+  gap: 4px;
+  border: 1px solid var(--border);
+}
+
+.segment {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.segment-rule {
+  inline-size: 24px;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+.segment span:last-child { font-size: 11px; font-weight: 500; }
+
+.segment:hover { color: var(--text-main); }
+
+.segment.on {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.1);
+}
+
+/* Where the name goes, as the four little diagrams rather than four words. */
+.mark-row { display: flex; gap: 8px; margin-block-start: 8px; }
+
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 42px;
+  block-size: 42px;
+  padding: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-dim);
+  transition: all 0.2s;
+}
+
+.mark:hover { background: var(--surface-hover, rgba(255,255,255,0.04)); color: var(--text-main); }
+
+.mark.on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
 
 /*
  * The panel comes in from the side, the way the dashboard's drawer does.

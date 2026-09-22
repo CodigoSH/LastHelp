@@ -21,6 +21,9 @@ landing.aboutText
 landing.aboutVoted
 landing.addModule
 landing.addSection
+landing.borderColour
+landing.borderDefault
+landing.borderWidth
 landing.countDone
 landing.countOpen
 landing.countReceived
@@ -45,9 +48,11 @@ landing.noneComing
 landing.noneCounted
 landing.noneDone
 landing.noneYet
-landing.nothingToStyle
 landing.pointWords
+landing.regular
 landing.scope
 landing.scopeAll
 landing.tabGeneral
 landing.tabLook
+landing.thick
+landing.thin

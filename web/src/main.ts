@@ -212,6 +212,20 @@ function squareLandingCells(): void {
 window.addEventListener("resize", squareLandingCells);
 
 function placeLandingModules(modules: views.LandingModule[]): void {
+  // A border somebody chose, through the sheet like everything else here: this
+  // product's content policy drops a style attribute.
+  setRule(
+    "landing-borders",
+    modules
+      .filter((m) => m.border_color || m.border_width)
+      .map(
+        (m) =>
+          `.landing-cell[data-module="${cssEscape(m.id)}"] > :not(.kebab-btn):not(.kebab-menu):not(.resize-handle):not(.section-legend){` +
+          `${m.border_color ? `border-color:${m.border_color};` : ""}` +
+          `${m.border_width ? `border-width:${m.border_width}px;` : ""}}`,
+      )
+      .join("\n"),
+  );
   setRule(
     "landing-modules",
     modules
@@ -307,6 +321,8 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           ...(m.scope ? { scope: m.scope } : {}),
           ...(m.label ? { label: m.label } : {}),
           ...(m.name ? { name: m.name } : {}),
+          ...(m.border_color ? { border_color: m.border_color } : {}),
+          ...(m.border_width ? { border_width: m.border_width } : {}),
           ...(m.parent ? { parent: m.parent } : {}),
         })),
       });
@@ -442,6 +458,24 @@ function wireLanding(orgs: OrganizationSummary[]): void {
   dialog?.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((tab) =>
     tab.addEventListener("click", () => showTab(dialog, tab.dataset.tab ?? "general")),
   );
+
+  // The three rows of buttons that stand in for a field: each writes its value
+  // into the hidden input beside it, which is what the form submits.
+  const rows: Array<[string, string, string]> = [
+    ["[data-at]", "at", "labelAt"],
+    ["[data-colour]", "colour", "borderColour"],
+    ["[data-width]", "width", "borderWidth"],
+  ];
+  for (const [selector, key, field] of rows) {
+    dialog?.querySelectorAll<HTMLButtonElement>(selector).forEach((button) =>
+      button.addEventListener("click", () => {
+        const value = button.dataset[key] ?? "";
+        const input = dialog.querySelector<HTMLInputElement>(`[name=${field}]`);
+        if (input) input.value = value;
+        pickOne(dialog, selector, key, value);
+      }),
+    );
+  }
   dialog?.addEventListener("submit", async () => {
     const data = new FormData(dialog);
     const id = String(data.get("id") ?? "");
@@ -452,6 +486,8 @@ function wireLanding(orgs: OrganizationSummary[]): void {
       target.body = String(data.get("label") ?? "").trim();
     }
     if (usesHeader(target.kind)) target.name = String(data.get("name") ?? "").trim();
+    target.border_color = String(data.get("borderColour") ?? "");
+    target.border_width = Number(data.get("borderWidth") ?? 0) || 0;
     if (takesScope(target.kind)) target.scope = String(data.get("scope") ?? "");
     if (usesHeader(target.kind)) {
       target.label = String(data.get("labelAt") ?? "top") as views.LandingModule["label"];
@@ -792,12 +828,26 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     }
   }
 
-  // And only a module that draws a name is asked where to keep it.
+  // And only a module that draws a name is asked where to keep it — as the four
+  // little diagrams, not four words.
   const puts = form.querySelector<HTMLElement>("[data-for-label-at]");
-  const at = form.querySelector<HTMLSelectElement>("[name=labelAt]");
+  const at = form.querySelector<HTMLInputElement>("[name=labelAt]");
   if (puts && at) {
     puts.hidden = !usesHeader(target.kind);
     at.value = target.label ?? "top";
+    pickOne(form, "[data-at]", "at", at.value);
+  }
+
+  // How its own box looks, which every module has.
+  const colour = form.querySelector<HTMLInputElement>("[name=borderColour]");
+  if (colour) {
+    colour.value = target.border_color ?? "";
+    pickOne(form, "[data-colour]", "colour", colour.value);
+  }
+  const width = form.querySelector<HTMLInputElement>("[name=borderWidth]");
+  if (width) {
+    width.value = String(target.border_width ?? 0);
+    pickOne(form, "[data-width]", "width", width.value);
   }
 
   // The button's words, a section's name, and a point's sentence. All three are
@@ -860,6 +910,18 @@ function defaultNameFor(kind: views.LandingModule["kind"]): string {
     default:
       return "";
   }
+}
+
+/**
+ * Mark one of a row of buttons as the chosen one.
+ *
+ * Three rows work this way — the colour, the width, the place a name goes — and
+ * three copies of the same four lines is three places for them to drift apart.
+ */
+function pickOne(form: HTMLFormElement, selector: string, key: string, value: string): void {
+  form.querySelectorAll<HTMLButtonElement>(selector).forEach((button) => {
+    button.classList.toggle("on", (button.dataset[key] ?? "") === value);
+  });
 }
 
 /** Show one tab of the settings dialog and mark it as the one showing. */

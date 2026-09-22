@@ -532,3 +532,42 @@ func TestAPointIsASentenceAndNotAParagraph(t *testing.T) {
 		t.Errorf("a point was measured as if it were a label: %v", err)
 	}
 }
+
+// TestABorderIsAColourAndAWidthOrNothing.
+//
+// The value reaches a stylesheet rule, so anything that is not exactly a colour
+// is refused rather than escaped and hoped about — the same rule the accent
+// already has. Empty and zero are the theme deciding, which is what every
+// module looks like until somebody says otherwise.
+func TestABorderIsAColourAndAWidthOrNothing(t *testing.T) {
+	page := func(colour string, width int) string {
+		out, _ := json.Marshal(Layout{Modules: []Module{
+			{ID: "b", Kind: Boards, X: 1, Y: 1, W: 6, H: 3,
+				BorderColor: colour, BorderWidth: width},
+		}})
+		return string(out)
+	}
+
+	if _, err := Parse(page("", 0)); err != nil {
+		t.Errorf("a module with no border of its own was refused: %v", err)
+	}
+	for _, colour := range Colours {
+		if _, err := Parse(page(colour, 2)); err != nil {
+			t.Errorf("%s was refused: %v", colour, err)
+		}
+	}
+	for name, bad := range map[string]string{
+		"a name":        "red",
+		"half a colour": "#abc",
+		"a rule":        "#000000; content: url(x)",
+	} {
+		if _, err := Parse(page(bad, 1)); err == nil {
+			t.Errorf("%s was accepted as a border colour", name)
+		}
+	}
+	for _, width := range []int{-1, 4} {
+		if _, err := Parse(page("#3b82f6", width)); err == nil {
+			t.Errorf("a border %d wide was accepted", width)
+		}
+	}
+}

@@ -73,6 +73,9 @@ export interface LandingModule {
   scope?: string;
   /** What this module calls itself. Empty means the name of what it draws. */
   name?: string;
+  /** The colour of the module's own border, and how thick. */
+  border_color?: string;
+  border_width?: number;
   /** Where this module's name sits. Empty means the top. */
   label?: "top" | "bottom" | "pill" | "off";
   /**
@@ -697,6 +700,84 @@ function modulePicker(text: Text): string {
  * has no use for is not shown to it — a dialog offering a control that does
  * nothing is a dialog that lies about what it does.
  */
+/**
+ * The dashboard's ten. Copied rather than chosen again, so a border set over
+ * there and a border set here are the same colour and not two that nearly
+ * match.
+ */
+const BORDER_COLOURS = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#64748b",
+  "#f8fafc",
+  "#1e293b",
+  "#333333",
+];
+
+/**
+ * Where a name sits, as the four little diagrams the dashboard draws.
+ *
+ * Its own marks, verbatim: a box with a line near the top, near the bottom, one
+ * along the border, and a box with a dot for none. A word for each would be a
+ * second vocabulary for something somebody has already learned by looking.
+ */
+function labelMark(at: string): string {
+  const box = `<rect x="4" y="4" width="16" height="16" rx="2" stroke-opacity="0.5" />`;
+  const inner =
+    at === "top"
+      ? `${box}<path d="M8 8 h8" /><path d="M12 13 v2" />`
+      : at === "pill"
+        ? `${box}<path d="M7 4 h10" stroke-width="4" />`
+        : at === "off"
+          ? `${box}<circle cx="12" cy="12" r="1.5" fill="currentColor" />`
+          : `${box}<path d="M8 16 h8" /><path d="M12 9 v2" />`;
+  return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+    stroke="currentColor" stroke-width="2" aria-hidden="true">${inner}</svg>`;
+}
+
+/** How a module's own box looks: its border's colour and how thick it is. */
+function appearanceControls(text: Text): string {
+  return `<div class="field-group">
+      <label>${escapeHTML(text.t("landing.borderColour"))}</label>
+      <div class="colour-grid">
+        <button type="button" class="colour-swatch none" data-colour=""
+          title="${escapeAttr(text.t("landing.borderDefault"))}"
+          aria-label="${escapeAttr(text.t("landing.borderDefault"))}"></button>
+        ${BORDER_COLOURS.map(
+          // No style attribute: this product serves style-src 'self', and the
+          // ten colours are a known set, so they are rules in the stylesheet
+          // keyed by the same attribute the button already carries.
+          (colour) => `<button type="button" class="colour-swatch" data-colour="${escapeAttr(colour)}"
+            aria-label="${escapeAttr(colour)}"></button>`,
+        ).join("")}
+      </div>
+      <input type="hidden" name="borderColour" />
+    </div>
+
+    <div class="field-group">
+      <label>${escapeHTML(text.t("landing.borderWidth"))}</label>
+      <div class="segmented">
+        ${[
+          [1, text.t("landing.thin")],
+          [2, text.t("landing.regular")],
+          [3, text.t("landing.thick")],
+        ]
+          .map(
+            ([width, name]) => `<button type="button" class="segment" data-width="${width}">
+              <span class="segment-rule"></span>
+              <span>${escapeHTML(String(name))}</span>
+            </button>`,
+          )
+          .join("")}
+      </div>
+      <input type="hidden" name="borderWidth" />
+    </div>`;
+}
+
 function moduleModal(
   text: Text,
   boards: LandingBoard[] = [],
@@ -732,20 +813,20 @@ function moduleModal(
         <input type="hidden" name="id" />
 
         <div class="tab-panel" data-panel="general">
-          <div class="field" data-for-name hidden>
+          <div class="field-group" data-for-name hidden>
             <label for="module-name">${escapeHTML(text.t("landing.name"))}</label>
             <input id="module-name" name="name" type="text" maxlength="80" />
             <p class="hint">${escapeHTML(text.t("landing.nameHelp"))}</p>
           </div>
-          <div class="field" data-for-scope hidden>
+          <div class="field-group" data-for-scope hidden>
             <label for="module-scope">${escapeHTML(text.t("landing.scope"))}</label>
             <select id="module-scope" name="scope">${options}</select>
           </div>
-          <div class="field" data-for-text hidden>
+          <div class="field-group" data-for-text hidden>
             <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
             <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
           </div>
-          <div class="field" data-for-label hidden>
+          <div class="field-group" data-for-label hidden>
             <label for="module-label">${escapeHTML(text.t("landing.label"))}</label>
             <input id="module-label" name="label" type="text" maxlength="160"
                    placeholder="${escapeAttr(text.t("board.report"))}" />
@@ -753,16 +834,26 @@ function moduleModal(
         </div>
 
         <div class="tab-panel" data-panel="look" hidden>
-          <div class="field" data-for-label-at hidden>
-            <label for="module-label-at">${escapeHTML(text.t("landing.labelAt"))}</label>
-            <select id="module-label-at" name="labelAt">
-              <option value="top">${escapeHTML(text.t("landing.labelTop"))}</option>
-              <option value="bottom">${escapeHTML(text.t("landing.labelBottom"))}</option>
-              <option value="pill">${escapeHTML(text.t("landing.labelPill"))}</option>
-              <option value="off">${escapeHTML(text.t("landing.labelOff"))}</option>
-            </select>
+          <div class="field-group" data-for-label-at hidden>
+            <label>${escapeHTML(text.t("landing.labelAt"))}</label>
+            <div class="mark-row">
+              ${(
+                [
+                  ["top", text.t("landing.labelTop")],
+                  ["bottom", text.t("landing.labelBottom")],
+                  ["pill", text.t("landing.labelPill")],
+                  ["off", text.t("landing.labelOff")],
+                ] as Array<[string, string]>
+              )
+                .map(
+                  ([at, name]) => `<button type="button" class="mark" data-at="${escapeAttr(at)}"
+                    title="${escapeAttr(name)}" aria-label="${escapeAttr(name)}">${labelMark(at)}</button>`,
+                )
+                .join("")}
+            </div>
+            <input type="hidden" name="labelAt" />
           </div>
-          <p class="hint" data-look-empty hidden>${escapeHTML(text.t("landing.nothingToStyle"))}</p>
+          ${appearanceControls(text)}
         </div>
 
         <p class="form-error" role="alert" hidden></p>
