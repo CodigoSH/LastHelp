@@ -247,6 +247,13 @@ type Module struct {
 	// somewhere else without rewriting everything inside it.
 	Parent string `json:"parent,omitempty"`
 
+	// Name is what this module calls itself, and empty means the name of what it
+	// draws — "Repositories", "Most wanted ideas".
+	//
+	// An operator with three boards modules pointed at three boards needs to
+	// tell them apart, and "Repositories" three times tells nobody anything.
+	Name string `json:"name,omitempty"`
+
 	// Label is where this module's name sits. Empty means the top, which is
 	// what every module drew before there was anywhere else to put it.
 	Label LabelAt `json:"label,omitempty"`
@@ -630,6 +637,12 @@ func (l Layout) validate() error {
 		}
 		if m.Label != "" && !m.Kind.usesHeader() {
 			return fmt.Errorf("module %q says where to put a name it does not draw", m.ID)
+		}
+		if m.Name != "" && !m.Kind.usesHeader() {
+			return fmt.Errorf("module %q carries a name it does not draw", m.ID)
+		}
+		if len([]rune(m.Name)) > maxLabel {
+			return fmt.Errorf("module %q has a name longer than %d characters", m.ID, maxLabel)
 		}
 	}
 	return nil

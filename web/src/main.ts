@@ -300,6 +300,7 @@ function wireLanding(orgs: OrganizationSummary[]): void {
             : {}),
           ...(m.scope ? { scope: m.scope } : {}),
           ...(m.label ? { label: m.label } : {}),
+          ...(m.name ? { name: m.name } : {}),
           ...(m.parent ? { parent: m.parent } : {}),
         })),
       });
@@ -432,15 +433,19 @@ function wireLanding(orgs: OrganizationSummary[]): void {
 
   // One dialog, filled for whichever module opened it.
   const dialog = root?.querySelector<HTMLFormElement>("form.module-config");
+  dialog?.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((tab) =>
+    tab.addEventListener("click", () => showTab(dialog, tab.dataset.tab ?? "general")),
+  );
   dialog?.addEventListener("submit", async () => {
     const data = new FormData(dialog);
     const id = String(data.get("id") ?? "");
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
-    if (target.kind === "call_to_action" || target.kind === "section") {
+    if (target.kind === "call_to_action" || target.kind === "section" || target.kind === "intro") {
       target.body = String(data.get("label") ?? "").trim();
     }
+    if (usesHeader(target.kind)) target.name = String(data.get("name") ?? "").trim();
     if (takesScope(target.kind)) target.scope = String(data.get("scope") ?? "");
     if (usesHeader(target.kind)) {
       target.label = String(data.get("labelAt") ?? "top") as views.LandingModule["label"];
@@ -789,21 +794,78 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     at.value = target.label ?? "top";
   }
 
-  // And only the button is asked for a label. Left empty it says what the rest
-  // of the product says on that button, which is the right answer often enough
-  // that asking for it as a required field would be asking for nothing.
+  // The button's words, a section's name, and a point's sentence. All three are
+  // one short line the operator writes, so they are one field.
   const naming = form.querySelector<HTMLElement>("[data-for-label]");
   const label = form.querySelector<HTMLInputElement>("[name=label]");
   if (naming && label) {
-    // The button's words, and a section's name. A section with no name draws no
-    // pill at all, which is what it does in the dashboard too, so this is left
-    // empty on purpose rather than filled with something.
-    const named = target.kind === "call_to_action" || target.kind === "section";
+    const named =
+      target.kind === "call_to_action" || target.kind === "section" || target.kind === "intro";
     naming.hidden = !named;
     label.value = named ? (target.body ?? "") : "";
+    const labelText = form.querySelector<HTMLElement>("[data-for-label] label");
+    if (labelText) {
+      labelText.textContent =
+        target.kind === "section"
+          ? i18n.t("landing.name")
+          : target.kind === "intro"
+            ? i18n.t("landing.pointWords")
+            : i18n.t("landing.label");
+    }
   }
+
+  // What the operator calls it, for the modules that draw a name at all.
+  const naming2 = form.querySelector<HTMLElement>("[data-for-name]");
+  const name = form.querySelector<HTMLInputElement>("[name=name]");
+  if (naming2 && name) {
+    naming2.hidden = !usesHeader(target.kind);
+    name.value = target.name ?? "";
+    name.placeholder = defaultNameFor(target.kind);
+  }
+
+  // A tab with nothing in it says so rather than opening empty.
+  const look = form.querySelector<HTMLElement>("[data-look-empty]");
+  if (look) look.hidden = usesHeader(target.kind);
+
+  // Always opened on the first tab: which one was left showing is a fact about
+  // the last module somebody configured, not about this one.
+  showTab(form, "general");
   void orgs;
   openModal("module-config");
+}
+
+/** The name of what a module draws, which is what it is called until it is not. */
+function defaultNameFor(kind: views.LandingModule["kind"]): string {
+  switch (kind) {
+    case "organisations":
+      return i18n.t("shell.organizations");
+    case "boards":
+      return i18n.t("portal.boards");
+    case "most_voted":
+      return i18n.t("landing.moduleVoted");
+    case "recently_done":
+      return i18n.t("landing.moduleDone");
+    case "recent_activity":
+      return i18n.t("landing.moduleActivity");
+    case "roadmap":
+      return i18n.t("landing.moduleRoadmap");
+    case "statistics":
+      return i18n.t("landing.moduleStats");
+    default:
+      return "";
+  }
+}
+
+/** Show one tab of the settings dialog and mark it as the one showing. */
+function showTab(form: HTMLFormElement, which: string): void {
+  form.querySelectorAll<HTMLElement>("[data-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.panel !== which;
+  });
+  form.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((tab) => {
+    const on = tab.dataset.tab === which;
+    tab.classList.toggle("on", on);
+    tab.setAttribute("aria-selected", String(on));
+  });
 }
 
 /**

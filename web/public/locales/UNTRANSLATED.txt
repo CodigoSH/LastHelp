@@ -37,11 +37,17 @@ landing.moduleRoadmap
 landing.moduleSection
 landing.moduleStats
 landing.moduleVoted
+landing.name
+landing.nameHelp
 landing.noBoards
 landing.noVotes
 landing.noneComing
 landing.noneCounted
 landing.noneDone
 landing.noneYet
+landing.nothingToStyle
+landing.pointWords
 landing.scope
 landing.scopeAll
+landing.tabGeneral
+landing.tabLook

@@ -16,7 +16,7 @@ import type {
 import { escapeAttr, escapeHTML } from "../escape";
 import { areaChart, donut } from "./charts";
 import { icons } from "./icons";
-import { actionButton, iconButton, modal } from "./modal";
+import { actionButton, iconButton } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
 export { field, choiceField, areaField } from "./wizard";
@@ -71,6 +71,8 @@ export interface LandingModule {
   body?: string;
   /** Which board a data module draws from, as "org/board". Empty for all. */
   scope?: string;
+  /** What this module calls itself. Empty means the name of what it draws. */
+  name?: string;
   /** Where this module's name sits. Empty means the top. */
   label?: "top" | "bottom" | "pill" | "off";
   /**
@@ -196,6 +198,15 @@ export function landing(
    * the kind of fault nobody looks for.
    */
   const heading = (m: LandingModule): { icon: string; title: string; count?: string } | null => {
+    const named = byKind(m);
+    if (!named) return null;
+    // What the operator called it wins over the name of what it draws. Three
+    // boards modules pointed at three boards all saying "Repositories" tells
+    // nobody which is which.
+    return { ...named, title: (m.name ?? "").trim() || named.title };
+  };
+
+  const byKind = (m: LandingModule): { icon: string; title: string; count?: string } | null => {
     const rows = content[m.id];
     const many = Array.isArray(rows) ? rows.length : 0;
     switch (m.kind) {
@@ -673,16 +684,24 @@ function modulePicker(text: Text): string {
   </dialog>`;
 }
 
+/**
+ * A module's settings, in the shape the dashboard uses for its own.
+ *
+ * The tabs ARE the header — General and Customization, with the close beside
+ * them — and the only action at the foot is Save. That is not decoration: it is
+ * the same dialog somebody has already used on the other product, and the point
+ * of all of this is that they do not have to learn it twice.
+ *
+ * General is what the module shows: what it is called, where it draws from, and
+ * its words. Customization is how it looks: where its name sits. A field a kind
+ * has no use for is not shown to it — a dialog offering a control that does
+ * nothing is a dialog that lies about what it does.
+ */
 function moduleModal(
   text: Text,
   boards: LandingBoard[] = [],
   orgs: OrganizationSummary[] = [],
 ): string {
-  // Three levels: everything, one organisation, one board. Marked with what
-  // each one is, because not every module can use every level — a button goes
-  // to one report form, and the organisations module has no use for a board.
-  // Which are offered is decided when the dialog opens, by the module opening
-  // it.
   const options = [
     `<option value="" data-level="all">${escapeHTML(text.t("landing.scopeAll"))}</option>`,
     ...orgs.map(
@@ -696,41 +715,64 @@ function moduleModal(
     ),
   ].join("");
 
-  return modal(
-    {
-      id: "module-config",
-      title: text.t("landing.compose"),
-      formClass: "module-config",
-      submit: text.t("panel.save"),
-      // No size here. The size is dragged from the corner of the module, which
-      // is where the dashboard puts it and is the only place it can be changed
-      // while looking at what it does to the page.
-      body: `<input type="hidden" name="id" />
-        <div class="field" data-for-text hidden>
-          <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
-          <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
+  return `<dialog class="modal" id="module-config">
+    <form class="module-config" method="dialog">
+      <div class="modal-head tabbed">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab-btn on" role="tab" data-tab="general"
+            aria-selected="true">${escapeHTML(text.t("landing.tabGeneral"))}</button>
+          <button type="button" class="tab-btn" role="tab" data-tab="look"
+            aria-selected="false">${escapeHTML(text.t("landing.tabLook"))}</button>
         </div>
-        <div class="field" data-for-label hidden>
-          <label for="module-label">${escapeHTML(text.t("landing.label"))}</label>
-          <input id="module-label" name="label" type="text" maxlength="80"
-                 placeholder="${escapeAttr(text.t("board.report"))}" />
+        <button type="button" class="icon-button" data-close
+          aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+      </div>
+
+      <div class="modal-body">
+        <input type="hidden" name="id" />
+
+        <div class="tab-panel" data-panel="general">
+          <div class="field" data-for-name hidden>
+            <label for="module-name">${escapeHTML(text.t("landing.name"))}</label>
+            <input id="module-name" name="name" type="text" maxlength="80" />
+            <p class="hint">${escapeHTML(text.t("landing.nameHelp"))}</p>
+          </div>
+          <div class="field" data-for-scope hidden>
+            <label for="module-scope">${escapeHTML(text.t("landing.scope"))}</label>
+            <select id="module-scope" name="scope">${options}</select>
+          </div>
+          <div class="field" data-for-text hidden>
+            <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
+            <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
+          </div>
+          <div class="field" data-for-label hidden>
+            <label for="module-label">${escapeHTML(text.t("landing.label"))}</label>
+            <input id="module-label" name="label" type="text" maxlength="160"
+                   placeholder="${escapeAttr(text.t("board.report"))}" />
+          </div>
         </div>
-        <div class="field" data-for-label-at hidden>
-          <label for="module-label-at">${escapeHTML(text.t("landing.labelAt"))}</label>
-          <select id="module-label-at" name="labelAt">
-            <option value="top">${escapeHTML(text.t("landing.labelTop"))}</option>
-            <option value="bottom">${escapeHTML(text.t("landing.labelBottom"))}</option>
-            <option value="pill">${escapeHTML(text.t("landing.labelPill"))}</option>
-            <option value="off">${escapeHTML(text.t("landing.labelOff"))}</option>
-          </select>
+
+        <div class="tab-panel" data-panel="look" hidden>
+          <div class="field" data-for-label-at hidden>
+            <label for="module-label-at">${escapeHTML(text.t("landing.labelAt"))}</label>
+            <select id="module-label-at" name="labelAt">
+              <option value="top">${escapeHTML(text.t("landing.labelTop"))}</option>
+              <option value="bottom">${escapeHTML(text.t("landing.labelBottom"))}</option>
+              <option value="pill">${escapeHTML(text.t("landing.labelPill"))}</option>
+              <option value="off">${escapeHTML(text.t("landing.labelOff"))}</option>
+            </select>
+          </div>
+          <p class="hint" data-look-empty hidden>${escapeHTML(text.t("landing.nothingToStyle"))}</p>
         </div>
-        <div class="field" data-for-scope hidden>
-          <label for="module-scope">${escapeHTML(text.t("landing.scope"))}</label>
-          <select id="module-scope" name="scope">${options}</select>
-        </div>`,
-    },
-    text,
-  );
+
+        <p class="form-error" role="alert" hidden></p>
+      </div>
+
+      <div class="modal-foot">
+        <button type="submit" class="button primary">${escapeHTML(text.t("panel.save"))}</button>
+      </div>
+    </form>
+  </dialog>`;
 }
 
 /**

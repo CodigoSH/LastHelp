@@ -4198,6 +4198,48 @@ a.stat:hover .stat-go {
 .add-wrap { position: relative; display: inline-flex; }
 .add-wrap .add-menu { inset-block-start: calc(100% + 6px); inset-inline-end: 0; }
 
+/*
+ * A settings dialog whose tabs ARE its header, which is how the dashboard does
+ * it: General and Customization on the left, the close on the right, and one
+ * action at the foot. Somebody who has configured a widget over there has
+ * already used this.
+ */
+.modal-head.tabbed {
+  align-items: stretch;
+  gap: 0;
+  padding-block-end: 0;
+  border-block-end: 1px solid var(--border);
+}
+
+.modal-head.tabbed .tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.modal-head.tabbed .tab-btn {
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+}
+
+.modal-head.tabbed .tab-btn.on {
+  color: var(--text-main);
+  border-block-end-color: var(--accent);
+}
+
+.modal-head.tabbed .icon-button { align-self: center; }
+
+.tab-panel { display: grid; gap: 0.9rem; }
+.tab-panel[hidden] { display: none; }
+
 /* What is being dragged is going in here. Same green the ghost uses, on the
    box rather than in it, so the answer is readable before letting go. */
 .landing-group.drop-target {

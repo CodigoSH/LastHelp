@@ -1600,6 +1600,72 @@ async function main() {
     JSON.stringify(tamanos.encogido),
   );
 
+  // The settings dialog, in the shape the dashboard uses for its own: the tabs
+  // ARE the header, General and Customization, the close beside them, and one
+  // action at the foot. Somebody who has configured a widget over there should
+  // not have to learn this one.
+  const ajustes = await evaluate(`
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+    const celda = document.querySelector('.landing-cell[data-module^="boards-"]');
+    celda.querySelector("[data-module-menu]").click();
+    await new Promise(r => setTimeout(r, 200));
+    celda.querySelector("[data-edit-module]").click();
+    await new Promise(r => setTimeout(r, 500));
+
+    const form = document.querySelector("form.module-config");
+    const pestanas = [...form.querySelectorAll(".modal-head.tabbed [data-tab]")]
+      .map(b => b.textContent.trim());
+    const enCabecera = !!form.querySelector(".modal-head.tabbed .tabs [data-tab]");
+    const primeraActiva = form.querySelector("[data-tab=general]").classList.contains("on");
+    const generalVisible = !form.querySelector('[data-panel="general"]').hidden;
+    const lookOculto = form.querySelector('[data-panel="look"]').hidden;
+
+    // Its own name, and a placeholder saying what it is called without one.
+    const nombre = form.querySelector("[name=name]");
+    const pideNombre = !form.querySelector("[data-for-name]").hidden;
+    const sugerencia = nombre.placeholder;
+    nombre.value = "Our projects";
+
+    // The second tab holds how it looks, and nothing else does.
+    form.querySelector("[data-tab=look]").click();
+    await new Promise(r => setTimeout(r, 200));
+    const trasCambiar = {
+      general: form.querySelector('[data-panel="general"]').hidden,
+      look: !form.querySelector('[data-panel="look"]').hidden,
+      posicion: !form.querySelector("[data-for-label-at]").hidden,
+    };
+
+    form.requestSubmit();
+    await new Promise(r => setTimeout(r, 1000));
+
+    const guardado = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === celda.dataset.module);
+    const enPantalla = document.querySelector(
+      '[data-module="' + celda.dataset.module + '"] .module-header h2')?.textContent.trim();
+
+    return { pestanas, enCabecera, primeraActiva, generalVisible, lookOculto,
+             pideNombre, sugerencia, trasCambiar,
+             nombreGuardado: guardado.name ?? "", enPantalla,
+             acciones: form.querySelectorAll(".modal-foot button").length };
+  `);
+  check(
+    "a module's settings are two tabs in the header, the way the dashboard's are",
+    ajustes.pestanas.length === 2 && ajustes.enCabecera === true &&
+      ajustes.primeraActiva === true && ajustes.generalVisible === true &&
+      ajustes.lookOculto === true && ajustes.trasCambiar.general === true &&
+      ajustes.trasCambiar.look === true && ajustes.trasCambiar.posicion === true &&
+      ajustes.acciones === 1,
+    JSON.stringify({ pestanas: ajustes.pestanas, acciones: ajustes.acciones }),
+  );
+  check(
+    "and a module is called what its operator calls it, not what it draws",
+    ajustes.pideNombre === true && ajustes.sugerencia !== "" &&
+      ajustes.nombreGuardado === "Our projects" && ajustes.enPantalla === "Our projects",
+    JSON.stringify({ sugerencia: ajustes.sugerencia, guardado: ajustes.nombreGuardado,
+                     enPantalla: ajustes.enPantalla }),
+  );
+
   // A module's dialog, and its three ways out. The × and Cancel had no listener
   // at all on this page: the wiring that gives every dialog in the product its
   // close buttons ran on three panel screens and not on this one, so the only
@@ -1624,21 +1690,19 @@ async function main() {
     const trasLaEquis = abierto();
 
     await abrir();
-    document.querySelector(".modal-foot [data-close]").click();
-    await new Promise(r => setTimeout(r, 300));
-    const trasCancelar = abierto();
-
-    await abrir();
     document.querySelector("#module-config [type=submit]").click();
     await new Promise(r => setTimeout(r, 900));
     const trasGuardar = abierto();
 
-    return { seAbre, trasLaEquis, trasCancelar, trasGuardar };
+    return { seAbre, trasLaEquis, trasGuardar,
+             // The dashboard's dialog has no cancel: the cross is the way out
+             // that changes nothing, and one action at the foot is the action.
+             cancelar: !!document.querySelector(".modal-foot [data-close]") };
   `);
   check(
-    "a module's dialog closes by the cross, by cancel, and by saving",
+    "a module's dialog closes by the cross and by saving, and offers no third way",
     salidas.seAbre === true && salidas.trasLaEquis === false &&
-      salidas.trasCancelar === false && salidas.trasGuardar === false,
+      salidas.trasGuardar === false && salidas.cancelar === false,
     JSON.stringify(salidas),
   );
 
