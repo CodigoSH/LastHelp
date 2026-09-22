@@ -34,16 +34,6 @@ export const icons = {
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
   minus: (s?: number) => stroke(`<path d="M5 12h14"/>`, s),
 
-  /* Whether a block of words can be typed into. Copied from the note widget in
-     this house, shackle and all: closed is a whole loop, open is a loop lifted
-     off one side. */
-  lock: (s?: number) =>
-    stroke(`<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`, s),
-  unlock: (s?: number) =>
-    stroke(`<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>`, s),
-
-  /* The writing tools. Same geometry as the rest — 24 square, no fill, round
-     caps — so a bar of them reads as one set rather than as a collection. */
   undo: (s?: number) => stroke(`<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>`, s),
   redo: (s?: number) => stroke(`<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/>`, s),
   bold: (s?: number) =>
@@ -60,6 +50,11 @@ export const icons = {
     stroke(`<path d="M9 6h11M9 12h11M9 18h11"/><path d="M5 6h.01M5 12h.01M5 18h.01"/>`, s),
   numbers: (s?: number) =>
     stroke(`<path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 5h1v4"/><path d="M4 15h2v1H4v2h2"/>`, s),
+  image: (s?: number) =>
+    stroke(
+      `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>`,
+      s,
+    ),
   link: (s?: number) =>
     stroke(
       `<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>`,

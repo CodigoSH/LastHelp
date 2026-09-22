@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// A name of the shape the store hands out: thirty-two hex characters.
+const fakeImageID = "0123456789abcdef0123456789abcdef"
+
 // TestTheWhitelistIsExactlyThis.
 //
 // A whitelist nobody asserts loses entries in silence. This compares the
@@ -13,8 +16,8 @@ import (
 // writes, has to be a change somebody made on purpose and defended in a diff.
 func TestTheWhitelistIsExactlyThis(t *testing.T) {
 	wantTags := []string{
-		"a", "blockquote", "br", "code", "em", "h1", "h2", "h3", "li", "ol",
-		"p", "s", "span", "strong", "u", "ul",
+		"a", "blockquote", "br", "code", "em", "figcaption", "figure", "h1",
+		"h2", "h3", "img", "li", "ol", "p", "s", "span", "strong", "u", "ul",
 	}
 	wantClasses := []string{
 		"align-center", "align-end", "align-justify", "align-start",
@@ -24,6 +27,14 @@ func TestTheWhitelistIsExactlyThis(t *testing.T) {
 	wantSchemes := []string{"http", "https", "mailto"}
 
 	same(t, "tags", AllowedTags, wantTags)
+	// The attributes are the other half of the policy and the half that is
+	// easier to widen by accident: one of these is what carries a link, and
+	// one is what carries a picture.
+	if len(AllowedAttributes) != 2 {
+		t.Fatalf("the attribute policy covers %d elements and the test names 2", len(AllowedAttributes))
+	}
+	same(t, "a", AllowedAttributes["a"], []string{"href"})
+	same(t, "img", AllowedAttributes["img"], []string{"src", "alt", "width"})
 	same(t, "classes", AllowedClasses, wantClasses)
 	same(t, "schemes", AllowedSchemes, wantSchemes)
 }
@@ -108,10 +119,24 @@ func TestCleanRefusesTheWaysScriptReachesAPage(t *testing.T) {
 			stays: `<span class="ink-accent">Words</span>`,
 		},
 		{
-			name:  "an image would show as a broken box under this page's policy",
-			in:    `<p>Look <img src="https://example.com/x.png" onerror="alert(1)"></p>`,
-			gone:  []string{"img", "onerror", "example.com"},
+			name: "an image from somewhere else is not this installation's",
+			in:   `<p>Look <img src="https://example.com/x.png" onerror="alert(1)"></p>`,
+			gone: []string{"onerror", "example.com", "src"},
+			// The tag survives with nothing to draw, which is the honest
+			// outcome: the words around it are the operator's.
 			stays: "Look",
+		},
+		{
+			name:  "nor is one reached by climbing out of where they are served",
+			in:    `<img src="/api/landing/images/../../etc/passwd">`,
+			gone:  []string{"passwd", "src"},
+			stays: "",
+		},
+		{
+			name:  "a width that is not a width is not written into the page",
+			in:    `<img src="/api/landing/images/` + fakeImageID + `.webp" width="1&quot; onload=&quot;alert(1)">`,
+			gone:  []string{"onload", "alert"},
+			stays: "src",
 		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -163,6 +188,11 @@ func TestCleanKeepsWhatSomebodyWrote(t *testing.T) {
 			"a link to somewhere in this installation",
 			`<p><a href="/orgs/codigosh">Here</a></p>`,
 			`<p><a href="/orgs/codigosh" rel="noopener noreferrer">Here</a></p>`,
+		},
+		{
+			"a picture this installation stored, kept off the first paint",
+			`<p><img src="/api/landing/images/` + fakeImageID + `.webp" alt="A screen" width="320"></p>`,
+			`<p><img src="/api/landing/images/` + fakeImageID + `.webp" loading="lazy" decoding="async" alt="A screen" width="320"></p>`,
 		},
 		{
 			"an address",

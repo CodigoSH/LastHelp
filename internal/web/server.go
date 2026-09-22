@@ -183,6 +183,10 @@ func (s *Server) routes() {
 	// reason the name and the mark are: it IS the page a visitor is looking at.
 	// Changing it is the administrator's, and that half is wrapped below.
 	s.mux.HandleFunc("GET /api/landing", s.handleGetLanding)
+	// Public for the same reason the page is: a picture on the front page that
+	// asked for a session would be a broken box for everybody who is not the
+	// operator.
+	s.mux.HandleFunc("GET /api/landing/images/{id}", s.handleGetLandingImage)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos", s.handleRepositories)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}", s.handleRepository)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/items", s.handleListItems)
@@ -228,6 +232,7 @@ func (s *Server) routes() {
 	// Composing the front page. Only the administrator: it is the first thing
 	// every visitor sees.
 	private("PUT /api/landing", s.handleSetLanding)
+	private("POST /api/landing/images", s.handleAddLandingImage)
 	private("POST /api/comments/{id}/moderation", s.handleModerateComment)
 	private("GET /api/items/{id}/statuses", s.handleStatuses)
 	private("POST /api/items/{id}/status", s.handleSetStatus)

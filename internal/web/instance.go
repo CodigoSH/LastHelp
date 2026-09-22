@@ -1,11 +1,15 @@
 package web
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
@@ -458,5 +462,69 @@ func (s *Server) handleSetLanding(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
+	// A picture is uploaded while somebody is writing, which means one dropped
+	// in and then undone is a picture nothing refers to. Sweeping here, against
+	// the layout that was just stored, covers every way that happens — undone,
+	// overwritten, or the whole module removed — and needs the browser to say
+	// nothing at all.
+	//
+	// After the layout is stored, never before: a sweep that ran first and then
+	// failed to store would delete the pictures the page still shows.
+	if err := landing.ForgetUnusedImages(s.db, in); err != nil {
+		// Not worth failing the save. The operator's page is stored; what is
+		// left behind is some bytes nobody can see.
+		slog.Warn("clearing unused front page pictures", "error", err)
+	}
 	writeJSON(w, http.StatusOK, in)
+}
+
+// handleAddLandingImage takes one picture for the front page.
+//
+// WebP only, and the browser is what makes it one: it scales and re-encodes
+// before sending, so the operator picks whatever came off their phone and what
+// arrives is a fraction of it. Checking the bytes rather than the declared type
+// is the part that matters here — a caller writes its own headers.
+func (s *Server) handleAddLandingImage(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, landing.MaxImageBytes))
+	if err != nil {
+		writeError(w, http.StatusRequestEntityTooLarge, "error.image_too_large")
+		return
+	}
+
+	at, err := landing.StoreImage(s.db, body, time.Now())
+	if errors.Is(err, landing.ErrNotAPicture) {
+		writeError(w, http.StatusBadRequest, "error.not_an_image")
+		return
+	}
+	if err != nil {
+		slog.Error("storing a front page picture", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"url": at})
+}
+
+// handleGetLandingImage serves one.
+//
+// Public, because the front page is: a picture on it that needed a session
+// would draw as a broken box for every visitor. The name is thirty-two random
+// hex characters and carries no meaning, so knowing one tells nobody anything
+// they could not already see on the page.
+func (s *Server) handleGetLandingImage(w http.ResponseWriter, r *http.Request) {
+	img, err := landing.ReadImage(s.db, r.PathValue("id"))
+	if errors.Is(err, sql.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		slog.Error("reading a front page picture", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	w.Header().Set("Content-Type", img.ContentType)
+	// The name is derived from nothing and never reused, so the bytes behind it
+	// cannot change. A year, immutable, is the honest cache for that — and it
+	// is most of why putting a picture on the front page is cheap.
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	_, _ = w.Write(img.Bytes)
 }

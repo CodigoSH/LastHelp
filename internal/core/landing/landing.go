@@ -304,6 +304,21 @@ type Module struct {
 	BorderColor string `json:"border_color,omitempty"`
 	BorderWidth int    `json:"border_width,omitempty"`
 
+	// Bare draws the module with no border at all.
+	//
+	// A field of its own rather than a width of nought, because nought already
+	// means something else and means it everywhere: "whatever the theme draws",
+	// which is what every module looks like until somebody chooses. Somebody
+	// who wants no line has chosen; somebody who has not touched it has not.
+	Bare bool `json:"bare,omitempty"`
+
+	// Clear draws the module with nothing behind it, so the page shows through.
+	//
+	// It is what makes a block of words readable as part of the page rather
+	// than as a card sitting on it — a heading across the top of a front page
+	// wants no box around it, and until now every module had one.
+	Clear bool `json:"clear,omitempty"`
+
 	// Label is where this module's name sits. Empty means the top, which is
 	// what every module drew before there was anywhere else to put it.
 	Label LabelAt `json:"label,omitempty"`

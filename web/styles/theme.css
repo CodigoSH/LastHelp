@@ -4337,49 +4337,6 @@ a.stat:hover .stat-go {
   position: relative;
 }
 
-/* The latch: whether this block can be typed into.
- *
- * Out of the way until the pointer is over the block, which is theirs — a
- * control that is always lit on a page a visitor also sees is a control
- * somebody has to explain. Quiet when closed and in the alert colour when
- * open, so that a block left open is visible from across the page. */
-.words-latch {
-  position: absolute;
-  inset-block-start: 10px;
-  inset-inline-end: 10px;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 28px;
-  block-size: 28px;
-  padding: 0;
-  background: var(--panel);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  color: var(--text-dim);
-  cursor: pointer;
-  opacity: 0;
-  transition: all 0.2s var(--ease);
-}
-
-.words:hover .words-latch,
-.words-latch:focus-visible,
-.words-latch.open {
-  opacity: 1;
-}
-
-.words-latch:hover {
-  color: var(--text-main);
-  transform: scale(1.05);
-}
-
-.words-latch.open {
-  color: var(--danger-color);
-  background: rgba(var(--danger-rgb), 0.12);
-  border-color: rgba(var(--danger-rgb), 0.3);
-}
-
 .words-box {
   block-size: 100%;
   box-sizing: border-box;
@@ -4440,6 +4397,38 @@ a.stat:hover .stat-go {
 .words-box .ink-success { color: var(--success-color); }
 .words-box .ink-warning { color: var(--warning-color); }
 .words-box .ink-info { color: var(--info-color); }
+
+/* A picture inside a block of words.
+ *
+ * The width comes from the attribute the handle writes, so it is not set here:
+ * what is set is the ceiling, because a module is narrower on a phone than the
+ * width somebody chose on a desktop and a picture that keeps that width would
+ * push the page sideways. */
+.words-box img {
+  max-inline-size: 100%;
+  block-size: auto;
+  border-radius: var(--radius);
+  vertical-align: middle;
+}
+
+/* Chosen, while the block is being written: the corner to drag is drawn on the
+   picture rather than inserted beside it, so there is nothing in the markup to
+   remember to take out again before it is stored. */
+.words-box[contenteditable="true"] img {
+  cursor: pointer;
+}
+
+.words-box[contenteditable="true"] img.chosen {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  /* The triangle in the bottom-right corner, drawn the way the grid draws the
+     one that resizes a module — same corner, same idea, so the gesture is
+     already known. Physical, not logical: it is where the pointer is. */
+  box-shadow:
+    inset -14px -14px 0 -7px var(--accent),
+    inset -18px -18px 0 -8px var(--panel);
+  cursor: nwse-resize;
+}
 
 /* What an untouched block says while the page is being arranged. */
 .words-prompt { color: var(--text-dim); font-style: italic; }

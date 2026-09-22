@@ -77,6 +77,10 @@ export interface LandingModule {
   /** The colour of the module's own border, and how thick. */
   border_color?: string;
   border_width?: number;
+  /** No border at all, which is not the same as not having chosen a width. */
+  bare?: boolean;
+  /** Nothing behind it, so the page shows through. */
+  clear?: boolean;
   /** Where this module's name sits. Empty means the top. */
   label?: "top" | "bottom" | "pill" | "off";
   /**
@@ -530,27 +534,13 @@ export function landing(
   const words = (m: LandingModule, fallback: string) => {
     const written = (m.body ?? "").trim();
     const inner = written !== "" ? written : fallback;
-    // The operator can write in it without arranging the page first, which is
-    // what the note widget in this house does: the block carries a small latch
-    // that opens it for typing. Closed while nobody has asked, so that a stray
-    // click on the page a visitor also sees cannot change it.
-    //
-    // While the page IS being arranged there is no latch and the block is
-    // simply open — everything on the page is being moved around anyway, and a
-    // second control saying "and this one too" is noise. That is theirs as
-    // well: it hides the button in grid edit mode.
-    const latch =
-      isAdmin && !editing
-        ? `<button type="button" class="words-latch" data-words-latch
-             title="${escapeAttr(text.t("landing.unlock"))}"
-             aria-label="${escapeAttr(text.t("landing.unlock"))}"
-             aria-pressed="false">${icons.lock(15)}</button>`
-        : "";
-    const open = editing ? "true" : "false";
+    // Written while the page is being arranged, and only then. It carried a
+    // latch that opened it on the ordinary page as well; that is one way in
+    // too many for a page every visitor sees, and arranging already opens
+    // every block on it.
     return `<div class="words">
-      ${latch}
       <div class="words-box"${
-        isAdmin ? ` contenteditable="${open}" data-words-body="${escapeAttr(m.id)}"` : ""
+        editing ? ` contenteditable="true" data-words-body="${escapeAttr(m.id)}"` : ""
       } data-words-empty="${written === "" ? "1" : "0"}">${inner}</div>
     </div>`;
   };
@@ -681,7 +671,7 @@ export function landing(
       ${drawn}
       ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
     </div>
-    ${isAdmin ? wordsBar(text) : ""}
+    ${editing ? wordsBar(text) : ""}
     ${editing ? modulePicker(text) + moduleModal(text, allBoards, orgs) + confirmModal(text) : ""}
   </div>`;
 }
@@ -753,6 +743,7 @@ function wordsBar(text: Text): string {
       ${tool("insertUnorderedList", text.t("words.bullets"), icons.bullets(15))}
       ${tool("insertOrderedList", text.t("words.numbers"), icons.numbers(15))}
       ${tool("link:", text.t("words.link"), icons.link(15))}
+      ${tool("image:", text.t("words.image"), icons.image(15))}
     </div>
     <div class="words-group">
       ${ink("ink-plain", text.t("words.inkPlain"))}
@@ -876,6 +867,7 @@ function appearanceControls(text: Text): string {
       <label>${escapeHTML(text.t("landing.borderWidth"))}</label>
       <div class="segmented">
         ${[
+          [0, text.t("landing.noBorder")],
           [1, text.t("landing.thin")],
           [2, text.t("landing.regular")],
           [3, text.t("landing.thick")],
@@ -889,6 +881,11 @@ function appearanceControls(text: Text): string {
           .join("")}
       </div>
       <input type="hidden" name="borderWidth" />
+      <label class="switch-row">
+        <input type="checkbox" name="clear" />
+        <span>${escapeHTML(text.t("landing.clear"))}</span>
+      </label>
+      <p class="hint">${escapeHTML(text.t("landing.clearHelp"))}</p>
     </div>`;
 }
 

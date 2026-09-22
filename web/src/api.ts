@@ -87,6 +87,24 @@ export const api = {
     if (!response.ok) throw new ApiError(response.status, body.error ?? "error.internal");
     return body as T;
   },
+  /**
+   * The bytes of one file, as the body.
+   *
+   * Not multipart: the server wants one picture and nothing else, and a
+   * multipart envelope around a single value is a parser and a boundary and a
+   * field name to agree on for no gain.
+   */
+  postBytes: async <T>(path: string, blob: Blob): Promise<T> => {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "X-CSRF-Token": csrfToken(), "Content-Type": blob.type },
+      body: blob,
+      credentials: "same-origin",
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ApiError(response.status, body.error ?? "error.internal");
+    return body as T;
+  },
   del: <T>(path: string, body?: unknown) => request<T>("DELETE", path, body),
 };
 

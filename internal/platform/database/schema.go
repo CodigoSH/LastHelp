@@ -349,6 +349,26 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 8,
+		name:    "a picture an operator puts on the front page",
+		// Bytes, not a data URL in the layout.
+		//
+		// The layout is one JSON value read on every render of the public page
+		// and bounded at a few thousand characters; a photograph encoded into
+		// it would blow that bound and be re-read by every visitor. The layout
+		// keeps a reference, the bytes live here, and they are served with a
+		// long cache because the name of a row never changes what is in it.
+		fn: func(tx *sql.Tx) error {
+			_, err := tx.Exec(`CREATE TABLE IF NOT EXISTS landing_image (
+				id          TEXT PRIMARY KEY,
+				bytes       BLOB NOT NULL,
+				content_type TEXT NOT NULL,
+				created_at  TEXT NOT NULL
+			)`)
+			return err
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

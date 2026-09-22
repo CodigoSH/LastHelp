@@ -47,7 +47,8 @@ type Command =
   | { kind: "exec"; command: string; value?: string }
   | { kind: "align"; value: (typeof ALIGNMENTS)[number] }
   | { kind: "ink"; value: (typeof INKS)[number] }
-  | { kind: "link" };
+  | { kind: "link" }
+  | { kind: "image" };
 
 /** The block element the cursor is inside, which is what an alignment applies to. */
 function blockAround(node: Node | null, within: HTMLElement): HTMLElement | null {
@@ -114,6 +115,45 @@ function linkUp(ask: (message: string) => string | null): void {
   document.execCommand("createLink", false, target.href);
 }
 
+/**
+ * Puts a picture where the cursor is.
+ *
+ * The file is scaled and re-encoded before it is sent — see landingImage.ts —
+ * so the caller hands over whatever was picked and gets back a path. It goes
+ * in at 480 wide: a starting size that looks deliberate in a module, and the
+ * handle on its corner is there to change it.
+ */
+async function placeImage(
+  where: HTMLElement,
+  pick: () => Promise<File | null>,
+  upload: (file: File) => Promise<string>,
+): Promise<void> {
+  const file = await pick();
+  if (!file) return;
+  const at = await upload(file);
+  where.focus();
+  const img = document.createElement("img");
+  img.src = at;
+  img.width = 480;
+  img.alt = "";
+
+  const selection = window.getSelection();
+  const range =
+    selection && selection.rangeCount > 0 && where.contains(selection.anchorNode)
+      ? selection.getRangeAt(0)
+      : null;
+  if (range) {
+    range.deleteContents();
+    range.insertNode(img);
+    range.setStartAfter(img);
+    range.collapse(true);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  } else {
+    where.append(img);
+  }
+}
+
 function run(what: Command, where: HTMLElement, ask: (message: string) => string | null): void {
   where.focus();
   switch (what.kind) {
@@ -128,6 +168,11 @@ function run(what: Command, where: HTMLElement, ask: (message: string) => string
       break;
     case "link":
       linkUp(ask);
+      break;
+    case "image":
+      // Handled by the caller: it needs to wait for a file and for an upload,
+      // and this one is deliberately synchronous so that every command that
+      // can run inside a selection does.
       break;
   }
 }
@@ -144,14 +189,18 @@ export function wireWords(options: {
   bar: HTMLElement | null;
   onChange: (id: string, html: string) => void;
   ask?: (message: string) => string | null;
-  /** The two faces of the latch, so the markup for them stays in one place. */
-  latchIcon?: (open: boolean) => string;
+  /** Picks a file and gives back the path it ended up at. */
+  image?: {
+    pick: () => Promise<File | null>;
+    upload: (file: File) => Promise<string>;
+    failed: (err: unknown) => void;
+  };
 }): void {
   const { root, bar, onChange } = options;
   const ask = options.ask ?? ((message: string) => window.prompt(message));
   if (!bar) return;
 
-  const blocks = [...root.querySelectorAll<HTMLElement>("[data-words-body]")];
+  const blocks = [...root.querySelectorAll<HTMLElement>("[data-words-body][contenteditable=true]")];
   if (blocks.length === 0) {
     bar.hidden = true;
     return;
@@ -168,32 +217,60 @@ export function wireWords(options: {
     block.parentElement?.append(bar);
   };
 
-  // The latch, for writing without arranging the page first.
-  //
-  // Closed until somebody asks: the front page is what every visitor sees, and
-  // a block that is live the moment an operator opens their own site is a
-  // block that changes under a stray click. Opening it is one press, and the
-  // press is what says "I meant to".
-  for (const latch of root.querySelectorAll<HTMLElement>("[data-words-latch]")) {
-    const block = latch.parentElement?.querySelector<HTMLElement>("[data-words-body]");
-    if (!block || latch.dataset.wired === "1") continue;
-    latch.dataset.wired = "1";
-    latch.addEventListener("click", () => {
-      const opening = block.getAttribute("contenteditable") !== "true";
-      block.setAttribute("contenteditable", String(opening));
-      latch.setAttribute("aria-pressed", String(opening));
-      latch.classList.toggle("open", opening);
-      latch.innerHTML = options.latchIcon?.(opening) ?? latch.innerHTML;
-      if (opening) {
-        block.focus();
-      } else {
-        block.blur();
-        bar.hidden = true;
+  /**
+   * Dragging a picture wider or narrower.
+   *
+   * The size is written as the width ATTRIBUTE, not as a style: this page is
+   * served with style-src 'self', so a style written by a drag is dropped by
+   * the browser and the handle would move while nothing happened. HTML has
+   * carried a width attribute on images since before CSS existed, it is not a
+   * style, and the server's policy accepts it as a number of pixels.
+   *
+   * The handle is drawn by the stylesheet on the selected picture rather than
+   * being an element, so there is nothing to insert into what somebody wrote
+   * and nothing to remember to take out again before saving.
+   */
+  const resizing = (block: HTMLElement): void => {
+    let dragging: { img: HTMLImageElement; fromX: number; fromWidth: number } | null = null;
+
+    block.addEventListener("pointerdown", (event) => {
+      const img = (event.target as HTMLElement).closest("img");
+      if (!(img instanceof HTMLImageElement)) return;
+      const box = img.getBoundingClientRect();
+      // The bottom-right corner, the same corner the grid resizes a module
+      // from. Physical rather than logical on purpose: it is where the pointer
+      // is, and the pointer does not mirror.
+      const onCorner = event.clientX > box.right - 18 && event.clientY > box.bottom - 18;
+      img.classList.toggle("chosen", true);
+      for (const other of block.querySelectorAll("img")) {
+        if (other !== img) other.classList.remove("chosen");
       }
+      if (!onCorner) return;
+      event.preventDefault();
+      dragging = { img, fromX: event.clientX, fromWidth: box.width };
+      block.setPointerCapture(event.pointerId);
     });
-  }
+
+    block.addEventListener("pointermove", (event) => {
+      if (!dragging) return;
+      const widest = block.clientWidth - 8;
+      const wanted = Math.round(dragging.fromWidth + (event.clientX - dragging.fromX));
+      dragging.img.width = Math.max(40, Math.min(widest, wanted));
+    });
+
+    const done = (event: PointerEvent): void => {
+      if (!dragging) return;
+      block.releasePointerCapture?.(event.pointerId);
+      dragging = null;
+      const id = block.dataset.wordsBody ?? "";
+      if (id !== "") onChange(id, block.innerHTML);
+    };
+    block.addEventListener("pointerup", done);
+    block.addEventListener("pointercancel", done);
+  };
 
   for (const block of blocks) {
+    resizing(block);
     block.addEventListener("focusin", () => place(block));
     block.addEventListener("input", () => {
       const id = block.dataset.wordsBody ?? "";
@@ -229,6 +306,17 @@ export function wireWords(options: {
     if (!button || !writing) return;
     const [kind, value] = (button.dataset.do ?? "").split(":");
     const block = writing;
+    if (kind === "image") {
+      const put = options.image;
+      if (!put) return;
+      void placeImage(block, put.pick, put.upload)
+        .then(() => {
+          const id = block.dataset.wordsBody ?? "";
+          if (id !== "") onChange(id, block.innerHTML);
+        })
+        .catch(put.failed);
+      return;
+    }
     if (kind === "align") run({ kind: "align", value: value as never }, block, ask);
     else if (kind === "ink") run({ kind: "ink", value: value as never }, block, ask);
     else if (kind === "link") run({ kind: "link" }, block, ask);

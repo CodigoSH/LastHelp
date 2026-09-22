@@ -3,6 +3,7 @@ package landing
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -27,16 +28,22 @@ var (
 	// project needs, and every addition past that is a decision to defend.
 	//
 	// Not here, and each for its own reason: script and style are the attack;
-	// iframe, object and embed bring someone else's page onto ours; img is
-	// absent because the policy this page is served under only allows images
-	// from this origin, so a pasted one would show as a broken box; form and
+	// iframe, object and embed bring someone else's page onto ours; form and
 	// input would put controls on a page whose controls all mean something.
+	//
+	// img IS here, and its src is the narrow part: only a picture this
+	// installation stored itself, under the one prefix it serves them from.
+	// Not a rule about taste — the policy this page is served under allows
+	// images from this origin only, so anything else would draw as a broken
+	// box, and a pasted one from elsewhere would be a promise the page cannot
+	// keep.
 	AllowedTags = map[string]bool{
 		"p": true, "br": true,
 		"h1": true, "h2": true, "h3": true,
 		"strong": true, "em": true, "u": true, "s": true,
 		"ul": true, "ol": true, "li": true,
 		"a": true, "blockquote": true, "code": true, "span": true,
+		"img": true, "figure": true, "figcaption": true,
 	}
 
 	// AllowedClasses is how a colour and an alignment are carried.
@@ -51,6 +58,18 @@ var (
 		"align-start": true, "align-center": true, "align-end": true, "align-justify": true,
 		"ink-plain": true, "ink-dim": true, "ink-accent": true, "ink-danger": true,
 		"ink-success": true, "ink-warning": true, "ink-info": true,
+	}
+
+	// AllowedAttributes is which attributes survive on which element.
+	//
+	// width on an image is how it is resized, and it is an attribute rather
+	// than a style for the same reason the colours are classes: a style
+	// attribute is dropped by the browser under this page's policy, so a
+	// handle that wrote one would drag and change nothing. HTML has carried a
+	// width attribute on images since before CSS existed and it still works.
+	AllowedAttributes = map[string]map[string]bool{
+		"a":   {"href": true},
+		"img": {"src": true, "alt": true, "width": true},
 	}
 
 	// AllowedSchemes is where a link may point. A javascript: href is the
@@ -131,7 +150,7 @@ func writeClean(out *strings.Builder, node *html.Node) {
 
 	attributes := keepAttributes(name, node.Attr)
 	out.WriteString("<" + name + attributes + ">")
-	if name != "br" {
+	if name != "br" && name != "img" {
 		writeChildren(out, node)
 		out.WriteString("</" + name + ">")
 	}
@@ -155,10 +174,48 @@ func keepAttributes(name string, attrs []html.Attribute) string {
 		if attr.Namespace != "" {
 			continue
 		}
-		switch strings.ToLower(attr.Key) {
+		key := strings.ToLower(attr.Key)
+		// The table decides first, and class is the one that is not in it
+		// because every element may carry one. Reading the table here rather
+		// than only naming it is what keeps it from becoming a comment: a
+		// policy nobody consults is a policy that drifts from the code under
+		// it without anything going red.
+		if key != "class" && !AllowedAttributes[name][key] {
+			continue
+		}
+		switch key {
 		case "class":
 			if kept := keepClasses(attr.Val); kept != "" {
 				out.WriteString(` class="` + html.EscapeString(kept) + `"`)
+			}
+		case "src":
+			if name != "img" {
+				continue
+			}
+			// Ours, and only ours. A relative path under the one prefix this
+			// installation serves pictures from — which also means a picture
+			// cannot be pointed at somebody else's server and turned into a
+			// beacon that tells them who reads this page.
+			if target := strings.TrimSpace(attr.Val); strings.HasPrefix(target, ImagePrefix) &&
+				!strings.Contains(target, "..") {
+				out.WriteString(` src="` + html.EscapeString(target) + `"`)
+				// Off the critical path and out of the way of the first paint,
+				// which is the whole reason a picture is allowed in here at
+				// all.
+				out.WriteString(` loading="lazy" decoding="async"`)
+			}
+		case "alt":
+			if name == "img" {
+				out.WriteString(` alt="` + html.EscapeString(attr.Val) + `"`)
+			}
+		case "width":
+			if name != "img" {
+				continue
+			}
+			// A number of pixels and nothing else: the attribute is written
+			// into a page, and "a width" that is not a width is a way in.
+			if n, err := strconv.Atoi(strings.TrimSpace(attr.Val)); err == nil && n > 0 && n <= 4000 {
+				out.WriteString(` width="` + strconv.Itoa(n) + `"`)
 			}
 		case "href":
 			if name != "a" {

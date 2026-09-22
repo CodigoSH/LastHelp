@@ -24,6 +24,7 @@ import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
 import { wireWords } from "./services/words";
+import { NoWebP, putImage } from "./services/landingImage";
 import { attachChartHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
 import { attachPasswordToggles } from "./services/password";
@@ -234,12 +235,23 @@ function placeLandingModules(modules: views.LandingModule[]): void {
   setRule(
     "landing-borders",
     modules
-      .filter((m) => m.border_color || m.border_width)
+      .filter((m) => m.border_color || m.border_width || m.bare || m.clear)
       .map(
         (m) =>
           `.landing-cell[data-module="${cssEscape(m.id)}"] > :not(.kebab-btn):not(.kebab-menu):not(.resize-handle):not(.section-legend){` +
           `${m.border_color ? `border-color:${m.border_color};` : ""}` +
-          `${m.border_width ? `border-width:${m.border_width}px;` : ""}}`,
+          `${m.bare ? "border-width:0;" : m.border_width ? `border-width:${m.border_width}px;` : ""}` +
+          // Nothing behind it and nothing under it: a surface that keeps its
+          // shadow while losing its fill reads as a pane of glass rather than
+          // as part of the page.
+          `${m.clear ? "background:transparent;box-shadow:none;" : ""}}` +
+          // The box a block of words lives in is one level further in, so it
+          // has to be told as well or the fill stays where it always was.
+          `${
+            m.clear
+              ? `.landing-cell[data-module="${cssEscape(m.id)}"] .words-box{background:transparent;box-shadow:none;${m.bare ? "border-width:0;" : ""}}`
+              : ""
+          }`,
       )
       .join("\n"),
   );
@@ -334,7 +346,13 @@ function wireLanding(orgs: OrganizationSummary[]): void {
   wireWords({
     root: document,
     bar: document.querySelector<HTMLElement>(".words-bar"),
-    latchIcon: (open) => (open ? icons.unlock(15) : icons.lock(15)),
+    image: {
+      pick: pickImageFile,
+      upload: putImage,
+      // A browser with no WebP encoder gets told that; everything else goes
+      // through the one place that turns a refusal into words.
+      failed: (err) => (err instanceof NoWebP ? toastError(i18n.t("error.no_webp")) : report(err)),
+    },
     onChange: (id, html) => {
       const target = landingModules.find((m) => m.id === id);
       if (!target) return;
@@ -366,6 +384,8 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           ...(m.name ? { name: m.name } : {}),
           ...(m.border_color ? { border_color: m.border_color } : {}),
           ...(m.border_width ? { border_width: m.border_width } : {}),
+          ...(m.bare ? { bare: true } : {}),
+          ...(m.clear ? { clear: true } : {}),
           ...(m.rows ? { rows: m.rows } : {}),
           ...(m.parent ? { parent: m.parent } : {}),
         })),
@@ -583,7 +603,14 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     // else, so there is no second name to keep.
     if (target.kind === "section") target.body = String(data.get("name") ?? "").trim();
     target.border_color = String(data.get("borderColour") ?? "");
-    target.border_width = Number(data.get("borderWidth") ?? 0) || 0;
+    // Nought is a choice here and nowhere else: the four segments are none,
+    // thin, regular and thick, and "none" is the one that has to be told apart
+    // from nobody having touched the control. An untouched control leaves the
+    // field empty; a chosen "none" leaves a nought in it.
+    const chosenWidth = String(data.get("borderWidth") ?? "");
+    target.bare = chosenWidth === "0";
+    target.border_width = Number(chosenWidth) || 0;
+    target.clear = data.get("clear") !== null;
     if (takesScope(target.kind)) target.scope = String(data.get("scope") ?? "");
     if (usesHeader(target.kind)) {
       target.label = String(data.get("labelAt") ?? "top") as views.LandingModule["label"];
@@ -965,9 +992,11 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   }
   const width = form.querySelector<HTMLInputElement>("[name=borderWidth]");
   if (width) {
-    width.value = String(target.border_width ?? 0);
+    width.value = target.bare ? "0" : target.border_width ? String(target.border_width) : "";
     pickOne(form, "[data-width]", "width", width.value);
   }
+  const clear = form.querySelector<HTMLInputElement>("[name=clear]");
+  if (clear) clear.checked = target.clear === true;
 
   // How many things a module that lists them shows.
   const counting = form.querySelector<HTMLElement>("[data-for-rows]");
@@ -1070,6 +1099,30 @@ function showMark(form: HTMLFormElement, at: string): void {
  * lies. Typing into the field still works — the steps are a second way in, not
  * the only one.
  */
+/**
+ * Asks for a picture.
+ *
+ * The input is made, used and dropped rather than sitting in the markup: a file
+ * input left on the page is a control a visitor can see the shadow of, and one
+ * more thing for a redraw to lose the listener of.
+ */
+function pickImageFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true });
+    // A picker closed with Escape fires nothing at all in some browsers, so
+    // this also listens for the window coming back and settles at nothing.
+    window.addEventListener(
+      "focus",
+      () => setTimeout(() => resolve(input.files?.[0] ?? null), 400),
+      { once: true },
+    );
+    input.click();
+  });
+}
+
 function stepRows(group: HTMLElement, field: HTMLInputElement): void {
   const low = Number(field.min || 0);
   const high = Number(field.max || 20);

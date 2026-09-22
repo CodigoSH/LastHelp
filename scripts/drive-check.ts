@@ -1821,11 +1821,18 @@ async function main() {
 
     // What is actually in that tab. It held one sentence saying there was
     // nothing there; it holds the controls the dashboard's own does: ten
-    // colours and a default, three widths, and where the name goes drawn as
-    // four little diagrams rather than written as four words.
+    // colours and a default, and where the name goes drawn as four little
+    // diagrams rather than written as four words.
+    //
+    // Four widths, not three: none is a choice, and it has to be one that can
+    // be told apart from nobody having touched the control — which is what an
+    // empty field means everywhere else here.
     const aspecto = {
       colores: form.querySelectorAll("[data-colour]").length,
       grosores: form.querySelectorAll("[data-width]").length,
+      sinBorde: !!form.querySelector('[data-width="0"]'),
+      // And whether the module has anything behind it at all.
+      relleno: !!form.querySelector("[name=clear]"),
       posiciones: form.querySelectorAll("[data-marks] [data-at]").length,
       marcas: [...form.querySelectorAll("[data-marks] [data-at]")].every(b => b.querySelector("svg")),
       // And it sits on the name, joined to the box you type it in — not in the
@@ -1881,7 +1888,8 @@ async function main() {
   );
   check(
     "the customization tab carries the dashboard's own controls",
-    ajustes.aspecto?.colores === 11 && ajustes.aspecto?.grosores === 3 &&
+    ajustes.aspecto?.colores === 11 && ajustes.aspecto?.grosores === 4 &&
+      ajustes.aspecto?.sinBorde === true && ajustes.aspecto?.relleno === true &&
       ajustes.aspecto?.posiciones === 4 && ajustes.aspecto?.marcas === true &&
       ajustes.aspecto?.juntoAlNombre === true &&
       (ajustes.aspecto?.fondoDelCierre ?? "").replace(/\s/g, "") === "rgba(0,0,0,0)" &&
@@ -2020,86 +2028,182 @@ async function main() {
       opciones.heroEnPantalla.enElServidor === true,
     JSON.stringify({ pide: opciones.heroPide, enPantalla: opciones.heroEnPantalla }),
   );
-  // Writing without arranging the page first, which is what the note widget in
-  // this house lets somebody do and what this could not: the words could only
-  // be changed from inside the arranging mode, so using the module meant
-  // turning the whole page into a building site every time.
-  const sinOrdenar = await evaluate(`
+  // No border and nothing behind it, which is what lets a block of words read
+  // as part of the page rather than as a card sitting on it. Counting the
+  // controls says they are there; this says they do something.
+  const desnudo = await evaluate(`
     const csrf = () => document.cookie.split(";").map(c => c.trim())
       .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
     const previa = (await fetch("/api/landing").then(r => r.json())).modules;
     await fetch("/api/landing", { method: "PUT",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: [{ id: "solo", kind: "text", x: 1, y: 1, w: 6, h: 3 }] }) });
+      body: JSON.stringify({ modules: [{ id: "naked", kind: "text", x: 1, y: 1, w: 6, h: 3 }] }) });
     history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1500));
-
-    const celda = document.querySelector('[data-module="solo"]');
-    const bloque = celda.querySelector("[data-words-body]");
-    const pestillo = celda.querySelector("[data-words-latch]");
-    // Shut until somebody asks: this is the page every visitor sees, and a
-    // block that is live on arrival changes under a stray click.
-    const cerrado = {
-      escribible: bloque?.getAttribute("contenteditable") ?? "",
-      hayPestillo: !!pestillo,
-      // Out of the way until the pointer is over the block, which is theirs.
-      escondido: pestillo ? getComputedStyle(pestillo).opacity === "0" : false,
-    };
-
-    pestillo?.click();
-    await new Promise(r => setTimeout(r, 350));
-    const abierto = {
-      escribible: bloque?.getAttribute("contenteditable") ?? "",
-      enAlerta: pestillo?.classList.contains("open") ?? false,
-      barra: document.querySelector(".words-bar")?.hidden === false,
-    };
-
-    bloque?.focus();
-    if (bloque) {
-      bloque.innerHTML = "<p>Written without arranging anything.</p>";
-      bloque.dispatchEvent(new Event("input", { bubbles: true }));
-    }
     await new Promise(r => setTimeout(r, 1400));
-    const guardado = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === "solo")?.body ?? "";
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 800));
 
-    pestillo?.click();
-    await new Promise(r => setTimeout(r, 300));
-    const trasCerrar = {
-      escribible: bloque?.getAttribute("contenteditable") ?? "",
-      barra: document.querySelector(".words-bar")?.hidden === false,
-    };
+    const celda = document.querySelector('[data-module="naked"]');
+    const antes = getComputedStyle(celda.querySelector(".words-box"));
+    const vestido = { borde: antes.borderTopWidth, fondo: antes.backgroundColor };
 
-    // And while the page IS being arranged there is no latch: everything is
-    // open anyway, and a second control saying so is noise. Theirs hides it in
-    // grid edit mode for the same reason.
-    document.querySelector("[data-edit-page]").click();
-    await new Promise(r => setTimeout(r, 900));
-    const ordenando = {
-      pestillos: document.querySelectorAll("[data-words-latch]").length,
-      escribible: document.querySelector('[data-module="solo"] [data-words-body]')
-        ?.getAttribute("contenteditable") ?? "",
-    };
-    document.querySelector("[data-edit-done]").click();
+
+    celda.querySelector("[data-module-menu]").click();
+    await new Promise(r => setTimeout(r, 200));
+    celda.querySelector("[data-edit-module]").click();
     await new Promise(r => setTimeout(r, 500));
+    const form = document.querySelector("form.module-config");
+    form.querySelector('[data-width="0"]').click();
+    form.querySelector("[name=clear]").checked = true;
+    form.requestSubmit();
+    await new Promise(r => setTimeout(r, 1300));
 
+    // Waited for, not slept at: the save redraws the page, and a box read
+    // before the redraw is a detached element whose computed style is a row of
+    // empty strings — which reads exactly like a border that was removed.
+    let caja = null;
+    for (let i = 0; i < 40 && !caja; i++) {
+      caja = document.querySelector('[data-module="naked"] .words-box');
+      if (caja && !caja.isConnected) caja = null;
+      if (!caja) await new Promise(r => setTimeout(r, 100));
+    }
+    // Read into plain strings HERE, not at the return. getComputedStyle hands
+    // back a LIVE declaration: held onto across the two redraws below, it
+    // belongs to an element that is no longer in the document by the time it is
+    // read, and every value comes back as an empty string — which reads exactly
+    // like a border that was successfully removed.
+    const ahora = caja
+      ? (() => {
+          const c = getComputedStyle(caja);
+          return { borde: c.borderTopWidth, fondo: c.backgroundColor, sombra: c.boxShadow };
+        })()
+      : { borde: "?", fondo: "?", sombra: "?" };
+    const guardado = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === "naked");
+
+    // And the dialog comes back saying what was chosen rather than empty: none
+    // is a choice, and a control that forgets it is a control that says
+    // nothing was chosen.
+    document.querySelector('[data-module="naked"] [data-module-menu]').click();
+    await new Promise(r => setTimeout(r, 200));
+    document.querySelector('[data-module="naked"] [data-edit-module]').click();
+    await new Promise(r => setTimeout(r, 500));
+    const reabierto = {
+      ancho: document.querySelector("form.module-config [name=borderWidth]").value,
+      relleno: document.querySelector("form.module-config [name=clear]").checked,
+    };
+    document.querySelector("#module-config [data-close]")?.click();
+    await new Promise(r => setTimeout(r, 300));
+
+    document.querySelector("[data-edit-done]")?.click();
     await fetch("/api/landing", { method: "PUT",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
       body: JSON.stringify({ modules: previa }) });
     history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
     await new Promise(r => setTimeout(r, 1300));
-    return { cerrado, abierto, guardado, trasCerrar, ordenando };
+    return { vestido, desnudo: ahora,
+             servidor: { bare: guardado?.bare === true, clear: guardado?.clear === true },
+             reabierto };
   `);
   check(
-    "a block of words is written without arranging the page first",
-    sinOrdenar.cerrado.escribible === "false" && sinOrdenar.cerrado.hayPestillo === true &&
-      sinOrdenar.cerrado.escondido === true &&
-      sinOrdenar.abierto.escribible === "true" && sinOrdenar.abierto.enAlerta === true &&
-      sinOrdenar.abierto.barra === true &&
-      sinOrdenar.guardado.includes("Written without arranging anything.") &&
-      sinOrdenar.trasCerrar.escribible === "false" && sinOrdenar.trasCerrar.barra === false &&
-      sinOrdenar.ordenando.pestillos === 0 && sinOrdenar.ordenando.escribible === "true",
-    JSON.stringify(sinOrdenar),
+    "a module can be asked for no border and nothing behind it",
+    desnudo.vestido.borde !== "0px" &&
+      desnudo.desnudo.borde === "0px" &&
+      desnudo.desnudo.fondo === "rgba(0, 0, 0, 0)" && desnudo.desnudo.sombra === "none" &&
+      desnudo.servidor.bare === true && desnudo.servidor.clear === true &&
+      // Nought is a choice and comes back as one, not as an untouched control.
+      desnudo.reabierto.ancho === "0" && desnudo.reabierto.relleno === true,
+    JSON.stringify(desnudo),
+  );
+
+  // A picture in a block of words, from the file to the page and back out.
+  //
+  // The conversion is the point rather than a detail: what an operator picks is
+  // a photograph off a phone, and what a front page can afford is a fraction of
+  // it. It is done in the browser because encoding WebP on the server would
+  // mean a C library and a binary that is no longer one static file.
+  const retrato = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: [{ id: "shot", kind: "text", x: 1, y: 1, w: 8, h: 5 }] }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1400));
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 800));
+
+    // A picture with detail in it, so that the encoder has something to do and
+    // the two sizes are a real comparison rather than two ways of writing a
+    // flat rectangle.
+    const c = document.createElement("canvas");
+    c.width = 900; c.height = 600;
+    const x = c.getContext("2d");
+    for (let i = 0; i < 900; i += 3) {
+      x.fillStyle = "hsl(" + (i % 360) + ",70%," + (40 + (i % 30)) + "%)";
+      x.fillRect(i, 0, 3, 600);
+    }
+    const png = await new Promise(r => c.toBlob(r, "image/png"));
+    const webp = await new Promise(r => c.toBlob(r, "image/webp", 0.9));
+
+    const subir = (blob, type) => fetch("/api/landing/images", { method: "POST",
+      headers: { "X-CSRF-Token": csrf(), "Content-Type": type }, body: blob });
+
+    // What is not WebP is refused on the bytes, not on the header it declared.
+    const mentira = await subir(png, "image/webp").then(r => r.status);
+    const vacia = await subir(new Blob([], { type: "image/webp" }), "image/webp").then(r => r.status);
+
+    const hecha = await subir(webp, "image/webp");
+    const { url } = await hecha.json();
+
+    const caja = document.querySelector('[data-module="shot"] [data-words-body]');
+    caja.focus();
+    caja.innerHTML = '<p><img src="' + url + '" width="480" alt="A shot"></p>';
+    caja.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 1500));
+    const guardado = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === "shot")?.body ?? "";
+
+    // Asked of the server, never of the browser: these are served immutable for
+    // a year, so a plain fetch answers out of the cache whatever the server
+    // still holds. That is how this measurement first said the sweep did
+    // nothing while the table was already empty.
+    const preguntar = (at) => fetch(at, { cache: "no-store" });
+    const servida = await preguntar(url);
+    const cabeceras = { estado: servida.status, tipo: servida.headers.get("content-type"),
+                        cache: servida.headers.get("cache-control") };
+
+    // And a picture nothing refers to any more goes: it was uploaded while
+    // somebody was writing, so undoing has to take it with it.
+    caja.innerHTML = "<p>No picture now.</p>";
+    caja.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 1600));
+    const trasQuitarla = await preguntar(url).then(r => r.status);
+
+    document.querySelector("[data-edit-done]")?.click();
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: previa }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1300));
+    return { png: png.size, webp: webp.size, mentira, vacia,
+             creada: hecha.status, guardado, cabeceras, trasQuitarla };
+  `);
+  check(
+    "a picture is stored as WebP, served for a year, and swept when nothing shows it",
+    // Lighter than what went in, which is the whole reason for the conversion.
+    retrato.webp < retrato.png &&
+      retrato.creada === 201 && retrato.mentira === 400 && retrato.vacia === 400 &&
+      retrato.guardado.includes('width="480"') && retrato.guardado.includes('alt="A shot"') &&
+      retrato.guardado.includes('loading="lazy"') &&
+      retrato.cabeceras.estado === 200 && retrato.cabeceras.tipo === "image/webp" &&
+      retrato.cabeceras.cache.includes("immutable") &&
+      retrato.trasQuitarla === 404,
+    JSON.stringify({ pesos: { png: retrato.png, webp: retrato.webp },
+                     subida: { creada: retrato.creada, noEsWebp: retrato.mentira, vacia: retrato.vacia },
+                     guardado: retrato.guardado, cabeceras: retrato.cabeceras,
+                     trasQuitarla: retrato.trasQuitarla }),
   );
 
   // The writing bar, driven the way a hand drives it.
