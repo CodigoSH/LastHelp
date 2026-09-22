@@ -4240,6 +4240,33 @@ a.stat:hover .stat-go {
 .tab-panel { display: grid; gap: 0.9rem; }
 .tab-panel[hidden] { display: none; }
 
+/*
+ * The panel comes in from the side, the way the dashboard's drawer does.
+ *
+ * translateX is physical and does not follow the reading direction, so it is
+ * multiplied by --rtl-flip: in Arabic the panel has to arrive from the left or
+ * it slides in from the wrong edge of the screen. Same duration and curve as
+ * the drawer it is copied from.
+ */
+@keyframes panel-arrives {
+  from {
+    transform: translateX(calc(var(--rtl-flip, 1) * 3%));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.admin.arriving {
+  animation: panel-arrives 0.4s var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin.arriving { animation: none; }
+}
+
 /* What is being dragged is going in here. Same green the ghost uses, on the
    box rather than in it, so the answer is readable before letting go. */
 .landing-group.drop-target {

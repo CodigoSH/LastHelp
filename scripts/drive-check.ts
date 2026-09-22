@@ -1600,6 +1600,60 @@ async function main() {
     JSON.stringify(tamanos.encogido),
   );
 
+  // The bar carries icons and nothing but icons, and the panel arrives from the
+  // side the reading direction ends on — the dashboard's drawer does exactly
+  // that, and this pass runs in Arabic, where getting it wrong means sliding in
+  // from the opposite edge of the screen.
+  const entrada = await evaluate(`
+    document.querySelector("[data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 600));
+    const bar = document.querySelector("body > nav");
+    const panel = bar.querySelector('a[href="/panel"]');
+    const conPalabras = !!panel.querySelector("span") || panel.textContent.trim() !== "";
+
+    history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));
+    // Read while it is arriving, not after: the class is taken off when the
+    // animation ends, so a check that waits for the page to settle sees nothing.
+    let visto = null;
+    for (let i = 0; i < 60 && !visto; i++) {
+      const shell = document.querySelector(".admin.arriving");
+      if (shell) {
+        const nombre = getComputedStyle(shell).animationName;
+        // The mechanism, not the direction this pass happens to be in. Reading
+        // only the computed flip would pass in English whatever the keyframes
+        // said, and getting it wrong means the panel sliding in from the
+        // opposite edge for a fifth of the languages.
+        const hojas = [...document.styleSheets].flatMap(h => { try { return [...h.cssRules]; } catch { return []; } });
+        const fotogramas = hojas.find(r => r.name === "panel-arrives");
+        visto = { nombre, direccion: document.documentElement.dir,
+                  giro: getComputedStyle(document.documentElement).getPropertyValue("--rtl-flip").trim(),
+                  sigueLaDireccion: (fotogramas?.cssText ?? "").includes("--rtl-flip") };
+      }
+      await new Promise(r => setTimeout(r, 40));
+    }
+    // Back to the front page: this block walked into the panel, and everything
+    // after it is about the page it left.
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1300));
+
+    return { conPalabras, icono: !!panel.querySelector("svg"),
+             titulo: panel.getAttribute("title") ?? "", entrada: visto };
+  `);
+  check(
+    "the panel is an icon in the bar, with its name in a tooltip",
+    entrada.conPalabras === false && entrada.icono === true && entrada.titulo !== "",
+    JSON.stringify({ palabras: entrada.conPalabras, titulo: entrada.titulo }),
+  );
+  check(
+    "and it arrives from the side the reading direction ends on",
+    entrada.entrada?.nombre === "panel-arrives" &&
+      entrada.entrada?.sigueLaDireccion === true &&
+      (entrada.entrada?.direccion === "rtl"
+        ? entrada.entrada?.giro === "-1"
+        : entrada.entrada?.giro === "1"),
+    JSON.stringify(entrada.entrada),
+  );
+
   // The settings dialog, in the shape the dashboard uses for its own: the tabs
   // ARE the header, General and Customization, the close beside them, and one
   // action at the foot. Somebody who has configured a widget over there should

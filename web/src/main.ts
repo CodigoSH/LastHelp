@@ -138,7 +138,13 @@ function renderNav(): void {
   // panel's own sidebar carries it, and a red control in the bar of every
   // public page is the one thing on that bar nobody came for.
   const account = me
-    ? `<a class="button small with-icon" href="/panel">${icons.overview(14)}<span>${escapeHTML(i18n.t("nav.panel"))}</span></a>${compose}`
+    ? // An icon with its name in a tooltip, like every other control in this
+      // bar and like the dashboard's own. A button with a word in it beside two
+      // icon buttons reads as a leftover from a bar that was styled once and
+      // then again.
+      `<a class="icon-button" href="/panel"
+          title="${escapeAttr(i18n.t("nav.panel"))}"
+          aria-label="${escapeAttr(i18n.t("nav.panel"))}">${icons.overview(16)}</a>${compose}`
     : // Not on the sign-in page itself: a link to where you already are is the
       // third thing on that screen saying the same word.
       location.pathname === "/sign-in"
@@ -1010,7 +1016,19 @@ async function showInShell(content: string, path: string): Promise<void> {
       text,
     );
   }
+  // Arriving at the panel, it comes in from the side the reading direction ends
+  // on — the dashboard's own drawer does exactly this. Only on arrival: moving
+  // between panel screens is not an arrival, and replaying it on every click
+  // would be a shudder rather than an entrance.
+  const arriving = !document.body.classList.contains("admin-view");
   document.body.classList.add("admin-view");
+  if (arriving) {
+    const shell = root?.querySelector<HTMLElement>(".admin");
+    shell?.classList.add("arriving");
+    shell?.addEventListener("animationend", () => shell.classList.remove("arriving"), {
+      once: true,
+    });
+  }
   attachPasswordToggles(root);
   wireShell();
 }
