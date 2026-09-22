@@ -28,7 +28,14 @@ const (
 	// Hero is the mark, the name and the tagline of this installation.
 	Hero Kind = "hero"
 
-	// Intro is the three sentences about how reporting works here.
+	// Intro is one thing worth saying about reporting here, with a mark beside
+	// it.
+	//
+	// It drew three fixed sentences, which were the right three for us and
+	// nobody else's to change. One module is one point now: the operator writes
+	// it, and wanting three means putting three on the page — side by side, one
+	// under the other, or in a block of four, whichever they want. That is the
+	// whole reason this page is a grid.
 	Intro Kind = "intro"
 
 	// Organisations is the list of places somebody can report to.
@@ -127,7 +134,9 @@ func (k Kind) takesScope() bool { return k == Organisations || k.usesData() }
 
 // usesWords is the modules that carry words of their own: the operator's own
 // paragraph, and the label on the button.
-func (k Kind) usesWords() bool { return k == Text || k == CallToAction || k == Section }
+func (k Kind) usesWords() bool {
+	return k == Text || k == CallToAction || k == Section || k == Intro
+}
 
 // usesHeader is the modules that draw a name of their own, and so are the ones
 // a label position means anything to. A hero is its own name and a paragraph
@@ -192,6 +201,11 @@ const (
 	// about what fits on a button, and a byte count would cut a Japanese label
 	// at a third of the length of an English one.
 	maxLabel = 80
+
+	// maxPoint is one thing worth saying, in runes. Longer than a label because
+	// it is a sentence and shorter than a paragraph because it sits beside a
+	// mark on one line.
+	maxPoint = 160
 
 	Columns = 12
 
@@ -292,8 +306,13 @@ type Layout struct {
 func Default() Layout {
 	return Layout{Modules: []Module{
 		{ID: "hero", Kind: Hero, X: 1, Y: 1, W: 12, H: 1},
-		{ID: "intro", Kind: Intro, X: 1, Y: 2, W: 12, H: 2},
-		{ID: "organisations", Kind: Organisations, X: 1, Y: 4, W: 12, H: 2},
+		// Three points side by side, one module each. It was one module drawing
+		// three fixed sentences; three modules is the same page and an operator
+		// who can move, resize, rewrite or remove any one of them.
+		{ID: "point-1", Kind: Intro, X: 1, Y: 2, W: 4, H: 1},
+		{ID: "point-2", Kind: Intro, X: 5, Y: 2, W: 4, H: 1},
+		{ID: "point-3", Kind: Intro, X: 9, Y: 2, W: 4, H: 1},
+		{ID: "organisations", Kind: Organisations, X: 1, Y: 3, W: 12, H: 2},
 	}}
 }
 
@@ -596,6 +615,9 @@ func (l Layout) validate() error {
 		// is a layout nobody can use and a page nobody can read past.
 		if (m.Kind == CallToAction || m.Kind == Section) && len([]rune(m.Body)) > maxLabel {
 			return fmt.Errorf("module %q has a label longer than %d characters", m.ID, maxLabel)
+		}
+		if m.Kind == Intro && len([]rune(m.Body)) > maxPoint {
+			return fmt.Errorf("module %q says more than %d characters in one point", m.ID, maxPoint)
 		}
 		if len(m.Body) > maxTextBody {
 			return fmt.Errorf("module %q is longer than %d characters", m.ID, maxTextBody)

@@ -23,10 +23,12 @@ func TestAnUnsetLayoutIsStillAFrontPage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%q: %v", stored, err)
 		}
-		if len(got.Modules) != 3 {
-			t.Fatalf("%q gave %d modules, want 3", stored, len(got.Modules))
+		if len(got.Modules) != 5 {
+			t.Fatalf("%q gave %d modules, want 5", stored, len(got.Modules))
 		}
-		for i, want := range []Kind{Hero, Intro, Organisations} {
+		// Three points, one module each: the page says the same three things it
+		// always did, and every one of them can be moved, rewritten or removed.
+		for i, want := range []Kind{Hero, Intro, Intro, Intro, Organisations} {
 			if got.Modules[i].Kind != want {
 				t.Errorf("%q: module %d is %q, want %q", stored, i+1, got.Modules[i].Kind, want)
 			}
@@ -322,11 +324,18 @@ func TestOnlyWhatHasSomewhereToPutWordsMayCarryThem(t *testing.T) {
 		return string(out)
 	}
 
-	for _, kind := range []Kind{Hero, Intro, Organisations, Boards, MostVoted, RecentlyDone} {
+	for _, kind := range []Kind{Hero, Organisations, Boards, MostVoted, RecentlyDone} {
 		m := Module{ID: "m", Kind: kind, X: 1, Y: 1, W: 12, H: 2, Body: "hello"}
 		if _, err := Parse(page(m)); err == nil {
 			t.Errorf("%q was allowed to carry words it cannot draw", kind)
 		}
+	}
+
+	// The intro carries words now: it used to draw three fixed sentences and
+	// draws one of the operator's instead.
+	if _, err := Parse(page(Module{ID: "p", Kind: Intro, X: 1, Y: 1, W: 4, H: 1,
+		Body: "Reporting requires no account."})); err != nil {
+		t.Errorf("a point could not carry its own words: %v", err)
 	}
 
 	if _, err := Parse(page(Module{ID: "t", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: "hello"})); err != nil {
@@ -497,5 +506,29 @@ func TestAModuleMayBeOneColumnWide(t *testing.T) {
 	}})
 	if _, err := Parse(string(out)); err != nil {
 		t.Errorf("two single-column modules side by side were refused: %v", err)
+	}
+}
+
+// TestAPointIsASentenceAndNotAParagraph.
+//
+// Its own bound: longer than a button's label because it is a sentence, shorter
+// than a paragraph because it sits beside a mark on one line. Counted in runes,
+// like every other bound about what fits.
+func TestAPointIsASentenceAndNotAParagraph(t *testing.T) {
+	page := func(body string) string {
+		out, _ := json.Marshal(Layout{Modules: []Module{
+			{ID: "p", Kind: Intro, X: 1, Y: 1, W: 4, H: 1, Body: body},
+		}})
+		return string(out)
+	}
+	if _, err := Parse(page(strings.Repeat("ぜ", maxPoint))); err != nil {
+		t.Errorf("a point of %d characters was refused: %v", maxPoint, err)
+	}
+	if _, err := Parse(page(strings.Repeat("ぜ", maxPoint+1))); err == nil {
+		t.Error("a point past the bound was accepted")
+	}
+	// And longer than a label, which is the point of having two bounds.
+	if _, err := Parse(page(strings.Repeat("a", maxLabel+10))); err != nil {
+		t.Errorf("a point was measured as if it were a label: %v", err)
 	}
 }

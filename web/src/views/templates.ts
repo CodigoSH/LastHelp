@@ -218,11 +218,32 @@ export function landing(
     }
   };
 
-  const intro = `<ul class="points">
-    ${point(icons.person(18), text.t("landing.pointNoAccount"))}
-    ${point(icons.idea(18), text.t("landing.pointVotes"))}
-    ${point(icons.open(18), text.t("landing.pointForge"))}
-  </ul>`;
+  /**
+   * One thing worth saying, with a mark beside it.
+   *
+   * It drew three fixed sentences — the right three for us, and nobody else's
+   * to change. Now it is one point in the operator's own words, and wanting
+   * three means putting three on the page: side by side, stacked, or in a block
+   * of four. Deciding that is the reason this page is a grid at all.
+   */
+  // A point with nothing written falls back to one of the three things worth
+  // saying about this product, in the order they appear on the page. That is
+  // what keeps an installation that never composes anything showing the same
+  // three sentences it always did, in its own language — the domain cannot
+  // carry translated text, and putting English in the default layout would ship
+  // one language to twenty.
+  const spare = [
+    { icon: icons.person(18), words: text.t("landing.pointNoAccount") },
+    { icon: icons.idea(18), words: text.t("landing.pointVotes") },
+    { icon: icons.open(18), words: text.t("landing.pointForge") },
+  ];
+  const pointsSoFar: string[] = [];
+
+  const intro = (id: string, words: string) => {
+    if (!pointsSoFar.includes(id)) pointsSoFar.push(id);
+    const fallback = spare[Math.min(pointsSoFar.indexOf(id), spare.length - 1)]!;
+    return `<ul class="points">${point(fallback.icon, words.trim() || fallback.words)}</ul>`;
+  };
 
   const organisations = (head: string, at: string) =>
     orgs.length === 0
@@ -514,7 +535,7 @@ export function landing(
         m.kind === "hero"
           ? hero
           : m.kind === "intro"
-            ? intro
+            ? intro(m.id, m.body ?? "")
             : m.kind === "organisations"
               ? showsOne(m)
                 ? oneOrg(m.scope ?? "")

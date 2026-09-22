@@ -20,8 +20,10 @@ func TestComposingTheFrontPage(t *testing.T) {
 	// Before anybody composes anything, it is the page that was always there.
 	body := decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
 	modules, _ := body["modules"].([]any)
-	if len(modules) != 3 {
-		t.Fatalf("an untouched installation offered %d modules, want 3", len(modules))
+	// Five: the mark and name, three points, and the organisations. The points
+	// used to be one module drawing three sentences.
+	if len(modules) != 5 {
+		t.Fatalf("an untouched installation offered %d modules, want 5", len(modules))
 	}
 
 	// The administrator composes it.

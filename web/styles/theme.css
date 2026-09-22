@@ -382,6 +382,20 @@ body > main {
 }
 
 /*
+ * The front page is not a column.
+ *
+ * Every other public screen asks for one thing — report this, read that, sign
+ * in — and a measure keeps those readable. The front page shows things, and the
+ * dashboard this grid comes from runs its tiles to within a margin of the
+ * window. Kept as one rule about the page that holds a grid rather than a class
+ * the view has to remember to pass.
+ */
+body > main:has(.landing-grid) {
+  max-inline-size: none;
+  padding-inline: clamp(1rem, 2.5vw, 2rem);
+}
+
+/*
  * One page, one rhythm.
  *
  * Every public screen is a .page: a header block, then its content, at the same
@@ -1377,8 +1391,14 @@ summary:focus-visible,
   color: var(--accent-alt);
 }
 
+/*
+ * Three across, for the one place that still draws three of them at once: the
+ * wizard's summary. A point on the front page is a module of its own now, so in
+ * there it fills the module it was given and how many go side by side is the
+ * operator's decision, made by dragging — not this rule's.
+ */
 @media (min-width: 52rem) {
-  .points { grid-template-columns: repeat(3, 1fr); }
+  .points:not(.landing-cell .points) { grid-template-columns: repeat(3, 1fr); }
 }
 /* ---------------------------------------------------------------- wizard */
 
@@ -4124,6 +4144,7 @@ a.stat:hover .stat-go {
 .landing-cell .points {
   block-size: 100%;
   align-content: stretch;
+  grid-template-columns: 1fr;
 }
 
 .landing-cell .points > li {
