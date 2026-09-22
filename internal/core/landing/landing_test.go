@@ -73,7 +73,7 @@ func TestTheThingsAPageCannotBe(t *testing.T) {
 		{"two modules in the same cells", `{"modules":[
 			{"id":"a","kind":"hero","x":1,"y":1,"w":6,"h":2},
 			{"id":"b","kind":"intro","x":4,"y":1,"w":6,"h":2}]}`},
-		{"words on a module that has none", `{"modules":[{"id":"a","kind":"hero","x":1,"y":1,"w":12,"h":4,"body":"hello"}]}`},
+		{"words on a module that has none", `{"modules":[{"id":"a","kind":"organisations","x":1,"y":1,"w":12,"h":4,"body":"hello"}]}`},
 		{"not json at all", `hello`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -324,7 +324,7 @@ func TestOnlyWhatHasSomewhereToPutWordsMayCarryThem(t *testing.T) {
 		return string(out)
 	}
 
-	for _, kind := range []Kind{Hero, Organisations, Boards, MostVoted, RecentlyDone} {
+	for _, kind := range []Kind{Organisations, Boards, MostVoted, RecentlyDone} {
 		m := Module{ID: "m", Kind: kind, X: 1, Y: 1, W: 12, H: 2, Body: "hello"}
 		if _, err := Parse(page(m)); err == nil {
 			t.Errorf("%q was allowed to carry words it cannot draw", kind)
@@ -344,6 +344,13 @@ func TestOnlyWhatHasSomewhereToPutWordsMayCarryThem(t *testing.T) {
 	if _, err := Parse(page(Module{ID: "go", Kind: CallToAction, X: 1, Y: 1, W: 4, H: 1,
 		Scope: "acme/atlas", Body: "Report something"})); err != nil {
 		t.Errorf("a button could not carry its own label: %v", err)
+	}
+
+	// The hero carries its own tagline now: it drew a fixed one, and the
+	// operator writes theirs instead.
+	if _, err := Parse(page(Module{ID: "h", Kind: Hero, X: 1, Y: 1, W: 3, H: 2,
+		Body: "Tell us what broke."})); err != nil {
+		t.Errorf("the hero could not carry its own tagline: %v", err)
 	}
 }
 
@@ -378,7 +385,9 @@ func TestWhereAModuleKeepsItsName(t *testing.T) {
 	// And a module that draws no name is not asked where to put one: a hero is
 	// its own name, a paragraph has none. Accepting it would store a setting
 	// whose dialog never shows it and nothing ever reads.
-	for _, kind := range []Kind{Hero, Intro, Text, CallToAction} {
+	// Not the hero: it draws a name of its own now, so it is asked where to put
+	// it like everything else that does.
+	for _, kind := range []Kind{Intro, Text, CallToAction} {
 		m := Module{ID: "m", Kind: kind, X: 1, Y: 1, W: 12, H: 2, Label: LabelPill}
 		if kind == Text || kind == CallToAction {
 			m.Body = "hello"
@@ -569,5 +578,35 @@ func TestABorderIsAColourAndAWidthOrNothing(t *testing.T) {
 		if _, err := Parse(page("#3b82f6", width)); err == nil {
 			t.Errorf("a border %d wide was accepted", width)
 		}
+	}
+}
+
+// TestHowManyRowsAModuleShows.
+//
+// An operator who gives a module two rows of height does not want eight things
+// in it. Bounded to what the reader will actually return, written once here so
+// the dialog cannot offer a number that would quietly be cut.
+func TestHowManyRowsAModuleShows(t *testing.T) {
+	page := func(kind Kind, rows int) string {
+		out, _ := json.Marshal(Layout{Modules: []Module{
+			{ID: "m", Kind: kind, X: 1, Y: 1, W: 3, H: 2, Rows: rows},
+		}})
+		return string(out)
+	}
+
+	if _, err := Parse(page(MostVoted, 0)); err != nil {
+		t.Errorf("a module that never said was refused: %v", err)
+	}
+	if _, err := Parse(page(MostVoted, maxRows)); err != nil {
+		t.Errorf("%d rows was refused: %v", maxRows, err)
+	}
+	for _, rows := range []int{-1, maxRows + 1} {
+		if _, err := Parse(page(MostVoted, rows)); err == nil {
+			t.Errorf("%d rows was accepted", rows)
+		}
+	}
+	// And a module that lists nothing is not asked how many to list.
+	if _, err := Parse(page(Hero, 4)); err == nil {
+		t.Error("a module that lists nothing was given a number of rows")
 	}
 }

@@ -189,15 +189,15 @@ func landingContentFrom(layout landing.Layout, boards []org.Board,
 	for _, m := range layout.Modules {
 		switch m.Kind {
 		case landing.Boards:
-			content[m.ID] = describeBoards(inScope(boards, m.Scope))
+			content[m.ID] = cut(describeBoards(inScope(boards, m.Scope)), m.Rows)
 		case landing.MostVoted:
-			content[m.ID] = voted(inScope(boards, m.Scope))
+			content[m.ID] = cut(voted(inScope(boards, m.Scope)), m.Rows)
 		case landing.RecentlyDone:
-			content[m.ID] = done(inScope(boards, m.Scope))
+			content[m.ID] = cut(done(inScope(boards, m.Scope)), m.Rows)
 		case landing.CallToAction:
 			content[m.ID] = whereItGoes(inScope(boards, m.Scope))
 		case landing.RecentActivity:
-			content[m.ID] = lately(inScope(boards, m.Scope))
+			content[m.ID] = cut(lately(inScope(boards, m.Scope)), m.Rows)
 		case landing.Roadmap:
 			content[m.ID] = coming(inScope(boards, m.Scope))
 		case landing.Statistics:
@@ -205,6 +205,16 @@ func landingContentFrom(layout landing.Layout, boards []org.Board,
 		}
 	}
 	return content
+}
+
+// cut is how many of them the operator asked for, and all of them when they
+// never said. Done here rather than in the browser so a module that shows three
+// does not carry eight across the wire to throw five away.
+func cut(rows []map[string]any, howMany int) []map[string]any {
+	if howMany <= 0 || howMany >= len(rows) {
+		return rows
+	}
+	return rows[:howMany]
 }
 
 // inScope narrows a list of boards to what a module was pointed at.

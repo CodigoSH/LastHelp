@@ -4537,6 +4537,14 @@ a.stat:hover .stat-go {
 .input-group { display: flex; gap: 0; inline-size: 100%; }
 
 .icon-dropdown { position: relative; inline-size: 42px; flex-shrink: 0; }
+.icon-dropdown[hidden] { display: none; }
+
+/* With no dropdown beside it the box is the whole field, so its corners come
+   back. */
+.input-group:has(.icon-dropdown[hidden]) input {
+  border-start-start-radius: 8px;
+  border-end-start-radius: 8px;
+}
 
 .icon-dropdown-btn {
   position: relative;

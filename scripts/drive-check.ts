@@ -1818,6 +1818,181 @@ async function main() {
                      enPantalla: ajustes.enPantalla }),
   );
 
+  // Every module can be configured for what it is: the hero carries its own
+  // words and decides whether to draw the mark, and a module that lists things
+  // is told how many. It drew a fixed name, a fixed line and a fixed mark, and
+  // the lists always showed as many as they had.
+  const opciones = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: [
+        { id: "top", kind: "hero", x: 1, y: 1, w: 6, h: 2 },
+        { id: "list", kind: "boards", x: 7, y: 1, w: 6, h: 3 },
+      ] }) });
+    // Two more boards, so that "show one" is a different number from "show
+    // them all". With the single board the journey already has, a list that
+    // ignored the count entirely would read the same as one that obeyed it.
+    const extras = ["second-board", "third-board"];
+    for (const slug of extras) {
+      await fetch("/api/orgs/codigosh/repositories", { method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+        body: JSON.stringify({ slug, name: slug }) });
+    }
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1300));
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    const abrir = async (id) => {
+      const celda = document.querySelector('[data-module="' + id + '"]');
+      celda.querySelector("[data-module-menu]").click();
+      await new Promise(r => setTimeout(r, 200));
+      celda.querySelector("[data-edit-module]").click();
+      await new Promise(r => setTimeout(r, 500));
+      return document.querySelector("form.module-config");
+    };
+
+    // The hero: its own heading, its own line, and the mark as a choice.
+    let form = await abrir("top");
+    const heroPide = {
+      nombre: !form.querySelector("[data-for-name]").hidden,
+      linea: !form.querySelector("[data-for-label]").hidden,
+      marca: !form.querySelector("[data-for-mark]").hidden,
+      filas: !form.querySelector("[data-for-rows]").hidden,
+    };
+    // Only what the form actually offers gets filled in: writing into a field
+    // the form keeps hidden would save the value anyway, and the screen would
+    // then show the heading whether or not it was ever on offer.
+    if (heroPide.nombre) form.querySelector("[name=name]").value = "Acme Support";
+    if (heroPide.linea) form.querySelector("[name=label]").value = "Tell us what broke.";
+    if (heroPide.marca) form.querySelector("[name=mark]").checked = false;
+    form.requestSubmit();
+    await new Promise(r => setTimeout(r, 1000));
+
+    const heroEnPantalla = {
+      titulo: document.querySelector('[data-module="top"] .hero h1')?.textContent?.trim() ?? "",
+      linea: document.querySelector('[data-module="top"] .hero .lead')?.textContent?.trim() ?? "",
+      marca: !!document.querySelector('[data-module="top"] .hero-mark'),
+    };
+
+    // A list: told how many, and it shows that many.
+    form = await abrir("list");
+    const listaPide = {
+      filas: !form.querySelector("[data-for-rows]").hidden,
+      marca: !form.querySelector("[data-for-mark]").hidden,
+    };
+    const cuenta = () => document.querySelectorAll('[data-module="list"] .cards .card').length;
+    const sinLimite = cuenta();
+    if (listaPide.filas) form.querySelector("[name=rows]").value = "1";
+    form.requestSubmit();
+    await new Promise(r => setTimeout(r, 1000));
+    const filasEnPantalla = cuenta();
+
+    document.querySelector("[data-edit-done]")?.click();
+    for (const slug of extras) {
+      await fetch("/api/orgs/codigosh/repos/" + slug, { method: "DELETE",
+        headers: { "X-CSRF-Token": csrf() } });
+    }
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: previa }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+
+    return { heroPide, heroEnPantalla, listaPide, sinLimite, filasEnPantalla };
+  `);
+  check(
+    "the hero is asked for its own words and whether to draw the mark",
+    opciones.heroPide.nombre === true && opciones.heroPide.linea === true &&
+      opciones.heroPide.marca === true && opciones.heroPide.filas === false &&
+      opciones.heroEnPantalla.titulo === "Acme Support" &&
+      opciones.heroEnPantalla.linea === "Tell us what broke." &&
+      opciones.heroEnPantalla.marca === false,
+    JSON.stringify({ pide: opciones.heroPide, enPantalla: opciones.heroEnPantalla }),
+  );
+  // And every one of them, not just the two above. The browser kept its own
+  // idea of which modules carry a name and which can be pointed at a board,
+  // and it had fallen three behind the server's: recent activity, the roadmap
+  // and the figures were drawn from a board the operator was never offered a
+  // way to choose. Two predicates in two languages drift in silence, so the
+  // table is asserted whole rather than per module.
+  const todos = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
+    const kinds = ["hero", "intro", "text", "call_to_action", "organisations",
+      "boards", "most_voted", "recently_done", "recent_activity", "roadmap",
+      "statistics", "section"];
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: kinds.map((kind, i) => ({
+        id: kind, kind, x: 1 + (i % 4) * 3, y: 1 + Math.floor(i / 4) * 2, w: 3, h: 2,
+      })) }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1400));
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+
+    const ofrece = {};
+    for (const kind of kinds) {
+      const celda = document.querySelector('[data-module="' + kind + '"]');
+      celda.querySelector("[data-module-menu]").click();
+      await new Promise(r => setTimeout(r, 150));
+      celda.querySelector("[data-edit-module]").click();
+      await new Promise(r => setTimeout(r, 350));
+      const form = document.querySelector("form.module-config");
+      ofrece[kind] = ["name", "label", "text", "scope", "rows", "mark"]
+        .filter(f => !form.querySelector("[data-for-" + f + "]").hidden).join(",");
+      form.querySelector("[data-close]").click();
+      await new Promise(r => setTimeout(r, 250));
+    }
+
+    document.querySelector("[data-edit-done]")?.click();
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: previa }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1200));
+    return ofrece;
+  `);
+  const esperado: Record<string, string> = {
+    hero: "name,label,mark",
+    intro: "label",
+    text: "text",
+    call_to_action: "label,scope",
+    organisations: "name,scope,rows",
+    boards: "name,scope,rows",
+    most_voted: "name,scope,rows",
+    recently_done: "name,scope,rows",
+    recent_activity: "name,scope,rows",
+    roadmap: "name,scope,rows",
+    statistics: "name,scope",
+    section: "name",
+  };
+  const desviados = Object.keys(esperado)
+    .filter((kind) => todos[kind] !== esperado[kind])
+    .map((kind) => `${kind}: ${todos[kind]} (se esperaba ${esperado[kind]})`);
+  check(
+    "and every module is asked about what it is, the whole table at once",
+    desviados.length === 0 &&
+      Object.values(todos).every((ofrecido) => ofrecido !== ""),
+    desviados.length === 0 ? JSON.stringify(todos) : desviados.join("; "),
+  );
+
+  check(
+    "and a module that lists things is asked how many, and shows that many",
+    opciones.listaPide.filas === true && opciones.listaPide.marca === false &&
+      opciones.sinLimite >= 2 && opciones.filasEnPantalla === 1,
+    JSON.stringify({
+      pide: opciones.listaPide,
+      sinLimite: opciones.sinLimite,
+      filas: opciones.filasEnPantalla,
+    }),
+  );
+
   // Removing asks first. It used to go on the click, and a module somebody
   // spent a minute pointing at the right board is not something to lose to a
   // stray one.

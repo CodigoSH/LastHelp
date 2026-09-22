@@ -37,7 +37,6 @@ landing.moduleAction
 landing.moduleActivity
 landing.moduleDone
 landing.moduleRoadmap
-landing.moduleSection
 landing.moduleStats
 landing.moduleVoted
 landing.name
@@ -56,10 +55,15 @@ landing.removeModule
 landing.removeModuleSays
 landing.removeSection
 landing.removeSectionSays
+landing.rows
+landing.rowsHelp
 landing.saveChanges
 landing.scope
 landing.scopeAll
+landing.showMark
+landing.showMarkHelp
 landing.tabGeneral
 landing.tabLook
+landing.tagline
 landing.thick
 landing.thin

@@ -133,10 +133,20 @@ func (k Kind) usesData() bool {
 // default page started reading tables it has no use for.
 func (k Kind) takesScope() bool { return k == Organisations || k.usesData() }
 
+// lists is the modules that draw a list of things, and so can be told how many
+// of them to draw.
+func (k Kind) lists() bool {
+	switch k {
+	case Boards, MostVoted, RecentlyDone, RecentActivity, Roadmap, Organisations:
+		return true
+	}
+	return false
+}
+
 // usesWords is the modules that carry words of their own: the operator's own
 // paragraph, and the label on the button.
 func (k Kind) usesWords() bool {
-	return k == Text || k == CallToAction || k == Section || k == Intro
+	return k == Text || k == CallToAction || k == Section || k == Intro || k == Hero
 }
 
 // usesHeader is the modules that draw a name of their own, and so are the ones
@@ -149,6 +159,11 @@ func (k Kind) usesHeader() bool {
 	}
 	return false
 }
+
+// isNamed is the modules that carry a name of their own. Wider than usesHeader
+// by exactly one: the hero has a heading rather than a header, so it is named
+// and there is nowhere to place that name but where it already is.
+func (k Kind) isNamed() bool { return k == Hero || k.usesHeader() }
 
 // LabelAt is where a module's name sits.
 //
@@ -208,6 +223,11 @@ const (
 	// mark on one line.
 	maxPoint = 160
 
+	// maxRows is the most a module that lists things will show. The same bound
+	// the server already uses when it reads them, written once so the dialog
+	// cannot offer a number the reader would quietly cut.
+	maxRows = 20
+
 	Columns = 12
 
 	// The narrowest a module may be, in columns.
@@ -254,6 +274,16 @@ type Module struct {
 	// An operator with three boards modules pointed at three boards needs to
 	// tell them apart, and "Repositories" three times tells nobody anything.
 	Name string `json:"name,omitempty"`
+
+	// Rows is how many a module that lists things shows, and zero means as many
+	// as it would anyway. An operator who gives a module two rows of height does
+	// not want eight of them in it.
+	Rows int `json:"rows,omitempty"`
+
+	// Mark says whether the hero draws the installation's mark beside its name.
+	// A pointer so that "not said" and "said no" are different things: absent
+	// means the mark is drawn, which is what it did before there was a choice.
+	Mark *bool `json:"mark,omitempty"`
 
 	// BorderColor and BorderWidth are how the module's own box looks, and they
 	// are the dashboard's controls with the dashboard's values: ten colours and
@@ -644,6 +674,9 @@ func (l Layout) validate() error {
 		if (m.Kind == CallToAction || m.Kind == Section) && len([]rune(m.Body)) > maxLabel {
 			return fmt.Errorf("module %q has a label longer than %d characters", m.ID, maxLabel)
 		}
+		if m.Kind == Hero && len([]rune(m.Body)) > maxPoint {
+			return fmt.Errorf("module %q has a tagline longer than %d characters", m.ID, maxPoint)
+		}
 		if m.Kind == Intro && len([]rune(m.Body)) > maxPoint {
 			return fmt.Errorf("module %q says more than %d characters in one point", m.ID, maxPoint)
 		}
@@ -659,8 +692,17 @@ func (l Layout) validate() error {
 		if m.Label != "" && !m.Kind.usesHeader() {
 			return fmt.Errorf("module %q says where to put a name it does not draw", m.ID)
 		}
-		if m.Name != "" && !m.Kind.usesHeader() {
+		if m.Name != "" && !m.Kind.isNamed() {
 			return fmt.Errorf("module %q carries a name it does not draw", m.ID)
+		}
+		if m.Rows < 0 || m.Rows > maxRows {
+			return fmt.Errorf("module %q asks for %d rows", m.ID, m.Rows)
+		}
+		if m.Rows != 0 && !m.Kind.lists() {
+			return fmt.Errorf("module %q asks for rows and does not list anything", m.ID)
+		}
+		if m.Mark != nil && m.Kind != Hero {
+			return fmt.Errorf("module %q says whether to draw a mark it does not have", m.ID)
 		}
 		if m.BorderColor != "" && !colourPattern.MatchString(m.BorderColor) {
 			return fmt.Errorf("module %q has a border colour of %q", m.ID, m.BorderColor)

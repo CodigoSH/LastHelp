@@ -339,6 +339,8 @@ function wireLanding(orgs: OrganizationSummary[]): void {
           ...(m.name ? { name: m.name } : {}),
           ...(m.border_color ? { border_color: m.border_color } : {}),
           ...(m.border_width ? { border_width: m.border_width } : {}),
+          ...(m.rows ? { rows: m.rows } : {}),
+          ...(m.kind === "hero" && m.mark === false ? { mark: false } : {}),
           ...(m.parent ? { parent: m.parent } : {}),
         })),
       });
@@ -545,10 +547,14 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
-    if (target.kind === "call_to_action" || target.kind === "intro") {
+    if (target.kind === "call_to_action" || target.kind === "intro" || target.kind === "hero") {
       target.body = String(data.get("label") ?? "").trim();
     }
-    if (usesHeader(target.kind)) target.name = String(data.get("name") ?? "").trim();
+    if (lists(target.kind)) target.rows = Number(data.get("rows") ?? 0) || 0;
+    if (target.kind === "hero") target.mark = data.get("mark") !== null;
+    if (usesHeader(target.kind) || target.kind === "hero") {
+      target.name = String(data.get("name") ?? "").trim();
+    }
     // A section's name is its body: it is the pill on its border and nothing
     // else, so there is no second name to keep.
     if (target.kind === "section") target.body = String(data.get("name") ?? "").trim();
@@ -913,6 +919,8 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   // Where the name goes, on the name: the dropdown lives inside the same box as
   // the name it places, which is where theirs is.
   const at = form.querySelector<HTMLInputElement>("[name=labelAt]");
+  const placing = form.querySelector<HTMLElement>(".icon-dropdown");
+  if (placing) placing.hidden = !usesHeader(target.kind) && target.kind !== "section";
   if (at) {
     const section = target.kind === "section";
     at.value = section ? "pill" : (target.label ?? "top");
@@ -941,18 +949,39 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     pickOne(form, "[data-width]", "width", width.value);
   }
 
+  // How many things a module that lists them shows.
+  const counting = form.querySelector<HTMLElement>("[data-for-rows]");
+  const rows = form.querySelector<HTMLInputElement>("[name=rows]");
+  if (counting && rows) {
+    counting.hidden = !lists(target.kind);
+    rows.value = String(target.rows ?? 0);
+  }
+
+  // And whether the hero draws the installation's mark beside its name.
+  const marking = form.querySelector<HTMLElement>("[data-for-mark]");
+  const mark = form.querySelector<HTMLInputElement>("[name=mark]");
+  if (marking && mark) {
+    marking.hidden = target.kind !== "hero";
+    mark.checked = target.mark !== false;
+  }
+
   // The button's words, a section's name, and a point's sentence. All three are
   // one short line the operator writes, so they are one field.
   const naming = form.querySelector<HTMLElement>("[data-for-label]");
   const label = form.querySelector<HTMLInputElement>("[name=label]");
   if (naming && label) {
-    const named = target.kind === "call_to_action" || target.kind === "intro";
+    const named =
+      target.kind === "call_to_action" || target.kind === "intro" || target.kind === "hero";
     naming.hidden = !named;
     label.value = named ? (target.body ?? "") : "";
     const labelText = form.querySelector<HTMLElement>("[data-for-label] label");
     if (labelText) {
       labelText.textContent =
-        target.kind === "intro" ? i18n.t("landing.pointWords") : i18n.t("landing.label");
+        target.kind === "intro"
+          ? i18n.t("landing.pointWords")
+          : target.kind === "hero"
+            ? i18n.t("landing.tagline")
+            : i18n.t("landing.label");
     }
   }
 
@@ -960,7 +989,9 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   const naming2 = form.querySelector<HTMLElement>("[data-for-name]");
   const name = form.querySelector<HTMLInputElement>("[name=name]");
   if (naming2 && name) {
-    naming2.hidden = !usesHeader(target.kind);
+    // The hero is named and has nowhere to put that name but where it already
+    // is, so it gets the field and not the dropdown beside it.
+    naming2.hidden = !usesHeader(target.kind) && target.kind !== "hero";
     name.value = target.name ?? "";
     name.placeholder = defaultNameFor(target.kind);
   }
@@ -1080,7 +1111,13 @@ function spillOnto(modules: views.LandingModule[]): void {
 /** The kinds that draw a name of their own, and so can be told where to put it. */
 function usesHeader(kind: views.LandingModule["kind"]): boolean {
   return (
-    kind === "organisations" || kind === "boards" || kind === "most_voted" || kind === "recently_done"
+    kind === "organisations" ||
+    kind === "boards" ||
+    kind === "most_voted" ||
+    kind === "recently_done" ||
+    kind === "recent_activity" ||
+    kind === "roadmap" ||
+    kind === "statistics"
   );
 }
 
@@ -1105,6 +1142,18 @@ function sizeFor(kind: views.LandingModule["kind"]): { w: number; h: number } {
   return kind === "section" ? { w: 6, h: 3 } : { w: 3, h: 2 };
 }
 
+/** The kinds that draw a list, and so can be told how long it is. */
+function lists(kind: views.LandingModule["kind"]): boolean {
+  return (
+    kind === "organisations" ||
+    kind === "boards" ||
+    kind === "most_voted" ||
+    kind === "recently_done" ||
+    kind === "recent_activity" ||
+    kind === "roadmap"
+  );
+}
+
 /**
  * The kinds that can be pointed at one place.
  *
@@ -1119,7 +1168,13 @@ function takesScope(kind: views.LandingModule["kind"]): boolean {
 /** The kinds that draw out of the database, and so have a board to be told. */
 function usesData(kind: views.LandingModule["kind"]): boolean {
   return (
-    kind === "boards" || kind === "most_voted" || kind === "recently_done" || kind === "call_to_action"
+    kind === "boards" ||
+    kind === "most_voted" ||
+    kind === "recently_done" ||
+    kind === "call_to_action" ||
+    kind === "recent_activity" ||
+    kind === "roadmap" ||
+    kind === "statistics"
   );
 }
 

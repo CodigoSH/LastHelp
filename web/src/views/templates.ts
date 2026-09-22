@@ -73,6 +73,10 @@ export interface LandingModule {
   scope?: string;
   /** What this module calls itself. Empty means the name of what it draws. */
   name?: string;
+  /** How many things a module that lists them shows. Zero is as many as it has. */
+  rows?: number;
+  /** Whether the hero draws the installation's mark. Absent means it does. */
+  mark?: boolean;
   /** The colour of the module's own border, and how thick. */
   border_color?: string;
   border_width?: number;
@@ -180,10 +184,19 @@ export function landing(
     `<li><span class="point-icon">${icon}</span><span>${escapeHTML(words)}</span></li>`;
 
 
-  const hero = `<section class="hero">
-    <span class="hero-mark">${brandMark(instance?.logo, 44)}</span>
-    <h1>${escapeHTML(instance?.name || text.t("app.name"))}</h1>
-    <p class="lead">${escapeHTML(text.t("app.tagline"))}</p>
+  /**
+   * The mark, a heading and a line under it.
+   *
+   * All three were fixed: the installation's mark, the installation's name and
+   * one sentence nobody could change. The words are the operator's now, and
+   * left empty they are what they always were — so a page nobody has touched
+   * says exactly what it said. The mark is the installation's own, set where
+   * the rest of its branding is; what this decides is whether to draw it.
+   */
+  const heroBlock = (m: LandingModule) => `<section class="hero">
+    ${m.mark === false ? "" : `<span class="hero-mark">${brandMark(instance?.logo, 44)}</span>`}
+    <h1>${escapeHTML((m.name ?? "").trim() || instance?.name || text.t("app.name"))}</h1>
+    <p class="lead">${escapeHTML((m.body ?? "").trim() || text.t("app.tagline"))}</p>
     ${
       orgs.length === 0 && isAdmin
         ? `<div class="hero-actions">
@@ -547,7 +560,7 @@ export function landing(
 
       const inner =
         m.kind === "hero"
-          ? hero
+          ? heroBlock(m)
           : m.kind === "intro"
             ? intro(m.id, m.body ?? "")
             : m.kind === "organisations"
@@ -878,6 +891,18 @@ function moduleModal(
           <div class="field-group" data-for-text hidden>
             <label for="module-body">${escapeHTML(text.t("landing.moduleText"))}</label>
             <textarea id="module-body" name="body" rows="5" maxlength="4000"></textarea>
+          </div>
+          <div class="field-group" data-for-rows hidden>
+            <label for="module-rows">${escapeHTML(text.t("landing.rows"))}</label>
+            <input id="module-rows" name="rows" type="number" min="0" max="20" step="1" />
+            <p class="hint">${escapeHTML(text.t("landing.rowsHelp"))}</p>
+          </div>
+          <div class="field-group" data-for-mark hidden>
+            <label class="switch-row">
+              <input type="checkbox" name="mark" />
+              <span>${escapeHTML(text.t("landing.showMark"))}</span>
+            </label>
+            <p class="hint">${escapeHTML(text.t("landing.showMarkHelp"))}</p>
           </div>
           <div class="field-group" data-for-label hidden>
             <label for="module-label">${escapeHTML(text.t("landing.label"))}</label>
