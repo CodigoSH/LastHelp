@@ -42,6 +42,8 @@ landing.moduleStats
 landing.moduleVoted
 landing.name
 landing.nameHelp
+landing.newModule
+landing.newModuleLead
 landing.noBoards
 landing.noVotes
 landing.noneComing
@@ -50,6 +52,7 @@ landing.noneDone
 landing.noneYet
 landing.pointWords
 landing.regular
+landing.saveChanges
 landing.scope
 landing.scopeAll
 landing.tabGeneral

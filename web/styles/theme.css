@@ -4167,16 +4167,65 @@ a.stat:hover .stat-go {
  * track — cards that fit themselves to the width rather than a fixed number of
  * columns, so the same dialog works on a laptop and on a phone.
  */
-.modal.wide {
-  inline-size: min(52rem, 92vw);
+/*
+ * Measured off their picker, not styled to taste.
+ *
+ * Called chooser and not picker: this stylesheet already has a `.picker`, the
+ * control that chooses an image, and it carries `line-height: 0`. Naming this
+ * one the same inherited that and left the title and the line under it both
+ * nought pixels tall, printed on top of each other — a name collision no test
+ * for duplicate rules can see, which is a fault this project has met before.
+ */
+.modal.chooser {
+  inline-size: min(49rem, 94vw);
   max-inline-size: none;
+  padding: 32px;
+  /* Their cap: the dialog never outgrows the window, and what does not fit
+     scrolls inside it rather than pushing the close button off the screen. */
+  max-block-size: min(88vh, 900px);
+  overflow: auto;
 }
+
+.picker-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-block-end: 28px;
+}
+
+.picker-head h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.picker-head .title-group p {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.picker-close {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.picker-close:focus { outline: none; }
+.picker-close:hover { color: var(--text-main); border-color: var(--text-dim); }
 
 .picker-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 0.9rem;
-  margin-block-start: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
 }
 
 .picker-card {
@@ -4184,15 +4233,15 @@ a.stat:hover .stat-go {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 0.4rem;
-  padding: 1.1rem 0.9rem;
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
   color: inherit;
   cursor: pointer;
   font: inherit;
-  transition: border-color 0.2s, transform 0.2s;
+  transition: all 0.3s var(--ease);
 }
 
 .picker-card:hover {
@@ -4200,9 +4249,67 @@ a.stat:hover .stat-go {
   transform: translateY(-2px);
 }
 
-.picker-icon { color: var(--accent); }
-.picker-name { font-weight: 600; }
-.picker-about { font-size: 0.8rem; color: var(--text-dim); line-height: 1.4; }
+/* The mark sits in a tile of its own, which is most of why theirs reads as a
+   card and mine read as a button with a picture on it. */
+.picker-icon {
+  inline-size: 64px;
+  block-size: 64px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.picker-name { font-weight: 700; font-size: 1.05rem; }
+.picker-about { font-size: 0.82rem; color: var(--text-dim); line-height: 1.45; }
+
+/* Their close on the settings dialog: a bordered square of 36, not a bare
+   mark. */
+.modal-close {
+  align-self: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 36px;
+  block-size: 36px;
+  transition: all 0.2s;
+}
+
+.modal-close:focus { outline: none; }
+.modal-close:hover { color: var(--text-main); border-color: var(--text-dim); }
+
+/* And their action: the whole width, outlined, in the accent, in small caps.
+   Mine was a small filled button in a corner, which is the single most visible
+   difference between the two dialogs. */
+.modal-foot { padding: 16px 24px 24px; }
+
+.modal-foot .save-changes {
+  inline-size: 100%;
+  block-size: 38px;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--accent);
+  border: 2px solid var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+
+.modal-foot .save-changes:hover { background: rgba(var(--accent-rgb), 0.1); }
+.modal-foot .save-changes:active { transform: translateY(1px); }
 
 /* The menu the plus opens, anchored under it. */
 .add-wrap { position: relative; display: inline-flex; }
@@ -4224,7 +4331,11 @@ a.stat:hover .stat-go {
   border-block-end: 1px solid var(--border);
 }
 
-.modal-head.tabbed .tabs {
+/* modal-tabs, not tabs: this stylesheet already has a `.tabs`, a pill-shaped
+   segmented control with a border and a background, and naming these the same
+   drew that pill around the dialog's header. Second name collision in one
+   change — see the note beside .modal.chooser. */
+.modal-head.tabbed .modal-tabs {
   display: flex;
   align-items: center;
   gap: 24px;

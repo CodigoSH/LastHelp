@@ -656,23 +656,26 @@ export function landing(
  */
 function modulePicker(text: Text): string {
   const kinds: Array<[string, string, string, string]> = [
-    ["hero", icons.overview(22), text.t("landing.moduleHero"), text.t("landing.aboutHero")],
-    ["intro", icons.info(22), text.t("landing.moduleIntro"), text.t("landing.aboutIntro")],
-    ["text", icons.edit(22), text.t("landing.moduleText"), text.t("landing.aboutText")],
-    ["call_to_action", icons.add(22), text.t("landing.moduleAction"), text.t("landing.aboutAction")],
-    ["organisations", icons.organization(22), text.t("shell.organizations"), text.t("landing.aboutOrgs")],
-    ["boards", icons.repository(22), text.t("portal.boards"), text.t("landing.aboutBoards")],
-    ["most_voted", icons.idea(22), text.t("landing.moduleVoted"), text.t("landing.aboutVoted")],
-    ["recently_done", icons.check(22), text.t("landing.moduleDone"), text.t("landing.aboutDone")],
-    ["recent_activity", icons.queue(22), text.t("landing.moduleActivity"), text.t("landing.aboutActivity")],
-    ["roadmap", icons.open(22), text.t("landing.moduleRoadmap"), text.t("landing.aboutRoadmap")],
-    ["statistics", icons.monitor(22), text.t("landing.moduleStats"), text.t("landing.aboutStats")],
+    ["hero", icons.overview(26), text.t("landing.moduleHero"), text.t("landing.aboutHero")],
+    ["intro", icons.info(26), text.t("landing.moduleIntro"), text.t("landing.aboutIntro")],
+    ["text", icons.edit(26), text.t("landing.moduleText"), text.t("landing.aboutText")],
+    ["call_to_action", icons.add(26), text.t("landing.moduleAction"), text.t("landing.aboutAction")],
+    ["organisations", icons.organization(26), text.t("shell.organizations"), text.t("landing.aboutOrgs")],
+    ["boards", icons.repository(26), text.t("portal.boards"), text.t("landing.aboutBoards")],
+    ["most_voted", icons.idea(26), text.t("landing.moduleVoted"), text.t("landing.aboutVoted")],
+    ["recently_done", icons.check(26), text.t("landing.moduleDone"), text.t("landing.aboutDone")],
+    ["recent_activity", icons.queue(26), text.t("landing.moduleActivity"), text.t("landing.aboutActivity")],
+    ["roadmap", icons.open(26), text.t("landing.moduleRoadmap"), text.t("landing.aboutRoadmap")],
+    ["statistics", icons.monitor(26), text.t("landing.moduleStats"), text.t("landing.aboutStats")],
   ];
 
-  return `<dialog class="modal wide" id="module-picker">
-    <div class="modal-head">
-      <h2>${escapeHTML(text.t("landing.add"))}</h2>
-      <button type="button" class="icon-button" data-close
+  return `<dialog class="modal chooser" id="module-picker">
+    <div class="picker-head">
+      <div class="title-group">
+        <h2>${escapeHTML(text.t("landing.newModule"))}</h2>
+        <p>${escapeHTML(text.t("landing.newModuleLead"))}</p>
+      </div>
+      <button type="button" class="picker-close" data-close
         aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
     </div>
     <div class="picker-grid">${kinds
@@ -799,13 +802,13 @@ function moduleModal(
   return `<dialog class="modal" id="module-config">
     <form class="module-config" method="dialog">
       <div class="modal-head tabbed">
-        <div class="tabs" role="tablist">
+        <div class="modal-tabs" role="tablist">
           <button type="button" class="tab-btn on" role="tab" data-tab="general"
             aria-selected="true">${escapeHTML(text.t("landing.tabGeneral"))}</button>
           <button type="button" class="tab-btn" role="tab" data-tab="look"
             aria-selected="false">${escapeHTML(text.t("landing.tabLook"))}</button>
         </div>
-        <button type="button" class="icon-button" data-close
+        <button type="button" class="modal-close" data-close
           aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
       </div>
 
@@ -860,7 +863,7 @@ function moduleModal(
       </div>
 
       <div class="modal-foot">
-        <button type="submit" class="button primary">${escapeHTML(text.t("panel.save"))}</button>
+        <button type="submit" class="save-changes">${escapeHTML(text.t("landing.saveChanges"))}</button>
       </div>
     </form>
   </dialog>`;

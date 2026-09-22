@@ -1492,6 +1492,11 @@ async function main() {
     await new Promise(r => setTimeout(r, 400));
     const dlg = document.querySelector("#module-picker");
     const tarjetas = [...dlg.querySelectorAll("[data-pick]")].map(c => c.dataset.pick);
+    // The title has height. The class named picker here is the image control
+    // elsewhere and carries a line-height of nought, which printed this title
+    // and the line under it on top of each other at no height at all.
+    const altoTitulo = Math.round(dlg.querySelector(".picker-head h2").getBoundingClientRect().height);
+    const altoLead = Math.round(dlg.querySelector(".picker-head p").getBoundingClientRect().height);
     const conTexto = [...dlg.querySelectorAll(".picker-card")]
       .every(c => c.querySelector(".picker-name")?.textContent.trim() &&
                   c.querySelector(".picker-about")?.textContent.trim() &&
@@ -1709,7 +1714,7 @@ async function main() {
     const form = document.querySelector("form.module-config");
     const pestanas = [...form.querySelectorAll(".modal-head.tabbed [data-tab]")]
       .map(b => b.textContent.trim());
-    const enCabecera = !!form.querySelector(".modal-head.tabbed .tabs [data-tab]");
+    const enCabecera = !!form.querySelector(".modal-head.tabbed .modal-tabs [data-tab]");
     const primeraActiva = form.querySelector("[data-tab=general]").classList.contains("on");
     const generalVisible = !form.querySelector('[data-panel="general"]').hidden;
     const lookOculto = form.querySelector('[data-panel="look"]').hidden;
@@ -1738,6 +1743,11 @@ async function main() {
       grosores: form.querySelectorAll("[data-width]").length,
       posiciones: form.querySelectorAll("[data-at]").length,
       marcas: [...form.querySelectorAll("[data-at]")].every(b => b.querySelector("svg")),
+      // Its own name, not one this stylesheet already uses for something else.
+      // The class named tabs here is a pill-shaped segmented control elsewhere,
+      // and borrowing the name drew that pill around this header. Invisible to
+      // a test for duplicate rules; visible only by looking.
+      pildoraDeOtro: getComputedStyle(form.querySelector(".modal-tabs")).borderStyle !== "none",
       // The chosen tab wears the accent and the other does not. Against the
       // other tab rather than against a fixed colour: the accent is the
       // operator's, so a literal here would be measuring this installation.
@@ -1773,7 +1783,8 @@ async function main() {
     ajustes.aspecto?.colores === 11 && ajustes.aspecto?.grosores === 3 &&
       ajustes.aspecto?.posiciones === 4 && ajustes.aspecto?.marcas === true &&
       ajustes.aspecto?.acento !== ajustes.aspecto?.apagada &&
-      ajustes.aspecto?.subrayado === true,
+      ajustes.aspecto?.subrayado === true &&
+      ajustes.aspecto?.pildoraDeOtro === false,
     JSON.stringify(ajustes.aspecto),
   );
   check(
