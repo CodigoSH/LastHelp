@@ -1945,6 +1945,46 @@ async function main() {
     seccion.resaltado === true && seccion.fantasmaDentro === true && seccion.valido === true,
     JSON.stringify({ resaltado: seccion.resaltado, fantasma: seccion.fantasmaDentro }),
   );
+  const seccionModal = await evaluate(`
+    document.querySelector("[data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+    const celda = document.querySelector('.landing-cell[data-module="group"]');
+    celda.querySelector("[data-module-menu]").click();
+    await new Promise(r => setTimeout(r, 200));
+    celda.querySelector("[data-edit-module]").click();
+    await new Promise(r => setTimeout(r, 500));
+    const form = document.querySelector("form.module-config");
+    const nombre = form.querySelector("[name=name]");
+    const pideNombre = !form.querySelector("[data-for-name]").hidden;
+    const valor = nombre.value;
+    form.querySelector("[data-tab=look]").click();
+    await new Promise(r => setTimeout(r, 250));
+    const marcas = [...form.querySelectorAll("[data-at]")].map(b => ({
+      at: b.dataset.at, puede: !b.disabled, elegida: b.classList.contains("on") }));
+    nombre.value = "Our work";
+    form.querySelector("[data-tab=general]").click();
+    form.requestSubmit();
+    await new Promise(r => setTimeout(r, 1000));
+    const guardada = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === "group");
+    document.querySelector("[data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 600));
+    return { pideNombre, valor, marcas, nombreGuardado: guardada.body ?? "",
+             enLaPildora: document.querySelector(
+               '.landing-cell[data-module="group"] .section-legend')?.textContent.trim() ?? "" };
+  `);
+  check(
+    "a section is named in the same field and placed with the same marks",
+    seccionModal.pideNombre === true && seccionModal.valor === "My projects" &&
+      seccionModal.marcas.length === 4 &&
+      seccionModal.marcas.find((m: { at: string }) => m.at === "pill")?.puede === true &&
+      seccionModal.marcas.find((m: { at: string }) => m.at === "pill")?.elegida === true &&
+      seccionModal.marcas.find((m: { at: string }) => m.at === "top")?.puede === false &&
+      seccionModal.nombreGuardado === "Our work" &&
+      seccionModal.enLaPildora === "Our work",
+    JSON.stringify(seccionModal),
+  );
+
   check(
     "a section wears its name on its border, or wears none",
     seccion.conPildora === true,

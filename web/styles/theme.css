@@ -4411,6 +4411,10 @@ a.stat:hover .stat-go {
 
 .mark:hover { background: var(--surface-hover, rgba(255,255,255,0.04)); color: var(--text-main); }
 
+/* A mark this kind of module cannot take. Shown rather than removed: a row that
+   changes length between modules is a row nobody learns. */
+.mark.cannot { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
+
 .mark.on {
   color: var(--accent);
   border-color: var(--accent);

@@ -482,10 +482,13 @@ function wireLanding(orgs: OrganizationSummary[]): void {
     const target = landingModules.find((m) => m.id === id);
     if (!target) return;
     if (target.kind === "text") target.body = String(data.get("body") ?? "");
-    if (target.kind === "call_to_action" || target.kind === "section" || target.kind === "intro") {
+    if (target.kind === "call_to_action" || target.kind === "intro") {
       target.body = String(data.get("label") ?? "").trim();
     }
     if (usesHeader(target.kind)) target.name = String(data.get("name") ?? "").trim();
+    // A section's name is its body: it is the pill on its border and nothing
+    // else, so there is no second name to keep.
+    if (target.kind === "section") target.body = String(data.get("name") ?? "").trim();
     target.border_color = String(data.get("borderColour") ?? "");
     target.border_width = Number(data.get("borderWidth") ?? 0) || 0;
     if (takesScope(target.kind)) target.scope = String(data.get("scope") ?? "");
@@ -833,9 +836,19 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   const puts = form.querySelector<HTMLElement>("[data-for-label-at]");
   const at = form.querySelector<HTMLInputElement>("[name=labelAt]");
   if (puts && at) {
-    puts.hidden = !usesHeader(target.kind);
-    at.value = target.label ?? "top";
+    const section = target.kind === "section";
+    puts.hidden = !usesHeader(target.kind) && !section;
+    at.value = section ? "pill" : (target.label ?? "top");
     pickOne(form, "[data-at]", "at", at.value);
+    // A section wears its name on its border or wears none, which is what it
+    // does over there. The other two marks are shown and cannot be taken: a
+    // control that quietly ignores half of itself is worse than one that says
+    // which half it will not do.
+    form.querySelectorAll<HTMLButtonElement>("[data-at]").forEach((mark) => {
+      const allowed = !section || mark.dataset.at === "pill" || mark.dataset.at === "off";
+      mark.disabled = !allowed;
+      mark.classList.toggle("cannot", !allowed);
+    });
   }
 
   // How its own box looks, which every module has.
@@ -855,18 +868,13 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
   const naming = form.querySelector<HTMLElement>("[data-for-label]");
   const label = form.querySelector<HTMLInputElement>("[name=label]");
   if (naming && label) {
-    const named =
-      target.kind === "call_to_action" || target.kind === "section" || target.kind === "intro";
+    const named = target.kind === "call_to_action" || target.kind === "intro";
     naming.hidden = !named;
     label.value = named ? (target.body ?? "") : "";
     const labelText = form.querySelector<HTMLElement>("[data-for-label] label");
     if (labelText) {
       labelText.textContent =
-        target.kind === "section"
-          ? i18n.t("landing.name")
-          : target.kind === "intro"
-            ? i18n.t("landing.pointWords")
-            : i18n.t("landing.label");
+        target.kind === "intro" ? i18n.t("landing.pointWords") : i18n.t("landing.label");
     }
   }
 
@@ -877,6 +885,16 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
     naming2.hidden = !usesHeader(target.kind);
     name.value = target.name ?? "";
     name.placeholder = defaultNameFor(target.kind);
+  }
+
+  // A section is named in the same field as everything else and placed with the
+  // same marks. Over there a section's name IS the pill on its border, so the
+  // only position it can take is that one — and saying so with the same control
+  // greyed down to one choice is clearer than a different control.
+  if (target.kind === "section" && naming2 && name) {
+    naming2.hidden = false;
+    name.value = target.body ?? "";
+    name.placeholder = "";
   }
 
   // A tab with nothing in it says so rather than opening empty.
