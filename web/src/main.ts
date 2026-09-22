@@ -334,6 +334,7 @@ function wireLanding(orgs: OrganizationSummary[]): void {
   wireWords({
     root: document,
     bar: document.querySelector<HTMLElement>(".words-bar"),
+    latchIcon: (open) => (open ? icons.unlock(15) : icons.lock(15)),
     onChange: (id, html) => {
       const target = landingModules.find((m) => m.id === id);
       if (!target) return;

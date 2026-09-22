@@ -144,12 +144,14 @@ export function wireWords(options: {
   bar: HTMLElement | null;
   onChange: (id: string, html: string) => void;
   ask?: (message: string) => string | null;
+  /** The two faces of the latch, so the markup for them stays in one place. */
+  latchIcon?: (open: boolean) => string;
 }): void {
   const { root, bar, onChange } = options;
   const ask = options.ask ?? ((message: string) => window.prompt(message));
   if (!bar) return;
 
-  const blocks = [...root.querySelectorAll<HTMLElement>("[data-words-body][contenteditable]")];
+  const blocks = [...root.querySelectorAll<HTMLElement>("[data-words-body]")];
   if (blocks.length === 0) {
     bar.hidden = true;
     return;
@@ -165,6 +167,31 @@ export function wireWords(options: {
     // bar with it, and nothing has to be recalculated as the page moves.
     block.parentElement?.append(bar);
   };
+
+  // The latch, for writing without arranging the page first.
+  //
+  // Closed until somebody asks: the front page is what every visitor sees, and
+  // a block that is live the moment an operator opens their own site is a
+  // block that changes under a stray click. Opening it is one press, and the
+  // press is what says "I meant to".
+  for (const latch of root.querySelectorAll<HTMLElement>("[data-words-latch]")) {
+    const block = latch.parentElement?.querySelector<HTMLElement>("[data-words-body]");
+    if (!block || latch.dataset.wired === "1") continue;
+    latch.dataset.wired = "1";
+    latch.addEventListener("click", () => {
+      const opening = block.getAttribute("contenteditable") !== "true";
+      block.setAttribute("contenteditable", String(opening));
+      latch.setAttribute("aria-pressed", String(opening));
+      latch.classList.toggle("open", opening);
+      latch.innerHTML = options.latchIcon?.(opening) ?? latch.innerHTML;
+      if (opening) {
+        block.focus();
+      } else {
+        block.blur();
+        bar.hidden = true;
+      }
+    });
+  }
 
   for (const block of blocks) {
     block.addEventListener("focusin", () => place(block));

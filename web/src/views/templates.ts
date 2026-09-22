@@ -530,9 +530,27 @@ export function landing(
   const words = (m: LandingModule, fallback: string) => {
     const written = (m.body ?? "").trim();
     const inner = written !== "" ? written : fallback;
+    // The operator can write in it without arranging the page first, which is
+    // what the note widget in this house does: the block carries a small latch
+    // that opens it for typing. Closed while nobody has asked, so that a stray
+    // click on the page a visitor also sees cannot change it.
+    //
+    // While the page IS being arranged there is no latch and the block is
+    // simply open — everything on the page is being moved around anyway, and a
+    // second control saying "and this one too" is noise. That is theirs as
+    // well: it hides the button in grid edit mode.
+    const latch =
+      isAdmin && !editing
+        ? `<button type="button" class="words-latch" data-words-latch
+             title="${escapeAttr(text.t("landing.unlock"))}"
+             aria-label="${escapeAttr(text.t("landing.unlock"))}"
+             aria-pressed="false">${icons.lock(15)}</button>`
+        : "";
+    const open = editing ? "true" : "false";
     return `<div class="words">
+      ${latch}
       <div class="words-box"${
-        editing ? ` contenteditable="true" data-words-body="${escapeAttr(m.id)}"` : ""
+        isAdmin ? ` contenteditable="${open}" data-words-body="${escapeAttr(m.id)}"` : ""
       } data-words-empty="${written === "" ? "1" : "0"}">${inner}</div>
     </div>`;
   };
@@ -663,7 +681,7 @@ export function landing(
       ${drawn}
       ${editing ? `<div class="landing-ghost" hidden></div>` : ""}
     </div>
-    ${editing ? wordsBar(text) : ""}
+    ${isAdmin ? wordsBar(text) : ""}
     ${editing ? modulePicker(text) + moduleModal(text, allBoards, orgs) + confirmModal(text) : ""}
   </div>`;
 }
@@ -881,16 +899,25 @@ function appearanceControls(text: Text): string {
  * danger variant. No cancel — the cross is how you back out, which is the same
  * rule the settings dialog follows.
  */
+/**
+ * Asking before removing something.
+ *
+ * A different composition from the settings dialog, and it was wearing that
+ * one's: a padded box, a title over a rule, the sentence, and one danger button
+ * at the end of the line. Not the full-width outlined action — that belongs to
+ * the dialog where the action is "save what I just typed", and this is the
+ * dialog where the action is "yes, lose it".
+ */
 function confirmModal(text: Text): string {
-  return `<dialog class="modal" id="confirm-remove">
-    <div class="modal-head">
-      <h2 data-confirm-title></h2>
+  return `<dialog class="modal confirm" id="confirm-remove">
+    <div class="confirm-head">
+      <h2 class="confirm-title" data-confirm-title></h2>
       <button type="button" class="modal-close" data-close
-        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close(20)}</button>
     </div>
     <p class="modal-message" data-confirm-message></p>
-    <div class="modal-foot">
-      <button type="button" class="save-changes danger" data-confirm>${escapeHTML(text.t("action.remove"))}</button>
+    <div class="confirm-actions">
+      <button type="button" class="button danger" data-confirm>${escapeHTML(text.t("action.remove"))}</button>
     </div>
   </dialog>`;
 }

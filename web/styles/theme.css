@@ -4337,6 +4337,49 @@ a.stat:hover .stat-go {
   position: relative;
 }
 
+/* The latch: whether this block can be typed into.
+ *
+ * Out of the way until the pointer is over the block, which is theirs — a
+ * control that is always lit on a page a visitor also sees is a control
+ * somebody has to explain. Quiet when closed and in the alert colour when
+ * open, so that a block left open is visible from across the page. */
+.words-latch {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 28px;
+  block-size: 28px;
+  padding: 0;
+  background: var(--panel);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s var(--ease);
+}
+
+.words:hover .words-latch,
+.words-latch:focus-visible,
+.words-latch.open {
+  opacity: 1;
+}
+
+.words-latch:hover {
+  color: var(--text-main);
+  transform: scale(1.05);
+}
+
+.words-latch.open {
+  color: var(--danger-color);
+  background: rgba(var(--danger-rgb), 0.12);
+  border-color: rgba(var(--danger-rgb), 0.3);
+}
+
 .words-box {
   block-size: 100%;
   box-sizing: border-box;
@@ -4655,6 +4698,48 @@ a.stat:hover .stat-go {
   letter-spacing: 0.05em;
   cursor: pointer;
   transition: all 0.2s var(--ease);
+}
+
+/* Asking before removing, measured off theirs rather than reusing the settings
+   dialog's furniture. Mine had no padding of its own, a header with no rule
+   under it, a nineteen pixel bold title, a sixteen pixel message and a button
+   stretched the whole width — five differences, all of them from wearing the
+   wrong composition. */
+.modal.confirm {
+  padding: 28px;
+  inline-size: min(30rem, calc(100vw - 2rem));
+}
+
+.confirm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block-end: 20px;
+  padding-block-end: 12px;
+  border-block-end: 1px solid var(--border);
+}
+
+.confirm-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* The message belongs to this dialog, so its spacing does too: theirs carries
+   its own bottom margin rather than being padded by the box around it. */
+.modal.confirm .modal-message {
+  margin: 0 0 28px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .modal-message {
@@ -5299,6 +5384,7 @@ a.stat:hover .stat-go {
  * dashboard recognises it before reading it. */
 .add-menu {
   position: absolute;
+  inline-size: max-content;
   inset-block-start: 36px;
   inset-inline-end: 4px;
   z-index: 5;
@@ -5318,6 +5404,10 @@ a.stat:hover .stat-go {
 .add-menu-item {
   display: flex;
   align-items: center;
+  /* One line, whatever the language. The menu is sized by the words in it, and
+     an item that wraps turns a two-entry menu into a four-line block — which is
+     what "Add a module" did in the languages that carry an article. */
+  white-space: nowrap;
   inline-size: 100%;
   box-sizing: border-box;
   padding: 8px 12px;
@@ -5437,6 +5527,20 @@ a.stat:hover .stat-go {
  * The button module: the one thing this page exists to make happen, so it is
  * centred in whatever box it was given rather than hugging a corner of it.
  */
+/* A box stretched to its module must not also be pushed down.
+ *
+ * .section carries a top margin from the page flow it was written for, and
+ * inside a cell it is also given the module's full height. Those two together
+ * are taller than the module by exactly that margin, and the tile clips rather
+ * than scrolls — so the bottom padding was cut off, with the words sitting on
+ * the cut. Measured on the button module: nine pixels over, nine pixels gone.
+ *
+ * Every module whose content is one of these boxes had it; fixing it where the
+ * margin is applied fixes the lot rather than one at a time. */
+.landing-cell > .section {
+  margin-block-start: 0;
+}
+
 .landing-action {
   display: flex;
   flex-direction: column;

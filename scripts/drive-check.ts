@@ -1484,6 +1484,43 @@ async function main() {
     JSON.stringify(registro),
   );
 
+  // Nothing a module holds is cut off by the module.
+  //
+  // The tile clips rather than scrolls — that is the dashboard's rule and what
+  // stops the resize handle fighting a scrollbar — so anything taller than its
+  // tile loses its bottom silently. A box given the module's full height while
+  // also carrying the page-flow top margin is taller by exactly that margin,
+  // and the button module was losing its bottom padding to it.
+  const recortes = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
+    const kinds = ["hero", "text", "call_to_action", "organisations", "boards",
+      "most_voted", "recently_done", "recent_activity", "roadmap", "statistics"];
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: kinds.map((kind, i) => ({
+        id: kind, kind, x: 1 + (i % 4) * 3, y: 1 + Math.floor(i / 4) * 2, w: 3, h: 2,
+        ...(kind === "call_to_action" ? { scope: "codigosh/lastboard", body: "Tell us" } : {}),
+      })) }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1500));
+    const cortados = [...document.querySelectorAll(".landing-cell")]
+      .map(c => ({ que: c.dataset.module, seSale: c.scrollHeight - c.clientHeight }))
+      .filter(x => x.seSale > 0);
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: previa }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1300));
+    return { cortados, mirados: kinds.length };
+  `);
+  check(
+    "and no module has its content cut off by the tile it sits in",
+    recortes.mirados === 10 && recortes.cortados.length === 0,
+    JSON.stringify(recortes),
+  );
+
   // Adding, the way the dashboard does it: a plus in the bar that opens a short
   // menu — a module, or a group — and the module one opens a picker of cards
   // saying what each kind draws. It was a dropdown and an Add button sitting on
@@ -1508,7 +1545,26 @@ async function main() {
       mono: (primera?.fontFamily ?? "").includes("mono"),
       radio: getComputedStyle(document.querySelector("body > nav .add-menu")).borderRadius,
       marca: Math.round(items[0]?.querySelector("svg")?.getBoundingClientRect().width ?? 0),
+      nowrap: primera?.whiteSpace === "nowrap",
     };
+    // One line each, whatever the language — and English is not a test of that:
+    // "Add Module" fits the starting width with or without the rule. The words
+    // are swapped for the longest pair any catalogue carries, measured, and put
+    // back, so this measures the menu rather than the language the journey runs
+    // in. A wrapped item is the same words in twice the box: 46 against 31.
+    const alto = (el) => Math.round(el.getBoundingClientRect().height);
+    const original = items.map(i => i.querySelector("span")?.textContent ?? "");
+    for (const i of items) {
+      const span = i.querySelector("span");
+      if (span) span.textContent = "Abschnitt hinzufügen";
+    }
+    await new Promise(r => setTimeout(r, 60));
+    forma.unaLinea = items.every(i => alto(i) < 38);
+    forma.conPalabrasLargas = items.map(alto);
+    items.forEach((i, n) => {
+      const span = i.querySelector("span");
+      if (span) span.textContent = original[n];
+    });
 
     document.querySelector('[data-open-modal="module-picker"]').click();
     await new Promise(r => setTimeout(r, 400));
@@ -1537,7 +1593,8 @@ async function main() {
       anadir.abierto === true && anadir.cerrado === true && anadir.hecho === true &&
       // And it is shaped like theirs, not like the kebab it used to borrow.
       anadir.forma.fuente === "11px" && anadir.forma.mono === true &&
-      anadir.forma.radio === "4px" && anadir.forma.marca === 14,
+      anadir.forma.radio === "4px" && anadir.forma.marca === 14 &&
+      anadir.forma.unaLinea === true && anadir.forma.nowrap === true,
     JSON.stringify({ enLaPagina: anadir.enLaPagina, menu: anadir.menu, forma: anadir.forma }),
   );
   check(
@@ -1963,6 +2020,88 @@ async function main() {
       opciones.heroEnPantalla.enElServidor === true,
     JSON.stringify({ pide: opciones.heroPide, enPantalla: opciones.heroEnPantalla }),
   );
+  // Writing without arranging the page first, which is what the note widget in
+  // this house lets somebody do and what this could not: the words could only
+  // be changed from inside the arranging mode, so using the module meant
+  // turning the whole page into a building site every time.
+  const sinOrdenar = await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: [{ id: "solo", kind: "text", x: 1, y: 1, w: 6, h: 3 }] }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1500));
+
+    const celda = document.querySelector('[data-module="solo"]');
+    const bloque = celda.querySelector("[data-words-body]");
+    const pestillo = celda.querySelector("[data-words-latch]");
+    // Shut until somebody asks: this is the page every visitor sees, and a
+    // block that is live on arrival changes under a stray click.
+    const cerrado = {
+      escribible: bloque?.getAttribute("contenteditable") ?? "",
+      hayPestillo: !!pestillo,
+      // Out of the way until the pointer is over the block, which is theirs.
+      escondido: pestillo ? getComputedStyle(pestillo).opacity === "0" : false,
+    };
+
+    pestillo?.click();
+    await new Promise(r => setTimeout(r, 350));
+    const abierto = {
+      escribible: bloque?.getAttribute("contenteditable") ?? "",
+      enAlerta: pestillo?.classList.contains("open") ?? false,
+      barra: document.querySelector(".words-bar")?.hidden === false,
+    };
+
+    bloque?.focus();
+    if (bloque) {
+      bloque.innerHTML = "<p>Written without arranging anything.</p>";
+      bloque.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    await new Promise(r => setTimeout(r, 1400));
+    const guardado = (await fetch("/api/landing").then(r => r.json()))
+      .modules.find(m => m.id === "solo")?.body ?? "";
+
+    pestillo?.click();
+    await new Promise(r => setTimeout(r, 300));
+    const trasCerrar = {
+      escribible: bloque?.getAttribute("contenteditable") ?? "",
+      barra: document.querySelector(".words-bar")?.hidden === false,
+    };
+
+    // And while the page IS being arranged there is no latch: everything is
+    // open anyway, and a second control saying so is noise. Theirs hides it in
+    // grid edit mode for the same reason.
+    document.querySelector("[data-edit-page]").click();
+    await new Promise(r => setTimeout(r, 900));
+    const ordenando = {
+      pestillos: document.querySelectorAll("[data-words-latch]").length,
+      escribible: document.querySelector('[data-module="solo"] [data-words-body]')
+        ?.getAttribute("contenteditable") ?? "",
+    };
+    document.querySelector("[data-edit-done]").click();
+    await new Promise(r => setTimeout(r, 500));
+
+    await fetch("/api/landing", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ modules: previa }) });
+    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
+    await new Promise(r => setTimeout(r, 1300));
+    return { cerrado, abierto, guardado, trasCerrar, ordenando };
+  `);
+  check(
+    "a block of words is written without arranging the page first",
+    sinOrdenar.cerrado.escribible === "false" && sinOrdenar.cerrado.hayPestillo === true &&
+      sinOrdenar.cerrado.escondido === true &&
+      sinOrdenar.abierto.escribible === "true" && sinOrdenar.abierto.enAlerta === true &&
+      sinOrdenar.abierto.barra === true &&
+      sinOrdenar.guardado.includes("Written without arranging anything.") &&
+      sinOrdenar.trasCerrar.escribible === "false" && sinOrdenar.trasCerrar.barra === false &&
+      sinOrdenar.ordenando.pestillos === 0 && sinOrdenar.ordenando.escribible === "true",
+    JSON.stringify(sinOrdenar),
+  );
+
   // The writing bar, driven the way a hand drives it.
   //
   // Colour and alignment are the two that cannot be copied from the dashboard:
@@ -2151,8 +2290,31 @@ async function main() {
       abierto: dlg?.open === true,
       titulo: dlg?.querySelector("[data-confirm-title]")?.textContent?.trim() ?? "",
       mensaje: dlg?.querySelector("[data-confirm-message]")?.textContent?.trim() ?? "",
-      acciones: dlg ? dlg.querySelectorAll(".modal-foot button").length : 0,
+      acciones: dlg ? dlg.querySelectorAll(".confirm-actions button").length : 0,
       sigue: (await fetch("/api/landing").then(r => r.json())).modules.length,
+    };
+
+    // And it is composed the way theirs is, not the way the settings dialog is.
+    // It was wearing that one's furniture: no padding of its own, a header with
+    // no rule under it, a bigger bolder title, a bigger message, and the action
+    // stretched across the whole width. Five differences, one wrong
+    // composition.
+    const cabecera = dlg.querySelector(".confirm-head");
+    const titulo = dlg.querySelector(".confirm-title");
+    const mensaje = dlg.querySelector(".modal-message");
+    const accion = dlg.querySelector(".confirm-actions button");
+    const cs = (el) => getComputedStyle(el);
+    const forma = {
+      relleno: cs(dlg).padding,
+      cabeceraCentrada: cs(cabecera).alignItems === "center",
+      reglaBajoTitulo: cs(cabecera).borderBottomWidth,
+      titulo: cs(titulo).fontSize + "/" + cs(titulo).fontWeight,
+      mensaje: cs(mensaje).fontSize,
+      // Right-aligned and its own width, not stretched: the full-width outlined
+      // action belongs to the dialog whose verb is "save", not to this one.
+      alFinal: cs(dlg.querySelector(".confirm-actions")).justifyContent,
+      accionEstrecha:
+        accion.getBoundingClientRect().width < dlg.getBoundingClientRect().width / 2,
     };
 
     // Backing out changes nothing.
@@ -2169,7 +2331,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 1100));
     const despues = (await fetch("/api/landing").then(r => r.json()));
 
-    return { antes, pregunta, trasCerrar, despues: despues.modules.length,
+    return { antes, pregunta, forma, trasCerrar, despues: despues.modules.length,
              sigueAhi: despues.modules.some(m => m.id === id) };
   `);
   check(
@@ -2178,6 +2340,14 @@ async function main() {
       borrar.pregunta.mensaje !== "" && borrar.pregunta.acciones === 1 &&
       borrar.pregunta.sigue === borrar.antes && borrar.trasCerrar === borrar.antes,
     JSON.stringify(borrar.pregunta),
+  );
+  check(
+    "and it is composed the way theirs is, not the way the settings dialog is",
+    borrar.forma.relleno === "28px" && borrar.forma.cabeceraCentrada === true &&
+      borrar.forma.reglaBajoTitulo === "1px" && borrar.forma.titulo === "18px/600" &&
+      borrar.forma.mensaje === "14px" && borrar.forma.alFinal === "flex-end" &&
+      borrar.forma.accionEstrecha === true,
+    JSON.stringify(borrar.forma),
   );
   check(
     "and confirming is what removes it",
