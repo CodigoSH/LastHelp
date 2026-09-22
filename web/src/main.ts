@@ -489,9 +489,29 @@ function wireLanding(orgs: OrganizationSummary[]): void {
         const input = dialog.querySelector<HTMLInputElement>(`[name=${field}]`);
         if (input) input.value = value;
         pickOne(dialog, selector, key, value);
+        if (key === "at") {
+          showMark(dialog, value);
+          dialog.querySelector<HTMLElement>("[data-marks]")!.hidden = true;
+          dialog.querySelector("[data-open-marks]")?.setAttribute("aria-expanded", "false");
+        }
       }),
     );
   }
+
+  // The button that opens that menu, and anything else that closes it.
+  const marksButton = dialog?.querySelector<HTMLButtonElement>("[data-open-marks]");
+  marksButton?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const menu = dialog?.querySelector<HTMLElement>("[data-marks]");
+    if (!menu) return;
+    menu.hidden = !menu.hidden;
+    marksButton.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  dialog?.addEventListener("click", (event) => {
+    if ((event.target as HTMLElement | null)?.closest("[data-open-marks], [data-marks]")) return;
+    const menu = dialog.querySelector<HTMLElement>("[data-marks]");
+    if (menu) menu.hidden = true;
+  });
   dialog?.addEventListener("submit", async () => {
     const data = new FormData(dialog);
     const id = String(data.get("id") ?? "");
@@ -849,17 +869,18 @@ function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
 
   // And only a module that draws a name is asked where to keep it — as the four
   // little diagrams, not four words.
-  const puts = form.querySelector<HTMLElement>("[data-for-label-at]");
+  // Where the name goes, on the name: the dropdown lives inside the same box as
+  // the name it places, which is where theirs is.
   const at = form.querySelector<HTMLInputElement>("[name=labelAt]");
-  if (puts && at) {
+  if (at) {
     const section = target.kind === "section";
-    puts.hidden = !usesHeader(target.kind) && !section;
     at.value = section ? "pill" : (target.label ?? "top");
     pickOne(form, "[data-at]", "at", at.value);
+    showMark(form, at.value);
     // A section wears its name on its border or wears none, which is what it
-    // does over there. The other two marks are shown and cannot be taken: a
-    // control that quietly ignores half of itself is worse than one that says
-    // which half it will not do.
+    // does over there. The other two are shown and cannot be taken: a control
+    // that quietly ignores half of itself is worse than one that says which
+    // half it will not do.
     form.querySelectorAll<HTMLButtonElement>("[data-at]").forEach((mark) => {
       const allowed = !section || mark.dataset.at === "pill" || mark.dataset.at === "off";
       mark.disabled = !allowed;
@@ -956,6 +977,13 @@ function pickOne(form: HTMLFormElement, selector: string, key: string, value: st
   form.querySelectorAll<HTMLButtonElement>(selector).forEach((button) => {
     button.classList.toggle("on", (button.dataset[key] ?? "") === value);
   });
+}
+
+/** Put the chosen diagram on the button that opens the menu of them. */
+function showMark(form: HTMLFormElement, at: string): void {
+  const chosen = form.querySelector<HTMLElement>(`[data-at="${at}"]`);
+  const shown = form.querySelector<HTMLElement>("[data-current-mark]");
+  if (chosen && shown) shown.innerHTML = chosen.innerHTML;
 }
 
 /** Show one tab of the settings dialog and mark it as the one showing. */

@@ -1741,8 +1741,24 @@ async function main() {
     const aspecto = {
       colores: form.querySelectorAll("[data-colour]").length,
       grosores: form.querySelectorAll("[data-width]").length,
-      posiciones: form.querySelectorAll("[data-at]").length,
-      marcas: [...form.querySelectorAll("[data-at]")].every(b => b.querySelector("svg")),
+      posiciones: form.querySelectorAll("[data-marks] [data-at]").length,
+      marcas: [...form.querySelectorAll("[data-marks] [data-at]")].every(b => b.querySelector("svg")),
+      // And it sits on the name, joined to the box you type it in — not in the
+      // tab about how the box looks. Measured as boxes, not as markup: the
+      // first version of this asked whether the two were siblings, which stays
+      // true however they are laid out, so laying them one above the other left
+      // it green.
+      juntoAlNombre: (() => {
+        const boton = form.querySelector("[data-open-marks]")?.getBoundingClientRect();
+        const caja = form.querySelector("#module-name")?.getBoundingClientRect();
+        if (!boton || !caja) return false;
+        const mismaFila = Math.abs((boton.top + boton.bottom) / 2 - (caja.top + caja.bottom) / 2) < 4;
+        const pegados = Math.abs(boton.right - caja.left) < 3;
+        return mismaFila && pegados;
+      })(),
+      // Their close is an outline on the header, not a filled button sitting on
+      // it.
+      fondoDelCierre: getComputedStyle(form.querySelector(".modal-close")).backgroundColor,
       // Its own name, not one this stylesheet already uses for something else.
       // The class named tabs here is a pill-shaped segmented control elsewhere,
       // and borrowing the name drew that pill around this header. Invisible to
@@ -1782,6 +1798,8 @@ async function main() {
     "the customization tab carries the dashboard's own controls",
     ajustes.aspecto?.colores === 11 && ajustes.aspecto?.grosores === 3 &&
       ajustes.aspecto?.posiciones === 4 && ajustes.aspecto?.marcas === true &&
+      ajustes.aspecto?.juntoAlNombre === true &&
+      (ajustes.aspecto?.fondoDelCierre ?? "").replace(/\s/g, "") === "rgba(0,0,0,0)" &&
       ajustes.aspecto?.acento !== ajustes.aspecto?.apagada &&
       ajustes.aspecto?.subrayado === true &&
       ajustes.aspecto?.pildoraDeOtro === false,
@@ -1865,9 +1883,10 @@ async function main() {
       await new Promise(r => setTimeout(r, 400));
       const form = document.querySelector("form.module-config");
       const ofrecido = !document.querySelector("[data-for-label-at]").hidden;
-      document.querySelector("[data-tab=look]").click();
+      form.querySelector("[data-open-marks]").click();
       await new Promise(r => setTimeout(r, 200));
-      form.querySelector('[data-at="' + valor + '"]').click();
+      form.querySelector('[data-marks] [data-at="' + valor + '"]').click();
+      await new Promise(r => setTimeout(r, 150));
       form.requestSubmit();
       await new Promise(r => setTimeout(r, 900));
       return { ofrecido, ...leer() };
@@ -2007,9 +2026,7 @@ async function main() {
     const nombre = form.querySelector("[name=name]");
     const pideNombre = !form.querySelector("[data-for-name]").hidden;
     const valor = nombre.value;
-    form.querySelector("[data-tab=look]").click();
-    await new Promise(r => setTimeout(r, 250));
-    const marcas = [...form.querySelectorAll("[data-at]")].map(b => ({
+    const marcas = [...form.querySelectorAll("[data-marks] [data-at]")].map(b => ({
       at: b.dataset.at, puede: !b.disabled, elegida: b.classList.contains("on") }));
     nombre.value = "Our work";
     form.querySelector("[data-tab=general]").click();

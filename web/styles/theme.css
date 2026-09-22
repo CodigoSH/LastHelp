@@ -4270,7 +4270,9 @@ a.stat:hover .stat-go {
    mark. */
 .modal-close {
   align-self: center;
-  background: var(--panel);
+  /* Transparent, not a filled square: measured off theirs, which reads as an
+     outline on the header rather than as a button sitting on it. */
+  background: transparent;
   border: 1px solid var(--border);
   color: var(--text-dim);
   padding: 8px;
@@ -4328,7 +4330,9 @@ a.stat:hover .stat-go {
   block-size: 56px;
   padding: 0 24px;
   margin-block-end: 0;
-  border-block-end: 1px solid var(--border);
+  /* Their hairline, read off the screen: a white at eight per cent, not the
+     theme's border colour. */
+  border-block-end: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* modal-tabs, not tabs: this stylesheet already has a `.tabs`, a pill-shaped
@@ -4396,7 +4400,8 @@ a.stat:hover .stat-go {
 .tab-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  /* Twelve, which is what theirs computes to. It was sixteen. */
+  gap: 12px;
   padding: 24px;
 }
 
@@ -4512,35 +4517,90 @@ a.stat:hover .stat-go {
   box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.1);
 }
 
-/* Where the name goes, as the four little diagrams rather than four words. */
-.mark-row { display: flex; gap: 8px; margin-block-start: 8px; }
+/*
+ * Where the name goes: a dropdown of four little diagrams, to the left of the
+ * box you type the name into and joined to it. That is where theirs is, and it
+ * belongs there — it is a property of the name, so it sits on the name rather
+ * than in a tab about how the box looks.
+ */
+.input-group { display: flex; gap: 0; inline-size: 100%; }
 
-.mark {
+.icon-dropdown { position: relative; inline-size: 42px; flex-shrink: 0; }
+
+.icon-dropdown-btn {
+  position: relative;
+  inline-size: 100%;
+  block-size: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  inline-size: 42px;
-  block-size: 42px;
+  padding: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+  border-start-start-radius: 8px;
+  border-end-start-radius: 8px;
+  border-inline-end: 0;
+  color: var(--text-dim);
+}
+
+.icon-dropdown-btn:hover { color: var(--text-main); }
+.icon-dropdown-btn:focus { outline: none; }
+
+.icon-dropdown-btn .caret {
+  position: absolute;
+  inset-block-end: 1px;
+  inset-inline-end: 1px;
+  opacity: 0.7;
+}
+
+.input-group input {
+  flex: 1;
+  min-inline-size: 0;
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+/* Their menu: a small solid panel of marks, above everything. */
+.dropdown-menu {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  inset-inline-start: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  z-index: 40;
+  min-inline-size: 50px;
+  padding: 4px;
+}
+
+.dropdown-menu[hidden] { display: none; }
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 8px;
   cursor: pointer;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius);
   background: transparent;
   color: var(--text-dim);
   transition: all 0.2s;
 }
 
-.mark:hover { background: var(--surface-hover, rgba(255,255,255,0.04)); color: var(--text-main); }
+.dropdown-item:hover { background: rgba(var(--accent-rgb), 0.08); color: var(--text-main); }
+.dropdown-item.on { color: var(--accent); }
 
-/* A mark this kind of module cannot take. Shown rather than removed: a row that
-   changes length between modules is a row nobody learns. */
-.mark.cannot { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
-
-.mark.on {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
+/* A place this kind of module cannot put its name. Shown rather than removed:
+   a menu that changes length depending on what you opened is one nobody
+   learns. */
+.dropdown-item.cannot { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
 
 /*
  * The panel comes in from the side, the way the dashboard's drawer does.

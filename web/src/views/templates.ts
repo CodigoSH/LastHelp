@@ -818,7 +818,36 @@ function moduleModal(
         <div class="tab-panel" data-panel="general">
           <div class="field-group" data-for-name hidden>
             <label for="module-name">${escapeHTML(text.t("landing.name"))}</label>
-            <input id="module-name" name="name" type="text" maxlength="80" />
+            <div class="input-group">
+              <div class="icon-dropdown" data-for-label-at>
+                <button type="button" class="icon-dropdown-btn" data-open-marks
+                  title="${escapeAttr(text.t("landing.labelAt"))}"
+                  aria-label="${escapeAttr(text.t("landing.labelAt"))}"
+                  aria-haspopup="menu" aria-expanded="false">
+                  <span data-current-mark>${labelMark("top")}</span>
+                  <svg class="caret" viewBox="0 0 24 24" width="10" height="10"
+                       fill="currentColor" aria-hidden="true"><path d="M7 10l5 5 5-5z" /></svg>
+                </button>
+                <input type="hidden" name="labelAt" />
+                <div class="dropdown-menu" data-marks role="menu" hidden>
+                  ${(
+                    [
+                      ["top", text.t("landing.labelTop")],
+                      ["bottom", text.t("landing.labelBottom")],
+                      ["pill", text.t("landing.labelPill")],
+                      ["off", text.t("landing.labelOff")],
+                    ] as Array<[string, string]>
+                  )
+                    .map(
+                      ([at, name]) => `<button type="button" class="dropdown-item" role="menuitem"
+                        data-at="${escapeAttr(at)}" title="${escapeAttr(name)}"
+                        aria-label="${escapeAttr(name)}">${labelMark(at)}</button>`,
+                    )
+                    .join("")}
+                </div>
+              </div>
+              <input id="module-name" name="name" type="text" maxlength="80" />
+            </div>
             <p class="hint">${escapeHTML(text.t("landing.nameHelp"))}</p>
           </div>
           <div class="field-group" data-for-scope hidden>
@@ -837,25 +866,6 @@ function moduleModal(
         </div>
 
         <div class="tab-panel" data-panel="look" hidden>
-          <div class="field-group" data-for-label-at hidden>
-            <label>${escapeHTML(text.t("landing.labelAt"))}</label>
-            <div class="mark-row">
-              ${(
-                [
-                  ["top", text.t("landing.labelTop")],
-                  ["bottom", text.t("landing.labelBottom")],
-                  ["pill", text.t("landing.labelPill")],
-                  ["off", text.t("landing.labelOff")],
-                ] as Array<[string, string]>
-              )
-                .map(
-                  ([at, name]) => `<button type="button" class="mark" data-at="${escapeAttr(at)}"
-                    title="${escapeAttr(name)}" aria-label="${escapeAttr(name)}">${labelMark(at)}</button>`,
-                )
-                .join("")}
-            </div>
-            <input type="hidden" name="labelAt" />
-          </div>
           ${appearanceControls(text)}
         </div>
 
