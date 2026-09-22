@@ -137,14 +137,30 @@ function renderNav(): void {
   // The panel is somewhere to go, so it is a button. Leaving is NOT here: the
   // panel's own sidebar carries it, and a red control in the bar of every
   // public page is the one thing on that bar nobody came for.
+  // The panel's own control, which opens it and closes it.
+  //
+  // The dashboard's drawer toggle: a box whose side column fills while the
+  // thing is open, so the icon says which state you are in rather than what
+  // clicking will do. Disabled while the front page is being arranged — one
+  // mode at a time, and a control that does something else mid-gesture is a
+  // control somebody hits by accident.
+  const inPanel = document.body.classList.contains("admin-view");
+  const panel = me
+    ? `<button class="icon-button panel-toggle${composing ? " cannot" : ""}" data-panel-toggle
+               aria-pressed="${inPanel}"
+               title="${escapeAttr(i18n.t("nav.panel"))}"
+               aria-label="${escapeAttr(i18n.t("nav.panel"))}">
+         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+              aria-hidden="true">
+           <rect x="3" y="3" width="18" height="18" rx="2" stroke-width="1.5" />
+           <rect class="panel-indicator${inPanel ? " on" : ""}" x="15" y="3" width="6" height="18" />
+           <path d="M15 3V21" stroke-width="1.5" />
+         </svg>
+       </button>`
+    : "";
+
   const account = me
-    ? // An icon with its name in a tooltip, like every other control in this
-      // bar and like the dashboard's own. A button with a word in it beside two
-      // icon buttons reads as a leftover from a bar that was styled once and
-      // then again.
-      `<a class="icon-button" href="/panel"
-          title="${escapeAttr(i18n.t("nav.panel"))}"
-          aria-label="${escapeAttr(i18n.t("nav.panel"))}">${icons.overview(16)}</a>${compose}`
+    ? `${compose}${panel}`
     : // Not on the sign-in page itself: a link to where you already are is the
       // third thing on that screen saying the same word.
       location.pathname === "/sign-in"
@@ -1052,6 +1068,8 @@ function usesData(kind: views.LandingModule["kind"]): boolean {
 
 function show(html: string): void {
   document.body.classList.remove("admin-view");
+  // And leaving it: the toggle has to stop saying the panel is open.
+  renderNav();
   if (root) root.innerHTML = html;
   // Every password field on whatever was just drawn, rather than a toggle
   // written into the one form somebody asked about and missing from the rest.
@@ -1102,6 +1120,7 @@ async function showInShell(content: string, path: string): Promise<void> {
   // would be a shudder rather than an entrance.
   const arriving = !document.body.classList.contains("admin-view");
   document.body.classList.add("admin-view");
+  renderNav();
   if (arriving) {
     const shell = root?.querySelector<HTMLElement>(".admin");
     shell?.classList.add("arriving");
@@ -1218,6 +1237,41 @@ function openModal(id: string): void {
  * a single click would close the dialog as many times as the page had been
  * drawn.
  */
+/**
+ * The one control that opens the panel and closes it.
+ *
+ * Delegated, because the bar is redrawn whenever what it shows changes and a
+ * listener bound to the button it drew would be listening to a button that is
+ * no longer there.
+ *
+ * Closing plays the arrival backwards before leaving, so the panel goes out the
+ * side it came in from rather than blinking away.
+ */
+function wirePanelToggle(): void {
+  document.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement | null)?.closest("[data-panel-toggle]");
+    if (!button) return;
+
+    if (!document.body.classList.contains("admin-view")) {
+      go("/panel");
+      return;
+    }
+
+    const shell = root?.querySelector<HTMLElement>(".admin");
+    if (!shell) {
+      go("/");
+      return;
+    }
+    shell.classList.add("leaving");
+    shell.addEventListener("animationend", () => go("/"), { once: true });
+    // And if the animation is off — somebody asked for less motion — the click
+    // still has to go somewhere.
+    setTimeout(() => {
+      if (document.body.classList.contains("admin-view")) go("/");
+    }, 400);
+  });
+}
+
 function wireDialogs(): void {
   document.addEventListener("click", (event) => {
     const target = event.target as HTMLElement | null;
@@ -2963,5 +3017,6 @@ void (async () => {
   i18n.subscribe(() => renderNav());
   // Once, for every dialog the product will ever draw.
   wireDialogs();
+  wirePanelToggle();
   await render();
 })();

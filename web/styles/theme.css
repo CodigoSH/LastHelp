@@ -345,17 +345,21 @@ body > nav {
   border-block-end: 1px solid var(--border);
 }
 
-/* The bar's contents share the measure of the page under it. Pinned to the
-   window's own edges instead, the brand floats far away from the first word of
-   the page it names, which is what made these screens read as unaligned. */
+/*
+ * The bar uses the window, the way the dashboard's does: the mark at one edge
+ * and the controls at the other, 20px from each. It used to share the measure
+ * of the page under it, which left both of them adrift in the middle of a wide
+ * screen with the space they should be using on the outside of them.
+ */
 .nav-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  max-inline-size: var(--page);
-  margin-inline: auto;
-  padding: 0.7rem 1.25rem;
+  inline-size: 100%;
+  block-size: 48px;
+  padding: 0 20px;
+  box-sizing: border-box;
 }
 
 .brand {
@@ -1624,8 +1628,14 @@ summary:focus-visible,
  * well — so the body became the grid, #app landed in its first column, and the
  * content rendered 254px wide inside a 1225px page. Nothing about the markup
  * looked wrong; only measuring the boxes showed it. */
+/*
+ * The bar stays. It used to disappear inside the panel, which left the one
+ * control that opens and closes the panel reachable only from outside it — so
+ * the way back was the browser's button. The dashboard keeps its bar on every
+ * screen and the panel toggle is what opens and closes it.
+ */
 body.admin-view > nav {
-  display: none;
+  display: block;
 }
 
 body.admin-view > main {
@@ -1637,7 +1647,7 @@ body.admin-view > main {
 .admin {
   display: grid;
   grid-template-columns: 16rem 1fr;
-  min-block-size: 100vh;
+  min-block-size: calc(100vh - 48px);
 }
 
 /* Merged from the two declared at the top level. The sidebar is the one surface
@@ -4444,8 +4454,36 @@ a.stat:hover .stat-go {
   animation: panel-arrives 0.4s var(--ease) both;
 }
 
+/* And out the way it came in, when the same control closes it. */
+@keyframes panel-leaves {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(calc(var(--rtl-flip, 1) * 3%)); opacity: 0; }
+}
+
+.admin.leaving {
+  animation: panel-leaves 0.25s var(--ease) both;
+}
+
+/*
+ * A control that cannot be used while another mode is on. Theirs exactly:
+ * dimmed, greyed and deaf to the pointer, rather than missing — a bar whose
+ * controls come and go is a bar you have to read again every time.
+ */
+/* The side column of the panel icon, which fills while the panel is open — so
+   the icon says which state you are in, not what clicking will do. */
+.panel-indicator { fill: currentColor; opacity: 0; transition: opacity 0.2s; }
+.panel-indicator.on { opacity: 1; }
+
+.icon-button.cannot {
+  opacity: 0.3;
+  pointer-events: none;
+  filter: grayscale(1);
+  cursor: default;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .admin.arriving { animation: none; }
+  .admin.arriving,
+  .admin.leaving { animation: none; }
 }
 
 /* What is being dragged is going in here. Same green the ghost uses, on the

@@ -505,16 +505,23 @@ async function main() {
     const rows = [...document.querySelectorAll(".item")];
     const leads = rows.map(r => Math.round(r.firstElementChild.getBoundingClientRect().width));
     const titles = rows.map(r => Math.round(r.querySelector(".item-title").getBoundingClientRect().left));
+    const inner = document.querySelector("body > nav .nav-inner").getBoundingClientRect();
     return {
+      // The bar uses the window, the way the dashboard's does: its contents
+      // start near the left edge and end near the right one. It used to share
+      // the page's measure, which put both ends adrift in the middle of a wide
+      // screen. Changed on purpose, so this asks the new question.
+      desdeElBorde: Math.round(brand.left),
+      hastaElBorde: Math.round(innerWidth - inner.right),
       offset: Math.round(Math.abs(brand.left - heading.left)),
       leads: [...new Set(leads)],
       titles: [...new Set(titles)],
     };
   `);
   check(
-    "the bar starts where the page starts",
-    grid.offset <= 1,
-    `${grid.offset}px apart`,
+    "the bar uses the window rather than the measure of the page under it",
+    grid.desdeElBorde <= 32 && grid.hastaElBorde <= 32,
+    JSON.stringify({ izquierda: grid.desdeElBorde, derecha: grid.hastaElBorde }),
   );
   check(
     "and every row leads with the same tile, so the titles line up",
@@ -567,13 +574,15 @@ async function main() {
     return {
       sidebar: !!document.querySelector(".side"),
       current: document.querySelector('.side-item[aria-current="page"]')?.textContent?.trim() ?? "",
-      publicNav: getComputedStyle(document.querySelector("body > nav")).display,
+      // The bar stays on every screen now; what matters here is that somebody
+      // arriving cold at a report inside the panel keeps the panel around it.
+      barra: getComputedStyle(document.querySelector("body > nav")).display !== "none",
       tools: document.querySelector(".team-tools") ? !document.querySelector(".team-tools").hidden : false,
     };
   `);
   check(
     "and the team keeps their panel around it",
-    inPanel.sidebar === true && inPanel.publicNav === "none" && inPanel.tools === true,
+    inPanel.sidebar === true && inPanel.barra === true && inPanel.tools === true,
     JSON.stringify(inPanel),
   );
   check("the vote is a count and a verb", detail.vote === "count+label", detail.vote);
@@ -885,8 +894,15 @@ async function main() {
     return {
       items: [...document.querySelectorAll(".side-item")].map(a => a.textContent.trim()),
       current: document.querySelector('.side-item[aria-current="page"]')?.textContent?.trim(),
+      // The bar keeps the panel's own control, which is what closes it.
+      cierra: !!document.querySelector("body > nav [data-panel-toggle]"),
       who: document.querySelector(".who")?.textContent?.trim(),
-      publicNavHidden: getComputedStyle(document.querySelector("body > nav")).display === "none",
+      // The bar stays on every screen now, the way the dashboard's does. What
+      // must not happen is two NAVIGATIONS: the bar carries modes — the panel
+      // toggle, arranging the front page — and the places you can go are down
+      // the side. A link to a page in both is the fault this was written for.
+      barraVisible: getComputedStyle(document.querySelector("body > nav")).display !== "none",
+      enlacesEnLaBarra: document.querySelectorAll("body > nav a[href^='/panel']").length,
     };`);
   check(
     "the administration shows its options down one side",
@@ -895,7 +911,8 @@ async function main() {
   );
   check(
     "and does not stack two navigations on top of each other",
-    sidebar.publicNavHidden === true,
+    sidebar.barraVisible === true && sidebar.enlacesEnLaBarra === 0,
+    JSON.stringify({ barra: sidebar.barraVisible, enlaces: sidebar.enlacesEnLaBarra }),
   );
 
   // The bar on the chosen row is a join between it and the panel it opened, so
@@ -1608,50 +1625,72 @@ async function main() {
     document.querySelector("[data-edit-done]")?.click();
     await new Promise(r => setTimeout(r, 600));
     const bar = document.querySelector("body > nav");
-    const panel = bar.querySelector('a[href="/panel"]');
-    const conPalabras = !!panel.querySelector("span") || panel.textContent.trim() !== "";
+    const antes = {
+      palabras: bar.querySelector("[data-panel-toggle]").textContent.trim() !== "",
+      icono: !!bar.querySelector("[data-panel-toggle] svg"),
+      titulo: bar.querySelector("[data-panel-toggle]").getAttribute("title") ?? "",
+      abierto: !!bar.querySelector(".panel-indicator.on"),
+    };
 
-    history.pushState({}, "", "/panel"); dispatchEvent(new PopStateEvent("popstate"));
-    // Read while it is arriving, not after: the class is taken off when the
-    // animation ends, so a check that waits for the page to settle sees nothing.
-    let visto = null;
-    for (let i = 0; i < 60 && !visto; i++) {
+    // Opened by its own control. Everything is read WHILE it happens: the
+    // arriving class is taken off when the animation ends, so a probe that
+    // waits for the page to settle finds nothing and reports the absence as a
+    // fault. That is what the first version of this did.
+    bar.querySelector("[data-panel-toggle]").click();
+    let llegando = null;
+    for (let i = 0; i < 40 && !llegando; i++) {
       const shell = document.querySelector(".admin.arriving");
       if (shell) {
-        const nombre = getComputedStyle(shell).animationName;
-        // The mechanism, not the direction this pass happens to be in. Reading
-        // only the computed flip would pass in English whatever the keyframes
-        // said, and getting it wrong means the panel sliding in from the
-        // opposite edge for a fifth of the languages.
         const hojas = [...document.styleSheets].flatMap(h => { try { return [...h.cssRules]; } catch { return []; } });
         const fotogramas = hojas.find(r => r.name === "panel-arrives");
-        visto = { nombre, direccion: document.documentElement.dir,
-                  giro: getComputedStyle(document.documentElement).getPropertyValue("--rtl-flip").trim(),
-                  sigueLaDireccion: (fotogramas?.cssText ?? "").includes("--rtl-flip") };
+        llegando = { nombre: getComputedStyle(shell).animationName,
+                     direccion: document.documentElement.dir,
+                     giro: getComputedStyle(document.documentElement).getPropertyValue("--rtl-flip").trim(),
+                     sigueLaDireccion: (fotogramas?.cssText ?? "").includes("--rtl-flip") };
       }
-      await new Promise(r => setTimeout(r, 40));
+      await new Promise(r => setTimeout(r, 25));
     }
-    // Back to the front page: this block walked into the panel, and everything
-    // after it is about the page it left.
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1300));
 
-    return { conPalabras, icono: !!panel.querySelector("svg"),
-             titulo: panel.getAttribute("title") ?? "", entrada: visto };
+    await new Promise(r => setTimeout(r, 500));
+    const dentro = {
+      enElPanel: document.body.classList.contains("admin-view"),
+      indicador: !!document.querySelector("body > nav .panel-indicator.on"),
+      barraVisible: getComputedStyle(document.querySelector("body > nav")).display !== "none",
+    };
+
+    // And the same control closes it, going back out the side it came in.
+    document.querySelector("body > nav [data-panel-toggle]").click();
+    let saliendo = false;
+    for (let i = 0; i < 20 && !saliendo; i++) {
+      saliendo = !!document.querySelector(".admin.leaving");
+      await new Promise(r => setTimeout(r, 25));
+    }
+    await new Promise(r => setTimeout(r, 1200));
+    const fuera = !document.body.classList.contains("admin-view");
+
+    return { antes, llegando, dentro, saliendo, fuera };
   `);
   check(
     "the panel is an icon in the bar, with its name in a tooltip",
-    entrada.conPalabras === false && entrada.icono === true && entrada.titulo !== "",
-    JSON.stringify({ palabras: entrada.conPalabras, titulo: entrada.titulo }),
+    entrada.antes.palabras === false && entrada.antes.icono === true &&
+      entrada.antes.titulo !== "" && entrada.antes.abierto === false,
+    JSON.stringify(entrada.antes),
+  );
+  check(
+    "and that one icon opens it, says so, and closes it again",
+    entrada.dentro.enElPanel === true && entrada.dentro.indicador === true &&
+      entrada.dentro.barraVisible === true && entrada.saliendo === true &&
+      entrada.fuera === true,
+    JSON.stringify({ dentro: entrada.dentro, saliendo: entrada.saliendo, fuera: entrada.fuera }),
   );
   check(
     "and it arrives from the side the reading direction ends on",
-    entrada.entrada?.nombre === "panel-arrives" &&
-      entrada.entrada?.sigueLaDireccion === true &&
-      (entrada.entrada?.direccion === "rtl"
-        ? entrada.entrada?.giro === "-1"
-        : entrada.entrada?.giro === "1"),
-    JSON.stringify(entrada.entrada),
+    entrada.llegando?.nombre === "panel-arrives" &&
+      entrada.llegando?.sigueLaDireccion === true &&
+      (entrada.llegando?.direccion === "rtl"
+        ? entrada.llegando?.giro === "-1"
+        : entrada.llegando?.giro === "1"),
+    JSON.stringify(entrada.llegando),
   );
 
   // The settings dialog, in the shape the dashboard uses for its own: the tabs
@@ -2005,7 +2044,7 @@ async function main() {
       lapiz: !!bar.querySelector("[data-edit-page]"),
       hecho: !!bar.querySelector("[data-edit-done]"),
       enLaPagina: !!document.querySelector("#app [data-edit-page], #app [data-edit-done]"),
-      panel: !!bar.querySelector('a[href="/panel"]'),
+      panel: !!bar.querySelector("[data-panel-toggle]"),
     });
 
     // Tolerant on purpose. A mutation that stops the control changing leaves no
