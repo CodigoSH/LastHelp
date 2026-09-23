@@ -4145,6 +4145,11 @@ a.stat:hover .stat-go {
 
 .briefs, .board-rows {
   display: grid;
+  /* One column that is as wide as the card and no wider. Without it the grid's
+     implicit column took the width of its longest row, so a long title never
+     reached its ellipsis and the state beside it was pushed out of a card
+     that clips — "En attente de vali…" on the overview, in French. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.35rem;
   margin: 0 1.1rem 1.1rem;
 }
@@ -4165,6 +4170,9 @@ a.stat:hover .stat-go {
   background: var(--surface-dim);
   border-color: var(--border);
 }
+
+/* The state is what the row is for; the title gives way before it does. */
+.brief > .status { flex-shrink: 0; }
 
 .brief-title {
   flex: 1;

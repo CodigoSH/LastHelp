@@ -3183,12 +3183,35 @@ async function main() {
       draggable: document.querySelectorAll("[draggable=true]").length,
       arrange: !!document.querySelector("[data-edit-dash], [data-hide], [data-show]"),
       stored: (await fetch("/api/me/dashboard")).status,
+      // Every row of the lists keeps its state inside its card, with a title
+      // long enough to push. The lists were grids whose one column took the
+      // width of the longest row, so a long title shoved the state out of a
+      // card that clips. The title is lengthened, measured and put back, so
+      // nothing after this reads a different screen.
+      desbordan: (() => {
+        const titulo = document.querySelector(".briefs .brief-title");
+        if (!titulo) return ["no rows"];
+        const antes = titulo.textContent;
+        titulo.textContent = "A title long enough to push anything beside it out of the card ".repeat(3);
+        const fuera = [...document.querySelectorAll(".briefs .brief")].filter(b => {
+          const card = b.closest(".dash-card")?.getBoundingClientRect();
+          const chip = (b.querySelector(".status") ?? b).getBoundingClientRect();
+          return card && (chip.left < card.left - 1 || chip.right > card.right + 1);
+        }).map(b => b.textContent.trim().slice(0, 30));
+        titulo.textContent = antes;
+        return fuera;
+      })(),
     };
   `);
   check(
     "the overview is one screen, the same for everybody",
     overview.cards === 13 && overview.draggable === 0 && overview.arrange === false,
-    JSON.stringify(overview),
+    JSON.stringify({ ...overview, desbordan: undefined }),
+  );
+  check(
+    "and every row of its lists keeps its state inside the card, however long the title",
+    overview.desbordan.length === 0,
+    JSON.stringify(overview.desbordan),
   );
   check(
     "and the layout it used to save is gone from the server too",

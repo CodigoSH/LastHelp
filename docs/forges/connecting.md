@@ -77,7 +77,7 @@ Add a webhook on the repository (or the organisation) with:
   pasting its number or URL. A project with four thousand open issues wants the
   second far more often than the first.
 - When that issue is **closed** or **reopened**, the item follows: a bug becomes
-  *closed* or *tracked*, an idea becomes *done* or *in progress*.
+  *fixed* or *fix in progress*, an idea becomes *shipped* or *in progress*.
 - The roadmap follows from that, which is why nobody has to maintain it.
 
 Nothing calls your forge from inside a request. Work goes to a queue with
