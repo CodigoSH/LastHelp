@@ -99,10 +99,21 @@ const shoot = async (name: string) => {
     return Math.min(Math.max(Math.ceil(bottom) + 24, 320), 2000);
   `);
 
+  // The window is made as tall as the picture first. Capturing beyond a
+  // window of the usual height drew the panel's sidebar — which is exactly as
+  // tall as the window and stays put — stopping halfway down the image, a
+  // fault of the photograph that read as a fault of the product.
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: WIDTH, height: Math.max(HEIGHT, Number(height)), deviceScaleFactor: 2, mobile: false,
+  });
+  await sleep(200);
   const shot = await page.send("Page.captureScreenshot", {
     format: "png",
     captureBeyondViewport: true,
     clip: { x: 0, y: 0, width: WIDTH, height: Number(height), scale: 2 },
+  });
+  await page.send("Emulation.setDeviceMetricsOverride", {
+    width: WIDTH, height: HEIGHT, deviceScaleFactor: 2, mobile: false,
   });
   await Bun.write(`${OUT}/${name}.png`, Buffer.from(shot.data, "base64"));
   console.log(`  wrote ${OUT}/${name}.png (${WIDTH}x${height})`);

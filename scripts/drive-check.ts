@@ -735,7 +735,7 @@ async function main() {
   //     "you are up to date". Compared with /api/update rather than with a
   //     premise about this build: this comment used to say the build had no
   //     release keys, and it has them.
-  await goTo("/panel/updates", ".about-hero");
+  await goTo("/panel/updates", ".about .hero-card");
   await waitFor("[data-update-zone] > :not(.checking)");
   const updates = await evaluate(`
     const zone = document.querySelector("[data-update-zone]");
@@ -832,7 +832,7 @@ async function main() {
       links: [...document.querySelectorAll(".about-links a")].map(a => a.getAttribute("href")),
       // Under the version, nothing about the build: the platform and the
       // compiler were a line nobody opening this page came for.
-      plataforma: /linux|darwin|windows|go1\./.test(document.querySelector(".about-hero")?.textContent ?? ""),
+      plataforma: /linux|darwin|windows|go1\./.test(document.querySelector(".about .hero-card")?.textContent ?? ""),
       // The name sits under its mark. The panel's heading rule gave every h2
       // 36px above it and pushed the name half a card away from the logo.
       bajoElLogo: Math.round(
@@ -861,7 +861,10 @@ async function main() {
   //      with "Public site" and "Sign out" adrift beside them, and "Sign out"
   //      broke over two lines.
   await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
-  await goTo("/panel/about", ".about-hero");
+  // On a short screen, where the grid has room left over to share: that is
+  // where the strip grew to 300px. A long one leaves nothing to share and
+  // passes with the fault in place.
+  await goTo("/panel/appearance", ".setting-row");
   const franja = await evaluate(`
     const side = document.querySelector(".side");
     const fila = [...side.querySelectorAll(".side-item, .side-foot .link")];
@@ -880,6 +883,47 @@ async function main() {
     "on a phone the panel's menu is one strip across the top, every link on the one line",
     franja.enlaces >= 8 && franja.alturas <= 4 && franja.franja < 80 && franja.salirEnUnaLinea === true,
     JSON.stringify(franja),
+  );
+
+  // 11d. The panel wears one set of pieces — About's — on every screen: a
+  //      card's icon in its 34px accent tile, a metric's the same, and a
+  //      setting row whose control stays inside the row. Swept across every
+  //      screen at a desktop width and at a phone's, so a screen added later
+  //      in its own style shows up here rather than in a screenshot.
+  const piezas: string[] = [];
+  const pantallas = ["/panel", "/panel/organizations", "/panel/codigosh", "/panel/backups",
+    "/panel/account", "/panel/appearance", "/panel/personalization", "/panel/about"];
+  let medidas = 0;
+  for (const [ancho, alto] of [[1280, 900], [390, 800]] as Array<[number, number]>) {
+    await page.send("Emulation.setDeviceMetricsOverride", { width: ancho, height: alto, deviceScaleFactor: 1, mobile: ancho < 500 });
+    for (const ruta of pantallas) {
+      await goTo(ruta, ".admin-main > *");
+      await sleep(250);
+      const r = await evaluate(`
+        const fallos = [];
+        let n = 0;
+        for (const i of document.querySelectorAll(".admin-main .bento-card .card-head > .icon, .admin-main .metric-icon")) {
+          n++;
+          const b = i.getBoundingClientRect();
+          if (Math.abs(b.width - 34) > 1 || Math.abs(b.height - 34) > 1) fallos.push("icon " + Math.round(b.width) + "x" + Math.round(b.height));
+        }
+        for (const row of document.querySelectorAll(".setting-row")) {
+          n++;
+          const b = row.getBoundingClientRect();
+          const c = row.querySelector(".setting-control")?.getBoundingClientRect();
+          if (!c || c.left < b.left - 1 || c.right > b.right + 1 || c.bottom > b.bottom + 1) fallos.push("row control outside");
+        }
+        return { n, fallos };
+      `);
+      medidas += r.n;
+      for (const f of r.fallos) piezas.push(`${ancho} ${ruta}: ${f}`);
+    }
+  }
+  await page.send("Emulation.clearDeviceMetricsOverride", {});
+  check(
+    "every panel screen wears the same pieces, at a desktop width and a phone's",
+    medidas > 20 && piezas.length === 0,
+    JSON.stringify({ medidas, piezas: piezas.slice(0, 6) }),
   );
 
   const langPicker = await evaluate(`return !!document.querySelector("body > nav select");`);

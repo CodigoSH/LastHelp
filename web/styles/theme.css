@@ -2011,8 +2011,13 @@ body.admin-view > main {
    A drawer would need a button, a state and a trap; a strip needs none of it
    and never hides where you are. */
 @media (max-width: 52rem) {
+  /* Two rows: the strip as tall as its links, the screen the rest. Left to
+     auto, a grid with a minimum height shares what is left over between its
+     rows, so on a short screen the strip grew to 300px with its links
+     floating in the middle of it. */
   .admin {
     grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
   }
 
   .side {
@@ -2494,18 +2499,6 @@ a.stat:hover {
   inline-size: 5rem;
   block-size: 5rem;
   font-size: 1.75rem;
-}
-
-.identity {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 1rem 0 1.75rem;
-}
-
-.identity .name {
-  font-size: 1.15rem;
-  font-weight: 600;
 }
 
 /* A short, monospaced label for a role or a state. */
@@ -3113,14 +3106,15 @@ body > nav .brand {
  * the release channel as a setting on a row of its own; the server's health;
  * and the links out at the foot, over a rule. Their numbers where they have
  * them — a 72px mark, 18px name, 12px version, 18px down to the update zone. */
-.about {
+/* A column of the panel's pieces — About's, and every screen built from them. */
+.panel-stack {
   display: grid;
   gap: 1rem;
   max-inline-size: 60rem;
   margin-block: 1.25rem 2rem;
 }
 
-.about-hero {
+.hero-card {
   position: relative;
   overflow: hidden;
   display: flex;
@@ -3135,7 +3129,7 @@ body > nav .brand {
 
 /* The light behind the mark. Lastboard lights its update card from a corner;
    the product is what this card is about, so it is lit from behind that. */
-.about-glow {
+.hero-glow {
   position: absolute;
   inset-block-start: -45%;
   inset-inline: 20%;
@@ -3144,7 +3138,13 @@ body > nav .brand {
   pointer-events: none;
 }
 
-.about-hero > :not(.about-glow) { position: relative; }
+.hero-card > :not(.hero-glow) { position: relative; }
+
+/* A person or a product, named under its picture. Through .panel-stack for
+   the same reason as About's name: the panel's h2 rule would otherwise push
+   it half a card down. */
+.panel-stack .hero-name { margin: 12px 0 2px; font-size: 18px; font-weight: 600; letter-spacing: 0; }
+.hero-sub { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
 
 .about-logo {
   inline-size: 72px;
@@ -3314,7 +3314,41 @@ body > nav .brand {
 }
 
 .setting-row h3 { margin: 0; font-size: 1rem; }
+.setting-row h3 label { font: inherit; }
 .setting-row p { margin: 2px 0 0; color: var(--text-dim); font-size: 0.875rem; }
+
+/* The control keeps a width of its own on the other side, so a column of rows
+   lines up, and gives way under its text on a narrow screen. */
+.setting-control { display: flex; justify-content: flex-end; min-inline-size: 0; }
+.setting-control .sel,
+.setting-control input[type="text"] { inline-size: 18rem; max-inline-size: 100%; }
+.setting-row.wide { grid-template-columns: minmax(0, 1fr); }
+.setting-row.wide .setting-control { justify-content: stretch; }
+.setting-row.wide .theme-choice { inline-size: 100%; }
+
+@media (max-width: 40rem) {
+  .setting-row { grid-template-columns: minmax(0, 1fr); }
+  .setting-control { justify-content: flex-start; }
+  .setting-control .sel,
+  .setting-control input[type="text"] { inline-size: 100%; }
+}
+
+/* Every card in the panel is headed like About's tiles: its icon in the
+   accent tile. The icon is the <svg> itself, which takes a box like any
+   replaced element, so no card's markup had to change for it. */
+.admin-main .bento-card .card-head > .icon {
+  box-sizing: border-box;
+  inline-size: 34px;
+  block-size: 34px;
+  padding: 8px;
+  flex-shrink: 0;
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
+  border-radius: 10px;
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.admin-main .bento-card .card-head { gap: 0.7rem; margin-block-end: 0.35rem; }
 
 /* Their switch, 44 by 24. The checkbox is still there, over the whole of it,
    so a click, a key and a screen reader all reach a real control. */
@@ -3372,6 +3406,9 @@ body > nav .brand {
 /* The name of a group of cards: the pill of Lastboard's section heads, with
    the rule running on from it. */
 .sec-head { display: flex; align-items: center; gap: 12px; margin-block-start: 0.5rem; }
+/* Loose on a page rather than inside a column of pieces, it is what separates
+   one part of the screen from the last, so it takes the room a heading would. */
+.admin-main > .sec-head { margin-block: 1.75rem 0; }
 
 .sec-pill {
   padding: 3px 9px;
