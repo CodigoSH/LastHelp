@@ -3418,22 +3418,25 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
 
-  const body = await api.get<{
-    organization: OrganizationSummary & { forge?: string; webhook_path?: string };
-    repositories: RepositorySummary[];
-  }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
-  const repos = body.repositories ?? [];
-  const canManage = ownsOrganization(orgSlug);
-  const forge = body.organization.forge ?? "none";
+  const base = `/api/orgs/${encodeURIComponent(orgSlug)}`;
+  const data = await api.get<views.OrganizationPanel>(`${base}/panel`).catch(() => null);
+  // Nobody with no board here learns anything from the address: the list of
+  // organisations says which ones they may open.
+  if (!data) return go("/panel/organizations");
+  const team = data.can_manage
+    ? await api
+        .get<{ members: views.TeamMember[]; accounts: { username: string; name: string }[] }>(`${base}/team`)
+        .catch(() => null)
+    : null;
+  const forge = data.organization.forge ?? "none";
 
   await showInShell(
-    views.organizationScreen(body.organization, repos, canManage, isAdministrator(), text) +
-      // The token belongs to whoever runs the organisation. A collaborator
-      // triages without ever being able to answer "what is the token", which
-      // is the whole reason the two roles exist. Each repository's channel is
-      // on that repository's page.
-      (canManage ? views.connectionForms(body.organization, location.origin, text) : "") +
-      views.modal(
+    views.organizationScreen(data, team, me.username ?? "", location.origin, text) +
+      // Only for whoever may add one: a dialog nobody can open is still a
+      // form on the page, one the server would refuse.
+      (!data.can_manage
+        ? ""
+        : views.modal(
         {
           id: "repo-modal",
           title: text.t("panel.newRepository"),
@@ -3443,7 +3446,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
           formClass: "repo-form",
         },
         text,
-      ),
+      )),
     `/panel/${orgSlug}`,
   );
 
@@ -3462,17 +3465,18 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
       // screen and selectable, which is the fallback that always worked.
     }
   });
+
   root?.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((button) =>
     button.addEventListener("click", () => go(button.dataset.open ?? "/")),
   );
 
-  onSubmit("form.repo-form", async (data) => {
-    await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/repositories`, {
-      name: String(data.get("name") ?? ""),
-      slug: String(data.get("slug") ?? ""),
-      forge_repo: String(data.get("forge_repo") ?? ""),
-      accepts_bugs: data.get("accepts_bugs") !== null,
-      accepts_ideas: data.get("accepts_ideas") !== null,
+  onSubmit("form.repo-form", async (formData) => {
+    await api.post(`${base}/repositories`, {
+      name: String(formData.get("name") ?? ""),
+      slug: String(formData.get("slug") ?? ""),
+      forge_repo: String(formData.get("forge_repo") ?? ""),
+      accepts_bugs: formData.get("accepts_bugs") !== null,
+      accepts_ideas: formData.get("accepts_ideas") !== null,
     });
     await render();
   });
@@ -3482,13 +3486,47 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
       const slug = button.dataset.deleteRepo ?? "";
       if (!confirm(i18n.t("organizations.confirmDeleteRepo", { name: button.dataset.name ?? slug }))) return;
       try {
-        await api.del(`/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(slug)}`);
+        await api.del(`${base}/repos/${encodeURIComponent(slug)}`);
         await render();
       } catch (err) {
         showFormError(err);
       }
     }),
   );
+
+  // Owners are added and taken off here; collaborators on their repository's
+  // page, where the rest of that board is.
+  onSubmit("form.owner-add", async (formData) => {
+    await api.post(`${base}/team`, { username: String(formData.get("username") ?? ""), repository: "", role: "owner" });
+    await render();
+  });
+  root?.querySelectorAll<HTMLButtonElement>("[data-revoke-owner]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      if (!confirm(i18n.t("org.confirmRevoke", { name: button.dataset.name ?? "" }))) return;
+      try {
+        await api.post(`${base}/team`, { username: button.dataset.revokeOwner ?? "", repository: "", role: "" });
+        await render();
+      } catch (err) {
+        report(err);
+      }
+    }),
+  );
+
+  onSubmit("form.org-settings", async (formData) => {
+    await api.patch(base, { name: String(formData.get("name") ?? "") });
+    toast(i18n.t("panel.saved"));
+    await render();
+  });
+
+  root?.querySelector<HTMLButtonElement>("[data-delete-org]")?.addEventListener("click", async () => {
+    if (!confirm(i18n.t("organizations.confirmDelete", { name: data.organization.name }))) return;
+    try {
+      await api.del(base);
+      go("/panel/organizations");
+    } catch (err) {
+      report(err);
+    }
+  });
 }
 
 async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<void> {

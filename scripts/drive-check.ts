@@ -1275,6 +1275,7 @@ async function main() {
 
     const form = document.querySelector("form.credentials");
     if (!form) return { form: false };
+    const antes = document.querySelector("[data-connected]")?.dataset.connected ?? "";
 
     form.querySelector("[name=token]").value = "a-token";
     form.querySelector("[name=webhook_secret]").value = "a long random secret";
@@ -1287,6 +1288,8 @@ async function main() {
       shown: path ? !path.hidden : false,
       text: (path?.textContent ?? "").trim(),
       tokenCleared: form.querySelector("[name=token]").value === "",
+      antes,
+      despues: document.querySelector("[data-connected]")?.dataset.connected ?? "",
     };
   `);
   check("an organisation with a forge asks for its token", connected.form === true);
@@ -1296,6 +1299,11 @@ async function main() {
     String(connected.text).slice(0, 56),
   );
   check("and does not leave the token in the field", connected.tokenCleared === true);
+  check(
+    "and says whether it is connected, before and after the token is stored",
+    connected.antes === "false" && connected.despues === "true",
+    JSON.stringify({ antes: connected.antes, despues: connected.despues }),
+  );
 
   // Coming back later still shows the address: it is configured once on the
   // forge, and somebody who lost it has no other way to find it.
@@ -4143,6 +4151,24 @@ async function main() {
     JSON.stringify(suyo),
   );
 
+  // 12d'. The organisation's page, as the same collaborator: where they work
+  //       and the way into it, and none of the owner's sections.
+  await goTo("/panel/codigosh", ".admin-main .settings");
+  const suOrg = await evaluate(`
+    return {
+      tarjetas: document.querySelectorAll(".admin-main .settings-card").length,
+      filas: [...document.querySelectorAll(".repositories .settings-item")].map(li => li.dataset.repo),
+      formularios: document.querySelectorAll(".admin-main form").length,
+      equipo: !!document.querySelector(".settings-list.team"),
+    };
+  `);
+  check(
+    "a collaborator's organisation page is the boards they work on, and nothing of the owner's",
+    suOrg.tarjetas === 2 && JSON.stringify(suOrg.filas) === '["lastboard"]' &&
+      suOrg.formularios === 0 && suOrg.equipo === false,
+    JSON.stringify(suOrg),
+  );
+
   // 12e. And as whoever runs it: every card, reached from the organisation's
   //      row, and each one does what it says. The team is changed here and put
   //      back as it was, so nothing downstream counts a different number.
@@ -4155,6 +4181,47 @@ async function main() {
       body: JSON.stringify({ username: "alex", password: "una contraseña larga de verdad" }) });
   `);
   await goTo("/panel/codigosh", ".repositories");
+  // The organisation in sections, in the order the work goes, and what is
+  // waiting in each board said where the board is listed — the same number
+  // the board's own page gives, or nothing when nothing waits.
+  const secciones = await evaluate(`
+    const tarjeta = (sel) => [...document.querySelectorAll(".admin-main .settings-card")]
+      .findIndex(c => c.querySelector(sel));
+    const panel = await fetch("/api/orgs/codigosh/repos/lastboard/panel").then(r => r.json());
+    const tag = document.querySelector('[data-repo="lastboard"] [data-pending]');
+    return {
+      orden: [".repositories", ".settings-list.team", "form.org-settings", "[data-delete-org]"].map(tarjeta),
+      pendientes: tag ? Number(tag.dataset.pending) : 0,
+      servidor: panel.pending,
+      alex: document.querySelector('.team [data-member="alex"] [data-role]')?.dataset.role ?? "",
+      quitarseASiMismo: !!document.querySelector('[data-revoke-owner="alex"]'),
+      ana: document.querySelector('.team [data-member="ana"] [data-role]')?.dataset.role ?? "",
+    };
+  `);
+  check(
+    "an organisation's page is in sections, says what waits in each board, and shows its team",
+    JSON.stringify(secciones.orden) === "[1,2,3,4]" && secciones.pendientes === secciones.servidor &&
+      secciones.alex === "owner" && secciones.quitarseASiMismo === false && secciones.ana === "collaborator",
+    JSON.stringify(secciones),
+  );
+
+  // An owner added and taken off from the page, and the team back as it was.
+  const duenos = await evaluate(`
+    window.confirm = () => true;
+    const f = document.querySelector("form.owner-add");
+    f.querySelector("#owner-who").value = "ana";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 1100));
+    const dueña = !!document.querySelector('[data-revoke-owner="ana"]');
+    document.querySelector('[data-revoke-owner="ana"]')?.click();
+    await new Promise(r => setTimeout(r, 1100));
+    return { dueña, vuelta: document.querySelector('.team [data-member="ana"] [data-role]')?.dataset.role ?? "" };
+  `);
+  check(
+    "an owner is added and taken off from the organisation's page",
+    duenos.dueña === true && duenos.vuelta === "collaborator",
+    JSON.stringify(duenos),
+  );
   // What a repository takes, as the marks of its kinds and not as words; each
   // named, because the picture is all a screen reader would otherwise get.
   const marcas = await evaluate(`

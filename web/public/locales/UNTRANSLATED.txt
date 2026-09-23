@@ -22,6 +22,15 @@ item.mergeSearch
 item.replyHelp
 item.statusHelp
 item.waitingHelp
+org.addOwner
+org.confirmRevoke
+org.connected
+org.connectedHelp
+org.delete
+org.deleteHelp
+org.notConnected
+org.notConnectedHelp
+org.teamLead
 repo.addCollaborator
 repo.channelNow
 repo.confirmRevoke

@@ -1277,56 +1277,6 @@ export function forgeOptions(text: Text): [string, string][] {
 }
 
 
-/**
- * The forge connection, and the channel the team reads.
- *
- * Both were API-only for a while, which meant the panel offered a forge in the
- * organisation form and then abandoned whoever chose one: no way to enter a
- * token, no way to find the webhook address. The same failure as an empty panel
- * that says nothing is configured and offers nothing to configure.
- */
-export function connectionForms(
-  org: OrganizationSummary & { forge?: string; webhook_path?: string },
-  /** Where this instance answers, so the address can be shown whole. Passed in
-   *  rather than read from `location`: these templates are pure so they can be
-   *  tested without a browser, and one reach for a global ends that. */
-  origin: string,
-  text: Text,
-): string {
-  const forgeCard =
-    !org.forge || org.forge === "none"
-      ? ""
-      : `<li class="bento-card">
-          <div class="card-head">${icons.repository()}<h3>${escapeHTML(text.t("panel.connection"))}</h3></div>
-          <span class="card-sub">${escapeHTML(text.t("panel.tokenHelp"))}</span>
-          <form class="credentials">
-            ${field({ id: "cred-token", name: "token", label: text.t("panel.token"), type: "password", required: true }, text)}
-            ${field({ id: "cred-secret", name: "webhook_secret", label: text.t("panel.webhookSecret"), type: "password", required: true, hint: text.t("panel.secretHelp") }, text)}
-            <p class="form-error" role="alert" hidden></p>
-            <div class="wizard-actions"><span class="spacer"></span>
-              <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
-          </form>
-        </li>`;
-
-  if (forgeCard === "") return "";
-
-  // The webhook address, which the operator has to copy into their forge. It
-  // belongs beside the connection rather than at the bottom of a form, and it
-  // is the one value on this page somebody needs on a clipboard.
-  const address = org.webhook_path
-    ? `<li class="bento-card">
-        <div class="card-head">${icons.open()}<h3>${escapeHTML(text.t("panel.webhookPath"))}</h3></div>
-        <span class="card-sub">${escapeHTML(text.t("panel.webhookPathHelp"))}</span>
-        <code class="fact-value" data-webhook>${escapeHTML(origin + org.webhook_path)}</code>
-        ${actionButton("copy", text.t("action.copy"), "data-copy-webhook")}
-      </li>`
-    : "";
-
-  // Cards like every other in the panel, one under another; each names itself,
-  // so no heading over them.
-  return `<ul class="settings settings-cards">${forgeCard}${address}</ul>`;
-}
-
 export function board(
   org: OrganizationSummary,
   repo: RepositorySummary,
@@ -3469,44 +3419,233 @@ export function organizationsScreen(
     </div>`;
 }
 
-/** One organisation: its repositories, and what can be done to it. */
+/** Everything the panel's page for one organisation shows, as the server says it. */
+export interface OrganizationPanel {
+  organization: {
+    slug: string;
+    name: string;
+    forge: string;
+    base_url?: string;
+    forge_owner?: string;
+    webhook_path?: string;
+  };
+  /** The ones the reader may triage, each with what is waiting in it. */
+  repositories: { slug: string; name: string; accepts_bugs: boolean; accepts_ideas: boolean; pending: number }[];
+  /** Whether a token and a webhook secret are stored; never what they are. */
+  connection?: { token: boolean; secret: boolean };
+  can_manage: boolean;
+  can_delete: boolean;
+}
+
+/**
+ * One organisation, in sections: its repositories with what is waiting in
+ * each, who works in it, its forge, its name, and ending it.
+ *
+ * It used to be one card of repositories with the forge's forms stacked under
+ * it and nothing about the team at all, so an owner had to know that People
+ * was where the organisation's own team lived. Each section is Lastboard's
+ * settings card, the one recipe the panel uses for what it configures. A
+ * collaborator sees the first two: where they work, and the way into it.
+ */
 export function organizationScreen(
-  org: OrganizationSummary & { forge?: string },
-  repos: RepositorySummary[],
-  canManage: boolean,
-  /** Deleting a repository ends every report in it, so it is the server's. */
-  canDelete: boolean,
+  data: OrganizationPanel,
+  team: { members: TeamMember[]; accounts: { username: string; name: string }[] } | null,
+  /** The account reading, so it is not offered a way to remove itself. */
+  self: string,
+  /** Where this instance answers, so the webhook address can be shown whole.
+   *  Passed in rather than read from `location`: these templates are pure. */
+  origin: string,
   text: Text,
 ): string {
-  const rows = repos
+  const org = data.organization;
+  const hasForge = !!org.forge && org.forge !== "none";
+
+  const summary = settingsCard(
+    org.name,
+    `<p class="org-tags"><span class="mono-tag">/${escapeHTML(org.slug)}</span>
+      ${hasForge ? `<span class="mono-tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>`,
+    { action: `<a class="button ghost" href="/${escapeAttr(org.slug)}">${escapeHTML(text.t("shell.publicBoard"))}</a>` },
+  );
+
+  const rows = data.repositories
     .map((r) =>
       settingsItem({
+        attrs: `data-repo="${escapeAttr(r.slug)}"`,
         lead: `<span class="si-mark">${icons.repository(16)}</span>`,
         name: r.name,
         sub: `/${org.slug}/${r.slug}`,
-        tags: acceptsMarks(r, text),
+        tags:
+          (r.pending > 0
+            ? `<span class="mono-tag waiting" data-pending="${r.pending}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(r.pending) }))}</span>`
+            : "") + acceptsMarks(r, text),
         href: `/panel/${org.slug}/repos/${r.slug}`,
-        actions: canManage
-          ? `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
-             ${canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`
-          : "",
+        actions: `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
+          ${data.can_delete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`,
       }),
     )
     .join("");
+  const repositories = settingsCard(
+    text.t("portal.boards"),
+    data.repositories.length === 0
+      ? emptyState(text.t("organizations.noRepositories"), icons.repository(28))
+      : `<ul class="settings-list repositories">${rows}</ul>`,
+    {
+      action: data.can_manage
+        ? actionButton("add", text.t("panel.newRepository"), 'data-add-repo data-open-modal="repo-modal"', "primary")
+        : "",
+    },
+  );
+
+  if (!data.can_manage) {
+    return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a></p>
+      <h1 class="visually-hidden">${escapeHTML(org.name)}</h1>
+      <div class="settings">${summary}${repositories}</div>`;
+  }
+
+  const forge = hasForge ? organizationForge(data, origin, text) : "";
+
+  const settings = settingsCard(
+    text.t("repo.settings"),
+    `<form class="org-settings">
+      ${field({ id: "os-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: org.name }, text)}
+      <p class="form-error" role="alert" hidden></p>
+      <div class="settings-actions">
+        <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+    </form>`,
+  );
+
+  const danger = data.can_delete
+    ? settingsCard(
+        text.t("repo.danger"),
+        `<div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("org.delete"))}</h4>
+            <p class="settings-danger">${escapeHTML(text.t("org.deleteHelp"))}</p>
+          </div>
+          ${actionButton("remove", text.t("action.delete"), `data-delete-org="${escapeAttr(org.slug)}" data-name="${escapeAttr(org.name)}"`, "danger")}
+        </div>`,
+      )
+    : "";
 
   return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a></p>
     <h1 class="visually-hidden">${escapeHTML(org.name)}</h1>
     <div class="settings">
-      ${settingsCard(
-        org.name,
-        `<p class="org-tags"><span class="mono-tag">/${escapeHTML(org.slug)}</span>
-          ${org.forge && org.forge !== "none" ? `<span class="mono-tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>
-        ${repos.length === 0 ? emptyState(text.t("organizations.noRepositories"), icons.repository(28)) : `<ul class="settings-list repositories">${rows}</ul>`}`,
-        {
-          action: canManage ? actionButton("add", text.t("panel.newRepository"), 'data-add-repo data-open-modal="repo-modal"', "primary") : "",
-        },
-      )}
+      ${summary}
+      ${repositories}
+      ${team ? organizationTeam(data, team, self, text) : ""}
+      ${forge}
+      ${settings}
+      ${danger}
     </div>`;
+}
+
+/**
+ * Who works in an organisation: its owners, who are added and taken off here,
+ * and its collaborators with the repositories they work on — each of those is
+ * changed on its repository's page, where the rest of that board's settings
+ * are.
+ */
+function organizationTeam(
+  data: OrganizationPanel,
+  team: { members: TeamMember[]; accounts: { username: string; name: string }[] },
+  self: string,
+  text: Text,
+): string {
+  const isOwner = (m: TeamMember) => m.roles.some((r) => r.role === "owner" && r.repository === "");
+  const owners = team.members.filter(isOwner);
+  const collaborators = team.members.filter((m) => !isOwner(m));
+  const name = (m: TeamMember) => m.name || m.username;
+
+  const ownerRow = (m: TeamMember) =>
+    settingsItem({
+      attrs: `data-member="${escapeAttr(m.username)}"`,
+      lead: avatar(name(m), m.avatar),
+      name: name(m),
+      sub: m.name && m.name !== m.username ? m.username : "",
+      tags: `<span class="mono-tag accent" data-role="owner">${escapeHTML(text.t("role.owner"))}</span>`,
+      // Not yourself: taking your own role away from this page would leave
+      // you on a page you may no longer open.
+      actions:
+        m.username === self
+          ? ""
+          : iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke-owner="${escapeAttr(m.username)}" data-name="${escapeAttr(name(m))}"`),
+    });
+  const collaboratorRow = (m: TeamMember) =>
+    settingsItem({
+      attrs: `data-member="${escapeAttr(m.username)}"`,
+      lead: avatar(name(m), m.avatar),
+      name: name(m),
+      // Where they work, which is the thing that says what they are here.
+      sub: m.roles.filter((r) => r.role === "collaborator").map((r) => r.where).join(", "),
+      tags: `<span class="mono-tag" data-role="collaborator">${escapeHTML(text.t("role.collaborator"))}</span>`,
+    });
+
+  const taken = new Set(owners.map((m) => m.username));
+  const candidates = team.accounts.filter((a) => !taken.has(a.username));
+  const add =
+    candidates.length === 0
+      ? ""
+      : `<form class="owner-add">
+          ${choiceField({
+            id: "owner-who",
+            name: "username",
+            label: text.t("org.addOwner"),
+            options: candidates.map((a) => [a.username, a.name ? `${a.name} (${a.username})` : a.username] as [string, string]),
+          })}
+          <div class="settings-actions">
+            <button class="button primary" type="submit">${escapeHTML(text.t("people.grant"))}</button></div>
+        </form>`;
+
+  return settingsCard(
+    text.t("repo.team"),
+    `<ul class="settings-list team">
+      ${owners.map(ownerRow).join("")}
+      ${collaborators.map(collaboratorRow).join("")}
+    </ul>
+    ${add}`,
+    { lead: text.t("org.teamLead", { organization: data.organization.name }) },
+  );
+}
+
+/**
+ * The forge, in one card: where it is and whether it is connected, the token
+ * and the secret, and the address the forge delivers to.
+ */
+function organizationForge(data: OrganizationPanel, origin: string, text: Text): string {
+  const org = data.organization;
+  const connected = data.connection?.token === true;
+  // The forge by the name it goes by, from the same list the wizard offers.
+  const forgeName = forgeOptions(text).find(([value]) => value === org.forge)?.[1] ?? org.forge;
+  const where = [forgeName, org.base_url, org.forge_owner].filter(Boolean).join(" · ");
+  return settingsCard(
+    text.t("panel.connection"),
+    `<div class="settings-row">
+      <div class="settings-info">
+        <h4>${escapeHTML(where)}</h4>
+        <p>${escapeHTML(text.t(connected ? "org.connectedHelp" : "org.notConnectedHelp"))}</p>
+      </div>
+      <span class="mono-tag${connected ? " accent" : ""}" data-connected="${connected}">${escapeHTML(text.t(connected ? "org.connected" : "org.notConnected"))}</span>
+    </div>
+    <form class="credentials">
+      ${field({ id: "cred-token", name: "token", label: text.t("panel.token"), type: "password", required: true, hint: text.t("panel.tokenHelp") }, text)}
+      ${field({ id: "cred-secret", name: "webhook_secret", label: text.t("panel.webhookSecret"), type: "password", required: true, hint: text.t("panel.secretHelp") }, text)}
+      <p class="form-error" role="alert" hidden></p>
+      <div class="settings-actions">
+        <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+    </form>
+    ${
+      org.webhook_path
+        ? `<div class="settings-row">
+            <div class="settings-info">
+              <h4>${escapeHTML(text.t("panel.webhookPath"))}</h4>
+              <p>${escapeHTML(text.t("panel.webhookPathHelp"))}</p>
+              <code class="fact-value" data-webhook>${escapeHTML(origin + org.webhook_path)}</code>
+            </div>
+            ${actionButton("copy", text.t("action.copy"), "data-copy-webhook")}
+          </div>`
+        : ""
+    }`,
+  );
 }
 
 /** Everything the panel's page for one repository shows, as the server says it. */

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -173,5 +174,83 @@ func TestARepositoryPageSaysWhatEachRoleMayDo(t *testing.T) {
 	// Somebody with no role on it does not open it.
 	if got := status(t, owner.do(http.MethodGet, "/api/orgs/other/repos/elsewhere/panel", nil)); got != http.StatusForbidden {
 		t.Errorf("a repository next door opened: %d", got)
+	}
+}
+
+// TestAnOrganisationPageShowsEachReaderTheirOwnBoards.
+//
+// A collaborator on one board opens the organisation to reach that board, and
+// is shown that board alone: the others would be doors that do not open. The
+// forge is its owner's, and whether it is connected is said without what it
+// is connected with.
+func TestAnOrganisationPageShowsEachReaderTheirOwnBoards(t *testing.T) {
+	admin, owner, collaborator := teamSetup(t)
+	admin.createRepo("acme", "second")
+
+	names := func(body map[string]any) []string {
+		out := []string{}
+		rows, _ := body["repositories"].([]any)
+		for _, row := range rows {
+			m, _ := row.(map[string]any)
+			out = append(out, m["slug"].(string))
+		}
+		return out
+	}
+
+	theirs := decode(t, collaborator.do(http.MethodGet, "/api/orgs/acme/panel", nil))
+	if got := names(theirs); len(got) != 1 || got[0] != "atlas" {
+		t.Errorf("a collaborator on atlas should see atlas alone: %v", got)
+	}
+	if theirs["can_manage"] != false {
+		t.Errorf("a collaborator was told they may manage the organisation: %v", theirs["can_manage"])
+	}
+	if _, told := theirs["connection"]; told {
+		t.Errorf("a collaborator was told about the forge connection: %v", theirs["connection"])
+	}
+
+	owned := decode(t, owner.do(http.MethodGet, "/api/orgs/acme/panel", nil))
+	if got := names(owned); len(got) != 2 {
+		t.Errorf("the owner should see both repositories: %v", got)
+	}
+	if owned["can_manage"] != true || owned["can_delete"] != false {
+		t.Errorf("an owner manages the organisation and does not end it: %v %v", owned["can_manage"], owned["can_delete"])
+	}
+
+	// Somebody with no role in it is refused, rather than shown an empty page.
+	if got := status(t, owner.do(http.MethodGet, "/api/orgs/other/panel", nil)); got != http.StatusForbidden {
+		t.Errorf("an organisation next door opened: %d", got)
+	}
+
+	// The forge, connected and then not, and never what with.
+	if got := status(t, admin.do(http.MethodPost, "/api/organizations", map[string]string{
+		"slug": "forged", "name": "Forged", "forge": "forgejo",
+		"base_url": "https://git.example.com", "forge_owner": "acme",
+	})); got != http.StatusCreated {
+		t.Fatalf("creating an organisation with a forge: %d", got)
+	}
+	connection := func() (map[string]any, string) {
+		resp := admin.do(http.MethodGet, "/api/orgs/forged/panel", nil)
+		raw, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		var body map[string]any
+		if err := json.Unmarshal(raw, &body); err != nil {
+			t.Fatal(err)
+		}
+		c, _ := body["connection"].(map[string]any)
+		return c, string(raw)
+	}
+	if c, _ := connection(); c == nil || c["token"] != false {
+		t.Errorf("a forge with no token should say it is not connected: %v", c)
+	}
+	if got := status(t, admin.do(http.MethodPost, "/api/orgs/forged/credentials",
+		map[string]string{"token": "tk_very_secret", "webhook_secret": "whs_very_secret"})); got != http.StatusOK {
+		t.Fatalf("storing the credentials: %d", got)
+	}
+	c, raw := connection()
+	if c == nil || c["token"] != true || c["secret"] != true {
+		t.Errorf("a forge with a token and a secret should say so: %v", c)
+	}
+	if strings.Contains(raw, "tk_very_secret") || strings.Contains(raw, "whs_very_secret") {
+		t.Errorf("the organisation's page returned what the forge credentials are: %s", raw)
 	}
 }

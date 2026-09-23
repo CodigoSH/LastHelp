@@ -82,10 +82,15 @@ confirmed bug and a planned idea are the same news.
 | Level | Role | Can |
 |---|---|---|
 | Server | **Administrator** | Everything, and the only one who crosses organisations |
-| Organisation | **Owner** | Its connection and **its token**, its repositories |
+| Organisation | **Owner** | Its connection and **its token**, its repositories, and who works in it |
 | Repository | **Collaborator** | Triage that repository: moderate, change status, reply, create and link issues. **Never sees the token** |
 
-That last line is the reason the two levels exist. Somebody trusted to triage
+Accounts are created by the administrator, under **People**. Who works where is
+given where the work is: owners on the organisation's page, collaborators on
+each repository's page — by the administrator or by any owner of that
+organisation.
+
+That last line of the table is the reason the two levels exist. Somebody trusted to triage
 one repository is not automatically somebody trusted with a credential that can
 write to every repository the organisation owns.
 

@@ -30,8 +30,8 @@ not anybody wanted a second level.
 ## 2. Store it
 
 In the panel, open **Organisations** and then the organisation. If it has a
-forge, its settings ask for the token
-and a webhook secret, and answers with the address to configure:
+forge, its **Forge connection** section says whether it is connected, asks for
+the token and a webhook secret, and gives the address to configure:
 
 ```
 Deliver here: https://help.example.com/hooks/xO3f…

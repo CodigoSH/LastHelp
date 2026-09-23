@@ -60,6 +60,80 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleOrganizationPanel is everything the panel's page for one organisation
+// shows: its repositories with what is waiting in each, its forge and whether
+// it is connected, and what the reader may change.
+//
+// The repositories are the ones the reader may triage, not all of them: a
+// collaborator on one board opens this page to reach that board, and a list
+// of boards they would be refused is a list of doors that do not open.
+// Somebody with no board here at all is refused the page.
+func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request) {
+	organisation, ok := s.lookupOrganization(w, r)
+	if !ok {
+		return
+	}
+	actor, _ := middleware.ActorFrom(r)
+	manage := actor.Can(authz.ManageOrganization, authz.Organization(organisation.ID))
+
+	repos, err := s.orgs().ListRepositories(organisation.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	rows := make([]map[string]any, 0, len(repos))
+	for _, repo := range repos {
+		if !actor.Can(authz.Triage, authz.Repository(repo.ID, organisation.ID)) {
+			continue
+		}
+		counts, err := s.items().Counts([]int64{repo.ID}, "moderation_state")
+		if err != nil {
+			slog.Error("counting a repository's queue", "error", err)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		rows = append(rows, map[string]any{
+			"slug":          repo.Slug,
+			"name":          repo.Name,
+			"accepts_bugs":  repo.AcceptsBugs,
+			"accepts_ideas": repo.AcceptsIdeas,
+			"pending":       counts[string(item.Pending)],
+		})
+	}
+	if !manage && len(rows) == 0 {
+		writeError(w, http.StatusForbidden, "error.forbidden")
+		return
+	}
+
+	about := map[string]any{"slug": organisation.Slug, "name": organisation.Name, "forge": string(organisation.Forge)}
+	body := map[string]any{
+		"organization": about,
+		"repositories": rows,
+		"can_manage":   manage,
+		"can_delete":   actor.Can(authz.ManageServer, authz.Scope{}),
+	}
+
+	// Where the forge is and whether it is connected, for whoever runs it:
+	// whether a token and a secret are stored, never what they are.
+	if manage && organisation.Forge != org.ForgeNone {
+		about["base_url"] = organisation.BaseURL
+		about["forge_owner"] = organisation.ForgeOwner
+		token, secret, err := s.orgs().Credentials(organisation.ID)
+		switch {
+		case errors.Is(err, org.ErrNoCredentials):
+		case err != nil:
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		body["connection"] = map[string]any{"token": token != "", "secret": secret != ""}
+		if hook, err := s.orgs().HookID(organisation.ID); err == nil && hook != "" {
+			about["webhook_path"] = "/hooks/" + hook
+		}
+	}
+
+	writeJSON(w, http.StatusOK, body)
+}
+
 // channelKind reads which channel a stored configuration is, and nothing else.
 // Through the notifier's own reader: a second parser of the same JSON is the
 // kind of copy that reads a key the other spells differently.
