@@ -69,6 +69,12 @@ export function iconButton(
   label: string,
   attrs = "",
 ): string {
-  return `<button type="button" class="icon-button" title="${escapeAttr(label)}"
-    aria-label="${escapeAttr(label)}" ${attrs}>${icons[action]()}</button>`;
+  // A class the caller passes replaces this one rather than following it: a
+  // second class attribute on one element is dropped by the browser, which
+  // silently took away every variant — the red of a delete — for as long as
+  // the two were written side by side.
+  const own = /\bclass="([^"]*)"/.exec(attrs);
+  const rest = own ? attrs.replace(own[0], "") : attrs;
+  return `<button type="button" class="${own ? own[1] : "icon-button"}" title="${escapeAttr(label)}"
+    aria-label="${escapeAttr(label)}" ${rest}>${icons[action]()}</button>`;
 }

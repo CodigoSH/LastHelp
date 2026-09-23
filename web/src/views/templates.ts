@@ -1327,34 +1327,6 @@ export function connectionForms(
   return `<ul class="settings settings-cards">${forgeCard}${address}</ul>`;
 }
 
-/** The team's triage controls on one item: rewrite, reply, and merge a duplicate away. */
-export function triageControls(text: Text, current: { title: string; body: string }): string {
-  return `
-    <section class="triage">
-      <h2>${escapeHTML(text.t("panel.rewrite"))}</h2>
-      <p class="hint">${escapeHTML(text.t("panel.rewriteHelp"))}</p>
-      <form class="rewrite">
-        <input name="title" value="${escapeAttr(current.title)}" maxlength="200" required
-               aria-label="${escapeAttr(text.t("form.title"))}" />
-        <textarea name="body" rows="5" aria-label="${escapeAttr(text.t("form.body"))}">${escapeHTML(current.body)}</textarea>
-        <button class="button" type="submit">${escapeHTML(text.t("panel.save"))}</button>
-      </form>
-
-      <h2>${escapeHTML(text.t("panel.reply"))}</h2>
-      <form class="team-reply">
-        <textarea name="body" rows="3" placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
-        <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
-      </form>
-
-      <h2>${escapeHTML(text.t("panel.merge"))}</h2>
-      <p class="hint">${escapeHTML(text.t("panel.mergeHelp"))}</p>
-      <form class="merge">
-        <input name="into" placeholder="${escapeAttr(text.t("panel.mergePlaceholder"))}" required />
-        <button class="button" type="submit">${escapeHTML(text.t("panel.merge"))}</button>
-      </form>
-    </section>`;
-}
-
 export function board(
   org: OrganizationSummary,
   repo: RepositorySummary,
@@ -1528,77 +1500,6 @@ export function roadmap(
         )
         .join("")}
     </div>
-  </div>`;
-}
-
-/**
- * The team's bridge to the forge: open an issue, or attach one that exists.
- *
- * Both, because a project with four thousand open issues does not want a four
- * thousand and first — it wants to say "this is already #4213". Offering only
- * the first is what makes this unusable on day one for anybody who has been
- * going for a while.
- */
-export function issueControl(
-  linked: { number: number; url: string } | null,
-  text: Text,
-): string {
-  if (linked) {
-    return `<p class="issue-link">${escapeHTML(text.t("item.issue"))}
-      <a href="${escapeAttr(linked.url)}" target="_blank" rel="noopener">#${escapeHTML(String(linked.number))}</a></p>`;
-  }
-
-  return `<div class="issue-control">
-    <button class="button" data-create-issue>${escapeHTML(text.t("panel.createIssue"))}</button>
-    <form class="attach">
-      <input name="issue" placeholder="${escapeAttr(text.t("panel.attachPlaceholder"))}"
-             aria-label="${escapeAttr(text.t("panel.attachIssue"))}" />
-      <button class="button" type="submit">${escapeHTML(text.t("panel.attachIssue"))}</button>
-    </form>
-  </div>`;
-}
-
-/**
- * The decision, on the report itself and in a card of its own.
- *
- * It existed only in the queue, so somebody who opened a waiting report to read
- * it properly — which is the whole point of opening it — then had to go back to
- * a list to act on what they had just read.
- *
- * Its own card rather than three more buttons at the top of the team's tools:
- * this is the one thing on the screen that is not reversible from the same
- * screen, and stacked in with the status select and the issue form it read as
- * one heap of controls. The card's title is the state it is in, which is why
- * the notice above is drawn for the reporter only — the same sentence twice on
- * one page is the sentence nobody reads.
- */
-export function moderationCard(text: Text): string {
-  return `<section class="bento-card decide">
-    <div class="card-head">${icons.queue()}<h3>${escapeHTML(text.t("item.waiting"))}</h3></div>
-    <div class="actions">
-      <button class="button primary with-icon" data-moderate="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
-      <button class="button with-icon" data-moderate="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
-      <button class="button danger with-icon" data-moderate="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
-    </div>
-  </section>`;
-}
-
-/** The team's status control, drawn only for somebody who may use it. */
-export function statusControl(
-  current: string,
-  statuses: string[],
-  text: Text,
-): string {
-  return `<div class="status-control">
-    <label for="status-select">${escapeHTML(text.t("panel.status"))}</label>
-    <select id="status-select">
-      ${statuses
-        .map(
-          (s) =>
-            `<option value="${escapeAttr(s)}"${s === current ? " selected" : ""}>${escapeHTML(text.t(`status.${s}`))}</option>`,
-        )
-        .join("")}
-    </select>
   </div>`;
 }
 
@@ -1846,6 +1747,63 @@ function answers(fields: ReportField[], text: Text): string {
  * the whole point of the page, and it was a grey rectangle the same weight as
  * "Send".
  */
+/**
+ * The report itself: what it is, what it says, and its votes. One function for
+ * the page everybody reads and the team's, so the two cannot come to show the
+ * same report differently. The team's carries a pencil in its meta line that
+ * turns the words into a form where they stand.
+ */
+function reportArticle(item: ItemDetail, text: Text, pencil = ""): string {
+  const vote =
+    item.kind === "idea"
+      ? `<button class="vote-block${item.voted ? " voted" : ""}" data-vote
+           aria-pressed="${item.voted ? "true" : "false"}">
+           <span class="count">${escapeHTML(text.number(item.votes))}</span>
+           <span class="label">${escapeHTML(item.voted ? text.t("item.voted") : text.t("item.vote"))}</span>
+         </button>`
+      : "";
+
+  // The forge issue, when the team has bridged this one. It is what a reporter
+  // came to find out — whether anybody is actually working on it — and it was
+  // already in the payload, drawn only for signed-in staff.
+  const issue = item.issue
+    ? `<a class="tracked" href="${escapeAttr(item.issue.url)}" target="_blank" rel="noopener">
+         ${icons.open(14)}<span>${escapeHTML(text.t("item.trackedAs", { number: text.number(item.issue.number) }))}</span>
+       </a>`
+    : "";
+
+  // Blank lines are how people write a report: what happened, then what they
+  // expected, then their version. Rendered as one run-on paragraph, a careful
+  // report reads like a worse one than it is.
+  const body = item.body
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `<p>${escapeHTML(part)}</p>`)
+    .join("");
+
+  return `<article class="detail">
+      <div class="detail-main">
+        <p class="meta">
+          <span class="kind kind-${escapeAttr(item.kind)}">
+            ${item.kind === "bug" ? icons.bug(14) : icons.idea(14)}
+            <span>${escapeHTML(text.t(`kind.${item.kind}`))}</span>
+          </span>
+          ${stateChip(item, text)}
+          <span class="when">${escapeHTML(text.date(item.created_at))}</span>
+          ${issue}
+          ${pencil}
+        </p>
+        <div class="detail-words">
+          <h1>${escapeHTML(item.title)}</h1>
+          <div class="body">${body}</div>
+        </div>
+        ${answers(item.fields ?? [], text)}
+      </div>
+      ${vote}
+    </article>`;
+}
+
 export function itemView(item: ItemDetail, text: Text): string {
   const board = item.repository;
   const org = board?.organization;
@@ -1885,34 +1843,6 @@ export function itemView(item: ItemDetail, text: Text): string {
       </section>`
     : "";
 
-  const vote =
-    item.kind === "idea"
-      ? `<button class="vote-block${item.voted ? " voted" : ""}" data-vote
-           aria-pressed="${item.voted ? "true" : "false"}">
-           <span class="count">${escapeHTML(text.number(item.votes))}</span>
-           <span class="label">${escapeHTML(item.voted ? text.t("item.voted") : text.t("item.vote"))}</span>
-         </button>`
-      : "";
-
-  // The forge issue, when the team has bridged this one. It is what a reporter
-  // came to find out — whether anybody is actually working on it — and it was
-  // already in the payload, drawn only for signed-in staff.
-  const issue = item.issue
-    ? `<a class="tracked" href="${escapeAttr(item.issue.url)}" target="_blank" rel="noopener">
-         ${icons.open(14)}<span>${escapeHTML(text.t("item.trackedAs", { number: text.number(item.issue.number) }))}</span>
-       </a>`
-    : "";
-
-  // Blank lines are how people write a report: what happened, then what they
-  // expected, then their version. Rendered as one run-on paragraph, a careful
-  // report reads like a worse one than it is.
-  const body = item.body
-    .split(/\n{2,}/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => `<p>${escapeHTML(part)}</p>`)
-    .join("");
-
   const thread =
     item.comments.length === 0
       ? `${emptyState(text.t("item.threadEmpty"), icons.people(28))}`
@@ -1933,37 +1863,7 @@ export function itemView(item: ItemDetail, text: Text): string {
 
   return `<div class="page">
     ${crumb}${merged}${waiting}
-    <article class="detail">
-      <div class="detail-main">
-        <p class="meta">
-          <span class="kind kind-${escapeAttr(item.kind)}">
-            ${item.kind === "bug" ? icons.bug(14) : icons.idea(14)}
-            <span>${escapeHTML(text.t(`kind.${item.kind}`))}</span>
-          </span>
-          ${stateChip(item, text)}
-          <span class="when">${escapeHTML(text.date(item.created_at))}</span>
-          ${issue}
-        </p>
-        <h1>${escapeHTML(item.title)}</h1>
-        <div class="body">${body}</div>
-        ${answers(item.fields ?? [], text)}
-      </div>
-      ${vote}
-    </article>
-
-    <!--
-      The team's tools have a container of their own, and it is not inside the
-      report. They used to be appended to the article, which made them children
-      of its grid: the status select and the attach-an-issue form became a
-      second column, and the report itself was squeezed into a strip a few
-      words wide. Nothing in the markup looked wrong — it was two correct
-      pieces meeting badly, and it only showed up in a screenshot.
-    -->
-    <section class="bento-card team-tools" hidden>
-      <div class="card-head">${icons.people()}<h3>${escapeHTML(text.t("panel.teamTools"))}</h3></div>
-      <span class="card-sub">${escapeHTML(text.t("panel.teamToolsHelp"))}</span>
-      <div class="tools"></div>
-    </section>
+    ${reportArticle(item, text)}
 
     ${yours}
 
@@ -3813,6 +3713,195 @@ function repositoryTeam(
     ${add}`,
     { lead: text.t("repo.teamLead", { organization: repo.organization.name }) },
   );
+}
+
+/**
+ * One report, as the team works on it.
+ *
+ * It used to be the public page with one card of "team tools" appended: the
+ * status, the forge issue, a rewrite form, a reply box and a merge form in a
+ * single box, three widths of field and three kinds of button — and a second
+ * box to write in underneath, the public one, which posted a team member's
+ * words as an anonymous visitor's and held them for that same person to
+ * approve. Now each job is a card of Lastboard's recipe, in the order the work
+ * goes: decide whether it is published, read it, set where it stands, bridge
+ * it, answer, and fold a duplicate away. There is one place to write.
+ */
+export function itemTeamView(
+  item: ItemDetail,
+  statuses: { current: string; statuses: string[] },
+  /** The other reports on the same board, the ones this one can be merged into. */
+  others: { public_id: string; title: string }[],
+  text: Text,
+): string {
+  const board = item.repository;
+  const org = board?.organization;
+  const crumb =
+    board && org
+      ? `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a>
+          <span aria-hidden="true">/</span>
+          <a href="/panel/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a>
+          <span aria-hidden="true">/</span>
+          <a href="/panel/${escapeAttr(org.slug)}/repos/${escapeAttr(board.slug)}">${escapeHTML(board.name)}</a></p>`
+      : "";
+
+  const merged = item.merged_into
+    ? `<p class="notice">${icons.info()}<a href="/i/${escapeAttr(item.merged_into)}">${escapeHTML(text.t("item.merged"))}</a></p>`
+    : "";
+
+  // The one decision here the page cannot take back, so it comes first and
+  // only while there is something to decide.
+  const decide =
+    item.moderation && item.moderation !== "published"
+      ? settingsCard(
+          text.t("item.waiting"),
+          `<div class="settings-row">
+            <div class="settings-info"><p>${escapeHTML(text.t("item.waitingHelp"))}</p></div>
+            <div class="decide-actions">
+              <button class="button primary with-icon" data-moderate="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+              <button class="button ghost with-icon" data-moderate="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+              <button class="button danger with-icon" data-moderate="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
+            </div>
+          </div>`,
+        )
+      : "";
+
+  const pencil = iconButton("edit", text.t("panel.rewrite"), 'class="icon-button detail-edit" data-rewrite');
+
+  const status = settingsCard(
+    text.t("panel.status"),
+    `<div class="settings-row">
+      <div class="settings-info"><p>${escapeHTML(text.t("item.statusHelp"))}</p></div>
+      <select id="status-select" aria-label="${escapeAttr(text.t("panel.status"))}">
+        ${statuses.statuses
+          .map(
+            (s) =>
+              `<option value="${escapeAttr(s)}"${s === statuses.current ? " selected" : ""}>${escapeHTML(text.t(`status.${s}`))}</option>`,
+          )
+          .join("")}
+      </select>
+    </div>`,
+  );
+
+  const issue = settingsCard(
+    text.t("item.issue"),
+    item.issue
+      ? `<div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("item.trackedAs", { number: text.number(item.issue.number) }))}</h4>
+            <p>${escapeHTML(text.t("item.issueLinkedHelp"))}</p>
+          </div>
+          <a class="button ghost with-icon" href="${escapeAttr(item.issue.url)}" target="_blank" rel="noopener" data-issue-link>${icons.open(15)}<span>${escapeHTML(text.t("item.issueOpenIt"))}</span></a>
+        </div>`
+      : `<div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("panel.createIssue"))}</h4>
+            <p>${escapeHTML(text.t("item.issueCreateHelp"))}</p>
+          </div>
+          <button class="button primary" type="button" data-create-issue>${escapeHTML(text.t("item.issueCreate"))}</button>
+        </div>
+        <form class="settings-row attach">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("panel.attachIssue"))}</h4>
+            <p>${escapeHTML(text.t("item.issueAttachHelp"))}</p>
+          </div>
+          <div class="inline-field">
+            <input name="issue" required placeholder="${escapeAttr(text.t("panel.attachPlaceholder"))}"
+                   aria-label="${escapeAttr(text.t("panel.attachIssue"))}" />
+            <button class="button ghost" type="submit">${escapeHTML(text.t("item.issueAttach"))}</button>
+          </div>
+        </form>`,
+  );
+
+  const thread =
+    item.comments.length === 0
+      ? `<p class="card-sub">${escapeHTML(text.t("item.threadEmpty"))}</p>`
+      : `<ul class="comments">${item.comments
+          .map((c) => {
+            const who = c.name || text.t(`comment.${c.author}`);
+            return `<li class="comment comment-${escapeAttr(c.author)}">
+              <p class="who">
+                ${avatar(who)}
+                <span class="who-name">${escapeHTML(who)}</span>
+                ${c.author === "team" ? `<span class="who-badge">${escapeHTML(text.t("comment.team"))}</span>` : ""}
+                <span class="when">${escapeHTML(text.date(c.created_at))}</span>
+              </p>
+              <p class="what">${escapeHTML(c.body)}</p>
+            </li>`;
+          })
+          .join("")}</ul>`;
+  const conversation = settingsCard(
+    text.t("item.comments"),
+    `${thread}
+    <form class="team-reply">
+      <div class="field">
+        <label for="team-reply-body">${escapeHTML(text.t("panel.reply"))}</label>
+        <textarea id="team-reply-body" name="body" rows="3" required
+                  placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
+        <p class="hint">${escapeHTML(text.t("item.replyHelp"))}</p>
+      </div>
+      <div class="settings-actions">
+        <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button></div>
+    </form>`,
+    { action: `<span class="count-chip">${escapeHTML(text.number(item.comments.length))}</span>` },
+  );
+
+  // Picked by title from this board's reports, filtered as you type: nobody
+  // knows another report's identifier, and asking for one made the control a
+  // form nobody could fill in.
+  const merge = item.merged_into
+    ? ""
+    : settingsCard(
+        text.t("panel.merge"),
+        others.length === 0
+          ? `<p class="card-sub">${escapeHTML(text.t("item.mergeNone"))}</p>`
+          : `<form class="merge">
+              <div class="field">
+                <label for="merge-search">${escapeHTML(text.t("item.mergePick"))}</label>
+                <input id="merge-search" type="search" data-merge-search
+                       placeholder="${escapeAttr(text.t("item.mergeSearch"))}" autocomplete="off" />
+              </div>
+              ${choiceField({
+                id: "merge-into",
+                name: "into",
+                label: text.t("item.mergeInto"),
+                options: others.map((o) => [o.public_id, o.title] as [string, string]),
+              })}
+              <div class="settings-actions">
+                <button class="button primary" type="submit">${escapeHTML(text.t("item.mergeAction"))}</button></div>
+            </form>`,
+        { lead: text.t("panel.mergeHelp") },
+      );
+
+  return `${crumb}${merged}
+    <h1 class="visually-hidden">${escapeHTML(item.title)}</h1>
+    <div class="settings item-team">
+      ${decide}
+      ${reportArticle(item, text, pencil)}
+      ${status}
+      ${issue}
+      ${conversation}
+      ${merge}
+    </div>`;
+}
+
+/** The report's words as a form, where they stood. Cancel puts them back. */
+export function rewriteForm(current: { title: string; body: string }, text: Text): string {
+  return `<form class="rewrite">
+    <p class="hint">${escapeHTML(text.t("panel.rewriteHelp"))}</p>
+    <div class="field">
+      <label for="rewrite-title">${escapeHTML(text.t("form.title"))}</label>
+      <input id="rewrite-title" name="title" value="${escapeAttr(current.title)}" maxlength="200" required />
+    </div>
+    <div class="field">
+      <label for="rewrite-body">${escapeHTML(text.t("form.body"))}</label>
+      <textarea id="rewrite-body" name="body" rows="6">${escapeHTML(current.body)}</textarea>
+    </div>
+    <div class="settings-actions">
+      <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button>
+      <button class="button ghost" type="button" data-rewrite-cancel>${escapeHTML(text.t("action.cancel"))}</button>
+    </div>
+  </form>`;
 }
 
 /** Who may act here, what each of them is, and where. */

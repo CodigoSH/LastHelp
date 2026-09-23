@@ -532,8 +532,6 @@ h2 {
 .crumb a:hover { color: var(--accent-alt); }
 .brand:hover { text-decoration: none; }
 
-
-
 /*
  * Nothing here — said as a place rather than as a missing thing.
  *
@@ -1138,10 +1136,6 @@ input:hover, textarea:hover, select:hover { border-color: var(--border-strong); 
 .sel-option.selected:hover,
 .sel-option.selected.active { background: rgba(var(--accent-rgb), 0.15); }
 
-/* In a row with its label, the control is as wide as its longest option
-   rather than the whole row. */
-.status-control .sel { inline-size: auto; min-inline-size: 12rem; }
-
 @media (prefers-reduced-motion: reduce) {
   .sel-list,
   .sel-icon,
@@ -1454,21 +1448,6 @@ summary:focus-visible,
 
 /* ----------------------------------------------------------- panel pieces */
 
-.status-control {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-block-start: 1rem;
-  padding-block-start: 0.8rem;
-  border-block-start: 1px dashed var(--border);
-}
-
-.issue-control { display: grid; gap: 0.5rem; margin-block-start: 0.8rem; }
-.issue-control .attach { display: flex; gap: 0.5rem; margin: 0; }
-.issue-control .attach input { flex: 1; }
-.issue-note { font-size: 0.875rem; color: var(--text-dim); margin: 0; }
-.issue-link { margin-block-start: 0.8rem; font-size: 0.9rem; }
-
 .new-org, .new-repo { max-inline-size: 28rem; }
 .forge-fields { display: grid; gap: 0.35rem; }
 
@@ -1485,19 +1464,14 @@ summary:focus-visible,
 }
 .update-note { font-size: 0.875rem; color: var(--text-dim); }
 
-.credentials, .channel, .team-reply, .merge { max-inline-size: 28rem; }
+.credentials, .channel { max-inline-size: 28rem; }
 .channel-fields, .channel-mail { display: grid; gap: 0.35rem; }
-.merge { display: flex; gap: 0.5rem; align-items: start; }
-.merge input { flex: 1; }
 .webhook-path {
   font-family: var(--font-mono);
   font-size: 0.8rem;
   color: var(--text-dim);
   word-break: break-all;
 }
-.triage { margin-block-start: 2rem; padding-block-start: 1rem; border-block-start: 1px solid var(--border); }
-
-.triage-note { font-size: 0.875rem; color: var(--text-dim); }
 
 .exports { font-size: 0.875rem; margin-block: 0.5rem 0; }
 
@@ -2061,8 +2035,6 @@ body.admin-view > main {
   display: grid;
   gap: 0.5rem;
 }
-
-
 
 /* The panel uses the window it is given.
  *
@@ -2698,7 +2670,6 @@ a.stat:hover {
   object-fit: cover;
 }
 
-
 /* A card whose whole face is a link, with its controls floating over the
    corner. The link is the <a>, not the <li>, so the buttons are not inside it —
    a button inside a link is a browser deciding which one you meant. */
@@ -3070,26 +3041,6 @@ body > nav .brand {
 
 .queue .on:hover { color: var(--accent-alt); }
 
-/* The team's tools on a public report: their own card, under it. Inside the
-   report's own grid they became a second column and squeezed it to a strip. */
-.team-tools { margin-block-start: 1rem; }
-.team-tools .tools { display: grid; gap: 0.75rem; }
-.team-tools .tools h2 { font-size: 1rem; margin: 0.5rem 0 0; }
-
-/* The second thing in the block is a second thing. Without this the heading sits
-   against the button of the form above it and reads as that form's caption —
-   "Send / Merge into another" as one sentence — which is how somebody merges a
-   report they meant to reply to.
- *
- * Written with the same two classes as the rule above on purpose. The first
- * attempt was `.triage form + h2`, which matches and still loses: one class and
- * two elements is lower than two classes and one element, so the margin stayed
- * at the 8px set here. It looked correct in the file and did nothing on screen,
- * and only the computed value said so. */
-.team-tools .tools form + h2 { margin-block-start: 1.75rem; }
-.team-tools .triage { margin: 0; }
-.team-tools .status-control { margin: 0; }
-
 /* ------------------------------------------------------- reporting something */
 
 /* The kind, as two cards rather than two words in a row. It decides which
@@ -3427,10 +3378,8 @@ body > nav .brand {
 /* The name of a group of cards: the pill of Lastboard's section heads, with
    the rule running on from it. */
 
-
 /* One fact about the machine: what it is, in a tile the accent marks, and the
    number — which is the point — at the size of a number. */
-
 
 /* How full the disk is. A <meter>, so its length is an attribute and not a
    style; accent while there is room, amber past three quarters, red past
@@ -3452,7 +3401,6 @@ body > nav .brand {
 .about-meter::-moz-meter-bar { border-radius: 3px; background: var(--accent); }
 .about-meter:-moz-meter-sub-optimum::-moz-meter-bar { background: var(--warning-color); }
 .about-meter:-moz-meter-sub-sub-optimum::-moz-meter-bar { background: var(--danger-color); }
-
 
 .about-links {
   display: flex;
@@ -3752,7 +3700,6 @@ body > nav .brand {
    card rather than a button of its own hanging under it. */
 .signin-go { inline-size: 100%; }
 
-
 /* The mark above the steps of the wizard. It wears the same lit tile as the one
    on the front page and on the entrance: three screens showing the same mark
    three different ways is how a product reads as assembled from parts. */
@@ -3820,7 +3767,6 @@ a.bento-card:hover,
   box-shadow: var(--shadow-md), var(--hairline);
 }
 
-
 .admin-main > h1 { margin-block-end: 0.35rem; }
 
 /* The dialog title bar and the card heads pick up the section-title weight
@@ -3829,7 +3775,6 @@ a.bento-card:hover,
 
 /* ---------------------------------------------------- one report, refined */
 
-
 /* The report itself reads at the measure of a paragraph even though the card
    is as wide as the page: a line of a hundred and forty characters is a line
    the eye loses its place in. */
@@ -3837,7 +3782,6 @@ a.bento-card:hover,
 .detail .body p { max-inline-size: var(--prose); }
 
 .detail .body p { line-height: 1.65; }
-
 
 .answers dl > div {
   padding: 0.6rem 0.75rem;
@@ -3856,7 +3800,6 @@ a.bento-card:hover,
 /* ------------------------------------------------------ signing in, refined */
 
 .signin .wizard-card { box-shadow: var(--shadow-md), var(--hairline); }
-
 
 /* The mark on the entrance, lit the way the front page lights it. */
 .signin-head .brand-logo {
@@ -3914,24 +3857,6 @@ a.bento-card:hover,
 }
 
 .side-foot .link:hover { background: rgba(127, 127, 127, 0.12); color: var(--text-main); }
-
-/* The team's tools, which are three separate jobs in one card and used to run
-   into each other: a rule between them and one width for every field. */
-.team-tools .tools > * + * {
-  margin-block-start: 1rem;
-  padding-block-start: 1rem;
-  border-block-start: 1px dashed var(--border);
-}
-
-.team-tools .team-reply,
-.team-tools .merge,
-.team-tools .issue-control {
-  max-inline-size: 40rem;
-}
-
-.team-tools .team-reply textarea { inline-size: 100%; }
-.team-tools .status-control,
-.team-tools .issue-control { margin-block-start: 0; padding-block-start: 0; border-block-start: 0; }
 
 /* The way back carries the chevron pointing back — the same drawing mirrored,
    and mirrored once more in Arabic, where back is the other way. */
@@ -4311,12 +4236,6 @@ a.stat:hover .stat-go {
    hand's width of nothing between the team's tools and the first comment. */
 .page > .thread { margin-block-start: 0; }
 
-/* The decision on a waiting report: its own card, above the team's tools and
-   apart from them. Its head carries the state, so nothing else has to. */
-.decide { margin-block-start: 0; }
-.decide .card-head { color: var(--hue-hold); }
-.decide .actions { margin-block-start: 0.35rem; }
-
 /* Leaving, in the bar. The mark points at the door and the door is at the end
    of the line, which is the other end in Arabic. */
 .nav-right .sign-out .icon { transform: scaleX(var(--rtl-flip)); }
@@ -4465,7 +4384,6 @@ a.stat:hover .stat-go {
 /* Held still so it can start again: an animation that is already running does
    not replay, and removing this class after a reflow is what restarts it. */
 .toast-bar.no-drain { animation: none !important; }
-
 
 /*
  * The front page, composed.
@@ -6233,7 +6151,6 @@ a.stat:hover .stat-go {
   }
 }
 
-
 /*
  * The front page editor: one row per module, in the order they are drawn.
  *
@@ -6286,7 +6203,6 @@ a.stat:hover .stat-go {
   flex-wrap: wrap;
   margin-block-start: 0.8rem;
 }
-
 
 /*
  * Arranging the front page, on the front page.
@@ -6441,7 +6357,6 @@ a.stat:hover .stat-go {
 .kebab-item:hover { background: rgba(128, 128, 128, 0.15); }
 .kebab-item.menu-delete:hover { color: var(--danger-color); }
 
-
 /*
  * Where a module would land, shown before the hand lets go.
  *
@@ -6487,7 +6402,6 @@ a.stat:hover .stat-go {
  * answer for a list is its own scroll, so a short module shows three of eight
  * and the other five are a scroll away instead of gone.
  */
-
 
 /*
  * The button module: the one thing this page exists to make happen, so it is
@@ -6974,3 +6888,20 @@ a.stat:hover .stat-go {
 @media (prefers-reduced-motion: reduce) {
   .accent-swatch { transition: none; }
 }
+
+/* The team's report: the report card, then one card per job. The pencil sits
+   at the end of the report's meta line, where the words it edits begin. */
+.item-team { max-inline-size: 760px; }
+.item-team .detail { margin: 0; }
+.detail .meta .detail-edit { margin-inline-start: auto; }
+.detail-words .rewrite { display: grid; gap: 12px; }
+.detail-words .rewrite .settings-actions { gap: 8px; margin-block-start: 4px; }
+.decide-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+/* A field and its button on one line, as the attach row asks for one short
+   value and acts on it. */
+.inline-field { display: flex; gap: 8px; align-items: center; }
+.inline-field input { inline-size: 200px; }
+.item-team .comments { margin-block: 8px 16px; }
+.item-team .team-reply textarea { inline-size: 100%; max-inline-size: none; }
+.item-team .settings-row .sel { min-inline-size: 180px; }
+

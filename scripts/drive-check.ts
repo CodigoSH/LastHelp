@@ -567,12 +567,15 @@ async function main() {
       // its grid and squeezed the report into a strip a few words wide —
       // markup that read correctly and rendered wrong.
       cardChildren: [...document.querySelector("article.detail").children].map(c => c.classList[0]).join("+"),
-      tools: !!document.querySelector(".team-tools .tools"),
+      tools: !!document.querySelector(".item-team"),
     };
   `);
+  // For the team the way back is the panel's: the organisation and the
+  // repository's page, where the rest of that board's work is. A visitor's
+  // crumb leads to the public board, and is checked as the visitor below.
   check(
     "a report says which board it is on and leads back",
-    JSON.stringify(detail.crumb) === '["/codigosh","/codigosh/lastboard"]',
+    JSON.stringify(detail.crumb) === '["/panel/organizations","/panel/codigosh","/panel/codigosh/repos/lastboard"]',
     JSON.stringify(detail.crumb),
   );
   check("its status wears the colour the board uses", detail.status.includes("status-"), detail.status);
@@ -592,13 +595,23 @@ async function main() {
       // The bar stays on every screen now; what matters here is that somebody
       // arriving cold at a report inside the panel keeps the panel around it.
       barra: getComputedStyle(document.querySelector("body > nav")).display !== "none",
-      tools: document.querySelector(".team-tools") ? !document.querySelector(".team-tools").hidden : false,
+      tools: !!document.querySelector(".item-team"),
+      // One place to write, and it is the team's. The public box posted a team
+      // member's words as an anonymous visitor's, held for that same person to
+      // approve.
+      cajas: document.querySelectorAll(".admin-main textarea").length,
+      publica: !!document.querySelector("form.comment-form"),
     };
   `);
   check(
     "and the team keeps their panel around it",
     inPanel.sidebar === true && inPanel.barra === true && inPanel.tools === true,
     JSON.stringify(inPanel),
+  );
+  check(
+    "and has one place to write, the team's reply, not the public comment box",
+    inPanel.cajas === 1 && inPanel.publica === false,
+    JSON.stringify({ cajas: inPanel.cajas, publica: inPanel.publica }),
   );
   check("the vote is a count and a verb", detail.vote === "count+label", detail.vote);
   check(
@@ -611,6 +624,15 @@ async function main() {
   //     reads it, published from the queue, and only then on the page. Every
   //     step of this existed except the middle one, so the page promised a
   //     reading that could not happen.
+  //     Written as a visitor writes it, signed out on the public page: the
+  //     team's page offers no public box, since the team's words are the
+  //     team's. Signed back in afterwards, as the administrator this pass is.
+  await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+  `);
+  await goTo(String(href), "form.comment-form");
   await evaluate(`
     const form = document.querySelector("form.comment-form");
     form.querySelector("textarea").value = "it happens on the phone too";
@@ -623,6 +645,16 @@ async function main() {
       shown: document.body.textContent.includes("it happens on the phone too"),
     };
   `);
+  await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/session", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ username: "alex", password: "una contraseña larga de verdad" }) });
+    location.reload();
+  `);
+  await sleep(1500);
+  await waitFor(".item-team");
   check("a comment is taken and held for a person", heldBack.told === true && heldBack.shown === false,
     JSON.stringify(heldBack));
 
@@ -1278,13 +1310,23 @@ async function main() {
   check("and it is still there on the next visit", String(revisit).includes("/hooks/"), String(revisit).slice(0, 56));
 
   await goTo(String(href), "form.team-reply");
+  // Merging is offered as a pick from the board's other reports, so the form
+  // is there exactly when there is another report to pick — and says so when
+  // there is none, rather than asking for an identifier that cannot exist.
   const triage = await evaluate(`
+    const id = location.pathname.split("/").pop();
+    const all = await fetch("/api/reports?board=codigosh/lastboard&limit=200").then(r => r.json());
+    const others = (all.items ?? []).filter(r => r.public_id !== id).length;
     return {
       reply: !!document.querySelector("form.team-reply"),
       merge: !!document.querySelector("form.merge"),
+      opciones: document.querySelectorAll("#merge-into option").length,
+      others,
     };
   `);
-  check("the team can reply and merge from the item", triage.reply === true && triage.merge === true,
+  check("the team can reply and merge from the item",
+    triage.reply === true && triage.merge === (triage.others > 0) &&
+      triage.opciones === triage.others,
     JSON.stringify(triage));
 
   // And rewrite it. A title that says "its broken" is the normal case, and
@@ -1293,11 +1335,14 @@ async function main() {
   // reachable, prefilled with what is actually there, and the heading has to
   // end up saying the new thing.
   const rewritable = await evaluate(`
-    const form = document.querySelector("form.rewrite");
+    // Behind the pencil, in the report card where the words stand.
+    document.querySelector("[data-rewrite]")?.click();
+    await new Promise(r => setTimeout(r, 200));
+    const form = document.querySelector(".detail form.rewrite");
     return {
       form: !!form,
       prefilled: form?.querySelector("input[name=title]")?.value ?? "",
-      heading: document.querySelector(".detail h1")?.textContent?.trim() ?? "",
+      heading: document.querySelector("h1.visually-hidden")?.textContent?.trim() ?? "",
     };
   `);
   check(
@@ -4239,11 +4284,20 @@ async function main() {
       sidebar: !!document.querySelector(".side"),
       publicNav: getComputedStyle(document.querySelector("body > nav")).display,
       report: !!document.querySelector("article.detail"),
+      crumb: [...document.querySelectorAll(".crumb a")].map(a => a.getAttribute("href")),
+      comentar: !!document.querySelector("form.comment-form"),
+      equipo: !!document.querySelector(".item-team, [data-rewrite], form.team-reply"),
     };
   `);
   check(
     "a visitor on the same address gets the page, not the application",
     visitor.sidebar === false && visitor.publicNav !== "none" && visitor.report === true,
+    JSON.stringify(visitor),
+  );
+  check(
+    "and a crumb to the public board, a box to comment in, and none of the team's controls",
+    JSON.stringify(visitor.crumb) === '["/codigosh","/codigosh/lastboard"]' &&
+      visitor.comentar === true && visitor.equipo === false,
     JSON.stringify(visitor),
   );
 

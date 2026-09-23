@@ -8,6 +8,20 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+item.issueAttach
+item.issueAttachHelp
+item.issueCreate
+item.issueCreateHelp
+item.issueLinkedHelp
+item.issueOpenIt
+item.mergeAction
+item.mergeInto
+item.mergeNone
+item.mergePick
+item.mergeSearch
+item.replyHelp
+item.statusHelp
+item.waitingHelp
 repo.addCollaborator
 repo.channelNow
 repo.confirmRevoke

@@ -2305,37 +2305,40 @@ async function showItem(publicID: string): Promise<void> {
   const path = `/api/items/${encodeURIComponent(publicID)}${token ? `?k=${encodeURIComponent(token)}` : ""}`;
   const item = await api.get<ItemDetail>(path);
 
-  // Somebody with a role keeps their panel around the report.
-  //
-  // The address is the public one — this is the page that travels, and a
-  // stranger opening it must not be shown an application — but for the team it
-  // is where the work is done, and arriving at it from the listing used to drop
-  // them out of the panel entirely: no navigation, no way back to what they
-  // were working through except the browser's own button.
-  const staff = me !== null && (me.admin === true || (me.memberships ?? []).length > 0);
-  if (staff) {
-    // Under Reports in the sidebar, because that is the screen this was
-    // reached from and the one to go back to.
-    await showInShell(views.itemView(item, text), "/panel/reports");
-  } else {
-    show(views.itemView(item, text));
+  // Whether this person works on this report is the server's to say: asking
+  // is the check, and a page that decides for itself who may act is a second
+  // implementation of the rules.
+  const allowed = me
+    ? await api
+        .get<{ current: string; statuses: string[] }>(`/api/items/${encodeURIComponent(publicID)}/statuses`)
+        .catch(() => null)
+    : null;
+
+  // The address is the public one — this is the page that travels — but for
+  // the team it is where the work is done, so they get the panel around it and
+  // the report as they work on it. Marked under the organisations, which is
+  // where the board it belongs to is found in the panel.
+  const org = item.repository?.organization?.slug ?? "";
+  if (allowed) {
+    const board = item.repository ? `${org}/${item.repository.slug}` : "";
+    const siblings = board
+      ? await api
+          .get<views.ReportsData>(`/api/reports?${new URLSearchParams({ board, limit: "200" }).toString()}`)
+          .catch(() => null)
+      : null;
+    const others = (siblings?.items ?? [])
+      .filter((r) => r.public_id !== publicID)
+      .map((r) => ({ public_id: r.public_id, title: r.title }));
+    await showInShell(views.itemTeamView(item, allowed, others, text), org ? `/panel/${org}` : "/panel");
+    wireVote(publicID);
+    wireTeamItem(publicID, item);
+    return;
   }
 
-  root?.querySelector<HTMLButtonElement>("[data-vote]")?.addEventListener("click", async (event) => {
-    const button = event.currentTarget as HTMLButtonElement;
-    const voted = button.classList.contains("voted");
-    const result = await api[voted ? "del" : "post"]<{ votes: number; voted: boolean }>(
-      `/api/items/${encodeURIComponent(publicID)}/votes`,
-    );
-    // Only the button is redrawn. Replacing the page would scroll the thread
-    // back to the top under whoever was reading it.
-    button.classList.toggle("voted", result.voted);
-    button.setAttribute("aria-pressed", result.voted ? "true" : "false");
-    const label = button.querySelector(".label");
-    if (label) label.textContent = result.voted ? i18n.t("item.voted") : i18n.t("item.vote");
-    const count = button.querySelector(".count");
-    if (count) count.textContent = i18n.number(result.votes);
-  });
+  const staff = me !== null && (me.admin === true || (me.memberships ?? []).length > 0);
+  if (staff) await showInShell(views.itemView(item, text), org ? `/panel/${org}` : "/panel");
+  else show(views.itemView(item, text));
+  wireVote(publicID);
 
   // The reporter's way back to their own report. The address is this page's,
   // token and all, and it is filled in here rather than in the template
@@ -2348,55 +2351,6 @@ async function showItem(publicID: string): Promise<void> {
       const span = (event.currentTarget as HTMLElement).querySelector("span");
       if (span) span.textContent = i18n.t("sent.copied");
     });
-  }
-
-  // The team's control, and only if the server says this person may use it.
-  // Asking is the check; drawing the select is not. A page that decides for
-  // itself who may act is a second implementation of the rules.
-  if (me) {
-    const allowed = await api
-      .get<{ current: string; statuses: string[] }>(`/api/items/${encodeURIComponent(publicID)}/statuses`)
-      .catch(() => null);
-    if (allowed) {
-      const tools = root?.querySelector<HTMLElement>(".team-tools");
-      if (tools) tools.hidden = false;
-
-      // What is still waiting is decided here rather than back in a list: the
-      // reason somebody opens a waiting report is to read it before deciding,
-      // and the decision was one screen away from the reading.
-      if (item.moderation && item.moderation !== "published") {
-        // Above the tools and outside them: it is the one decision on this
-        // screen that the screen cannot undo.
-        tools?.insertAdjacentHTML("beforebegin", views.moderationCard(text));
-        root?.querySelectorAll<HTMLButtonElement>("[data-moderate]").forEach((button) =>
-          button.addEventListener("click", async () => {
-            try {
-              await api.post(`/api/items/${encodeURIComponent(publicID)}/moderation`, {
-                state: button.dataset.moderate,
-              });
-              await render();
-            } catch (err) {
-              report(err);
-            }
-          }),
-        );
-      }
-
-      tools
-        ?.querySelector(".tools")
-        ?.insertAdjacentHTML("beforeend", views.statusControl(allowed.current, allowed.statuses, text));
-
-      root?.querySelector<HTMLSelectElement>("#status-select")?.addEventListener("change", async (e) => {
-        const select = e.target as HTMLSelectElement;
-        await api
-          .post(`/api/items/${encodeURIComponent(publicID)}/status`, { status: select.value })
-          .then(() => toast(i18n.t("toast.statusChanged")))
-          .catch((err) => report(err));
-      });
-
-      wireIssueControl(publicID, item.issue ?? null);
-      wireTriage(publicID, { title: item.title ?? "", body: item.body ?? "" });
-    }
   }
 
   const commentForm = root?.querySelector<HTMLFormElement>("form.comment-form");
@@ -2412,6 +2366,135 @@ async function showItem(publicID: string): Promise<void> {
     commentForm.reset();
     const sent = commentForm.querySelector<HTMLParagraphElement>(".comment-sent");
     if (sent) sent.hidden = false;
+  });
+}
+
+function wireVote(publicID: string): void {
+  root?.querySelector<HTMLButtonElement>("[data-vote]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    const voted = button.classList.contains("voted");
+    const result = await api[voted ? "del" : "post"]<{ votes: number; voted: boolean }>(
+      `/api/items/${encodeURIComponent(publicID)}/votes`,
+    );
+    // Only the button is redrawn. Replacing the page would scroll the thread
+    // back to the top under whoever was reading it.
+    button.classList.toggle("voted", result.voted);
+    button.setAttribute("aria-pressed", result.voted ? "true" : "false");
+    const label = button.querySelector(".label");
+    if (label) label.textContent = result.voted ? i18n.t("item.voted") : i18n.t("item.vote");
+    const count = button.querySelector(".count");
+    if (count) count.textContent = i18n.number(result.votes);
+  });
+}
+
+/**
+ * The team's report: each card's one job.
+ *
+ * Every change re-renders the page rather than patching it: the title and the
+ * status appear in more than one place on this screen, and updating the one
+ * that was easy to reach is how the two start disagreeing.
+ */
+function wireTeamItem(publicID: string, item: ItemDetail): void {
+  const base = `/api/items/${encodeURIComponent(publicID)}`;
+  const act = async (call: () => Promise<unknown>, done?: string) => {
+    try {
+      await call();
+      if (done) toast(i18n.t(done));
+      await render();
+    } catch (err) {
+      report(err);
+    }
+  };
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-moderate]").forEach((button) =>
+    button.addEventListener("click", () =>
+      act(() => api.post(`${base}/moderation`, { state: button.dataset.moderate })),
+    ),
+  );
+
+  root?.querySelector<HTMLSelectElement>("#status-select")?.addEventListener("change", (e) =>
+    act(() => api.post(`${base}/status`, { status: (e.target as HTMLSelectElement).value }), "toast.statusChanged"),
+  );
+
+  // Rewriting, where the words stand: the pencil swaps them for a form, and
+  // Cancel swaps them back without asking the server anything.
+  const words = root?.querySelector<HTMLElement>(".detail-words");
+  const pencil = root?.querySelector<HTMLButtonElement>("[data-rewrite]");
+  pencil?.addEventListener("click", () => {
+    if (!words || words.querySelector("form.rewrite")) return;
+    const kept = words.innerHTML;
+    pencil.hidden = true;
+    words.innerHTML = views.rewriteForm({ title: item.title ?? "", body: item.body ?? "" }, text);
+    words.querySelector<HTMLInputElement>("input[name=title]")?.focus();
+    words.querySelector("[data-rewrite-cancel]")?.addEventListener("click", () => {
+      words.innerHTML = kept;
+      pencil.hidden = false;
+    });
+    const form = words.querySelector<HTMLFormElement>("form.rewrite");
+    form?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      void act(
+        () => api.patch(base, { title: String(data.get("title") ?? ""), body: String(data.get("body") ?? "") }),
+        "panel.saved",
+      );
+    });
+  });
+
+  // Creating an issue answers "queued", not "created": the request does not
+  // call the forge — forges rate-limit and forges go down — so saying it was
+  // created would be reporting something that has not happened yet.
+  root?.querySelector<HTMLButtonElement>("[data-create-issue]")?.addEventListener("click", async () => {
+    try {
+      await api.post(`${base}/issue`);
+      toast(i18n.t("panel.issueQueued"));
+    } catch (err) {
+      report(err);
+    }
+  });
+  const attach = root?.querySelector<HTMLFormElement>("form.attach");
+  attach?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = String(new FormData(attach).get("issue") ?? "");
+    void act(() => api.post(`${base}/attach`, { issue: value }), "toast.issueAttached");
+  });
+
+  const reply = root?.querySelector<HTMLFormElement>("form.team-reply");
+  reply?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const body = String(new FormData(reply).get("body") ?? "");
+    void act(() => api.post(`${base}/reply`, { body }), "toast.replied");
+  });
+
+  // Typing narrows the list of reports to the titles that contain it. Hidden
+  // options are what the house dropdown leaves out, so the picker shows the
+  // same narrowing; the chosen one moves to the first that still matches.
+  const search = root?.querySelector<HTMLInputElement>("[data-merge-search]");
+  const into = root?.querySelector<HTMLSelectElement>("#merge-into");
+  search?.addEventListener("input", () => {
+    if (!into) return;
+    const q = search.value.trim().toLocaleLowerCase();
+    let first: HTMLOptionElement | null = null;
+    for (const option of into.options) {
+      option.hidden = q !== "" && !(option.textContent ?? "").toLocaleLowerCase().includes(q);
+      if (!option.hidden && !first) first = option;
+    }
+    if (into.selectedOptions[0]?.hidden && first) {
+      into.value = first.value;
+      into.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    // Nothing matches: nothing to merge into, and a button that looks ready
+    // and does nothing is worse than one that says it cannot.
+    const submit = root?.querySelector<HTMLButtonElement>("form.merge [type=submit]");
+    if (submit) submit.disabled = first === null;
+  });
+  const merge = root?.querySelector<HTMLFormElement>("form.merge");
+  merge?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const target = String(new FormData(merge).get("into") ?? "");
+    if (!target || into?.selectedOptions[0]?.hidden) return;
+    // The merged report now redirects, so the page it lands on is the survivor.
+    void act(() => api.post(`${base}/merge`, { into: target }), "toast.merged");
   });
 }
 
@@ -2487,101 +2570,6 @@ function wireChannel(orgSlug: string, saved?: () => Promise<void>): void {
         errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
         errorLine.hidden = false;
       }
-      report(err);
-    }
-  });
-}
-
-/**
- * The bridge control, and the only place the panel talks to a forge.
- *
- * Creating an issue answers "queued", not "created": the request does not call
- * the forge — forges rate-limit and forges go down — so saying it was created
- * would be reporting something that has not happened yet.
- */
-function wireIssueControl(publicID: string, linked: { number: number; url: string } | null): void {
-  root
-    ?.querySelector(".team-tools .tools")
-    ?.insertAdjacentHTML("beforeend", views.issueControl(linked, text));
-
-  root?.querySelector<HTMLButtonElement>("[data-create-issue]")?.addEventListener("click", async () => {
-    try {
-      await api.post(`/api/items/${encodeURIComponent(publicID)}/issue`);
-      toast(i18n.t("panel.issueQueued"));
-    } catch (err) {
-      report(err);
-    }
-  });
-
-  const attach = root?.querySelector<HTMLFormElement>("form.attach");
-  attach?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const value = String(new FormData(attach).get("issue") ?? "");
-    try {
-      await api.post(`/api/items/${encodeURIComponent(publicID)}/attach`, { issue: value });
-      toast(i18n.t("toast.issueAttached"));
-      await render();
-    } catch (err) {
-      report(err);
-    }
-  });
-}
-
-/** Replying as the team, and merging a duplicate away. */
-function wireTriage(publicID: string, current: { title: string; body: string }): void {
-  root?.querySelector(".team-tools .tools")?.insertAdjacentHTML(
-    "beforeend",
-    views.triageControls(text, current),
-  );
-
-  // Rewriting the report. The page is re-rendered afterwards rather than the
-  // heading patched in place: the title appears in more than one spot on this
-  // screen, and updating the one that was easy to reach is how the two start
-  // disagreeing.
-  const rewrite = root?.querySelector<HTMLFormElement>("form.rewrite");
-  rewrite?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const data = new FormData(rewrite);
-    try {
-      await api.patch(`/api/items/${encodeURIComponent(publicID)}`, {
-        title: String(data.get("title") ?? ""),
-        body: String(data.get("body") ?? ""),
-      });
-      toast(i18n.t("panel.saved"));
-      await render();
-    } catch (err) {
-      report(err);
-    }
-  });
-
-  const reply = root?.querySelector<HTMLFormElement>("form.team-reply");
-  reply?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const data = new FormData(reply);
-    try {
-      await api.post(`/api/items/${encodeURIComponent(publicID)}/reply`, {
-        body: String(data.get("body") ?? ""),
-      });
-      reply.reset();
-      toast(i18n.t("toast.replied"));
-      await render();
-    } catch (err) {
-      report(err);
-    }
-  });
-
-  const merge = root?.querySelector<HTMLFormElement>("form.merge");
-  merge?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const data = new FormData(merge);
-    try {
-      await api.post(`/api/items/${encodeURIComponent(publicID)}/merge`, {
-        into: String(data.get("into") ?? ""),
-      });
-      // The merged item now redirects, so the page it lands on is the survivor.
-      toast(i18n.t("toast.merged"));
-      await render();
-    } catch (err) {
       report(err);
     }
   });
