@@ -1653,7 +1653,7 @@ async function showAppearance(): Promise<void> {
   if (!(await requirePanel())) return;
   await showInShell(
     views.appearanceScreen(
-      availableLocales.map((l) => ({ code: l.code, name: l.name })),
+      availableLocales.map((l) => ({ code: l.code, name: `${l.flag} ${l.name}` })),
       i18n.current,
       currentTheme(),
       text,
@@ -1724,7 +1724,7 @@ async function showPeople(): Promise<void> {
               name: "language",
               label: text.t("people.language"),
               hint: text.t("people.languageHelp"),
-              options: availableLocales.map((l) => [l.code, l.name] as [string, string]),
+              options: availableLocales.map((l) => [l.code, `${l.flag} ${l.name}`] as [string, string]),
               selected: "en",
             }),
           submit: text.t("auth.create"),
@@ -2575,7 +2575,7 @@ function wireForgeChoice(rerender: (forge: string) => void): void {
 function showSetupStep(step: 1 | 2 | 3): void {
   show(
     views.setupWizard(step, text, {
-      languages: availableLocales.map((l) => ({ code: l.code, name: l.name })),
+      languages: availableLocales.map((l) => ({ code: l.code, name: `${l.flag} ${l.name}` })),
       language: i18n.current,
       theme: currentTheme(),
       picture: draft.picture,

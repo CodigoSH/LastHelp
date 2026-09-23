@@ -915,13 +915,27 @@ async function main() {
       for (const i of document.querySelectorAll(".admin-main .bento-card .card-head > .icon")) {
         if (i.getBoundingClientRect().width > 0) fallos.push("card icon shown");
       }
+      // Laid on their sheet — one solid grey, not the public page's ground.
+      const sonda = document.createElement("i");
+      sonda.style.backgroundColor = "var(--sheet)";
+      document.body.append(sonda);
+      const hoja = getComputedStyle(sonda).backgroundColor;
+      sonda.remove();
+      n++;
+      const fondo = getComputedStyle(document.querySelector(".admin")).backgroundColor;
+      if (fondo !== hoja) fallos.push("panel ground " + fondo + " is not the sheet " + hoja);
+      // And every language named beside its flag, as their picker does.
+      for (const o of document.querySelectorAll("#appearance-language option")) {
+        n++;
+        if (!/^\\p{Regional_Indicator}{2} /u.test(o.textContent)) fallos.push("no flag: " + o.textContent);
+      }
       return { n, fallos };
     `);
     piezas += r.n;
     for (const f of r.fallos) receta.push(`${ruta}: ${f}`);
   }
   check(
-    "every panel screen wears Lastboard's settings recipe: outlined buttons, quiet 13px titles, no card icons",
+    "every panel screen wears Lastboard's settings recipe: its sheet, outlined buttons, quiet 13px titles, no card icons, flags beside languages",
     piezas > 15 && receta.length === 0,
     JSON.stringify({ piezas, receta: receta.slice(0, 6) }),
   );

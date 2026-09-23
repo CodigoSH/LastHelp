@@ -28,6 +28,9 @@
      making for one value. */
   --canvas-glass: rgba(246, 247, 249, 0.82);
   --panel: #ffffff;
+  /* The sheet the panel is laid on: Lastboard's --surface-solid, measured on
+     its drawer — white here, #242424 in the dark. */
+  --sheet: #ffffff;
   --surface-dim: #eef0f4;
   --text-main: #12151b;
   --text-dim: #5b6470;
@@ -125,6 +128,7 @@
   --dark-canvas-glass: rgba(18, 18, 18, 0.78);
   --dark-panel: #1a1a1a;
   --dark-surface-dim: #242424;
+  --dark-sheet: #242424;
   --dark-text-main: #e9ecf2;
   --dark-text-dim: #98a2b1;
   --dark-border: #333333;
@@ -150,6 +154,7 @@
     --canvas: var(--dark-canvas);
     --canvas-glass: var(--dark-canvas-glass);
     --panel: var(--dark-panel);
+    --sheet: var(--dark-sheet);
     --surface-dim: var(--dark-surface-dim);
     --text-main: var(--dark-text-main);
     --text-dim: var(--dark-text-dim);
@@ -174,6 +179,7 @@
   --canvas: var(--dark-canvas);
   --canvas-glass: var(--dark-canvas-glass);
   --panel: var(--dark-panel);
+  --sheet: var(--dark-sheet);
   --surface-dim: var(--dark-surface-dim);
   --text-main: var(--dark-text-main);
   --text-dim: var(--dark-text-dim);
@@ -1834,10 +1840,14 @@ body.admin-view > main {
   padding: 0;
 }
 
+/* Laid on Lastboard's sheet: one solid grey, the drawer's, rather than the
+   public page's dark ground with its glow — the panel is a tool, and theirs
+   reads as one surface you work on. */
 .admin {
   display: grid;
   grid-template-columns: 16rem 1fr;
   min-block-size: calc(100vh - 48px);
+  background: var(--sheet);
 }
 
 /* Merged from the two declared at the top level. The sidebar is the one surface
@@ -1847,7 +1857,8 @@ body.admin-view > main {
    is a different rule, not a copy of this one. */
 .side {
   border-inline-end: 1px solid var(--border);
-  background: color-mix(in srgb, var(--panel) 92%, var(--text-main) 3%);
+  /* Their menu column: the sheet with a 4% veil over it, measured. */
+  background: rgba(128, 128, 128, 0.04);
   padding: 1.25rem 0.9rem;
   display: flex;
   flex-direction: column;

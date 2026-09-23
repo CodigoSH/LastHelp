@@ -7,10 +7,12 @@ export interface LocaleMetadata {
   flag: string;
 }
 
-/** The twenty. This list and the server's have to agree, and a test compares
+/** The twenty, each with the flag Lastboard shows beside it in its language
+ *  picker — the same flag for the same language in both products, English's
+ *  included. This list and the server's have to agree, and a test compares
  *  them: two hand-written lists drift the first time one gains a language. */
 export const availableLocales: LocaleMetadata[] = [
-  { code: "en", name: "English", flag: "🇬🇧" },
+  { code: "en", name: "English", flag: "🇺🇸" },
   { code: "es", name: "Español", flag: "🇪🇸" },
   { code: "de", name: "Deutsch", flag: "🇩🇪" },
   { code: "fr", name: "Français", flag: "🇫🇷" },
