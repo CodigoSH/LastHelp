@@ -8,3 +8,17 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+repo.addCollaborator
+repo.channelNow
+repo.confirmRevoke
+repo.danger
+repo.delete
+repo.deleteHelp
+repo.exportDownload
+repo.exportHelp
+repo.noCollaborators
+repo.pending
+repo.pendingHelp
+repo.settings
+repo.team
+repo.teamLead

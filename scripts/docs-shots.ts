@@ -89,11 +89,13 @@ const go = async (path: string) => {
   await sleep(1400);
 };
 
-const shoot = async (name: string) => {
+const shoot = async (name: string, whole = false) => {
   // Clipped to the content rather than to the viewport. A screenshot that is
   // two thirds empty background says nothing about the interface and makes
   // every image in the documentation look like a mistake.
-  const height = await evaluate(`
+  // A screen that is the whole window — Review, which scrolls inside itself —
+  // has no content height to clip to, and is photographed as the window.
+  const height = whole ? HEIGHT : await evaluate(`
     const main = document.querySelector("main");
     const bottom = main ? main.getBoundingClientRect().bottom + window.scrollY : 0;
     return Math.min(Math.max(Math.ceil(bottom) + 24, 320), 2000);
@@ -201,8 +203,9 @@ await shoot("report");
 await go("/acme/atlas/roadmap");
 await shoot("roadmap");
 
-await go("/acme/atlas/queue");
-await shoot("queue");
+// The queue is Review now: every board in one list, the report beside it.
+await go("/review");
+await shoot("queue", true);
 
 await go(`/i/${seeded[0]}`);
 await shoot("item");

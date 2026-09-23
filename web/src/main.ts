@@ -2068,14 +2068,25 @@ async function render(): Promise<void> {
     if (parts[0] === "panel" && parts[1] && parts.length === 2) {
       return await showPanelOrganization(parts[1]);
     }
+    // Under "repos" rather than straight after the organisation: /panel/{org}/new
+    // is the wizard, and a repository called "new" would otherwise never open.
+    if (parts[0] === "panel" && parts[2] === "repos" && parts[1] && parts[3] && parts.length === 4) {
+      return await showPanelRepository(parts[1], parts[3]);
+    }
     if (parts[0] === "i" && parts[1]) return await showItem(parts[1]);
     if (parts.length === 1 && parts[0]) return await showRepositories(parts[0]);
     if (parts.length === 2 && parts[0] && parts[1]) return await showBoard(parts[0], parts[1]);
     if (parts.length === 3 && parts[2] === "new" && parts[0] && parts[1]) {
       return await showReportForm(parts[0], parts[1]);
     }
+    // Where one board's queue used to live. Review filtered to that board is
+    // the queue now; the address stays a door, because it is in people's
+    // history and in links they sent each other.
     if (parts.length === 3 && parts[2] === "queue" && parts[0] && parts[1]) {
-      return await showQueue(parts[0], parts[1]);
+      return go(
+        "/review?" +
+          new URLSearchParams({ mode: "all", moderation: "pending", board: `${parts[0]}/${parts[1]}` }).toString(),
+      );
     }
     if (parts.length === 3 && parts[2] === "roadmap" && parts[0] && parts[1]) {
       return await showRoadmap(parts[0], parts[1]);
@@ -2420,7 +2431,7 @@ function wireCredentials(orgSlug: string): void {
 }
 
 /** Choosing where a board's team is told something arrived. */
-function wireChannel(orgSlug: string): void {
+function wireChannel(orgSlug: string, saved?: () => Promise<void>): void {
   const form = root?.querySelector<HTMLFormElement>("form.channel");
   if (!form) return;
 
@@ -2454,6 +2465,7 @@ function wireChannel(orgSlug: string): void {
         },
       );
       toast(i18n.t("panel.saved"));
+      await saved?.();
     } catch (err) {
       // The failure stays beside the form as well as toasting: it is about
       // what was typed, and the fix is in the fields somebody is looking at.
@@ -3145,9 +3157,12 @@ async function wireReview(
       report(err);
       return;
     }
-    if (view.mode === "all") {
+    if (view.mode === "all" && view.filters.moderation !== "pending") {
       // In the archive the row stays, wearing its new state: a row that
-      // vanished would read as a report that was deleted.
+      // vanished would read as a report that was deleted. Unless the list is
+      // filtered to what is waiting — a repository's queue is exactly that —
+      // where a decided row no longer answers the filter, and staying would
+      // leave it looking undecided.
       if (row) row.moderation = state;
       all[at]?.classList.toggle("out", state === "rejected" || state === "spam");
       void draw(id);
@@ -3411,10 +3426,11 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
 
   await showInShell(
     views.organizationScreen(body.organization, repos, canManage, isAdministrator(), text) +
-      // The token and the channel belong to whoever runs the organisation. A
-      // collaborator triages without ever being able to answer "what is the
-      // token", which is the whole reason the two roles exist.
-      (canManage ? views.connectionForms(body.organization, repos, location.origin, text) : "") +
+      // The token belongs to whoever runs the organisation. A collaborator
+      // triages without ever being able to answer "what is the token", which
+      // is the whole reason the two roles exist. Each repository's channel is
+      // on that repository's page.
+      (canManage ? views.connectionForms(body.organization, location.origin, text) : "") +
       views.modal(
         {
           id: "repo-modal",
@@ -3444,8 +3460,6 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
       // screen and selectable, which is the fallback that always worked.
     }
   });
-  wireChannel(orgSlug);
-
   root?.querySelectorAll<HTMLButtonElement>("[data-open]").forEach((button) =>
     button.addEventListener("click", () => go(button.dataset.open ?? "/")),
   );
@@ -3475,97 +3489,68 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   );
 }
 
-/**
- * The queue is the panel's front page for one board: what is waiting, with two
- * buttons.
- *
- * Acting on an entry removes that entry and leaves the rest alone. Redrawing
- * the whole list after every decision would throw away the scroll position of
- * somebody working down a long queue.
- */
-/**
- * Approve or hide a message, wherever the row is being shown.
- *
- * Bound by both the queue of one board and the queue that spans them. The row
- * is removed rather than the list redrawn: somebody working down a queue keeps
- * their place, and a redraw after every decision throws it away.
- */
-function bindCommentDecisions(): void {
-  root?.querySelectorAll<HTMLButtonElement>("[data-comment-act]").forEach((button) =>
-    button.addEventListener("click", async () => {
-      const entry = button.closest<HTMLLIElement>("li[data-comment]");
-      const id = entry?.dataset.comment;
-      if (!id) return;
-      try {
-        await api.post(`/api/comments/${encodeURIComponent(id)}/moderation`, {
-          state: button.dataset.commentAct,
-        });
-        entry?.remove();
-      } catch (err) {
-        report(err);
-      }
-    }),
-  );
-}
-
-async function showQueue(orgSlug: string, repoSlug: string): Promise<void> {
+async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
 
   const base = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}`;
-  const body = await api.get<{ items: Array<ItemSummary & { body: string; fields?: ReportField[] }> }>(
-    `${base}/queue`,
-  );
-  const items = body.items ?? [];
-  const bodies = new Map(items.map((i) => [i.public_id, i.body]));
-  const fields = new Map(items.map((i) => [i.public_id, i.fields ?? []]));
+  const repo = await api.get<views.RepositoryPanel>(`${base}/panel`).catch(() => null);
+  // Nobody who may not triage it learns anything from the address: the
+  // organisation's page says what they may open.
+  if (!repo) return go(`/panel/${encodeURIComponent(orgSlug)}`);
+  const team = repo.can_manage
+    ? await api
+        .get<{ members: views.TeamMember[]; accounts: { username: string; name: string }[] }>(
+          `/api/orgs/${encodeURIComponent(orgSlug)}/team`,
+        )
+        .catch(() => null)
+    : null;
 
-  // The comments waiting on this board. Failing softly rather than taking the
-  // screen down with it: the reports are what somebody came here for.
-  const waiting = await api
-    .get<{ comments: views.WaitingComment[] }>(`${base}/comments`)
-    .catch(() => ({ comments: [] as views.WaitingComment[] }));
+  await showInShell(views.repositoryScreen(repo, team, text), `/panel/${orgSlug}`);
 
-  const repo = await api.get<RepositorySummary & { organization?: OrganizationSummary }>(base);
-  await showInShell(
-    views.queueScreen(
-      repo.organization ?? { slug: orgSlug, name: orgSlug },
-      repo,
-      items,
-      bodies,
-      fields,
-      waiting.comments ?? [],
-      text,
-    ),
-    `/${orgSlug}/${repoSlug}/queue`,
-  );
+  onSubmit("form.repo-settings", async (data) => {
+    await api.patch(base, {
+      name: String(data.get("name") ?? ""),
+      forge_repo: String(data.get("forge_repo") ?? repo.forge_repo),
+      accepts_bugs: data.get("accepts_bugs") !== null,
+      accepts_ideas: data.get("accepts_ideas") !== null,
+    });
+    toast(i18n.t("panel.saved"));
+    await render();
+  });
 
-  bindCommentDecisions();
+  wireChannel(orgSlug, render);
 
-  root?.querySelectorAll<HTMLButtonElement>("[data-act]").forEach((button) =>
+  const teamURL = `/api/orgs/${encodeURIComponent(orgSlug)}/team`;
+  onSubmit("form.team-add", async (data) => {
+    await api.post(teamURL, {
+      username: String(data.get("username") ?? ""),
+      repository: repoSlug,
+      role: "collaborator",
+    });
+    await render();
+  });
+  root?.querySelectorAll<HTMLButtonElement>("[data-revoke]").forEach((button) =>
     button.addEventListener("click", async () => {
-      const entry = button.closest<HTMLLIElement>("li[data-id]");
-      const id = entry?.dataset.id;
-      if (!id) return;
+      if (!confirm(i18n.t("repo.confirmRevoke", { name: button.dataset.name ?? "" }))) return;
       try {
-        await api.post(`/api/items/${encodeURIComponent(id)}/moderation`, {
-          state: button.dataset.act,
-        });
-        entry?.remove();
-        if (!root?.querySelector("li[data-id]")) {
-          const list = root?.querySelector(".queue");
-          list?.replaceWith(
-            Object.assign(document.createElement("p"), {
-              className: "empty",
-              textContent: i18n.t("panel.empty"),
-            }),
-          );
-        }
+        await api.post(teamURL, { username: button.dataset.revoke ?? "", repository: repoSlug, role: "" });
+        await render();
       } catch (err) {
         report(err);
       }
     }),
   );
+
+  root?.querySelector<HTMLButtonElement>("[data-delete-repo]")?.addEventListener("click", async () => {
+    if (!confirm(i18n.t("organizations.confirmDeleteRepo", { name: repo.name }))) return;
+    try {
+      await api.del(base);
+      go(`/panel/${encodeURIComponent(orgSlug)}`);
+    } catch (err) {
+      report(err);
+    }
+  });
 }
 
 // --- odds and ends ---------------------------------------------------------

@@ -56,10 +56,15 @@ Anyone claiming a spam filter stops a determined human is selling something.
 
 ![The moderation queue](../images/queue.png)
 
-Two buttons and a third for spam. With four repositories you will see between zero and
-five things a week, which is why there are no bulk actions, no saved views and
-no search here: anything that assumes scale on this side is weight you carry for
-a situation you do not have.
+Everything waiting is decided in **Review**, in the panel's top bar: every
+repository you work on in one list, the report beside it, and three buttons —
+publish, reject, and spam. The arrow keys move down the list. Each
+repository's page in the panel links to the same screen filtered to that
+repository.
+
+With four repositories you will see between zero and five things a week, which
+is why there are no bulk actions: anything that assumes scale on this side is
+weight you carry for a situation you do not have.
 
 Comments wait in the same place, listed under the reports with the report each
 one was written on. They are held for the same reason: the page tells whoever

@@ -1277,46 +1277,6 @@ export function forgeOptions(text: Text): [string, string][] {
 }
 
 
-/** One organisation in the panel: its boards, and a form to add another. */
-export function panelOrganization(
-  org: OrganizationSummary,
-  repos: RepositorySummary[],
-  text: Text,
-): string {
-  const list =
-    repos.length === 0
-      ? `${emptyState(text.t("portal.empty"), icons.repository(28))}`
-      : `<ul class="cards">${repos
-          .map(
-            (r) => `<li><a class="card" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}">
-              <span class="card-title">${escapeHTML(r.name)}</span>
-              <span class="card-sub">/${escapeHTML(org.slug)}/${escapeHTML(r.slug)}</span>
-            </a></li>`,
-          )
-          .join("")}</ul>`;
-
-  const exports =
-    repos.length === 0
-      ? ""
-      : `<p class="exports">${repos
-          .map(
-            (r) =>
-              `<a href="/api/orgs/${escapeAttr(org.slug)}/repos/${escapeAttr(r.slug)}/export"
-                  download>${escapeHTML(text.t("panel.export", { repository: r.name }))}</a>`,
-          )
-          .join(" · ")}</p>`;
-
-  return `
-    <p class="crumb"><a href="/panel">${escapeHTML(text.t("nav.panel"))}</a></p>
-    <h1>${escapeHTML(org.name)}</h1>
-    ${list}
-    ${exports}
-
-    <p class="head-actions">
-      <a class="button primary" href="/panel/${escapeAttr(org.slug)}/new">${escapeHTML(text.t("panel.newRepository"))}</a>
-    </p>`;
-}
-
 /**
  * The forge connection, and the channel the team reads.
  *
@@ -1327,7 +1287,6 @@ export function panelOrganization(
  */
 export function connectionForms(
   org: OrganizationSummary & { forge?: string; webhook_path?: string },
-  repos: RepositorySummary[],
   /** Where this instance answers, so the address can be shown whole. Passed in
    *  rather than read from `location`: these templates are pure so they can be
    *  tested without a browser, and one reach for a global ends that. */
@@ -1349,47 +1308,7 @@ export function connectionForms(
           </form>
         </li>`;
 
-  const kinds = [
-    ["", text.t("panel.channelNone")],
-    ["ntfy", "ntfy"],
-    ["gotify", "Gotify"],
-    ["webhook", "Webhook"],
-    ["smtp", "Email"],
-  ];
-
-  const channelCard =
-    repos.length === 0
-      ? ""
-      : `<li class="bento-card">
-          <div class="card-head">${icons.warning()}<h3>${escapeHTML(text.t("panel.channel"))}</h3></div>
-          <span class="card-sub">${escapeHTML(text.t("panel.channelHelp"))}</span>
-          <form class="channel">
-            ${choiceField({
-              id: "chan-repo",
-              name: "repo",
-              label: text.t("portal.boards"),
-              options: repos.map((r) => [r.slug, r.name] as [string, string]),
-            })}
-            ${choiceField({
-              id: "chan-kind",
-              name: "kind",
-              label: text.t("panel.channel"),
-              options: kinds.map(([v, l]) => [v ?? "", l ?? ""] as [string, string]),
-            })}
-            <div class="channel-fields" hidden>
-              ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/acme-feedback" }, text)}
-              ${field({ id: "chan-token", name: "token", label: text.t("panel.token"), type: "password" }, text)}
-            </div>
-            <div class="channel-mail" hidden>
-              ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "team@example.com" }, text)}
-            </div>
-            <p class="form-error" role="alert" hidden></p>
-            <div class="wizard-actions"><span class="spacer"></span>
-              <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
-          </form>
-        </li>`;
-
-  if (forgeCard === "" && channelCard === "") return "";
+  if (forgeCard === "") return "";
 
   // The webhook address, which the operator has to copy into their forge. It
   // belongs beside the connection rather than at the bottom of a form, and it
@@ -1405,7 +1324,7 @@ export function connectionForms(
 
   // Cards like every other in the panel, one under another; each names itself,
   // so no heading over them.
-  return `<ul class="settings settings-cards">${forgeCard}${address}${channelCard}</ul>`;
+  return `<ul class="settings settings-cards">${forgeCard}${address}</ul>`;
 }
 
 /** The team's triage controls on one item: rewrite, reply, and merge a duplicate away. */
@@ -2140,105 +2059,6 @@ export interface WaitingComment {
   board?: { organization?: string; repository?: string; name?: string };
 }
 
-/**
- * The messages waiting, wherever they are being shown.
- *
- * One function for both screens rather than two that drift: the queue of one
- * board and the queue that spans boards differ in a chip, and the day the
- * buttons change they have to change in one place. The row carries
- * data-comment, which is what the handlers bind to.
- */
-export function waitingComments(comments: WaitingComment[], text: Text): string {
-  if (comments.length === 0) return "";
-  return `<h2 class="queue-head">${escapeHTML(text.t("panel.commentsWaiting", { count: comments.length }))}</h2>
-    <ul class="queue">${comments
-      .map(
-        (c) => `<li class="bento-card" data-comment="${escapeAttr(String(c.id))}">
-          <p class="meta">
-            <span class="who-badge">${escapeHTML(text.t(`comment.${c.author}`))}</span>
-            ${
-              c.board?.name
-                ? `<span class="chip">${escapeHTML(c.board.name)}</span>`
-                : ""
-            }
-            <span class="when">${escapeHTML(text.date(c.created_at))}</span>
-          </p>
-          <p class="body">${escapeHTML(c.body)}</p>
-          <a class="on" href="/i/${escapeAttr(c.item.public_id)}"
-             title="${escapeAttr(text.t("panel.commentOn"))}">${icons.open(14)}<span>${escapeHTML(c.item.title)}</span></a>
-          <div class="actions">
-            <button class="button primary with-icon" data-comment-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
-            <button class="button ghost with-icon" data-comment-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
-          </div>
-        </li>`,
-      )
-      .join("")}</ul>`;
-}
-
-export function queueScreen(
-  org: OrganizationSummary,
-  repo: RepositorySummary,
-  items: ItemSummary[],
-  bodies: Map<string, string>,
-  fields: Map<string, ReportField[]>,
-  comments: WaitingComment[],
-  text: Text,
-): string {
-  const header = `<p class="crumb"><a href="/panel/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
-    <div class="screen-head">
-      <h1>${escapeHTML(repo.name)}</h1>
-      <a class="button ghost with-icon" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">
-        ${icons.open()}<span>${escapeHTML(text.t("shell.publicBoard"))}</span></a>
-    </div>
-    ${
-      // Said once. With nothing waiting the empty state below says so, and a
-      // lead saying it too is the same sentence twice on a page with one line
-      // of text on it.
-      items.length === 0 && comments.length === 0
-        ? ""
-        : `<p class="lead">${escapeHTML(text.t("queue.lead", { count: items.length }))}</p>`
-    }`;
-
-  // The comments waiting, which is a second queue on the same board and not a
-  // second screen: somebody triaging works through what has arrived, and what
-  // has arrived is both kinds.
-  const commentQueue = waitingComments(comments, text);
-
-  if (items.length === 0) {
-    return `${header}${commentQueue}
-      ${
-        comments.length === 0
-          ? emptyState(
-              text.t("queue.empty"),
-              icons.check(28),
-              `<a class="button" href="/panel/reports?board=${escapeAttr(`${org.slug}/${repo.slug}`)}">${escapeHTML(text.t("shell.reports"))}</a>`,
-            )
-          : ""
-      }`;
-  }
-
-  return `${header}
-    <ul class="queue">${items
-      .map(
-        (i) => `<li class="bento-card" data-id="${escapeAttr(i.public_id)}">
-          <p class="meta">
-            <span class="kind kind-${escapeAttr(i.kind)}">${escapeHTML(text.t(`kind.${i.kind}`))}</span>
-            <span class="when">${escapeHTML(text.date(i.created_at))}</span>
-          </p>
-          <h3>${escapeHTML(i.title)}</h3>
-          <p class="body">${escapeHTML(bodies.get(i.public_id) ?? "")}</p>
-          ${answers(fields.get(i.public_id) ?? [], text)}
-          <div class="actions">
-            <button class="button primary with-icon" data-act="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
-            <button class="button ghost with-icon" data-act="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
-            <button class="button danger with-icon" data-act="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
-          </div>
-        </li>`,
-      )
-      .join("")}</ul>
-    ${commentQueue}`;
-}
-
 /* ------------------------------------------------------------------ wizards
  *
  * Every one of these used to be a form dumped on a page with no order, no
@@ -2457,22 +2277,22 @@ export function repositoryFields(text: Text, forge: string, hasForge: boolean): 
 
 /** What a board takes. Both on by default: a board that accepts nothing is
  *  refused by the server, and defaulting to off makes that the common mistake. */
-export function acceptsFields(text: Text): string {
+export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean }): string {
   // Two checkboxes that say what they turn on, not two pills reading "Bug" and
   // "Idea". This is a settings form: the control people know here is a
   // checkbox with a sentence beside it, and the words are what somebody
   // reporting will be offered rather than the internal name of a kind.
-  const box = (name: string, label: string) =>
+  const box = (name: string, label: string, on = true) =>
     `<label class="check">
-      <input type="checkbox" name="${escapeAttr(name)}" checked />
+      <input type="checkbox" name="${escapeAttr(name)}"${on ? " checked" : ""} />
       <span>${escapeHTML(label)}</span>
     </label>`;
 
   return `<div class="field">
     <label>${escapeHTML(text.t("repo.accepts"))}</label>
     <div class="checks">
-      ${box("accepts_bugs", text.t("repo.acceptsBugs"))}
-      ${box("accepts_ideas", text.t("repo.acceptsIdeas"))}
+      ${box("accepts_bugs", text.t("repo.acceptsBugs"), current?.bugs ?? true)}
+      ${box("accepts_ideas", text.t("repo.acceptsIdeas"), current?.ideas ?? true)}
     </div>
     <p class="hint">${escapeHTML(text.t("repo.acceptsHelp"))}</p>
   </div>`;
@@ -3752,10 +3572,9 @@ export function organizationScreen(
           r.accepts_bugs ? `<span class="chip">${escapeHTML(text.t("kind.bug"))}</span>` : "",
           r.accepts_ideas ? `<span class="chip">${escapeHTML(text.t("kind.idea"))}</span>` : "",
         ].join(""),
-        href: `/${org.slug}/${r.slug}/queue`,
+        href: `/panel/${org.slug}/repos/${r.slug}`,
         actions: canManage
           ? `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
-             ${iconButton("edit", text.t("action.edit"), `data-edit-repo="${escapeAttr(r.slug)}"`)}
              ${canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`
           : "",
       }),
@@ -3775,6 +3594,214 @@ export function organizationScreen(
         },
       )}
     </div>`;
+}
+
+/** Everything the panel's page for one repository shows, as the server says it. */
+export interface RepositoryPanel {
+  slug: string;
+  name: string;
+  forge_repo: string;
+  accepts_bugs: boolean;
+  accepts_ideas: boolean;
+  /** Which channel tells the team, never what it stores. Empty for none. */
+  channel: string;
+  pending: number;
+  organization: { slug: string; name: string; forge: string };
+  can_manage: boolean;
+  can_delete: boolean;
+}
+
+/** Who works in an organisation, as the team endpoint returns it. */
+export interface TeamMember {
+  username: string;
+  name: string;
+  avatar?: string;
+  admin: boolean;
+  roles: { role: string; repository: string; where: string }[];
+}
+
+/**
+ * One repository, in one place: what it takes, who is told, who works on it,
+ * and what is waiting there.
+ *
+ * These used to be four places — a queue screen of its own, a pencil wired to
+ * nothing, a channel picker on the organisation's page and People — and a
+ * team member had to know all four to run one board. Each card is Lastboard's
+ * settings card, the one recipe the panel uses for everything it configures.
+ */
+export function repositoryScreen(
+  repo: RepositoryPanel,
+  /** The team of the organisation, or null when the reader may not see it. */
+  team: { members: TeamMember[]; accounts: { username: string; name: string }[] } | null,
+  text: Text,
+): string {
+  const org = repo.organization;
+  const board = `${org.slug}/${repo.slug}`;
+  const hasForge = !!org.forge && org.forge !== "none";
+
+  // What is waiting, and the way to it. Review filtered to this board is the
+  // queue now; a second list of the same reports here would be a second place
+  // for the same decision.
+  const review = `/review?${new URLSearchParams({ mode: "all", moderation: "pending", board }).toString()}`;
+  const summary = settingsCard(
+    repo.name,
+    `<p class="org-tags"><span class="mono-tag">/${escapeHTML(board)}</span>
+      ${repo.accepts_bugs ? `<span class="chip">${escapeHTML(text.t("kind.bug"))}</span>` : ""}
+      ${repo.accepts_ideas ? `<span class="chip">${escapeHTML(text.t("kind.idea"))}</span>` : ""}</p>
+    <div class="settings-row">
+      <div class="settings-info">
+        <h4>${escapeHTML(text.t("repo.pending", { count: text.number(repo.pending) }))}</h4>
+        <p>${escapeHTML(text.t("repo.pendingHelp"))}</p>
+      </div>
+      <a class="button primary" href="${escapeAttr(review)}" data-repo-review>${escapeHTML(text.t("review.title"))}</a>
+    </div>
+    <div class="settings-row">
+      <div class="settings-info">
+        <h4>${escapeHTML(text.t("panel.export", { repository: repo.name }))}</h4>
+        <p>${escapeHTML(text.t("repo.exportHelp"))}</p>
+      </div>
+      <a class="button ghost with-icon" href="/api/orgs/${escapeAttr(org.slug)}/repos/${escapeAttr(repo.slug)}/export"
+         download data-export>${icons.download()}<span>${escapeHTML(text.t("repo.exportDownload"))}</span></a>
+    </div>`,
+    {
+      action: `<a class="button ghost" href="/${escapeAttr(board)}">${escapeHTML(text.t("shell.publicBoard"))}</a>`,
+    },
+  );
+
+  if (!repo.can_manage) {
+    return `${repositoryCrumb(org, text)}
+      <h1 class="visually-hidden">${escapeHTML(repo.name)}</h1>
+      <div class="settings">${summary}</div>`;
+  }
+
+  const settings = settingsCard(
+    text.t("repo.settings"),
+    `<form class="repo-settings">
+      ${field({ id: "rs-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: repo.name }, text)}
+      ${hasForge ? field({ id: "rs-forge", name: "forge_repo", label: text.t("panel.forgeRepo"), hint: text.t("panel.forgeRepoHelp"), value: repo.forge_repo }, text) : ""}
+      ${acceptsFields(text, { bugs: repo.accepts_bugs, ideas: repo.accepts_ideas })}
+      <p class="form-error" role="alert" hidden></p>
+      <div class="settings-actions">
+        <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+    </form>`,
+  );
+
+  const kinds: [string, string][] = [
+    ["", text.t("panel.channelNone")],
+    ["ntfy", "ntfy"],
+    ["gotify", "Gotify"],
+    ["webhook", "Webhook"],
+    ["smtp", "Email"],
+  ];
+  const now = kinds.find(([value]) => value === repo.channel)?.[1] ?? repo.channel;
+  // The channel chosen shows as chosen; what it stores never comes back, so
+  // the fields are empty and saving writes the whole channel again.
+  const channel = settingsCard(
+    text.t("panel.channel"),
+    `<form class="channel">
+      <input type="hidden" name="repo" value="${escapeAttr(repo.slug)}" />
+      ${choiceField({ id: "chan-kind", name: "kind", label: text.t("panel.channel"), options: kinds, selected: repo.channel })}
+      <div class="channel-fields" hidden>
+        ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/acme-feedback" }, text)}
+        ${field({ id: "chan-token", name: "token", label: text.t("panel.token"), type: "password" }, text)}
+      </div>
+      <div class="channel-mail" hidden>
+        ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "team@example.com" }, text)}
+      </div>
+      ${repo.channel ? `<p class="hint" data-channel-now>${escapeHTML(text.t("repo.channelNow", { channel: now }))}</p>` : ""}
+      <p class="form-error" role="alert" hidden></p>
+      <div class="settings-actions">
+        <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+    </form>`,
+    { lead: text.t("panel.channelHelp") },
+  );
+
+  const danger = repo.can_delete
+    ? settingsCard(
+        text.t("repo.danger"),
+        `<div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("repo.delete"))}</h4>
+            <p class="settings-danger">${escapeHTML(text.t("repo.deleteHelp"))}</p>
+          </div>
+          ${actionButton("remove", text.t("action.delete"), `data-delete-repo="${escapeAttr(repo.slug)}" data-name="${escapeAttr(repo.name)}"`, "danger")}
+        </div>`,
+      )
+    : "";
+
+  return `${repositoryCrumb(org, text)}
+    <h1 class="visually-hidden">${escapeHTML(repo.name)}</h1>
+    <div class="settings">
+      ${summary}
+      ${settings}
+      ${team ? repositoryTeam(repo, team, text) : ""}
+      ${channel}
+      ${danger}
+    </div>`;
+}
+
+function repositoryCrumb(org: { slug: string; name: string }, text: Text): string {
+  return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a>
+    <span aria-hidden="true">/</span>
+    <a href="/panel/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>`;
+}
+
+/**
+ * Who works on one repository: the organisation's owners, who work on all of
+ * it and are changed on the organisation's page, and its collaborators, who
+ * are added and taken off here.
+ */
+function repositoryTeam(
+  repo: RepositoryPanel,
+  team: { members: TeamMember[]; accounts: { username: string; name: string }[] },
+  text: Text,
+): string {
+  const owners = team.members.filter((m) => m.roles.some((r) => r.role === "owner" && r.repository === ""));
+  const collaborators = team.members.filter(
+    (m) =>
+      m.roles.some((r) => r.role === "collaborator" && r.repository === repo.slug) &&
+      !owners.includes(m),
+  );
+  const row = (m: TeamMember, role: string, removable: boolean) =>
+    settingsItem({
+      attrs: `data-member="${escapeAttr(m.username)}"`,
+      lead: avatar(m.name || m.username, m.avatar),
+      name: m.name || m.username,
+      // The username under the name, when there is a name: under itself it
+      // is the same word twice.
+      sub: m.name && m.name !== m.username ? m.username : "",
+      tags: `<span class="mono-tag${role === "owner" ? " accent" : ""}" data-role="${role}">${escapeHTML(text.t(`role.${role}`))}</span>`,
+      actions: removable
+        ? iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke="${escapeAttr(m.username)}" data-name="${escapeAttr(m.name || m.username)}"`)
+        : "",
+    });
+
+  const taken = new Set([...owners, ...collaborators].map((m) => m.username));
+  const candidates = team.accounts.filter((a) => !taken.has(a.username));
+  const add =
+    candidates.length === 0
+      ? ""
+      : `<form class="team-add">
+          ${choiceField({
+            id: "team-who",
+            name: "username",
+            label: text.t("repo.addCollaborator"),
+            options: candidates.map((a) => [a.username, a.name ? `${a.name} (${a.username})` : a.username] as [string, string]),
+          })}
+          <div class="settings-actions">
+            <button class="button primary" type="submit">${escapeHTML(text.t("people.grant"))}</button></div>
+        </form>`;
+
+  return settingsCard(
+    text.t("repo.team"),
+    `<ul class="settings-list team">
+      ${owners.map((m) => row(m, "owner", false)).join("")}
+      ${collaborators.map((m) => row(m, "collaborator", true)).join("")}
+    </ul>
+    ${collaborators.length === 0 ? `<p class="card-sub">${escapeHTML(text.t("repo.noCollaborators"))}</p>` : ""}
+    ${add}`,
+    { lead: text.t("repo.teamLead", { organization: repo.organization.name }) },
+  );
 }
 
 /** Who may act here, what each of them is, and where. */

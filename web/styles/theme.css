@@ -6735,6 +6735,7 @@ a.stat:hover .stat-go {
 /* Their list of users: a row per thing, a surface and a border, the accent
    when pointed at, the actions at the far end. */
 .settings-list { display: grid; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
+.settings-list + .card-sub { margin-block-start: 12px; }
 
 .settings-item {
   display: flex;

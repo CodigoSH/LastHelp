@@ -12,8 +12,9 @@ people talking to nobody reads worse from outside than no portal at all.
 Configured **per repository**, so one repository can go to one room and another somewhere
 else. A single global channel is a channel everybody eventually silences.
 
-Choose it in the panel, on the organisation's screen: pick a repository, pick a
-channel, and it asks only for what that channel needs.
+Choose it in the panel, on the repository's page (**Organisations**, the
+organisation, then the repository): pick a channel, and it asks only for what
+that channel needs.
 
 Or over the API, which is what the panel calls:
 

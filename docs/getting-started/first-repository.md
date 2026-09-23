@@ -103,7 +103,7 @@ vote count as a signal of what is popular rather than as a count of people.
 
 ## Taking your data with you
 
-Every repository exports as JSON, from the organisation's screen in the panel or at
+Every repository exports as JSON, from its page in the panel or at
 `/api/orgs/<org>/repos/<repository>/export`. It carries everything the operator
 decided — the published items, the queue, the rejections, the merged duplicates,
 the comments and the issue links — because an export that showed only the

@@ -467,14 +467,26 @@ async function main() {
   const beforeApproval = await evaluate(`return document.querySelectorAll(".items li").length`);
   check("nothing waiting is public", beforeApproval === 0, `rows=${beforeApproval}`);
 
-  // 7. The queue shows it, and publishing works from the panel.
-  await goTo("/codigosh/lastboard/queue", ".queue, .empty");
-  const queued = await evaluate(`return document.querySelectorAll(".queue li").length`);
-  check("the queue shows it", queued === 1, `rows=${queued}`);
+  // 7. The queue shows it, and publishing works from the panel. Through the
+  //    board's old queue address, which is Review filtered to that board now:
+  //    the address is in people's history, so it has to land somewhere that
+  //    answers the same question.
+  await goTo("/codigosh/lastboard/queue", ".rev-list");
+  const queued = await evaluate(`
+    const q = new URLSearchParams(location.search);
+    return { path: location.pathname, board: q.get("board"), moderation: q.get("moderation"),
+             rows: document.querySelectorAll('[data-what="report"]').length };
+  `);
+  check(
+    "a board's old queue address opens Review filtered to that board, with it waiting",
+    queued.path === "/review" && queued.board === "codigosh/lastboard" &&
+      queued.moderation === "pending" && queued.rows === 1,
+    JSON.stringify(queued),
+  );
 
-  await evaluate(`document.querySelector('[data-act="published"]').click()`);
-  await sleep(600);
-  const emptied = await evaluate(`return document.querySelectorAll(".queue li").length`);
+  await evaluate(`document.querySelector(".rev-detail [data-act='published']").click()`);
+  await sleep(900);
+  const emptied = await evaluate(`return document.querySelectorAll('[data-what="report"]').length`);
   check("publishing removes it from the queue", emptied === 0, `rows=${emptied}`);
 
   // 8. Now it is public and votable.
@@ -612,13 +624,9 @@ async function main() {
   check("a comment is taken and held for a person", heldBack.told === true && heldBack.shown === false,
     JSON.stringify(heldBack));
 
-  await goTo("/codigosh/lastboard/queue", ".queue, .empty");
-  const queued2 = await evaluate(`return document.querySelectorAll("li[data-comment]").length`);
-  check("it waits in the queue beside the reports", queued2 === 1, `rows=${queued2}`);
-  // The same message, on the screen that does not make you name a board first.
-  // That is the whole point of it: five boards used to mean asking five times
-  // to find the one with something in it. The row has to name its board, or a
-  // decision is taken about a message from nowhere.
+  // The message waits in Review, the one screen for everything waiting. The
+  // row has to name its board, or a decision is taken about a message from
+  // nowhere.
   // Waiting for the list rather than for a row: if a message whose report is
   // not in the list were counted and not drawn, there would be no row to wait
   // for, and the pass would stop on a timeout instead of on this check.
@@ -1207,7 +1215,9 @@ async function main() {
     };
   `);
   check("the organisation panel can add a board", orgPanel.addBoard === true);
-  check("and can choose where the team is told", orgPanel.channel === true);
+  // Each repository's channel is on that repository's page: a picker of
+  // repositories on the organisation's page was a second way to name one.
+  check("and leaves each repository's channel to its own page", orgPanel.channel === false);
   check(
     "and does not ask for a token when there is no forge",
     orgPanel.credentials === false,
@@ -4009,6 +4019,137 @@ async function main() {
     "and an account with nothing waiting is shown no number at all",
     noBadge.pending.reports === 0 && noBadge.pending.messages === 0 && noBadge.pill === false,
     JSON.stringify(noBadge),
+  );
+
+  // 12d. A repository's page in the panel, as the collaborator sees it: what
+  //      is waiting and the way to it, and nothing they would be refused.
+  //      Checked before the administrator's view, because the page is drawn
+  //      from what the server says each reader may do — and a page that shows
+  //      the owner's cards to everybody looks exactly right to the owner.
+  await goTo("/panel/codigosh/repos/lastboard", ".admin-main .settings");
+  const suyo = await evaluate(`
+    return {
+      tarjetas: document.querySelectorAll(".admin-main .settings-card").length,
+      revision: document.querySelector("[data-repo-review]")?.getAttribute("href") ?? "",
+      exportar: document.querySelector("[data-export]")?.getAttribute("href") ?? "",
+      formularios: document.querySelectorAll(".admin-main form").length,
+    };
+  `);
+  check(
+    "a collaborator's repository page is what waits there and the way to it, and nothing else",
+    suyo.tarjetas === 1 && suyo.formularios === 0 &&
+      suyo.revision.includes("board=codigosh%2Flastboard") &&
+      suyo.exportar === "/api/orgs/codigosh/repos/lastboard/export",
+    JSON.stringify(suyo),
+  );
+
+  // 12e. And as whoever runs it: every card, reached from the organisation's
+  //      row, and each one does what it says. The team is changed here and put
+  //      back as it was, so nothing downstream counts a different number.
+  await evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
+    await fetch("/api/session", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
+      body: JSON.stringify({ username: "alex", password: "una contraseña larga de verdad" }) });
+  `);
+  await goTo("/panel/codigosh", ".repositories");
+  await evaluate(`[...document.querySelectorAll(".repositories .si-main")]
+    .find(a => a.textContent.includes("Lastboard"))?.click()`);
+  await waitFor(".admin-main form.repo-settings");
+  const pagina = await evaluate(`
+    const rol = (u) => document.querySelector('[data-member="' + u + '"] [data-role]')?.dataset.role ?? "";
+    // Each card by what it holds, not by its title: the language this pass
+    // runs in at this point is not English.
+    const tarjeta = (sel) => [...document.querySelectorAll(".admin-main .settings-card")]
+      .findIndex(c => c.querySelector(sel));
+    return {
+      donde: location.pathname,
+      tarjetas: document.querySelectorAll(".admin-main .settings-card").length,
+      orden: ["[data-repo-review]", "form.repo-settings", ".settings-list.team", "form.channel", "[data-delete-repo]"]
+        .map(tarjeta),
+      alex: rol("alex"),
+      ana: rol("ana"),
+      quitarAna: !!document.querySelector('[data-revoke="ana"]'),
+      quitarAlex: !!document.querySelector('[data-revoke="alex"]'),
+    };
+  `);
+  check(
+    "a repository's row opens its page, with its settings, its team, its channel and its danger zone",
+    pagina.donde === "/panel/codigosh/repos/lastboard" &&
+      pagina.tarjetas === 5 && JSON.stringify(pagina.orden) === "[0,1,2,3,4]" &&
+      pagina.alex === "owner" && pagina.ana === "collaborator" &&
+      pagina.quitarAna === true && pagina.quitarAlex === false,
+    JSON.stringify(pagina),
+  );
+
+  // Taking a collaborator off and putting them back, from the page.
+  const equipo = await evaluate(`
+    window.confirm = () => true;
+    document.querySelector('[data-revoke="ana"]').click();
+    await new Promise(r => setTimeout(r, 1100));
+    const fuera = !document.querySelector('[data-member="ana"]');
+    const ofrecida = [...document.querySelectorAll("#team-who option")].map(o => o.value).includes("ana");
+    const f = document.querySelector("form.team-add");
+    f.querySelector("#team-who").value = "ana";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 1100));
+    return { fuera, ofrecida,
+             vuelta: document.querySelector('[data-member="ana"] [data-role]')?.dataset.role ?? "" };
+  `);
+  check(
+    "a collaborator is taken off and added back from the repository's page",
+    equipo.fuera === true && equipo.ofrecida === true && equipo.vuelta === "collaborator",
+    JSON.stringify(equipo),
+  );
+
+  // The channel: chosen here, said back as chosen, and never read back.
+  const canal = await evaluate(`
+    const f = document.querySelector("form.channel");
+    const kind = f.querySelector("#chan-kind");
+    kind.value = "ntfy";
+    kind.dispatchEvent(new Event("change"));
+    f.querySelector("#chan-url").value = "https://ntfy.example/drive-topic";
+    f.querySelector("#chan-token").value = "tk_drive";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 1100));
+    const ahora = document.querySelector("[data-channel-now]")?.textContent ?? "";
+    const elegido = document.querySelector("#chan-kind")?.value ?? "";
+    const url = document.querySelector("#chan-url")?.value ?? "";
+    // Back to none, so nothing afterwards tries to deliver anywhere.
+    const csrf = document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/orgs/codigosh/repos/lastboard/channel", { method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+      body: JSON.stringify({ kind: "" }) });
+    return { ahora, elegido, url };
+  `);
+  check(
+    "the channel is set from the repository's page and said back without what it stores",
+    canal.ahora.includes("ntfy") && canal.elegido === "ntfy" && canal.url === "",
+    JSON.stringify(canal),
+  );
+
+  // What it accepts, saved from the page and read back from the server.
+  const acepta = await evaluate(`
+    const f = document.querySelector("form.repo-settings");
+    f.querySelector("[name=accepts_ideas]").checked = false;
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 1100));
+    const r = await fetch("/api/orgs/codigosh/repos/lastboard/panel").then(r => r.json());
+    const marcada = document.querySelector("form.repo-settings [name=accepts_ideas]")?.checked;
+    const csrf = document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/orgs/codigosh/repos/lastboard", { method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+      body: JSON.stringify({ name: r.name, forge_repo: r.forge_repo, accepts_bugs: true, accepts_ideas: true }) });
+    return { ideas: r.accepts_ideas, bugs: r.accepts_bugs, marcada };
+  `);
+  check(
+    "what a repository accepts is saved from its page",
+    acepta.ideas === false && acepta.bugs === true && acepta.marcada === false,
+    JSON.stringify(acepta),
   );
 
   // 13. And a stranger, on the same address, is shown a page rather than an
