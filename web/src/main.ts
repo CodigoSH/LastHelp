@@ -1894,10 +1894,72 @@ async function showAbout(): Promise<void> {
   // know: uptime, disk and memory are facts about the machine, and the browser
   // has none of them.
   const facts = await api.get<views.ServerFacts>("/api/server").catch(() => ({}) as views.ServerFacts);
-  await showInShell(
-    views.aboutScreen(facts, text),
-    "/panel/about",
-  );
+  await showInShell(views.aboutScreen(facts, text), "/panel/about");
+
+  const zone = root?.querySelector<HTMLElement>("[data-update-zone]");
+  const check = root?.querySelector<HTMLButtonElement>("[data-check]");
+  const beta = root?.querySelector<HTMLInputElement>("[data-beta]");
+
+  // The update is asked after the page is drawn: the release server can take
+  // seconds to answer, and nothing else here waits on it.
+  const ask = async () => {
+    if (!zone) return;
+    zone.innerHTML = views.updateZone("checking", text);
+    if (check) check.disabled = true;
+    const status = await api.get<views.UpdateStatus>("/api/update").catch(() => null);
+    // The page may have been left while the release server was thinking.
+    if (!zone.isConnected) return;
+    zone.innerHTML = views.updateZone(status, text);
+    if (beta && status) {
+      beta.checked = status.beta === true;
+      beta.disabled = false;
+    }
+    if (check) {
+      check.disabled = false;
+      // Asking again changes nothing when the reason is a fact of this
+      // installation — no keys, no network, a container — so the button is
+      // only offered where a second look can say something new.
+      const fixed = ["error.update_offline", "error.update_unverifiable", "error.update_container"];
+      check.hidden = status !== null && fixed.includes(status.reason ?? "");
+    }
+  };
+
+  check?.addEventListener("click", () => void ask());
+
+  beta?.addEventListener("change", async () => {
+    try {
+      await api.post("/api/update/channel", { beta: beta.checked });
+    } catch (err) {
+      beta.checked = !beta.checked;
+      report(err);
+      return;
+    }
+    // Which release is "latest" depends on the channel, so it is asked again.
+    await ask();
+  });
+
+  // Delegated, because the zone is rewritten every time it is asked.
+  zone?.addEventListener("click", async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-update]");
+    if (!button) return;
+    const note = zone.querySelector<HTMLParagraphElement>(".update-note");
+    button.disabled = true;
+    if (note) {
+      note.textContent = i18n.t("update.installing");
+      note.hidden = false;
+    }
+    try {
+      await api.post("/api/update");
+      // The server restarts a moment after answering, so waiting and
+      // reloading is what brings the page back on the new version.
+      setTimeout(() => location.reload(), 4000);
+    } catch (err) {
+      button.disabled = false;
+      if (note) note.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+    }
+  });
+
+  await ask();
 }
 
 /** A page that could not be loaded. The screen has nothing else to show. */
@@ -1958,7 +2020,10 @@ async function render(): Promise<void> {
     // people's history and in links they sent each other, and the archive it
     // used to hold is a mode of the screen that replaced it.
     if (path === "/panel/reports") return go("/review" + location.search);
-    if (path === "/panel/updates") return await showUpdates();
+    // Where updates used to live. They are part of About now, as in
+    // Lastboard; the address is kept as a door because it is in people's
+    // bookmarks and in the documentation of older releases.
+    if (path === "/panel/updates") return go("/panel/about");
     if (path === "/panel/account") return await showProfile();
     if (path === "/panel/appearance") return await showAppearance();
     if (path === "/panel/people") return await showPeople();
@@ -3284,69 +3349,6 @@ async function showPersonalization(): Promise<void> {
     instanceLoaded = false;
     await render();
   });
-}
-
-/**
- * Updates, on a page of their own.
- *
- * They used to hang off the bottom of the panel's front page, under the form
- * for adding an organisation, which is not where anybody looks for them. The
- * endpoint refuses anybody who may not see this, and asking it is the check: a
- * screen that decided for itself who may look would be a second implementation
- * of the rules.
- */
-async function showUpdates(): Promise<void> {
-  me = await api.get<Me>("/api/me").catch(() => null);
-  if (!me) return go("/sign-in");
-
-  const status = await api
-    .get<{
-      current: string;
-      latest?: string;
-      available?: boolean;
-      notes?: string;
-      reason?: string;
-      beta?: boolean;
-    }>("/api/update")
-    .catch(() => null);
-  const beta = status?.beta === true;
-
-  await showInShell(
-    status
-      ? `<h1>${escapeHTML(i18n.t("shell.updates"))}</h1>
-         <ul class="bento">${views.updatePanel(status, text)}${views.channelSwitch(beta, text)}</ul>`
-      : views.emptyState(i18n.t("error.forbidden"), icons.warning(28)),
-    "/panel/updates",
-  );
-
-  root?.querySelector<HTMLInputElement>("[data-beta]")?.addEventListener("change", async (event) => {
-    await api
-      .post("/api/update/channel", { beta: (event.currentTarget as HTMLInputElement).checked })
-      .catch(showFormError);
-    await render();
-  });
-
-  if (status) {
-    root?.querySelector<HTMLButtonElement>("[data-update]")?.addEventListener("click", async (event) => {
-      const button = event.currentTarget as HTMLButtonElement;
-      const note = root?.querySelector<HTMLParagraphElement>(".update-note");
-      button.disabled = true;
-      if (note) {
-        note.textContent = i18n.t("update.installing");
-        note.hidden = false;
-      }
-      try {
-        await api.post("/api/update");
-        // The server restarts a moment after answering, so waiting and
-        // reloading is what brings the page back on the new version.
-        setTimeout(() => location.reload(), 4000);
-      } catch (err) {
-        button.disabled = false;
-        if (note) note.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
-      }
-    });
-  }
-
 }
 
 async function showPanelOrganization(orgSlug: string): Promise<void> {

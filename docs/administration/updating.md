@@ -4,14 +4,16 @@ Three ways, and the right one depends on how you installed.
 
 ## From the panel
 
-Sign in as the administrator and open **Updates** in the sidebar. It shows what
-is running and what is available, and one button installs it and restarts.
+Sign in as the administrator and open **About** in the sidebar. Under the
+version it says whether there is something newer — or why it could not check —
+and when there is, one button installs it and restarts. **Check for updates**
+asks again.
 
-![Updates in the panel](../images/update.png)
+![About in the panel](../images/about.png)
 
-The release channel is on the same screen. Following betas is remembered on the
-server rather than in a browser, because a checkbox that forgets itself between
-visits is one nobody trusts.
+The release channel is the switch just below. Following betas is remembered on
+the server rather than in a browser, because a setting that forgets itself
+between visits is one nobody trusts.
 
 What it does, in this order, and each step either proves something or stops:
 

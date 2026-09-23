@@ -1277,54 +1277,6 @@ export function forgeOptions(text: Text): [string, string][] {
 }
 
 
-/**
- * The update panel.
- *
- * It says why it cannot check as plainly as it says there is something to
- * install. An empty answer where a reason belongs reads as "you are up to
- * date", which is the one thing it must never say by accident.
- */
-/** The beta switch, which decides what "latest" means for this installation. */
-export function channelSwitch(beta: boolean, text: Text): string {
-  return `<li class="bento-card">
-    <div class="card-head">${icons.update()}<h3>${escapeHTML(text.t("update.channel"))}</h3></div>
-    <span class="card-sub">${escapeHTML(text.t("update.channelHelp"))}</span>
-    <label class="check">
-      <input type="checkbox" data-beta ${beta ? "checked" : ""} />
-      <span>${escapeHTML(text.t("update.beta"))}</span>
-    </label>
-  </li>`;
-}
-
-export function updatePanel(
-  status: {
-    current: string;
-    latest?: string;
-    available?: boolean;
-    notes?: string;
-    reason?: string;
-  },
-  text: Text,
-): string {
-  // A card like every other card, rather than three loose paragraphs under one.
-  // What is running is the number somebody came for, so it is the number: the
-  // version at the size of a fact, and under it what there is to do about it.
-  const state = status.reason
-    ? `<p class="notice">${icons.info()}<span>${escapeHTML(text.t(status.reason))}</span></p>`
-    : status.available
-      ? `<p class="available">${escapeHTML(text.t("update.available", { version: status.latest ?? "" }))}</p>
-         ${status.notes ? `<pre class="notes">${escapeHTML(status.notes)}</pre>` : ""}
-         <button class="button primary with-icon" data-update>${icons.download()}<span>${escapeHTML(text.t("update.install"))}</span></button>
-         <p class="update-note" role="status" hidden></p>`
-      : `<p class="hint">${icons.check(14)} ${escapeHTML(text.t("update.upToDate"))}</p>`;
-
-  return `<li class="bento-card">
-    <div class="card-head">${icons.info()}<h3>${escapeHTML(text.t("about.version"))}</h3></div>
-    <p class="running fact">${escapeHTML(status.current)}</p>
-    ${state}
-  </li>`;
-}
-
 /** One organisation in the panel: its boards, and a form to add another. */
 export function panelOrganization(
   org: OrganizationSummary,
@@ -2818,7 +2770,8 @@ export function adminShell(spec: ShellSpec, text: Text): string {
             ? item("/panel/people", text.t("shell.people"), icons.people()) +
                 item("/panel/personalization", text.t("shell.personalization"), icons.brush()) +
                 item("/panel/backups", text.t("shell.backups"), icons.backup()) +
-                item("/panel/updates", text.t("shell.updates"), icons.update()) +
+                // Updates live inside About, as in Lastboard: what is running
+                // and whether it is the one to run are one question.
                 item("/panel/about", text.t("shell.about"), icons.info())
             : "",
         )}
@@ -3840,79 +3793,209 @@ export interface ServerFacts {
 }
 
 /**
- * About: what the server is doing, for the person who has to keep it running.
+ * About, for the person who has to keep this running: what it is, whether
+ * there is something newer, and whether the machine under it is healthy.
  *
- * It used to show the version, the commit hash, the schema number and the name
- * of the installation. The name is a setting and lives on the Personalization
- * screen; the commit answers a question nobody was asking on this page. What an
- * operator opens this for is whether the thing is healthy — how long it has
- * been up, how big the database has grown, whether the disk under it is
- * filling, what it costs in memory.
+ * Updates used to be a page of their own beside this one, with the version on
+ * both. They are the same question — "what am I running, and is it the one I
+ * should be" — so, as in Lastboard, they are one screen: the product and its
+ * version at the top with the update underneath, the release channel as a
+ * setting on a row of its own, the server's health below, and the links out
+ * at the foot.
  *
- * The schema number stays, at the bottom and quietly: it is the one number that
- * matters when a backup will not restore.
+ * The update zone is drawn by `updateZone` and filled after the page: asking
+ * the release server can take seconds, and the rest of this screen is known at
+ * once.
  */
 export function aboutScreen(facts: ServerFacts, text: Text): string {
-  const card = (label: string, value: string, icon: string, sub = "") =>
-    `<li class="bento-card">
-      <div class="card-head">${icon}<h3>${escapeHTML(label)}</h3></div>
-      <strong class="fact">${escapeHTML(value)}</strong>
-      ${sub ? `<span class="card-sub">${escapeHTML(sub)}</span>` : ""}
+  const tile = (icon: string, label: string, value: string, sub = "", extra = "") =>
+    `<li class="about-stat">
+      <div class="about-stat-head"><span class="about-stat-icon">${icon}</span>
+        <span class="about-stat-label">${escapeHTML(label)}</span></div>
+      <strong class="about-stat-value">${escapeHTML(value)}</strong>
+      ${extra}
+      ${sub ? `<span class="about-stat-sub">${escapeHTML(sub)}</span>` : ""}
     </li>`;
 
-  const cards: string[] = [];
-
-  cards.push(
-    card(
-      text.t("about.version"),
-      facts.version || "—",
-      icons.info(),
-      facts.os ? `${facts.os} · ${facts.go ?? ""}`.trim() : "",
-    ),
-  );
-
+  const stats: string[] = [];
   if (facts.uptime_seconds !== undefined) {
-    cards.push(
-      card(
+    stats.push(
+      tile(
+        icons.clock(18),
         text.t("about.uptime"),
         text.since(facts.uptime_seconds),
-        icons.queue(),
-        facts.started_at !== undefined ? text.date(facts.started_at) : "",
+        facts.started_at !== undefined ? text.t("about.since", { date: text.date(facts.started_at) }) : "",
       ),
     );
   }
-
   if (facts.database_bytes !== undefined) {
-    cards.push(card(text.t("about.database"), text.bytes(facts.database_bytes), icons.backup()));
+    stats.push(
+      tile(
+        icons.backup(18),
+        text.t("about.database"),
+        text.bytes(facts.database_bytes),
+        // The one number that matters when a backup will not restore, beside
+        // the database it describes rather than in a line of small print.
+        facts.schema !== undefined ? text.t("about.schema", { version: text.number(facts.schema) }) : "",
+      ),
+    );
   }
-
   if (facts.disk_free_bytes !== undefined) {
-    // Free first, and the total underneath: the number that decides whether to
-    // do something today is how much is left, not how big the disk is.
-    cards.push(
-      card(
+    const total = facts.disk_total_bytes;
+    // How full, as a bar: free space is the number that decides whether to do
+    // something today, and a bar says "nearly full" before anybody has done
+    // the division. A <meter> rather than a drawn bar, because its length is
+    // an attribute — this page's policy drops a style attribute, and a meter
+    // is what the element is for. It turns amber past 75% and red past 90%.
+    const meter =
+      total !== undefined && total > 0
+        ? // Machine numbers, never through the locale formatter: a decimal
+          // comma in an attribute is a number the browser cannot read.
+          `<meter class="about-meter" min="0" max="${String(Math.round(total))}"
+             value="${String(Math.round(total - facts.disk_free_bytes))}"
+             low="${String(Math.round(total * 0.75))}" high="${String(Math.round(total * 0.9))}" optimum="0"
+             aria-label="${escapeAttr(text.t("about.disk"))}"></meter>`
+        : "";
+    stats.push(
+      tile(
+        icons.disk(18),
         text.t("about.disk"),
         text.bytes(facts.disk_free_bytes),
-        icons.download(),
-        facts.disk_total_bytes !== undefined
-          ? text.t("about.diskOf", { total: text.bytes(facts.disk_total_bytes) })
-          : "",
+        total !== undefined ? text.t("about.diskOf", { total: text.bytes(total) }) : "",
+        meter,
       ),
     );
   }
-
   if (facts.memory_bytes !== undefined) {
-    cards.push(card(text.t("about.memory"), text.bytes(facts.memory_bytes), icons.overview()));
+    stats.push(tile(icons.chip(18), text.t("about.memory"), text.bytes(facts.memory_bytes)));
   }
+
+  const link = (href: string, icon: string, label: string) =>
+    `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${icon}<span>${escapeHTML(label)}</span></a>`;
 
   return `<h1>${escapeHTML(text.t("shell.about"))}</h1>
     <p class="lead">${escapeHTML(text.t("about.lead"))}</p>
-    <ul class="bento">${cards.join("")}</ul>
-    <p class="hint">${escapeHTML(text.t("about.source"))}${
-      facts.schema !== undefined
-        ? ` ${escapeHTML(text.t("about.schemaIs", { version: text.number(facts.schema) }))}`
-        : ""
-    }</p>`;
+    <div class="about">
+      <section class="about-hero">
+        <span class="about-glow" aria-hidden="true"></span>
+        <img class="about-logo" src="/logo.svg" alt="" width="72" height="72" />
+        <h2 class="about-name">${escapeHTML(text.t("app.name"))}</h2>
+        <p class="about-version">${escapeHTML(facts.version || "—")}</p>
+        ${facts.os ? `<p class="about-built">${escapeHTML(`${facts.os} · ${facts.go ?? ""}`.trim())}</p>` : ""}
+        <div class="about-update" data-update-zone>${updateZone("checking", text)}</div>
+        <button type="button" class="button ghost with-icon about-check" data-check hidden>
+          ${icons.update(15)}<span>${escapeHTML(text.t("update.check"))}</span></button>
+      </section>
+
+      <section class="about-row">
+        <div class="about-row-text">
+          <h3>${escapeHTML(text.t("update.beta"))}</h3>
+          <p>${escapeHTML(text.t("update.channelHelp"))}</p>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" role="switch" data-beta disabled
+            aria-label="${escapeAttr(text.t("update.beta"))}" />
+          <span class="toggle-track" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      ${
+        stats.length === 0
+          ? ""
+          : `<div class="about-sec"><span class="about-pill">${escapeHTML(text.t("about.server"))}</span>
+               <span class="about-rule"></span></div>
+             <ul class="about-stats">${stats.join("")}</ul>`
+      }
+
+      <footer class="about-foot">
+        <p>${escapeHTML(text.t("about.source"))}</p>
+        <nav class="about-links" aria-label="${escapeAttr(text.t("shell.about"))}">
+          ${link("https://git.codigosh.com/CodigoSH/LastHelp", icons.code(15), text.t("about.sourceCode"))}
+          ${link("https://opencollective.com/codigosh", icons.heart(15), text.t("about.donate"))}
+        </nav>
+      </footer>
+    </div>`;
+}
+
+/**
+ * Release notes, drawn rather than shown as source.
+ *
+ * They are Keep-a-Changelog, generated from commit subjects: "### Added"
+ * headings and "- " items and nothing else. Printed as they come, the person
+ * deciding whether to install read markdown punctuation. This draws exactly
+ * those two shapes — every piece of text still escaped — and anything else as
+ * a plain line, so a note written by hand is never lost, only left plain.
+ */
+export function releaseNotes(markdown: string): string {
+  const out: string[] = [];
+  let items: string[] = [];
+  const flush = () => {
+    if (items.length > 0) out.push(`<ul>${items.map((i) => `<li>${escapeHTML(i)}</li>`).join("")}</ul>`);
+    items = [];
+  };
+  for (const raw of markdown.split("\n")) {
+    const line = raw.trim();
+    if (line.startsWith("- ") || line.startsWith("* ")) {
+      items.push(line.slice(2));
+      continue;
+    }
+    flush();
+    if (line === "") continue;
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    out.push(heading ? `<h4>${escapeHTML(heading[1] ?? "")}</h4>` : `<p>${escapeHTML(line)}</p>`);
+  }
+  flush();
+  return out.join("");
+}
+
+/** What /api/update says. */
+export interface UpdateStatus {
+  current: string;
+  latest?: string;
+  available?: boolean;
+  notes?: string;
+  reason?: string;
+  beta?: boolean;
+}
+
+/**
+ * The part of About that says whether there is something newer.
+ *
+ * It says why it cannot check as plainly as it says there is something to
+ * install. An empty answer where a reason belongs reads as "you are up to
+ * date", which is the one thing it must never say by accident — so up to date
+ * is green only when the release server was reached and said so.
+ */
+export function updateZone(status: UpdateStatus | "checking" | null, text: Text): string {
+  if (status === "checking") {
+    return `<p class="about-state checking" role="status"><span class="about-spin" aria-hidden="true"></span>
+      <span>${escapeHTML(text.t("update.checking"))}</span></p>`;
+  }
+  if (status === null) {
+    return `<p class="about-state warn" role="status">${icons.warning(16)}<span>${escapeHTML(text.t("error.update_unreachable"))}</span></p>`;
+  }
+  if (status.available) {
+    // Lastboard's: a card within the card, lit from one corner, the badge that
+    // pulses and the version under it, and one button — the notes are read
+    // before pressing it, which is where reading them can still change a mind.
+    return `<div class="about-new">
+      <span class="about-new-glow" aria-hidden="true"></span>
+      <div class="about-new-head">
+        <span class="about-badge">${escapeHTML(text.t("update.badge"))}</span>
+        <span class="about-new-version">${escapeHTML(status.latest ?? "")}</span>
+      </div>
+      ${status.notes ? `<div class="notes release-notes">${releaseNotes(status.notes)}</div>` : ""}
+      <button class="button primary with-icon" data-update>${icons.download()}<span>${escapeHTML(text.t("update.install"))}</span></button>
+      <p class="update-note" role="status" hidden></p>
+    </div>`;
+  }
+  if (status.latest || status.reason === "error.update_none") {
+    const said = status.reason ? text.t(status.reason) : text.t("update.upToDate");
+    return `<p class="about-state ok" role="status">${icons.check(16)}<span>${escapeHTML(said)}</span></p>`;
+  }
+  return `<p class="about-state${status.reason === "error.update_unreachable" ? " warn" : ""}" role="status">${icons.info(16)}<span>${escapeHTML(
+    text.t(status.reason ?? "error.update_unreachable"),
+  )}</span></p>`;
 }
 
 /**

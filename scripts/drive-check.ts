@@ -728,22 +728,45 @@ async function main() {
   `);
   check("asking for an issue says something", issueNote.shown === true, issueNote.text.slice(0, 44));
 
-  // 11. The update panel. This build has no release keys, so what is checked is
-  //     that it says so rather than showing nothing — an empty answer where a
-  //     reason belongs reads as "you are up to date".
-  // Updates have a section of their own in the sidebar now. They used to hang
-  // off the bottom of the panel's front page, under a form, which is not where
-  // anybody looks for them.
-  await goTo("/panel/updates", ".running");
+  // 11. Updates live inside About now, as in Lastboard, and the old address
+  //     is a door to it. What is checked is that the zone says what the server
+  //     said — never nothing, and never green unless the release server was
+  //     reached and answered. An empty answer where a reason belongs reads as
+  //     "you are up to date". Compared with /api/update rather than with a
+  //     premise about this build: this comment used to say the build had no
+  //     release keys, and it has them.
+  await goTo("/panel/updates", ".about-hero");
+  await waitFor("[data-update-zone] > :not(.checking)");
   const updates = await evaluate(`
-    const body = document.body.textContent;
+    const zone = document.querySelector("[data-update-zone]");
+    const api = await fetch("/api/update").then(r => r.json());
+    const alcanzado = (!!api.latest && !api.available) || api.reason === "error.update_none";
     return {
-      hasSection: !!document.querySelector(".running"),
-      offersInstall: !!document.querySelector("[data-update]"),
-      text: (document.querySelector(".notice")?.textContent ?? "").trim(),
+      alcanzado,
+      razon: api.reason ?? "",
+      ofreceInstalar: !!zone?.querySelector("[data-update]"),
+      donde: location.pathname,
+      version: document.querySelector(".about-version")?.textContent?.trim() ?? "",
+      dice: zone?.textContent?.trim() ?? "",
+      comprobando: !!zone?.querySelector(".checking"),
+      verde: !!zone?.querySelector(".about-state.ok"),
+      interruptor: !(document.querySelector("[data-beta]")?.disabled ?? true),
+      enElMenu: [...document.querySelectorAll(".side-item")].map(a => a.getAttribute("href")),
     };
   `);
-  check("the panel says what version is running", updates.hasSection === true);
+  check(
+    "updates are part of About: the old address opens it, and the menu has one entry",
+    updates.donde === "/panel/about" && updates.enElMenu.includes("/panel/about") &&
+      !updates.enElMenu.includes("/panel/updates"),
+    JSON.stringify(updates.enElMenu),
+  );
+  check(
+    "About says what is running and what the release server said, never a green it did not earn",
+    updates.version.length > 0 && updates.dice.length > 0 && updates.comprobando === false &&
+      updates.verde === updates.alcanzado && updates.ofreceInstalar === false &&
+      updates.interruptor === true,
+    JSON.stringify(updates),
+  );
 
   // 11a. Signing in through the form, which nothing here did.
   //
@@ -794,22 +817,38 @@ async function main() {
     `${signedIn.path} ${signedIn.said}`,
   );
 
-  // 11b. About, which is the page somebody keeping a server running opens.
-  await goTo("/panel/about", ".bento-card");
+  // 11b. About, which is the page somebody keeping a server running opens:
+  //      the machine's health, each fact a number, and how full the disk is
+  //      as a bar that is an attribute rather than a style.
+  await goTo("/panel/about", ".about-stat");
   const about = await evaluate(`
+    const tiles = [...document.querySelectorAll(".about-stat")];
+    const meter = document.querySelector(".about-meter");
+    const r = meter?.getBoundingClientRect();
     return {
-      cards: document.querySelectorAll(".bento-card").length,
-      // The commit hash and the name of the installation used to be here. One
-      // answers a question nobody asks on this page, and the other is a
-      // setting that lives on Personalization.
-      facts: [...document.querySelectorAll(".fact")].map(f => f.textContent.trim()),
+      tiles: tiles.length,
+      values: tiles.map(t => t.querySelector(".about-stat-value")?.textContent?.trim() ?? ""),
+      meter: meter ? { value: meter.value, max: meter.max, ancho: Math.round(r.width), alto: Math.round(r.height) } : null,
+      links: [...document.querySelectorAll(".about-links a")].map(a => a.getAttribute("href")),
+      // The name sits under its mark. The panel's heading rule gave every h2
+      // 36px above it and pushed the name half a card away from the logo.
+      bajoElLogo: Math.round(
+        (document.querySelector(".about-name")?.getBoundingClientRect().top ?? 999) -
+        (document.querySelector(".about-logo")?.getBoundingClientRect().bottom ?? 0)),
     };
   `);
-  check("About reports the state of the server", about.cards >= 4, `${about.cards} cards`);
+  check("About reports the state of the server", about.tiles >= 4, `${about.tiles} tiles`);
   check(
-    "and every card of it has a number to report",
-    about.facts.length === about.cards && about.facts.every((f: string) => f.length > 0),
-    JSON.stringify(about.facts),
+    "and every tile has a number to report",
+    about.values.every((v: string) => v.length > 0),
+    JSON.stringify(about.values),
+  );
+  check(
+    "About sits together: the name under its mark, the disk as a bar with a real length, the links out",
+    about.meter !== null && about.meter.max > 0 && about.meter.value >= 0 &&
+      about.meter.value <= about.meter.max && about.meter.ancho > 100 && about.meter.alto >= 4 &&
+      about.links.length === 2 && about.bajoElLogo >= 8 && about.bajoElLogo <= 20,
+    JSON.stringify({ meter: about.meter, links: about.links, bajoElLogo: about.bajoElLogo }),
   );
 
   const langPicker = await evaluate(`return !!document.querySelector("body > nav select");`);
@@ -985,11 +1024,6 @@ async function main() {
     "hidden fields take up no space",
     reallyHidden.attribute === true && reallyHidden.takesSpace === false,
     JSON.stringify(reallyHidden),
-  );
-  check(
-    "a build that cannot verify says so instead of offering an update",
-    updates.offersInstall === false && updates.text !== "",
-    updates.text.slice(0, 50),
   );
 
   // 12. Everything the panel can do, it can do from the screen.

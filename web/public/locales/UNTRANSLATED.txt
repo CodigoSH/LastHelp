@@ -8,3 +8,11 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+about.donate
+about.schema
+about.server
+about.since
+about.sourceCode
+update.badge
+update.check
+update.checking

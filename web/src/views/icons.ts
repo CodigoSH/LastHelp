@@ -103,6 +103,25 @@ export const icons = {
   feed: (s?: number) =>
     stroke(`<path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.2"/>`, s),
   clock: (s?: number) => stroke(`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>`, s),
+  /** Source code: the two angle brackets. */
+  code: (s?: number) => stroke(`<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>`, s),
+  heart: (s?: number) =>
+    stroke(
+      `<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>`,
+      s,
+    ),
+  /** A disk, for storage that is not the database. */
+  disk: (s?: number) =>
+    stroke(
+      `<path d="M22 12H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M6 16h.01M10 16h.01"/>`,
+      s,
+    ),
+  /** A chip, for memory. */
+  chip: (s?: number) =>
+    stroke(
+      `<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 15h3M2 9h3M2 15h3"/>`,
+      s,
+    ),
   edit: (s?: number) =>
     stroke(
       `<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>

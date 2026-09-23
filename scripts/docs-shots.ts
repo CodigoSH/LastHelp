@@ -199,8 +199,9 @@ await shoot("item");
 await go("/panel");
 await shoot("panel");
 
-await go("/panel/updates");
-await shoot("update");
+// About, with the update inside it: they are one screen now.
+await go("/panel/about");
+await shoot("about");
 
 await go("/panel/organizations");
 await shoot("organizations");
