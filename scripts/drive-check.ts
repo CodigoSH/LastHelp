@@ -894,7 +894,10 @@ async function main() {
   const receta: string[] = [];
   let piezas = 0;
   for (const ruta of ["/panel", "/panel/organizations", "/panel/codigosh", "/panel/people",
-    "/panel/backups", "/panel/account", "/panel/appearance", "/panel/personalization"]) {
+    "/panel/backups", "/panel/account", "/panel/appearance", "/panel/personalization",
+    // About too: it was the one screen left in pieces of its own after the
+    // rest had been ported, and nothing measured it.
+    "/panel/about"]) {
     await goTo(ruta, ".admin-main > *");
     await sleep(250);
     const r = await evaluate(`

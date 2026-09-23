@@ -3853,20 +3853,22 @@ export interface ServerFacts {
  * once.
  */
 export function aboutScreen(facts: ServerFacts, text: Text): string {
-  const tile = (icon: string, label: string, value: string, sub = "", extra = "") =>
-    `<li class="about-stat">
-      <div class="about-stat-head"><span class="about-stat-icon">${icon}</span>
-        <span class="about-stat-label">${escapeHTML(label)}</span></div>
+  // A fact about the machine, as one of Lastboard's rows: what it is on one
+  // side, the number at the end of the line.
+  const row = (label: string, value: string, sub = "", extra = "") =>
+    `<div class="settings-row about-stat">
+      <div class="settings-info">
+        <h4>${escapeHTML(label)}</h4>
+        ${sub ? `<p>${escapeHTML(sub)}</p>` : ""}
+        ${extra}
+      </div>
       <strong class="about-stat-value">${escapeHTML(value)}</strong>
-      ${extra}
-      ${sub ? `<span class="about-stat-sub">${escapeHTML(sub)}</span>` : ""}
-    </li>`;
+    </div>`;
 
   const stats: string[] = [];
   if (facts.uptime_seconds !== undefined) {
     stats.push(
-      tile(
-        icons.clock(18),
+      row(
         text.t("about.uptime"),
         text.since(facts.uptime_seconds),
         facts.started_at !== undefined ? text.t("about.since", { date: text.date(facts.started_at) }) : "",
@@ -3875,8 +3877,7 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
   }
   if (facts.database_bytes !== undefined) {
     stats.push(
-      tile(
-        icons.backup(18),
+      row(
         text.t("about.database"),
         text.bytes(facts.database_bytes),
         // The one number that matters when a backup will not restore, beside
@@ -3887,11 +3888,8 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
   }
   if (facts.disk_free_bytes !== undefined) {
     const total = facts.disk_total_bytes;
-    // How full, as a bar: free space is the number that decides whether to do
-    // something today, and a bar says "nearly full" before anybody has done
-    // the division. A <meter> rather than a drawn bar, because its length is
-    // an attribute — this page's policy drops a style attribute, and a meter
-    // is what the element is for. It turns amber past 75% and red past 90%.
+    // How full, as a bar under the row's words: a <meter>, so its length is an
+    // attribute this page's policy allows. Amber past 75%, red past 90%.
     const meter =
       total !== undefined && total > 0
         ? // Machine numbers, never through the locale formatter: a decimal
@@ -3902,8 +3900,7 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
              aria-label="${escapeAttr(text.t("about.disk"))}"></meter>`
         : "";
     stats.push(
-      tile(
-        icons.disk(18),
+      row(
         text.t("about.disk"),
         text.bytes(facts.disk_free_bytes),
         total !== undefined ? text.t("about.diskOf", { total: text.bytes(total) }) : "",
@@ -3912,17 +3909,20 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
     );
   }
   if (facts.memory_bytes !== undefined) {
-    stats.push(tile(icons.chip(18), text.t("about.memory"), text.bytes(facts.memory_bytes)));
+    stats.push(row(text.t("about.memory"), text.bytes(facts.memory_bytes)));
   }
 
   const link = (href: string, icon: string, label: string) =>
     `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${icon}<span>${escapeHTML(label)}</span></a>`;
 
-  return `<h1>${escapeHTML(text.t("shell.about"))}</h1>
-    <p class="lead">${escapeHTML(text.t("about.lead"))}</p>
-    <div class="about">
-      <section class="about-hero">
-        <span class="about-glow" aria-hidden="true"></span>
+  // Lastboard's About, card for card: the product as a statement in a card of
+  // its own — mark, name, version, and the update under it; the beta switch
+  // on a row in a card of its own; and the links out at the foot, over a
+  // rule. The server's health, which theirs does not show, is one more card
+  // of the same recipe with a row per fact.
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.about"))}</h1>
+    <div class="settings about">
+      <section class="bento-card about-hero">
         <img class="about-logo" src="/logo.svg" alt="" width="72" height="72" />
         <h2 class="about-name">${escapeHTML(text.t("app.name"))}</h2>
         <p class="about-version">${escapeHTML(facts.version || "—")}</p>
@@ -3931,33 +3931,26 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
           ${icons.update(15)}<span>${escapeHTML(text.t("update.check"))}</span></button>
       </section>
 
-      <section class="about-row">
-        <div class="about-row-text">
-          <h3>${escapeHTML(text.t("update.beta"))}</h3>
-          <p>${escapeHTML(text.t("update.channelHelp"))}</p>
+      <section class="bento-card">
+        <div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("update.beta"))}</h4>
+            <p>${escapeHTML(text.t("update.channelHelp"))}</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" role="switch" data-beta disabled
+              aria-label="${escapeAttr(text.t("update.beta"))}" />
+            <span class="toggle-track" aria-hidden="true"></span>
+          </label>
         </div>
-        <label class="toggle">
-          <input type="checkbox" role="switch" data-beta disabled
-            aria-label="${escapeAttr(text.t("update.beta"))}" />
-          <span class="toggle-track" aria-hidden="true"></span>
-        </label>
       </section>
 
-      ${
-        stats.length === 0
-          ? ""
-          : `<div class="about-sec"><span class="about-pill">${escapeHTML(text.t("about.server"))}</span>
-               <span class="about-rule"></span></div>
-             <ul class="about-stats">${stats.join("")}</ul>`
-      }
+      ${stats.length === 0 ? "" : settingsCard(text.t("about.server"), stats.join(""))}
 
-      <footer class="about-foot">
-        <p>${escapeHTML(text.t("about.source"))}</p>
-        <nav class="about-links" aria-label="${escapeAttr(text.t("shell.about"))}">
-          ${link("https://git.codigosh.com/CodigoSH/LastHelp", icons.code(15), text.t("about.sourceCode"))}
-          ${link("https://opencollective.com/codigosh", icons.heart(15), text.t("about.donate"))}
-        </nav>
-      </footer>
+      <nav class="about-links" aria-label="${escapeAttr(text.t("shell.about"))}">
+        ${link("https://git.codigosh.com/CodigoSH/LastHelp", icons.code(15), text.t("about.sourceCode"))}
+        ${link("https://opencollective.com/codigosh", icons.heart(15), text.t("about.donate"))}
+      </nav>
     </div>`;
 }
 
@@ -4035,7 +4028,7 @@ export function updateZone(status: UpdateStatus | "checking" | null, text: Text)
   }
   if (status.latest || status.reason === "error.update_none") {
     const said = status.reason ? text.t(status.reason) : text.t("update.upToDate");
-    return `<p class="about-state ok" role="status">${icons.check(16)}<span>${escapeHTML(said)}</span></p>`;
+    return `<p class="about-state ok" role="status">${icons.done(18)}<span>${escapeHTML(said)}</span></p>`;
   }
   return `<p class="about-state${status.reason === "error.update_unreachable" ? " warn" : ""}" role="status">${icons.info(16)}<span>${escapeHTML(
     text.t(status.reason ?? "error.update_unreachable"),
