@@ -1403,7 +1403,7 @@ export function connectionForms(
       </li>`
     : "";
 
-  return `${panelSection(text.t("panel.settings"))}
+  return `<h2>${escapeHTML(text.t("panel.settings"))}</h2>
     <ul class="bento wide">${forgeCard}${address}${channelCard}</ul>`;
 }
 
@@ -2942,41 +2942,19 @@ function briefRow(b: Brief, text: Text, showVotes = false): string {
 export function overviewScreen(data: OverviewData, text: Text): string {
   const number = (value: number) => escapeHTML(text.number(value));
 
-  // A number, in the panel's metric tile — the same one About uses for the
-  // server's health: what it is in a small-capitals label beside an accent
-  // tile, and the number at the size of a number. Each is a way into the
-  // listing it counts.
   const stat = (id: string, value: number, label: string, icon: string, href?: string) => {
-    // In a tile a sixth of the window wide, the icon, the label and the arrow
-    // do not fit on one line — "Organisations" was cut and the arrow sat on
-    // "Published". So the icon and the arrow share the top, the number is
-    // under them, and the label is at the foot, where it may take two lines.
-    const go = href ? `<span class="stat-go" aria-hidden="true">${icons.chevron(14)}</span>` : "";
-    const inner = `<span class="metric-head"><span class="metric-icon">${icon}</span>${go}</span>
-      <span class="metric-value">${number(value)}</span>
-      <span class="metric-label">${escapeHTML(label)}</span>`;
+    const inner = `<span class="value">${number(value)}</span>
+      <span class="label">${icon}${escapeHTML(label)}</span>`;
     return card(
       id,
       href
-        ? `<a class="stat metric" href="${escapeAttr(href)}">${inner}</a>`
-        : `<div class="stat metric">${inner}</div>`,
+        ? `<a class="stat" href="${escapeAttr(href)}">${inner}<span class="stat-go" aria-hidden="true">${icons.chevron(14)}</span></a>`
+        : `<div class="stat">${inner}</div>`,
       "narrow",
     );
   };
 
-  // Every card is headed the same way as a metric: its icon in the accent tile
-  // and its name in small capitals, so the page reads as one set of parts.
-  const head = (icon: string, title: string, extra = "") =>
-    `<h3 class="card-head"><span class="metric-icon">${icon}</span>
-       <span class="metric-label">${escapeHTML(title)}</span>${extra}</h3>`;
-
-  const bars = (
-    id: string,
-    icon: string,
-    title: string,
-    counts: Record<string, number>,
-    label: (key: string) => string,
-  ) => {
+  const bars = (id: string, title: string, counts: Record<string, number>, label: (key: string) => string) => {
     const entries = Object.entries(counts).filter(([, n]) => n > 0);
     const body =
       entries.length === 0
@@ -2992,12 +2970,8 @@ export function overviewScreen(data: OverviewData, text: Text): string {
               </div>`;
             })
             .join("")}</div>`;
-    return card(id, `${head(icon, title)}${body}`, "wide");
+    return card(id, `<h3>${escapeHTML(title)}</h3>${body}`, "wide");
   };
-
-  function section(title: string): string {
-    return `<li class="dash-sec">${panelSection(title)}</li>`;
-  }
 
   function card(id: string, body: string, size: string): string {
     return `<li class="dash-card ${size}" data-card="${escapeAttr(id)}">${body}</li>`;
@@ -3012,7 +2986,8 @@ export function overviewScreen(data: OverviewData, text: Text): string {
   // box — the shape of "nothing yet" is still the shape of the chart.
   const activity = card(
     "activity",
-    `${head(icons.clock(16), text.t("overview.activity"), `<span class="count-chip">${number(arrived)}</span>`)}
+    `<h3>${escapeHTML(text.t("overview.activity"))}
+       <span class="count-chip">${number(arrived)}</span></h3>
      <div class="chart-wrap">
        ${areaChart(
          series.map((day) => day.reports),
@@ -3034,7 +3009,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
 
   const kinds = card(
     "kinds",
-    `${head(icons.overview(16), text.t("overview.byKind"))}
+    `<h3>${escapeHTML(text.t("overview.byKind"))}</h3>
      <div class="donut-row">
        ${donut(
          [
@@ -3053,10 +3028,10 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     "wide",
   );
 
-  const list = (id: string, icon: string, title: string, rows: Brief[], votes: boolean) =>
+  const list = (id: string, title: string, rows: Brief[], votes: boolean) =>
     card(
       id,
-      `${head(icon, title)}
+      `<h3>${escapeHTML(title)}</h3>
        ${
          rows.length === 0
            ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
@@ -3070,7 +3045,8 @@ export function overviewScreen(data: OverviewData, text: Text): string {
   // thing that is waiting rather than being the third grey number in a row.
   const boards = card(
     "boards",
-    `${head(icons.repository(16), text.t("portal.boards"), `<span class="count-chip">${number(data.repositories)}</span>`)}
+    `<h3>${escapeHTML(text.t("portal.boards"))}
+       <span class="count-chip">${number(data.repositories)}</span></h3>
      ${
        (data.boards ?? []).length === 0
          ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
@@ -3107,10 +3083,10 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     people: stat("people", data.people, text.t("shell.people"), icons.people(), "/panel/people"),
     activity,
     kinds,
-    statuses: bars("statuses", icons.queue(16), text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`)),
-    moderation: bars("moderation", icons.check(16), text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`)),
-    top: list("top", icons.idea(16), text.t("board.sortVotes"), data.top ?? [], true),
-    recent: list("recent", icons.bug(16), text.t("overview.recent"), data.recent ?? [], false),
+    statuses: bars("statuses", text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`)),
+    moderation: bars("moderation", text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`)),
+    top: list("top", text.t("board.sortVotes"), data.top ?? [], true),
+    recent: list("recent", text.t("overview.recent"), data.recent ?? [], false),
     boards,
   };
 
@@ -3120,17 +3096,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     ${total === 0 ? `<p class="lead">${escapeHTML(text.t("overview.emptyLead"))}</p>` : ""}
 
     <ul class="dashboard">
-      ${overviewCards
-        .map((name) =>
-          // Two sections under the numbers, named with the section head About
-          // uses: what is happening, and the reports themselves.
-          name === "activity"
-            ? section(text.t("overview.secActivity")) + all[name]
-            : name === "top"
-              ? section(text.t("overview.reports")) + all[name]
-              : all[name],
-        )
-        .join("")}
+      ${overviewCards.map((name) => all[name]).join("")}
     </ul>`;
 }
 
@@ -3517,30 +3483,26 @@ export function profileScreen(
   me: { username: string; name?: string; avatar?: string; admin: boolean },
   text: Text,
 ): string {
-  // Who you are, as a statement at the top — About's card: centred, lit from
-  // behind, only as tall as what it says — and the two things you can change
-  // about it underneath.
   return `<h1>${escapeHTML(text.t("shell.profile"))}</h1>
 
-    <div class="panel-stack">
-      <section class="hero-card">
-        <span class="hero-glow" aria-hidden="true"></span>
-        ${imagePicker(
-          {
-            what: "avatar",
-            current: me.avatar,
-            initials: me.name || me.username,
-            label: text.t("profile.picture"),
-            big: true,
-          },
-          text,
-        )}
-        <h2 class="hero-name">${escapeHTML(me.name || me.username)}</h2>
-        <p class="hero-sub">
+    <div class="identity">
+      ${imagePicker(
+        {
+          what: "avatar",
+          current: me.avatar,
+          initials: me.name || me.username,
+          label: text.t("profile.picture"),
+          big: true,
+        },
+        text,
+      )}
+      <div>
+        <div class="name">${escapeHTML(me.name || me.username)}</div>
+        <div class="card-sub">
           <span class="tag">${escapeHTML(me.username)}</span>
           ${me.admin ? `<span class="chip accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
-        </p>
-      </section>
+        </div>
+      </div>
     </div>
 
     <ul class="bento">
@@ -3570,19 +3532,6 @@ export function profileScreen(
     </ul>`;
 }
 
-/**
- * One setting: what it is and what it does on one side, its control on the
- * other. The row About uses for the release channel, and every panel screen
- * that sets things now uses it. `title` is markup — usually a <label> for the
- * control — and `help` is text.
- */
-function settingRow(title: string, help: string, control: string, wide = ""): string {
-  return `<section class="setting-row${wide ? ` ${wide}` : ""}">
-    <div class="setting-text"><h3>${title}</h3>${help ? `<p>${escapeHTML(help)}</p>` : ""}</div>
-    <div class="setting-control">${control}</div>
-  </section>`;
-}
-
 /** Language and look, which belong to the reader rather than to the server. */
 export function appearanceScreen(
   languages: { code: string; name: string }[],
@@ -3590,22 +3539,20 @@ export function appearanceScreen(
   theme: string,
   text: Text,
 ): string {
-  // Two settings, each on a row of its own with what it does beside it — the
-  // row About uses for the release channel.
   return `<h1>${escapeHTML(text.t("shell.appearance"))}</h1>
     <p class="lead">${escapeHTML(text.t("appearance.lead"))}</p>
-    <div class="panel-stack">
-      ${settingRow(
-        `<label for="appearance-language">${escapeHTML(text.t("shell.language"))}</label>`,
-        text.t("appearance.languageHelp"),
-        `<select id="appearance-language" name="language">${languages
-          .map(
-            (l) =>
-              `<option value="${escapeAttr(l.code)}"${l.code === language ? " selected" : ""}>${escapeHTML(l.name)}</option>`,
-          )
-          .join("")}</select>`,
-      )}
-      ${settingRow(escapeHTML(text.t("shell.theme")), text.t("appearance.themeHelp"), themeChoice(theme, text), "wide")}
+    <div class="wizard-card">
+      ${choiceField({
+        id: "appearance-language",
+        name: "language",
+        label: text.t("shell.language"),
+        options: languages.map((l) => [l.code, l.name] as [string, string]),
+        selected: language,
+      })}
+      <div class="field">
+        <label>${escapeHTML(text.t("shell.theme"))}</label>
+        ${themeChoice(theme, text)}
+      </div>
     </div>`;
 }
 
@@ -3639,28 +3586,26 @@ export function personalizationScreen(
     <p class="lead">${escapeHTML(text.t("personalization.lead"))}</p>
 
     <form class="instance-settings">
-      <div class="panel-stack">
-        ${settingRow(
-          `<label for="instance-name">${escapeHTML(text.t("setup.instanceName"))}</label>`,
-          text.t("setup.instanceNameHelp"),
-          `<input type="text" id="instance-name" name="name" value="${escapeAttr(instance.name)}" placeholder="Acme" />`,
-        )}
-        ${settingRow(
-          escapeHTML(text.t("personalization.logo")),
-          text.t("personalization.logoHelp"),
-          imagePicker(
+      <div class="wizard-card">
+        ${field({ id: "instance-name", name: "name", label: text.t("setup.instanceName"), hint: text.t("setup.instanceNameHelp"), value: instance.name, example: "Acme" }, text)}
+
+        <div class="field">
+          <label>${escapeHTML(text.t("personalization.logo"))}</label>
+          ${imagePicker(
             { what: "logo", current: instance.logo, initials: instance.name || "L", label: text.t("personalization.logo") },
             text,
-          ),
-        )}
-        ${settingRow(
-          `<label for="accent">${escapeHTML(text.t("personalization.accent"))}</label>`,
-          text.t("personalization.accentHelp"),
-          `<div class="accent-row">
+          )}
+          <p class="hint">${escapeHTML(text.t("personalization.logoHelp"))}</p>
+        </div>
+
+        <div class="field">
+          <label for="accent">${escapeHTML(text.t("personalization.accent"))}</label>
+          <div class="accent-row">
             <input type="color" id="accent" name="accent" value="${escapeAttr(instance.accent || "#e8520e")}" />
             <button type="button" class="button ghost" data-reset-accent>${escapeHTML(text.t("personalization.accentReset"))}</button>
-          </div>`,
-        )}
+          </div>
+          <p class="hint">${escapeHTML(text.t("personalization.accentHelp"))}</p>
+        </div>
       </div>
       <p class="form-error" role="alert" hidden></p>
       <div class="wizard-actions"><span class="spacer"></span>
@@ -3744,7 +3689,6 @@ export function organizationScreen(
     <p class="lead"><span class="tag">/${escapeHTML(org.slug)}</span>
       ${org.forge && org.forge !== "none" ? `<span class="chip accent">${escapeHTML(org.forge)}</span>` : ""}</p>
 
-    ${panelSection(text.t("portal.boards"))}
     ${repos.length === 0 ? `${emptyState(text.t("organizations.noRepositories"), icons.repository(28))}` : `<ul class="bento repositories">${cards}</ul>`}`;
 }
 
@@ -3862,12 +3806,12 @@ export interface ServerFacts {
  */
 export function aboutScreen(facts: ServerFacts, text: Text): string {
   const tile = (icon: string, label: string, value: string, sub = "", extra = "") =>
-    `<li class="metric">
-      <div class="metric-head"><span class="metric-icon">${icon}</span>
-        <span class="metric-label">${escapeHTML(label)}</span></div>
-      <strong class="metric-value">${escapeHTML(value)}</strong>
+    `<li class="about-stat">
+      <div class="about-stat-head"><span class="about-stat-icon">${icon}</span>
+        <span class="about-stat-label">${escapeHTML(label)}</span></div>
+      <strong class="about-stat-value">${escapeHTML(value)}</strong>
       ${extra}
-      ${sub ? `<span class="metric-sub">${escapeHTML(sub)}</span>` : ""}
+      ${sub ? `<span class="about-stat-sub">${escapeHTML(sub)}</span>` : ""}
     </li>`;
 
   const stats: string[] = [];
@@ -3928,9 +3872,9 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
 
   return `<h1>${escapeHTML(text.t("shell.about"))}</h1>
     <p class="lead">${escapeHTML(text.t("about.lead"))}</p>
-    <div class="panel-stack about">
-      <section class="hero-card">
-        <span class="hero-glow" aria-hidden="true"></span>
+    <div class="about">
+      <section class="about-hero">
+        <span class="about-glow" aria-hidden="true"></span>
         <img class="about-logo" src="/logo.svg" alt="" width="72" height="72" />
         <h2 class="about-name">${escapeHTML(text.t("app.name"))}</h2>
         <p class="about-version">${escapeHTML(facts.version || "—")}</p>
@@ -3939,23 +3883,24 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
           ${icons.update(15)}<span>${escapeHTML(text.t("update.check"))}</span></button>
       </section>
 
-      <section class="setting-row">
-        <div class="setting-text">
+      <section class="about-row">
+        <div class="about-row-text">
           <h3>${escapeHTML(text.t("update.beta"))}</h3>
           <p>${escapeHTML(text.t("update.channelHelp"))}</p>
         </div>
-        <div class="setting-control"><label class="toggle">
+        <label class="toggle">
           <input type="checkbox" role="switch" data-beta disabled
             aria-label="${escapeAttr(text.t("update.beta"))}" />
           <span class="toggle-track" aria-hidden="true"></span>
-        </label></div>
+        </label>
       </section>
 
       ${
         stats.length === 0
           ? ""
-          : `${panelSection(text.t("about.server"))}
-             <ul class="metrics">${stats.join("")}</ul>`
+          : `<div class="about-sec"><span class="about-pill">${escapeHTML(text.t("about.server"))}</span>
+               <span class="about-rule"></span></div>
+             <ul class="about-stats">${stats.join("")}</ul>`
       }
 
       <footer class="about-foot">
@@ -3997,15 +3942,6 @@ export function releaseNotes(markdown: string): string {
   }
   flush();
   return out.join("");
-}
-
-/**
- * A section of a panel screen: the name in a pill with a rule running on from
- * it. Lastboard's section head, which About brought in and every panel screen
- * now uses to say where one group of cards ends and the next begins.
- */
-export function panelSection(title: string): string {
-  return `<div class="sec-head"><span class="sec-pill">${escapeHTML(title)}</span><span class="sec-rule"></span></div>`;
 }
 
 /** What /api/update says. */

@@ -2385,6 +2385,22 @@ a.bento-card:hover {
 
 /* ------------------------------------------------------------------- stats */
 
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0 2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.stat {
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
 /* A stat that is a link is still a card. Without this the anchor stays inline,
    the list item keeps no border, and the number floats over the one below. */
 a.stat {
@@ -2395,6 +2411,28 @@ a.stat {
 
 a.stat:hover {
   border-color: rgba(var(--accent-rgb), 0.55);
+}
+
+.stats > li {
+  display: contents;
+}
+
+.stat .value {
+  display: block;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat .label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
 }
 
 /* A bar per status, drawn from the numbers rather than from a chart library:
@@ -2499,6 +2537,18 @@ a.stat:hover {
   inline-size: 5rem;
   block-size: 5rem;
   font-size: 1.75rem;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0 1.75rem;
+}
+
+.identity .name {
+  font-size: 1.15rem;
+  font-weight: 600;
 }
 
 /* A short, monospaced label for a role or a state. */
@@ -3106,15 +3156,14 @@ body > nav .brand {
  * the release channel as a setting on a row of its own; the server's health;
  * and the links out at the foot, over a rule. Their numbers where they have
  * them — a 72px mark, 18px name, 12px version, 18px down to the update zone. */
-/* A column of the panel's pieces — About's, and every screen built from them. */
-.panel-stack {
+.about {
   display: grid;
   gap: 1rem;
   max-inline-size: 60rem;
   margin-block: 1.25rem 2rem;
 }
 
-.hero-card {
+.about-hero {
   position: relative;
   overflow: hidden;
   display: flex;
@@ -3129,7 +3178,7 @@ body > nav .brand {
 
 /* The light behind the mark. Lastboard lights its update card from a corner;
    the product is what this card is about, so it is lit from behind that. */
-.hero-glow {
+.about-glow {
   position: absolute;
   inset-block-start: -45%;
   inset-inline: 20%;
@@ -3138,13 +3187,7 @@ body > nav .brand {
   pointer-events: none;
 }
 
-.hero-card > :not(.hero-glow) { position: relative; }
-
-/* A person or a product, named under its picture. Through .panel-stack for
-   the same reason as About's name: the panel's h2 rule would otherwise push
-   it half a card down. */
-.panel-stack .hero-name { margin: 12px 0 2px; font-size: 18px; font-weight: 600; letter-spacing: 0; }
-.hero-sub { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
+.about-hero > :not(.about-glow) { position: relative; }
 
 .about-logo {
   inline-size: 72px;
@@ -3302,7 +3345,7 @@ body > nav .brand {
 
 /* A setting on a row of its own, as theirs is: what it is and what it means on
    one side, the switch on the other. */
-.setting-row {
+.about-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -3313,42 +3356,8 @@ body > nav .brand {
   background: var(--panel);
 }
 
-.setting-row h3 { margin: 0; font-size: 1rem; }
-.setting-row h3 label { font: inherit; }
-.setting-row p { margin: 2px 0 0; color: var(--text-dim); font-size: 0.875rem; }
-
-/* The control keeps a width of its own on the other side, so a column of rows
-   lines up, and gives way under its text on a narrow screen. */
-.setting-control { display: flex; justify-content: flex-end; min-inline-size: 0; }
-.setting-control .sel,
-.setting-control input[type="text"] { inline-size: 18rem; max-inline-size: 100%; }
-.setting-row.wide { grid-template-columns: minmax(0, 1fr); }
-.setting-row.wide .setting-control { justify-content: stretch; }
-.setting-row.wide .theme-choice { inline-size: 100%; }
-
-@media (max-width: 40rem) {
-  .setting-row { grid-template-columns: minmax(0, 1fr); }
-  .setting-control { justify-content: flex-start; }
-  .setting-control .sel,
-  .setting-control input[type="text"] { inline-size: 100%; }
-}
-
-/* Every card in the panel is headed like About's tiles: its icon in the
-   accent tile. The icon is the <svg> itself, which takes a box like any
-   replaced element, so no card's markup had to change for it. */
-.admin-main .bento-card .card-head > .icon {
-  box-sizing: border-box;
-  inline-size: 34px;
-  block-size: 34px;
-  padding: 8px;
-  flex-shrink: 0;
-  border: 1px solid rgba(var(--accent-rgb), 0.18);
-  border-radius: 10px;
-  background: var(--accent-wash);
-  color: var(--accent);
-}
-
-.admin-main .bento-card .card-head { gap: 0.7rem; margin-block-end: 0.35rem; }
+.about-row h3 { margin: 0; font-size: 1rem; }
+.about-row p { margin: 2px 0 0; color: var(--text-dim); font-size: 0.875rem; }
 
 /* Their switch, 44 by 24. The checkbox is still there, over the whole of it,
    so a click, a key and a screen reader all reach a real control. */
@@ -3405,12 +3414,9 @@ body > nav .brand {
 
 /* The name of a group of cards: the pill of Lastboard's section heads, with
    the rule running on from it. */
-.sec-head { display: flex; align-items: center; gap: 12px; margin-block-start: 0.5rem; }
-/* Loose on a page rather than inside a column of pieces, it is what separates
-   one part of the screen from the last, so it takes the room a heading would. */
-.admin-main > .sec-head { margin-block: 1.75rem 0; }
+.about-sec { display: flex; align-items: center; gap: 12px; margin-block-start: 0.5rem; }
 
-.sec-pill {
+.about-pill {
   padding: 3px 9px;
   border: 1px solid var(--card-border);
   border-radius: 12px;
@@ -3424,9 +3430,9 @@ body > nav .brand {
   text-transform: uppercase;
 }
 
-.sec-rule { flex: 1; block-size: 1px; background: var(--border); }
+.about-rule { flex: 1; block-size: 1px; background: var(--border); }
 
-.metrics {
+.about-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   gap: 0.9rem;
@@ -3437,7 +3443,7 @@ body > nav .brand {
 
 /* One fact about the machine: what it is, in a tile the accent marks, and the
    number — which is the point — at the size of a number. */
-.metric {
+.about-stat {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -3447,9 +3453,9 @@ body > nav .brand {
   background: var(--panel);
 }
 
-.metric-head { display: flex; align-items: center; gap: 0.6rem; }
+.about-stat-head { display: flex; align-items: center; gap: 0.6rem; }
 
-.metric-icon {
+.about-stat-icon {
   display: grid;
   place-items: center;
   inline-size: 34px;
@@ -3461,7 +3467,7 @@ body > nav .brand {
   color: var(--accent);
 }
 
-.metric-label {
+.about-stat-label {
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -3469,7 +3475,7 @@ body > nav .brand {
   color: var(--text-dim);
 }
 
-.metric-value {
+.about-stat-value {
   margin-block-start: 0.2rem;
   font-size: 1.6rem;
   font-weight: 700;
@@ -3477,31 +3483,7 @@ body > nav .brand {
   font-variant-numeric: tabular-nums;
 }
 
-.metric-sub { color: var(--text-dim); font-size: 0.82rem; }
-
-/* The same pieces across the panel. Overview's numbers are metric tiles set
-   inside its cards — the card is the border, so the tile draws none — and
-   every card is headed like a metric: the icon in its accent tile, the name
-   in small capitals. */
-.dash-card .metric {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  padding: 1rem 1.1rem;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.dash-card .metric-value { margin: 0; }
-.dash-card .metric .stat-go { position: static; margin-inline-start: auto; }
-
-.dash-card > .card-head { gap: 0.6rem; }
-.dash-card > .card-head .count-chip { margin-inline-start: auto; }
-
-/* A section of the dashboard: the head spans the grid, like About's. */
-.dash-sec { grid-column: 1 / -1; list-style: none; }
-.dash-sec .sec-head { margin-block: 0.6rem 0; }
+.about-stat-sub { color: var(--text-dim); font-size: 0.82rem; }
 
 /* How full the disk is. A <meter>, so its length is an attribute and not a
    style; accent while there is room, amber past three quarters, red past
