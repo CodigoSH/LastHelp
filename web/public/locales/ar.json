@@ -4,8 +4,6 @@
   "about.diskOf": "من أصل {total}",
   "about.donate": "تبرّع",
   "about.memory": "الذاكرة المستخدمة",
-  "about.schema": "المخطط {version}",
-  "about.server": "هذا الخادم",
   "about.since": "منذ {date}",
   "about.sourceCode": "الشيفرة المصدرية",
   "about.uptime": "يعمل منذ",

@@ -3853,17 +3853,15 @@ export interface ServerFacts {
  * once.
  */
 export function aboutScreen(facts: ServerFacts, text: Text): string {
-  // A fact about the machine, as one of Lastboard's rows: what it is on one
-  // side, the number at the end of the line.
+  // A fact about the machine, as a card of the panel's recipe: its name as the
+  // card's quiet title, the number under it at the size of a number.
   const row = (label: string, value: string, sub = "", extra = "") =>
-    `<div class="settings-row about-stat">
-      <div class="settings-info">
-        <h4>${escapeHTML(label)}</h4>
-        ${sub ? `<p>${escapeHTML(sub)}</p>` : ""}
-        ${extra}
-      </div>
+    `<section class="bento-card about-stat">
+      <div class="card-top"><h3>${escapeHTML(label)}</h3></div>
       <strong class="about-stat-value">${escapeHTML(value)}</strong>
-    </div>`;
+      ${extra}
+      ${sub ? `<p class="about-stat-sub">${escapeHTML(sub)}</p>` : ""}
+    </section>`;
 
   const stats: string[] = [];
   if (facts.uptime_seconds !== undefined) {
@@ -3877,13 +3875,9 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
   }
   if (facts.database_bytes !== undefined) {
     stats.push(
-      row(
-        text.t("about.database"),
-        text.bytes(facts.database_bytes),
-        // The one number that matters when a backup will not restore, beside
-        // the database it describes rather than in a line of small print.
-        facts.schema !== undefined ? text.t("about.schema", { version: text.number(facts.schema) }) : "",
-      ),
+      // The size and nothing else: the schema number beside it answered a
+      // question for whoever develops this, not for whoever runs it.
+      row(text.t("about.database"), text.bytes(facts.database_bytes)),
     );
   }
   if (facts.disk_free_bytes !== undefined) {
@@ -3945,7 +3939,7 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
         </div>
       </section>
 
-      ${stats.length === 0 ? "" : settingsCard(text.t("about.server"), stats.join(""))}
+      ${stats.length === 0 ? "" : `<div class="about-stats">${stats.join("")}</div>`}
 
       <nav class="about-links" aria-label="${escapeAttr(text.t("shell.about"))}">
         ${link("https://git.codigosh.com/CodigoSH/LastHelp", icons.code(15), text.t("about.sourceCode"))}

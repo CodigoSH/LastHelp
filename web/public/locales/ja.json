@@ -4,8 +4,6 @@
   "about.diskOf": "{total} 中",
   "about.donate": "寄付する",
   "about.memory": "使用中のメモリ",
-  "about.schema": "スキーマ {version}",
-  "about.server": "このサーバー",
   "about.since": "{date} から",
   "about.sourceCode": "ソースコード",
   "about.uptime": "稼働時間",

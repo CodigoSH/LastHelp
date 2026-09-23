@@ -4,8 +4,6 @@
   "about.diskOf": "από {total}",
   "about.donate": "Δωρεά",
   "about.memory": "Μνήμη σε χρήση",
-  "about.schema": "Σχήμα {version}",
-  "about.server": "Αυτός ο διακομιστής",
   "about.since": "Από {date}",
   "about.sourceCode": "Πηγαίος κώδικας",
   "about.uptime": "Σε λειτουργία εδώ και",

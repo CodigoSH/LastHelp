@@ -4,8 +4,6 @@
   "about.diskOf": "{total}-এর মধ্যে",
   "about.donate": "অনুদান দিন",
   "about.memory": "ব্যবহৃত মেমরি",
-  "about.schema": "স্কিমা {version}",
-  "about.server": "এই সার্ভার",
   "about.since": "{date} থেকে",
   "about.sourceCode": "সোর্স কোড",
   "about.uptime": "চলছে",

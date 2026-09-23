@@ -4,8 +4,6 @@
   "about.diskOf": "z {total}",
   "about.donate": "Wesprzyj",
   "about.memory": "Zajęta pamięć",
-  "about.schema": "Schemat {version}",
-  "about.server": "Ten serwer",
   "about.since": "Od {date}",
   "about.sourceCode": "Kod źródłowy",
   "about.uptime": "Działa od",

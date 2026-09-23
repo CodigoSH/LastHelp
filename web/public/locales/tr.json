@@ -4,8 +4,6 @@
   "about.diskOf": "/ {total}",
   "about.donate": "Bağış yap",
   "about.memory": "Kullanılan bellek",
-  "about.schema": "Şema {version}",
-  "about.server": "Bu sunucu",
   "about.since": "{date} tarihinden beri",
   "about.sourceCode": "Kaynak kodu",
   "about.uptime": "Çalışma süresi",

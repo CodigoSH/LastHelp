@@ -4,8 +4,6 @@
   "about.diskOf": "dari {total}",
   "about.donate": "Donasi",
   "about.memory": "Memori terpakai",
-  "about.schema": "Skema {version}",
-  "about.server": "Peladen ini",
   "about.since": "Sejak {date}",
   "about.sourceCode": "Kode sumber",
   "about.uptime": "Berjalan selama",

@@ -4,8 +4,6 @@
   "about.diskOf": "共 {total}",
   "about.donate": "捐助",
   "about.memory": "内存占用",
-  "about.schema": "架构 {version}",
-  "about.server": "这台服务器",
   "about.since": "自 {date} 起",
   "about.sourceCode": "源代码",
   "about.uptime": "已运行",

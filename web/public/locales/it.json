@@ -4,8 +4,6 @@
   "about.diskOf": "su {total}",
   "about.donate": "Dona",
   "about.memory": "Memoria in uso",
-  "about.schema": "Schema {version}",
-  "about.server": "Questo server",
   "about.since": "Dal {date}",
   "about.sourceCode": "Codice sorgente",
   "about.uptime": "In funzione da",

@@ -4,8 +4,6 @@
   "about.diskOf": "of {total}",
   "about.donate": "Donate",
   "about.memory": "Memory in use",
-  "about.schema": "Schema {version}",
-  "about.server": "This server",
   "about.since": "Since {date}",
   "about.sourceCode": "Source code",
   "about.uptime": "Running for",

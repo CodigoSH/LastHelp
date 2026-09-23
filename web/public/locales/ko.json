@@ -4,8 +4,6 @@
   "about.diskOf": "{total} 중",
   "about.donate": "후원하기",
   "about.memory": "사용 중인 메모리",
-  "about.schema": "스키마 {version}",
-  "about.server": "이 서버",
   "about.since": "{date}부터",
   "about.sourceCode": "소스 코드",
   "about.uptime": "가동된 지",

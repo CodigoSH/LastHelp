@@ -4,8 +4,6 @@
   "about.diskOf": "из {total}",
   "about.donate": "Поддержать",
   "about.memory": "Занято памяти",
-  "about.schema": "Схема {version}",
-  "about.server": "Этот сервер",
   "about.since": "С {date}",
   "about.sourceCode": "Исходный код",
   "about.uptime": "Работает уже",

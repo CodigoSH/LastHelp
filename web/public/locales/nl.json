@@ -4,8 +4,6 @@
   "about.diskOf": "van {total}",
   "about.donate": "Doneren",
   "about.memory": "Gebruikt geheugen",
-  "about.schema": "Schema {version}",
-  "about.server": "Deze server",
   "about.since": "Sinds {date}",
   "about.sourceCode": "Broncode",
   "about.uptime": "Draait al",

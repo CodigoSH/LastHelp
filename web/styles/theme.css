@@ -3458,9 +3458,28 @@ body > nav .brand {
   border-block-start: 1px solid var(--border);
 }
 
-/* A fact's number at the end of its row. */
-.about-stat-value { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.about-stat .about-meter { max-inline-size: 240px; margin-block-start: 6px; }
+/* The server's facts: a card each, two to a row, one on a phone. */
+.about-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.about-stat-value {
+  display: block;
+  margin-block-start: 6px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.about-stat-sub { margin: 4px 0 0; font-size: 12px; color: var(--text-dim); }
+.about-stat .about-meter { margin-block-start: 10px; }
+
+@media (max-width: 40rem) {
+  .about-stats { grid-template-columns: minmax(0, 1fr); }
+}
 
 .about-links a {
   display: inline-flex;
@@ -6863,6 +6882,8 @@ a.stat:hover .stat-go {
 
 @media (max-width: 40rem) {
   .settings-row { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  /* A switch is small enough to stay at the end of its line, as theirs does. */
+  .settings-row:has(> .toggle) { grid-template-columns: minmax(0, 1fr) auto; }
   .profile-head { flex-direction: column; align-items: flex-start; }
   .si-tags { display: none; }
 }
