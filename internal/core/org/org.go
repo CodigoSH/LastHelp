@@ -61,23 +61,20 @@ func (f Forge) valid() bool {
 	return false
 }
 
-// ModerationMode is how much of what arrives waits for a human.
-type ModerationMode string
-
-const (
-	// ModerateAll holds everything. The default, and correct on day one.
-	ModerateAll ModerationMode = "all"
-
-	// ModerateFirst holds only the first thing from a visitor nobody has
-	// approved before. It exists because a queue that holds everything is right
-	// on day one and a daily chore the day a project gets popular — which is
-	// the real cost of not asking for accounts.
-	ModerateFirst ModerationMode = "first"
-)
-
-func (m ModerationMode) valid() bool {
-	return m == ModerateAll || m == ModerateFirst
-}
+// Nothing here decides how much waits for a human, and that is not an
+// oversight.
+//
+// There was a ModerationMode with two values — hold everything, or hold only
+// the first thing from somebody nobody has approved before — and the second
+// could never be implemented: it needs an identity for anonymous visitors, and
+// public accounts were **descartados** on 23-sep-2026 (see the project memory,
+// hallazgo_registro_publico_descartado.md). The API accepted the setting, the
+// column stored it, and not one line ever read it: a setting that saves and
+// changes nothing is worse than no setting, because it looks done.
+//
+// Everything waits for a human. The column `moderation_mode` stays in the
+// schema — a migration is never deleted — carrying its default and read by
+// nobody.
 
 // Organization is a forge connection.
 //
@@ -96,14 +93,13 @@ type Organization struct {
 
 // Repository is what the public sees and what a collaborator triages.
 type Repository struct {
-	ID             int64
-	OrgID          int64
-	Slug           string
-	Name           string
-	ForgeRepo      string
-	AcceptsBugs    bool
-	AcceptsIdeas   bool
-	ModerationMode ModerationMode
+	ID           int64
+	OrgID        int64
+	Slug         string
+	Name         string
+	ForgeRepo    string
+	AcceptsBugs  bool
+	AcceptsIdeas bool
 
 	// NotifyConfig is the channel this board's team reads, stored as JSON. It
 	// is opaque here on purpose: the domain has no business knowing what a
@@ -223,21 +219,17 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 	if strings.TrimSpace(r.Name) == "" {
 		r.Name = r.Slug
 	}
-	if r.ModerationMode == "" {
-		r.ModerationMode = ModerateAll
-	}
-	if !r.ModerationMode.valid() {
-		return Repository{}, fmt.Errorf("unknown moderation mode %q", r.ModerationMode)
-	}
 	if !r.AcceptsBugs && !r.AcceptsIdeas {
 		return Repository{}, ErrNothingAccepted
 	}
 
+	// moderation_mode is not written: nothing reads it, and the column carries
+	// its own default. Named here so that the next person to see it in the
+	// schema does not go looking for the code that fills it.
 	res, err := s.DB.Exec(`INSERT INTO repository
-		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, moderation_mode, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas,
-		string(r.ModerationMode), now.Unix())
+		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas, now.Unix())
 	if err != nil {
 		if isUnique(err) {
 			return Repository{}, ErrSlugTaken
@@ -259,7 +251,7 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.moderation_mode, r.notify_config, r.created_at
+		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.created_at
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
 		WHERE o.slug = ? AND r.slug = ?`, NormaliseSlug(orgSlug), NormaliseSlug(repoSlug)))
@@ -268,14 +260,14 @@ func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 func (s Store) RepositoryByID(id int64) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, moderation_mode, notify_config, created_at
+		       accepts_bugs, accepts_ideas, notify_config, created_at
 		FROM repository WHERE id = ?`, id))
 }
 
 func (s Store) ListRepositories(orgID int64) ([]Repository, error) {
 	rows, err := s.DB.Query(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, moderation_mode, notify_config, created_at
+		       accepts_bugs, accepts_ideas, notify_config, created_at
 		FROM repository WHERE org_id = ? ORDER BY name COLLATE NOCASE, id`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("listing repositories: %w", err)
@@ -324,14 +316,12 @@ func (s Store) scanRepository(row scanner) (Repository, error) {
 
 func scanRepositoryRow(row scanner) (Repository, error) {
 	var r Repository
-	var mode string
 	var created int64
 	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.ForgeRepo,
-		&r.AcceptsBugs, &r.AcceptsIdeas, &mode, &r.NotifyConfig, &created)
+		&r.AcceptsBugs, &r.AcceptsIdeas, &r.NotifyConfig, &created)
 	if err != nil {
 		return Repository{}, err
 	}
-	r.ModerationMode = ModerationMode(mode)
 	r.CreatedAt = time.Unix(created, 0)
 	return r, nil
 }
@@ -430,7 +420,7 @@ type Board struct {
 func (s Store) ListBoards() ([]Board, error) {
 	rows, err := s.DB.Query(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.moderation_mode, r.notify_config, r.created_at,
+		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.created_at,
 		       o.slug, o.name
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
@@ -443,15 +433,13 @@ func (s Store) ListBoards() ([]Board, error) {
 	var out []Board
 	for rows.Next() {
 		var b Board
-		var mode string
 		var created int64
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Slug, &b.Name, &b.ForgeRepo,
-			&b.AcceptsBugs, &b.AcceptsIdeas, &mode, &b.NotifyConfig, &created,
+			&b.AcceptsBugs, &b.AcceptsIdeas, &b.NotifyConfig, &created,
 			&b.OrgSlug, &b.OrgName)
 		if err != nil {
 			return nil, fmt.Errorf("listing boards: %w", err)
 		}
-		b.ModerationMode = ModerationMode(mode)
 		b.CreatedAt = time.Unix(created, 0)
 		out = append(out, b)
 	}

@@ -111,9 +111,9 @@ func TestRepositoriesLiveUnderAnOrganization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.ModerationMode != ModerateAll {
-		t.Errorf("moderation defaulted to %q; holding everything is the right default on day one", r.ModerationMode)
-	}
+	// Nothing is asserted here about moderation any more: there is no setting
+	// to assert. Everything waits for a human, and that is checked where it
+	// happens — portal_test.go, on what a submission comes back as.
 
 	found, err := s.RepositoryBySlugs("codigosh", "lastboard")
 	if err != nil {

@@ -77,12 +77,11 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 }
 
 type newRepository struct {
-	Slug           string `json:"slug"`
-	Name           string `json:"name"`
-	ForgeRepo      string `json:"forge_repo"`
-	AcceptsBugs    *bool  `json:"accepts_bugs"`
-	AcceptsIdeas   *bool  `json:"accepts_ideas"`
-	ModerationMode string `json:"moderation_mode"`
+	Slug         string `json:"slug"`
+	Name         string `json:"name"`
+	ForgeRepo    string `json:"forge_repo"`
+	AcceptsBugs  *bool  `json:"accepts_bugs"`
+	AcceptsIdeas *bool  `json:"accepts_ideas"`
 }
 
 // handleCreateRepository registers a repository for feedback.
@@ -109,7 +108,6 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 	created, err := s.orgs().CreateRepository(org.Repository{
 		OrgID: o.ID, Slug: in.Slug, Name: in.Name, ForgeRepo: in.ForgeRepo,
 		AcceptsBugs: accepts(in.AcceptsBugs), AcceptsIdeas: accepts(in.AcceptsIdeas),
-		ModerationMode: org.ModerationMode(in.ModerationMode),
 	}, s.now())
 	if err != nil {
 		writeError(w, statusForOrgError(err), keyForOrgError(err))
