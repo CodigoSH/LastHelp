@@ -169,6 +169,30 @@ export function formatDuration(code: string, seconds: number): string {
 }
 
 /**
+ * How old something is, as short as the language allows: "3d", "5h", "12m".
+ *
+ * For a column of rows in a queue, where the question is only which of these
+ * has been waiting longest. A full date ("23 Sept 2026") is three times the
+ * width and makes the reader do the subtraction; the full date is still there,
+ * in the row's title, for whoever needs it.
+ *
+ * Minutes at the least: "40s" on a queue is noise that changes while you read.
+ */
+const ageFormatters = new Map<string, Intl.NumberFormat>();
+
+export function formatAge(code: string, seconds: number): string {
+  const units = durationUnits.slice(0, -1);
+  const [scale, unit] = units.find(([s]) => seconds >= s) ?? units[units.length - 1]!;
+  const cacheKey = `${code}|${unit}`;
+  let formatter = ageFormatters.get(cacheKey);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(code, { style: "unit", unit, unitDisplay: "narrow" });
+    ageFormatters.set(cacheKey, formatter);
+  }
+  return formatter.format(Math.max(1, Math.floor(seconds / scale)));
+}
+
+/**
  * Machine values never go through a locale formatter, and this is the reminder
  * of why: a decimal comma inside an SVG `points` attribute cuts the number in
  * half and the browser discards the rest without a word, so a chart in Spanish

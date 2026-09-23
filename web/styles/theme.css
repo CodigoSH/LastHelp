@@ -4412,22 +4412,99 @@ a.stat:hover .stat-go {
 
 .rev-body { display: flex; flex: 1; min-block-size: 0; }
 
-.rev-list {
+/* The column: the archive's controls stay put at its head while the rows
+   scroll under them. */
+.rev-side {
   inline-size: 545px;
   max-inline-size: 52%;
   flex-shrink: 0;
   border-inline-end: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.rev-list {
+  flex: 1;
+  min-block-size: 0;
   overflow: auto;
   padding-inline: 12px;
   padding-block-end: 12px;
 }
+
+/* The archive's controls. The search box is Lastboard's, from the head of its
+   status page's list, to the pixel: input colours, the house radius, 12px text
+   and the glass left out. */
+.rev-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 14px 10px;
+  border-block-end: 1px solid var(--border);
+}
+
+.rev-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 9px;
+}
+
+.rev-search svg { color: var(--text-dim); flex: none; }
+
+.rev-search input {
+  border: 0;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 2px;
+  inline-size: 100%;
+  min-inline-size: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.rev-search:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
+
+.rev-narrow { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Wide enough that the longest label in English still fits: three to a row in
+   the desktop column, two on a phone rather than three cut short. */
+.rev-narrow select {
+  flex: 1 1 9rem;
+  min-inline-size: 0;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text-dim);
+}
+
+/* A narrowing that is on says so: the same accent a chosen row carries. */
+.rev-narrow select.set {
+  color: var(--text-main);
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+}
+
+.rev-more,
+.rev-unfilter { display: flex; justify-content: center; margin: 12px 0 4px; }
 
 .rev-detail {
   flex: 1 1 auto;
   min-inline-size: 0;
   overflow: auto;
   padding: 28px 32px;
+  position: relative;
 }
+
+/* The drawer's own parts, which only exist on a phone. */
+.rev-veil,
+.rev-shut { display: none; }
 
 .rev-group {
   margin: 0;
@@ -4475,6 +4552,12 @@ a.stat:hover .stat-go {
 }
 
 .rev-row.child { margin-inline-start: 26px; inline-size: calc(100% - 26px); }
+
+/* Turned away, in the archive: still findable, visibly not part of the
+   product's public face. */
+.rev-row.out .rev-t,
+.rev-row.out .rev-p { opacity: 0.55; }
+.rev-row.out .rev-t { text-decoration: line-through; text-decoration-color: var(--text-dim); }
 
 .rev-dot {
   inline-size: 8px;
@@ -4548,11 +4631,85 @@ a.stat:hover .stat-go {
   color: var(--text-main);
 }
 
-/* Their fold, at their width: the detail goes and the list takes the screen. */
+/* Their fold, at their width: the list takes the screen, and a tapped row
+   opens the detail as a drawer from the trailing edge. The drawer is
+   Lastboard's MonitorHistoryDrawer: 420px or the whole width, a veil at 45%,
+   a 0.28s slide mirrored by --rtl-flip, and the square close that turns. */
 @media (max-width: 640px) {
-  .rev-list { inline-size: 100%; max-inline-size: 100%; border-inline-end: none; }
-  .rev-detail { display: none; }
+  .rev-side { inline-size: 100%; max-inline-size: 100%; border-inline-end: none; }
   .rev-foot { display: none; }
+  .rev-modes { padding-inline-start: 8px; }
+
+  /* Both below the top bar, like the rest of this screen: the bar stays on
+     top of everything here, so a drawer drawn from the window's own top edge
+     had its close button hidden underneath it. */
+  .rev-veil {
+    display: block;
+    position: fixed;
+    inset: 48px 0 0;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 4;
+  }
+
+  .rev-detail {
+    position: fixed;
+    inset-block: 48px 0;
+    inset-inline-end: 0;
+    inline-size: min(420px, 100%);
+    background: var(--panel);
+    border-inline-start: 1px solid var(--border);
+    box-shadow: calc(var(--rtl-flip, 1) * -10px) 0 40px rgba(0, 0, 0, 0.35);
+    padding: 64px 20px 24px;
+    box-sizing: border-box;
+    transform: translateX(calc(var(--rtl-flip, 1) * 100%));
+    /* Hidden once it has slid out, so what is off screen cannot be reached
+       with the tab key; shown at once when it slides in. */
+    transition: transform 0.28s var(--ease), visibility 0s linear 0.28s;
+    visibility: hidden;
+    z-index: 5;
+  }
+
+  .review.reading .rev-veil { opacity: 1; pointer-events: auto; }
+  .review.reading .rev-detail {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.28s var(--ease), visibility 0s;
+  }
+
+  .rev-shut {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    inset-block-start: 15px;
+    inset-inline-end: 16px;
+    inline-size: 36px;
+    block-size: 36px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .rev-shut:hover,
+  .rev-shut:focus-visible {
+    background: rgba(var(--accent-rgb), 0.1);
+    transform: rotate(90deg);
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb), 0.3);
+    border-radius: var(--radius);
+  }
+}
+
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  .rev-veil,
+  .rev-detail { transition: none; }
 }
 
 /* A block of words, and the box it lives in.

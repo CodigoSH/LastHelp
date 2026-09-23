@@ -14,6 +14,7 @@ const text: Text = {
   number: (value) => String(value),
   bytes: (value) => `${value} bytes`,
   since: (seconds) => `${seconds}s ago`,
+  age: (seconds) => `${seconds}s`,
 };
 
 function report(over: Partial<ItemDetail> = {}): ItemDetail {

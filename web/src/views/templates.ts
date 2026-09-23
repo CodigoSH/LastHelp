@@ -31,6 +31,8 @@ export interface Text {
   bytes(value: number): string;
   /** How long ago, in the largest unit that still says something. */
   since(seconds: number): string;
+  /** How old, as short as the language writes it — for a column of rows. */
+  age(seconds: number): string;
 }
 
 /**
@@ -3196,6 +3198,30 @@ export interface ReportFilters {
 }
 
 /** Every status either kind can be in, in the order the work goes through. */
+const everyStatus = [
+  "new",
+  "confirmed",
+  "planned",
+  "in_progress",
+  "in_forge",
+  "done",
+  "closed",
+  "declined",
+  "not_reproducible",
+];
+
+/** What the review screen is showing, all of it read from the address. */
+export interface ReviewView {
+  mode: "pending" | "all";
+  chosen: string;
+  /** Only the archive narrows; what is waiting is never filtered. */
+  filters: ReportFilters;
+  /** Whether a further page may exist past what is drawn. */
+  more: boolean;
+  /** Seconds since the epoch, given rather than read so the rows can be tested. */
+  now: number;
+}
+
 /**
  * Reviewing what is waiting: one screen, two panes, one job.
  *
@@ -3217,16 +3243,129 @@ export interface ReportFilters {
  *     add reports and messages together while the tabs below counted only
  *     reports, so the same screen showed 19, 16 and 13.
  *   - **A filter narrows, it never reveals.** The messages used to vanish the
- *     moment any report filter was touched.
+ *     moment any report filter was touched. That is why the filters live only
+ *     in the archive: what is waiting is a queue to empty, and a queue you can
+ *     narrow is a queue where something waits unseen.
  */
-export function reviewScreen(
-  data: ReportsData,
-  mode: "pending" | "all",
-  chosen: string,
-  text: Text,
-): string {
+export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): string {
+  const total = (data.items ?? []).length + (data.comments ?? []).length;
+  return `<div class="review">
+    <div class="rev-head">
+      <span class="rev-where">${icons.queue(15)}<span>${escapeHTML(text.t("review.title"))}</span></span>
+      <div class="rev-modes">
+        <button class="tab${view.mode === "pending" ? " on" : ""}" data-mode="pending">
+          ${escapeHTML(text.t("review.pending"))}
+          ${
+            // The waiting count stays on its tab while the archive is open:
+            // it is the number the bar shows, and the two never disagree.
+            view.mode === "pending"
+              ? `<span class="count-chip">${escapeHTML(text.number(total))}</span>`
+              : ""
+          }</button>
+        <button class="tab${view.mode === "all" ? " on" : ""}" data-mode="all">${escapeHTML(text.t("board.all"))}</button>
+      </div>
+      <span class="rev-spacer"></span>
+      <button type="button" class="icon-button" data-leave
+        title="${escapeAttr(text.t("action.close"))}"
+        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close(18)}</button>
+    </div>
+    <div class="rev-body">
+      <aside class="rev-side">
+        ${view.mode === "all" ? reviewFilters(data, view.filters, text) : ""}
+        <div class="rev-list" data-list>${reviewList(data, view, text)}</div>
+      </aside>
+      <div class="rev-veil" data-shut></div>
+      <section class="rev-detail">
+        <button type="button" class="rev-shut" data-shut
+          title="${escapeAttr(text.t("action.close"))}"
+          aria-label="${escapeAttr(text.t("action.close"))}">${icons.close(18)}</button>
+        <div data-detail></div>
+      </section>
+    </div>
+    <div class="rev-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> ${escapeHTML(text.t("review.keyMove"))}</span>
+      <span><kbd>P</kbd> ${escapeHTML(text.t("panel.approve"))}</span>
+      <span><kbd>R</kbd> ${escapeHTML(text.t("panel.reject"))}</span>
+      <span><kbd>S</kbd> ${escapeHTML(text.t("panel.spam"))}</span>
+      <span><kbd>/</kbd> ${escapeHTML(text.t("board.search"))}</span>
+      <span><kbd>Esc</kbd> ${escapeHTML(text.t("review.keyLeave"))}</span>
+    </div>
+  </div>`;
+}
+
+/**
+ * The archive's controls: a search box and four narrowings.
+ *
+ * The search box is Lastboard's, from the head of that page's list. The four
+ * selects are what the screen this replaced offered as tabs and selects on a
+ * row of their own; in a column of 545px they have to be compact, and a select
+ * carries its own label as the first option, so nothing is spent on captions.
+ * An option that would find nothing is not offered.
+ */
+function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): string {
+  const counts = data.counts ?? { moderation: {}, status: {}, kind: {} };
+  const option = (value: string, label: string, selected: boolean) =>
+    `<option value="${escapeAttr(value)}"${selected ? " selected" : ""}>${escapeHTML(label)}</option>`;
+  const choices = (
+    name: keyof ReportFilters,
+    any: string,
+    values: { value: string; label: string; count?: number }[],
+  ) => {
+    const chosen = filters[name];
+    return `<select data-f="${escapeAttr(name)}" aria-label="${escapeAttr(any)}"
+        class="${chosen ? "set" : ""}">
+      ${option("", any, chosen === "")}
+      ${values
+        .filter((v) => v.count === undefined || v.count > 0 || v.value === chosen)
+        .map((v) => option(v.value, v.label, v.value === chosen))
+        .join("")}
+    </select>`;
+  };
+
+  const kind = choices("kind", text.t("review.anyKind"), [
+    { value: "bug", label: text.t("kind.bug"), count: counts.kind.bug ?? 0 },
+    { value: "idea", label: text.t("kind.idea"), count: counts.kind.idea ?? 0 },
+  ]);
+  const moderation = choices(
+    "moderation",
+    text.t("review.anyModeration"),
+    ["pending", "published", "rejected", "spam"].map((m) => ({
+      value: m,
+      label: text.t(`moderation.${m}`),
+      count: counts.moderation[m] ?? 0,
+    })),
+  );
+  const status = choices(
+    "status",
+    text.t("review.anyStatus"),
+    everyStatus.map((s) => ({ value: s, label: text.t(`status.${s}`), count: counts.status[s] ?? 0 })),
+  );
+  const board =
+    data.boards.length < 2
+      ? ""
+      : choices(
+          "board",
+          text.t("review.anyBoard"),
+          data.boards.map((b) => ({ value: `${b.org}/${b.repo}`, label: `${b.organization} / ${b.name}` })),
+        );
+
+  return `<div class="rev-filter">
+    <label class="rev-search">
+      ${icons.search(14)}
+      <input type="search" data-q value="${escapeAttr(filters.q)}"
+        placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
+    </label>
+    <div class="rev-narrow">${kind}${moderation}${status}${board}</div>
+  </div>`;
+}
+
+/**
+ * The rows, on their own so a further page can be drawn without the screen.
+ */
+export function reviewList(data: ReportsData, view: ReviewView, text: Text): string {
   const rows = data.items ?? [];
   const waiting = data.comments ?? [];
+  const chosen = view.chosen;
 
   // Grouped by board, because moderating is already context-switching and
   // jumping between projects on every row makes it worse.
@@ -3249,6 +3388,14 @@ export function reviewScreen(
   const preview = (body: string) =>
     `<p class="rev-p">${escapeHTML(body.replace(/\s+/g, " ").trim().slice(0, 180))}</p>`;
 
+  // How long it has been waiting, short, with the date in the title for
+  // whoever needs the day. A queue is read for which has waited longest, and
+  // "23 Sept 2026" makes you do the subtraction in a column a third as wide.
+  const when = (at: number) =>
+    `<span class="rev-w" title="${escapeAttr(text.date(at))}">${escapeHTML(
+      text.age(Math.max(0, view.now - at)),
+    )}</span>`;
+
   const commentRow = (c: WaitingComment, onItsOwn: boolean) =>
     `<button type="button" class="rev-row${onItsOwn ? "" : " child"}${
       `c:${c.id}` === chosen ? " on" : ""
@@ -3260,19 +3407,24 @@ export function reviewScreen(
         )}</span>
         ${preview(c.body ?? "")}
       </span>
-      <span class="rev-w">${escapeHTML(text.date(c.created_at))}</span>
+      ${when(c.created_at)}
     </button>`;
 
   const reportRow = (r: ReportRow) => {
     const kids = under.get(r.public_id) ?? [];
-    return `<button type="button" class="rev-row${r.public_id === chosen ? " on" : ""}"
+    return `<button type="button" class="rev-row${r.public_id === chosen ? " on" : ""}${
+      // In the archive, what was turned away is dimmed rather than hidden:
+      // it is what somebody searches the archive for, and it should still
+      // read as not part of the product's public face.
+      r.moderation === "rejected" || r.moderation === "spam" ? " out" : ""
+    }"
         data-pick="${escapeAttr(r.public_id)}" data-what="report">
         <span class="rev-dot ${escapeAttr(r.kind)}"></span>
         <span class="rev-main">
           <span class="rev-t">${escapeHTML(r.title)}</span>
           ${preview(r.body ?? "")}
         </span>
-        <span class="rev-w">${escapeHTML(text.date(r.created_at))}</span>
+        ${when(r.created_at)}
       </button>
       ${kids.map((c) => commentRow(c, false)).join("")}`;
   };
@@ -3298,38 +3450,24 @@ export function reviewScreen(
           <span class="count-chip">${escapeHTML(text.number(orphans.length))}</span></p>
         ${orphans.map((c) => commentRow(c, true)).join("")}`);
 
-  const total = rows.length + waiting.length;
+  if (rows.length + waiting.length === 0) {
+    const narrowed = view.mode === "all" && Object.values(view.filters).some((v) => v !== "");
+    return narrowed
+      ? `<div class="rev-empty">${emptyState(text.t("review.nothingMatches"), icons.search(28))}
+           <p class="rev-unfilter"><button type="button" class="button small" data-unfilter>${escapeHTML(
+             text.t("review.clearFilters"),
+           )}</button></p></div>`
+      : `<div class="rev-empty">${emptyState(text.t("review.clear"), icons.check(28))}</div>`;
+  }
 
-  return `<div class="review">
-    <div class="rev-head">
-      <span class="rev-where">${icons.queue(15)}<span>${escapeHTML(text.t("review.title"))}</span></span>
-      <div class="rev-modes">
-        <button class="tab${mode === "pending" ? " on" : ""}" data-mode="pending">
-          ${escapeHTML(text.t("review.pending"))}
-          <span class="count-chip">${escapeHTML(text.number(total))}</span></button>
-        <button class="tab${mode === "all" ? " on" : ""}" data-mode="all">${escapeHTML(text.t("board.all"))}</button>
-      </div>
-      <span class="rev-spacer"></span>
-      <button type="button" class="icon-button" data-leave
-        title="${escapeAttr(text.t("action.close"))}"
-        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close(18)}</button>
-    </div>
-    <div class="rev-body">
-      <div class="rev-list">${
-        total === 0
-          ? `<div class="rev-empty">${emptyState(text.t("review.clear"), icons.check(28))}</div>`
-          : list
-      }</div>
-      <div class="rev-detail" data-detail></div>
-    </div>
-    <div class="rev-foot">
-      <span><kbd>↑</kbd><kbd>↓</kbd> ${escapeHTML(text.t("review.keyMove"))}</span>
-      <span><kbd>P</kbd> ${escapeHTML(text.t("panel.approve"))}</span>
-      <span><kbd>R</kbd> ${escapeHTML(text.t("panel.reject"))}</span>
-      <span><kbd>S</kbd> ${escapeHTML(text.t("panel.spam"))}</span>
-      <span><kbd>Esc</kbd> ${escapeHTML(text.t("review.keyLeave"))}</span>
-    </div>
-  </div>`;
+  return (
+    list +
+    (view.more
+      ? `<p class="rev-more"><button type="button" class="button small" data-more>${escapeHTML(
+          text.t("review.more"),
+        )}</button></p>`
+      : "")
+  );
 }
 
 /**

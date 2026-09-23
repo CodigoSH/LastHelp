@@ -37,12 +37,19 @@ const text: views.Text = {
   number: (value) => i18n.number(value),
   bytes: (value) => i18n.bytes(value),
   since: (seconds) => i18n.since(seconds),
+  age: (seconds) => i18n.age(seconds),
 };
 
 const root = document.getElementById("app");
 const nav = document.getElementById("nav");
 
 let me: Me | null = null;
+
+/** The address last drawn, so the review screen knows where it was opened from. */
+let lastRendered = "";
+
+/** Where somebody was before opening the review screen: leaving goes back there. */
+let reviewCameFrom = "/panel";
 
 /**
  * What this installation calls itself.
@@ -147,8 +154,9 @@ function renderNav(): void {
   // mode at a time, and a control that does something else mid-gesture is a
   // control somebody hits by accident.
   const inPanel = document.body.classList.contains("admin-view");
+  const inReview = location.pathname === "/review";
   const panel = me
-    ? `<button class="icon-button panel-toggle${composing ? " cannot" : ""}" data-panel-toggle
+    ? `<button class="icon-button panel-toggle${composing || inReview ? " cannot" : ""}" data-panel-toggle
                aria-pressed="${inPanel}"
                title="${escapeAttr(i18n.t("nav.panel"))}"
                aria-label="${escapeAttr(i18n.t("nav.panel"))}">
@@ -180,11 +188,12 @@ function renderNav(): void {
    */
   const canTriage = (me?.memberships?.length ?? 0) > 0;
   const waiting = (me?.pending?.reports ?? 0) + (me?.pending?.messages ?? 0);
-  const inReview = location.pathname === "/review";
   const review =
     me && canTriage
-      ? `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}"
-             href="/review" data-review
+      ? // While the screen is open this is its way out, the way the status
+        // icon closes Lastboard's status page: it goes back where you were.
+        `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}"
+             href="${escapeAttr(inReview ? reviewCameFrom : "/review")}" data-review
              title="${escapeAttr(i18n.t("review.title"))}"
              aria-label="${escapeAttr(i18n.t("review.title"))}">
            ${icons.queue(16)}${waiting > 0 ? `<b>${escapeHTML(text.number(waiting))}</b>` : ""}
@@ -1910,9 +1919,19 @@ async function render(): Promise<void> {
   restoreTheme();
   await i18n.ready;
   await loadInstance();
-  renderNav();
 
   const path = location.pathname.replace(/\/+$/, "") || "/";
+  // Where the review screen was opened from, which is where leaving it goes:
+  // the bar's icon, the close button and Escape all take you back rather than
+  // to a fixed page, the way closing Lastboard's status page leaves you on the
+  // board you were on.
+  if (path === "/review" && lastRendered !== "" && !lastRendered.startsWith("/review") &&
+      !lastRendered.startsWith("/panel/reports")) {
+    reviewCameFrom = lastRendered;
+  }
+  lastRendered = location.pathname + location.search;
+  renderNav();
+
   const parts = path.split("/").filter(Boolean);
 
   try {
@@ -2785,19 +2804,51 @@ async function showPanel(): Promise<void> {
  * to somebody and a reload lands back on it. Lastboard's equivalent is an
  * overlay because that product has no router; copying the overlay would be
  * importing a limitation rather than the design.
+ *
+ * Everything on screen is read from the address — the mode, what is chosen and
+ * every narrowing of the archive — so there is one source of truth for what is
+ * shown instead of a variable and an address that drift apart.
  */
+const REVIEW_PAGE = 50;
+
+/** Whether the search box had the cursor when the screen was last redrawn. */
+let reviewSearching = false;
+
+function leaveReview(): void {
+  go(reviewCameFrom);
+}
+
 async function showReview(): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
 
   const query = new URLSearchParams(location.search);
   const mode = query.get("mode") === "all" ? "all" : "pending";
+  const filters: views.ReportFilters = {
+    moderation: "",
+    kind: "",
+    status: "",
+    board: "",
+    sort: "",
+    q: "",
+  };
+  if (mode === "all") {
+    for (const key of Object.keys(filters) as (keyof views.ReportFilters)[]) {
+      filters[key] = query.get(key) ?? "";
+    }
+  }
 
-  const data = await api
-    .get<views.ReportsData>(
-      `/api/reports?${new URLSearchParams(mode === "pending" ? { moderation: "pending" } : {}).toString()}`,
-    )
-    .catch(() => null);
+  const ask = (offset: number) => {
+    const params = new URLSearchParams(
+      mode === "pending" ? { moderation: "pending" } : { ...filters },
+    );
+    for (const [key, value] of [...params.entries()]) if (value === "") params.delete(key);
+    params.set("limit", String(REVIEW_PAGE));
+    params.set("offset", String(offset));
+    return api.get<views.ReportsData>(`/api/reports?${params.toString()}`);
+  };
+
+  const data = await ask(0).catch(() => null);
   if (!data) {
     show(views.failureScreen(i18n.t("error.forbidden"), text));
     return;
@@ -2816,11 +2867,20 @@ async function showReview(): Promise<void> {
   }
 
   const rows = data.items ?? [];
-  let chosen = query.get("at") ?? rows[0]?.public_id ?? "";
+  const view: views.ReviewView = {
+    mode,
+    chosen:
+      query.get("at") ??
+      rows[0]?.public_id ??
+      (data.comments?.[0] ? `c:${data.comments[0].id}` : ""),
+    filters,
+    more: rows.length === REVIEW_PAGE,
+    now: Math.floor(Date.now() / 1000),
+  };
 
-  show(views.reviewScreen(data, mode, chosen, text));
+  show(views.reviewScreen(data, view, text));
   renderNav();
-  await wireReview(data, mode, () => chosen, (id) => (chosen = id));
+  await wireReview(data, view, ask);
 }
 
 /**
@@ -2832,10 +2892,11 @@ async function showReview(): Promise<void> {
  */
 async function wireReview(
   data: views.ReportsData,
-  mode: "pending" | "all",
-  current: () => string,
-  choose: (id: string) => void,
+  view: views.ReviewView,
+  ask: (offset: number) => Promise<views.ReportsData>,
 ): Promise<void> {
+  const screen = root?.querySelector<HTMLElement>(".review");
+  const list = root?.querySelector<HTMLElement>("[data-list]");
   const pane = root?.querySelector<HTMLElement>("[data-detail]");
   const rowOf = (id: string) => data.items.find((r) => r.public_id === id) ?? null;
   // A message is selected by "c:<id>", which is not a report's public id: the
@@ -2845,6 +2906,13 @@ async function wireReview(
       ? ((data.comments ?? []).find((c) => String(c.id) === id.slice(2)) ?? null)
       : null;
   const fields = new Map<string, ReportField[]>();
+
+  // On a phone there is no room for the detail beside the list, so a chosen
+  // row opens it as a drawer from the trailing edge — Lastboard's answer on
+  // the same page at the same width. Only a tap opens it: arriving on the
+  // screen, or a decision moving to the next row, keeps the list in view.
+  const narrow = () => window.matchMedia("(max-width: 640px)").matches;
+  const reading = (on: boolean) => screen?.classList.toggle("reading", on);
 
   const draw = async (id: string) => {
     if (!pane) return;
@@ -2864,7 +2932,7 @@ async function wireReview(
   };
 
   const select = (id: string) => {
-    choose(id);
+    view.chosen = id;
     for (const el of root?.querySelectorAll<HTMLElement>("[data-pick]") ?? []) {
       el.classList.toggle("on", el.dataset.pick === id);
     }
@@ -2877,30 +2945,99 @@ async function wireReview(
     void draw(id);
   };
 
-  for (const el of root?.querySelectorAll<HTMLElement>("[data-pick]") ?? []) {
-    el.addEventListener("click", () => select(el.dataset.pick ?? ""));
-  }
+  // Delegated to the list, which survives a further page being drawn into it.
+  list?.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    const row = target.closest<HTMLElement>("[data-pick]");
+    if (row) {
+      select(row.dataset.pick ?? "");
+      if (narrow()) reading(true);
+      return;
+    }
+    if (target.closest("[data-more]")) void more();
+    if (target.closest("[data-unfilter]")) go("/review?mode=all");
+  });
   for (const el of root?.querySelectorAll<HTMLElement>("[data-mode]") ?? []) {
     el.addEventListener("click", () => go(`/review?mode=${el.dataset.mode}`));
   }
-  root?.querySelector<HTMLElement>("[data-leave]")?.addEventListener("click", () => go("/panel"));
+  root?.querySelector<HTMLElement>("[data-leave]")?.addEventListener("click", leaveReview);
+  for (const el of root?.querySelectorAll<HTMLElement>("[data-shut]") ?? []) {
+    el.addEventListener("click", () => reading(false));
+  }
 
-  if (current()) void draw(current());
+  // The archive's narrowings write the address and the screen redraws from
+  // it. The chosen row is dropped: it may not be in what comes back.
+  const narrowTo = (change: Partial<views.ReportFilters>) => {
+    const next = new URLSearchParams({ mode: "all" });
+    for (const [key, value] of Object.entries({ ...view.filters, ...change })) {
+      if (value) next.set(key, String(value));
+    }
+    go(`/review?${next.toString()}`);
+  };
+  for (const el of root?.querySelectorAll<HTMLSelectElement>("[data-f]") ?? []) {
+    el.addEventListener("change", () => narrowTo({ [el.dataset.f ?? ""]: el.value }));
+  }
+  const search = root?.querySelector<HTMLInputElement>("[data-q]");
+  if (search) {
+    search.addEventListener(
+      "input",
+      debounce(() => {
+        reviewSearching = true;
+        narrowTo({ q: search.value });
+      }, 350),
+    );
+    // Typing is redrawn from the address like every other narrowing, so the
+    // box is handed back the cursor where it was — otherwise every pause in
+    // typing would throw the person out of the field they are typing in.
+    //
+    // Read and cleared here, once, rather than cleared on blur: replacing the
+    // screen removes the old box, removing a focused element fires blur, and
+    // that blur arrived before this line and wiped the flag it was about to
+    // read.
+    if (reviewSearching) {
+      search.focus();
+      search.setSelectionRange(search.value.length, search.value.length);
+    }
+  }
+  reviewSearching = false;
+
+  // A further page, appended rather than navigated to: the rows already read
+  // stay where they are, and so does the scroll.
+  let loaded = data.items.length;
+  const more = async () => {
+    const page = await ask(loaded).catch((err) => {
+      report(err);
+      return null;
+    });
+    if (!page || !list) return;
+    data.items = [...data.items, ...(page.items ?? [])];
+    loaded = data.items.length;
+    view.more = (page.items ?? []).length === REVIEW_PAGE;
+    const top = list.scrollTop;
+    list.innerHTML = views.reviewList(data, view, text);
+    list.scrollTop = top;
+  };
+
+  if (view.chosen) void draw(view.chosen);
 
   const order = () => [...(root?.querySelectorAll<HTMLElement>("[data-pick]") ?? [])];
   const step = (by: number) => {
     const all = order();
-    const at = all.findIndex((el) => el.dataset.pick === current());
+    const at = all.findIndex((el) => el.dataset.pick === view.chosen);
     const next = all[Math.min(all.length - 1, Math.max(0, at + by))];
     if (next) select(next.dataset.pick ?? "");
   };
 
   const decide = async (state: string) => {
-    const id = current();
+    const id = view.chosen;
     if (!id) return;
     const all = order();
     const at = all.findIndex((el) => el.dataset.pick === id);
     const after = all[at + 1] ?? all[at - 1];
+    // Only what is waiting can be decided: in the archive a key press on a
+    // report published last March would undo somebody's work by accident.
+    const row = rowOf(id);
+    if (!id.startsWith("c:") && row?.moderation !== "pending") return;
     try {
       const comment = id.startsWith("c:");
       await api.post(
@@ -2913,6 +3050,16 @@ async function wireReview(
       report(err);
       return;
     }
+    if (view.mode === "all") {
+      // In the archive the row stays, wearing its new state: a row that
+      // vanished would read as a report that was deleted.
+      if (row) row.moderation = state;
+      all[at]?.classList.toggle("out", state === "rejected" || state === "spam");
+      void draw(id);
+      if (me) me = await api.get<Me>("/api/me").catch(() => me);
+      renderNav();
+      return;
+    }
     // Gone from the list and from the data behind it, so stepping and counting
     // agree with what is on the screen.
     all[at]?.remove();
@@ -2921,13 +3068,14 @@ async function wireReview(
       data.comments = (data.comments ?? []).filter((c) => String(c.id) !== id.slice(2));
     }
     if (after) select(after.dataset.pick ?? "");
-    else if (pane) pane.innerHTML = views.reviewDetail(null, [], text);
+    else {
+      if (pane) pane.innerHTML = views.reviewDetail(null, [], text);
+      reading(false);
+    }
+    if (me) me = await api.get<Me>("/api/me").catch(() => me);
     renderNav();
   };
 
-  for (const el of root?.querySelectorAll<HTMLButtonElement>("[data-act]") ?? []) {
-    el.addEventListener("click", () => void decide(el.dataset.act ?? ""));
-  }
   // Delegated, because the detail pane is rewritten on every selection and a
   // listener bound to its buttons would die with them.
   pane?.addEventListener("click", (event) => {
@@ -2936,7 +3084,15 @@ async function wireReview(
   });
 
   reviewKeys?.();
-  reviewKeys = keyboardFor({ step, decide, mode });
+  reviewKeys = keyboardFor({
+    step,
+    decide,
+    // Escape closes the drawer first when one is open: on a phone it is the
+    // thing in front, and leaving the whole screen from inside it would skip
+    // a step the person can see.
+    leave: () => (screen?.classList.contains("reading") ? reading(false) : leaveReview()),
+    find: () => search?.focus(),
+  });
 }
 
 /** Set while the review screen is up, so its keys are removed when it is not. */
@@ -2945,13 +3101,21 @@ let reviewKeys: (() => void) | null = null;
 function keyboardFor(on: {
   step: (by: number) => void;
   decide: (state: string) => Promise<void>;
-  mode: string;
+  leave: () => void;
+  find: () => void;
 }): () => void {
   const handler = (event: KeyboardEvent) => {
+    // Only on this screen. The listener is removed when the next one is drawn,
+    // but a key pressed between the address changing and that draw would
+    // otherwise decide something on a page nobody is looking at.
+    if (location.pathname !== "/review") return;
     // Never while somebody is typing: a queue with single-letter shortcuts and
     // a search box is a queue that approves things while you look for one.
     const target = event.target as HTMLElement | null;
-    if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+    if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) {
+      if (event.key === "Escape") target.blur();
+      return;
+    }
     if (target?.isContentEditable) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
 
@@ -2978,8 +3142,12 @@ function keyboardFor(on: {
       case "S":
         void on.decide("spam");
         break;
+      case "/":
+        event.preventDefault();
+        on.find();
+        break;
       case "Escape":
-        go("/panel");
+        on.leave();
         break;
     }
   };

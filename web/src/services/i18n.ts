@@ -3,6 +3,7 @@ import {
   formatBytes,
   formatDate,
   formatNumber,
+  formatAge,
   formatDuration,
   resolveLanguage,
   translate,
@@ -100,6 +101,10 @@ class I18n {
 
   since(seconds: number): string {
     return formatDuration(this.language, seconds);
+  }
+
+  age(seconds: number): string {
+    return formatAge(this.language, seconds);
   }
 
   subscribe(listener: () => void): () => void {

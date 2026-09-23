@@ -618,7 +618,10 @@ async function main() {
   // That is the whole point of it: five boards used to mean asking five times
   // to find the one with something in it. The row has to name its board, or a
   // decision is taken about a message from nowhere.
-  await goTo("/review", ".rev-row, .rev-empty");
+  // Waiting for the list rather than for a row: if a message whose report is
+  // not in the list were counted and not drawn, there would be no row to wait
+  // for, and the pass would stop on a timeout instead of on this check.
+  await goTo("/review", ".rev-list");
   const spanning = await evaluate(`
     const fila = document.querySelector('[data-what="comment"]');
     fila?.click();
@@ -3346,6 +3349,172 @@ async function main() {
     "reports left the panel menu, and the way in is the bar",
     menu.sigueEnElMenu === false && menu.pildoraEnLaBarra === true,
     JSON.stringify(menu),
+  );
+
+  // 11d. The archive. "Everything" used to be a list of fifty with no way to
+  //      find anything in it — the screen it replaced had tabs, selects and a
+  //      search box, and they went when it did. They are back, in the address
+  //      like everything else on this screen.
+  await goTo("/review?mode=all", ".rev-filter");
+  // Waiting for the screen to be redrawn, not for the select to look chosen:
+  // if the narrowing were ignored it would never look chosen, and the pass
+  // would stop on a timeout instead of on this check.
+  await evaluate(`
+    document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
+    const s = document.querySelector('[data-f="kind"]');
+    s.value = "bug";
+    s.dispatchEvent(new Event("change"));
+  `);
+  await waitFor("#app > :not([data-leaving]) .rev-filter");
+  const porTipo = await evaluate(`
+    return {
+      puesto: document.querySelector('[data-f="kind"]')?.classList.contains("set") ?? false,
+      direccion: new URLSearchParams(location.search).get("kind"),
+      filas: document.querySelectorAll('[data-what="report"]').length,
+      noSonFallos: document.querySelectorAll('[data-what="report"] .rev-dot:not(.bug)').length,
+    };
+  `);
+  check(
+    "the archive narrows by type, and the address says so",
+    porTipo.puesto === true && porTipo.direccion === "bug" && porTipo.filas >= 1 &&
+      porTipo.noSonFallos === 0,
+    JSON.stringify(porTipo),
+  );
+
+  // Typing into the search box redraws the screen from the address, and the
+  // cursor has to survive it — otherwise every pause throws you out of the box.
+  await evaluate(`document.querySelector("[data-q]").focus()`);
+  await page.send("Input.insertText", { text: "accent" });
+  await waitFor('#app .rev-filter [data-q][value="accent"]');
+  await sleep(300);
+  const buscando = await evaluate(`
+    const filas = [...document.querySelectorAll('[data-what="report"]')];
+    return {
+      direccion: new URLSearchParams(location.search).get("q"),
+      filas: filas.length,
+      todasCasan: filas.every(f => /accent/i.test(f.textContent)),
+      sigueEscribiendo: document.activeElement?.matches?.("[data-q]") ?? false,
+      // Y el tipo no se perdió al buscar: las dos cosas se suman.
+      tipo: new URLSearchParams(location.search).get("kind"),
+    };
+  `);
+  check(
+    "a search finds what it says, keeps the other narrowing, and keeps the cursor",
+    buscando.direccion === "accent" && buscando.filas >= 1 && buscando.todasCasan &&
+      buscando.sigueEscribiendo === true && buscando.tipo === "bug",
+    JSON.stringify(buscando),
+  );
+
+  // A narrowing that finds nothing says so, and offers the way back.
+  await goTo("/review?mode=all&q=zzzz-nothing-says-this", ".rev-empty");
+  const nada = await evaluate(`
+    return {
+      filas: document.querySelectorAll("[data-pick]").length,
+      quitar: !!document.querySelector("[data-unfilter]"),
+    };
+  `);
+  check(
+    "an archive search that finds nothing says so and offers to clear it",
+    nada.filas === 0 && nada.quitar === true,
+    JSON.stringify(nada),
+  );
+
+  // How long each row has waited, short — with the day in the title. A queue
+  // is read for which has waited longest, and a full date in that column made
+  // you do the subtraction.
+  await goTo("/review?mode=all", ".rev-row");
+  const edad = await evaluate(`
+    const w = [...document.querySelectorAll(".rev-w")];
+    return {
+      filas: w.length,
+      largoMaximo: Math.max(...w.map(e => e.textContent.trim().length)),
+      conFecha: w.filter(e => (e.getAttribute("title") ?? "").length > 6).length,
+    };
+  `);
+  check(
+    "each row says how long it has waited, short, with the date on hover",
+    edad.filas >= 1 && edad.largoMaximo <= 6 && edad.conFecha === edad.filas,
+    JSON.stringify(edad),
+  );
+
+  // The bar while the screen is open: the icon that opened it is the way out
+  // and goes back where you were; the panel's toggle is greyed, one mode at a
+  // time, as Lastboard greys its bar while its status page is up.
+  await goTo("/panel/organizations", ".admin-main");
+  await evaluate(`document.querySelector(".review-pill").click()`);
+  await waitFor(".review");
+  const barraEnRevision = await evaluate(`
+    const t = document.querySelector("[data-panel-toggle]");
+    return {
+      panelApagado: t?.classList.contains("cannot") ?? false,
+      noResponde: t ? getComputedStyle(t).pointerEvents === "none" : false,
+      salida: document.querySelector(".review-pill")?.getAttribute("href") ?? "",
+    };
+  `);
+  await evaluate(`document.querySelector(".review-pill").click()`);
+  await waitFor(".admin-main");
+  const vuelta = await evaluate(`return location.pathname`);
+  check(
+    "while reviewing, the bar's icon is the way back and the panel toggle is greyed",
+    barraEnRevision.panelApagado === true && barraEnRevision.noResponde === true &&
+      barraEnRevision.salida === "/panel/organizations" && vuelta === "/panel/organizations",
+    JSON.stringify({ barra: barraEnRevision, vuelta }),
+  );
+
+  // A phone. The detail has no room beside the list, so a tapped row opens it
+  // as a drawer from the trailing edge, and Escape closes the drawer before it
+  // closes the screen. Measured on the box, not on a class: a drawer that is
+  // "open" and still off the edge is the failure this is for.
+  await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
+  await goTo("/review?mode=all", ".rev-row");
+  // Off the screen means past the TRAILING edge, which depends on the
+  // direction: by this point the pass reads Arabic, and the drawer rightly
+  // comes in from the left.
+  const cerrado = await evaluate(`
+    const r = document.querySelector(".rev-detail").getBoundingClientRect();
+    return { izquierda: Math.round(r.left), derecha: Math.round(r.right), ancho: innerWidth,
+             dir: document.documentElement.dir || "ltr" };
+  `);
+  const fuera = (c: { izquierda: number; derecha: number; ancho: number }) =>
+    cerrado.dir === "rtl" ? c.derecha <= 0 : c.izquierda >= c.ancho;
+  await evaluate(`document.querySelector(".rev-row").click()`);
+  await sleep(450);
+  // Tolerant probes: if the drawer never opened, Escape leaves the screen and
+  // there is no detail left to measure — that has to read as this check
+  // failing, not as a script error with no name on it.
+  const abierto = await evaluate(`
+    const d = document.querySelector(".rev-detail");
+    const r = d?.getBoundingClientRect();
+    return {
+      izquierda: Math.round(r?.left ?? NaN), derecha: Math.round(r?.right ?? NaN), ancho: innerWidth,
+      titulo: d?.querySelector(".rev-title")?.textContent?.trim() ?? "",
+      visible: d ? getComputedStyle(d).visibility : "(no detail)",
+      // The close button can be pressed: what is at its centre is the button
+      // itself. Drawn from the window's top edge, it sat under the top bar —
+      // there, measured right, and impossible to press.
+      cerrarAlcanzable: (() => {
+        const b = d?.querySelector(".rev-shut")?.getBoundingClientRect();
+        if (!b || b.width === 0) return false;
+        return !!document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest(".rev-shut");
+      })(),
+    };
+  `);
+  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await sleep(450);
+  const trasEscape = await evaluate(`
+    const r = document.querySelector(".rev-detail")?.getBoundingClientRect() ?? { left: NaN, right: NaN };
+    return { izquierda: Math.round(r.left), derecha: Math.round(r.right), ancho: innerWidth,
+             donde: location.pathname };
+  `);
+  await page.send("Emulation.clearDeviceMetricsOverride", {});
+  check(
+    "on a phone a tapped row opens the detail as a drawer, and Escape closes it first",
+    fuera(cerrado) &&
+      abierto.izquierda >= 0 && abierto.derecha <= abierto.ancho && abierto.titulo !== "" &&
+      abierto.visible === "visible" && abierto.cerrarAlcanzable === true &&
+      fuera(trasEscape) && trasEscape.donde === "/review",
+    JSON.stringify({ cerrado, abierto, trasEscape }),
   );
 
   // 12. The other account. Every check above ran as the administrator, which is
