@@ -200,8 +200,11 @@ function renderNav(): void {
          </a>`
       : "";
 
+  // The queue first, then the page's own controls beside the panel's: editing
+  // the front page and opening the panel are both about this installation, so
+  // they sit together, and what is waiting stands a step apart from them.
   const account = me
-    ? `${compose}${review}${panel}`
+    ? `${review}${compose}${panel}`
     : // Not on the sign-in page itself: a link to where you already are is the
       // third thing on that screen saying the same word.
       location.pathname === "/sign-in"

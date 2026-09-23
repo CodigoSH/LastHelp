@@ -3261,6 +3261,34 @@ async function main() {
     JSON.stringify(bandeja),
   );
 
+  // Y fuera de la pantalla de revisión, la píldora dice que hay algo esperando
+  // con el color de «en espera». Se leía gris: la regla de los enlaces de la
+  // barra le ganaba por especificidad, y el fichero decía lo contrario.
+  // Comparado contra el valor calculado del token, no contra una cadena.
+  await goTo("/panel", ".side-item");
+  const pildora = await evaluate(`
+    const p = document.querySelector(".review-pill");
+    // The token resolved by the browser: an element coloured with it through
+    // CSSOM, which the page's policy does not govern.
+    const sonda = document.createElement("i");
+    sonda.style.color = "var(--hue-hold)";
+    document.body.append(sonda);
+    const esperado = getComputedStyle(sonda).color;
+    sonda.remove();
+    return {
+      tieneTrabajo: p?.classList.contains("has") ?? false,
+      color: p ? getComputedStyle(p).color : "(sin píldora)",
+      esperado,
+    };
+  `);
+  check(
+    "outside the review screen the bar's pill wears the waiting colour when something waits",
+    pildora.tieneTrabajo === true && pildora.color === pildora.esperado,
+    JSON.stringify(pildora),
+  );
+  await goTo("/review", ".rev-row");
+  await waitFor(".rev-detail .rev-title");
+
   // La ficha, al lado y entera: el cuerpo completo sin abrir otra pantalla.
   const ficha = await evaluate(`
     const det = document.querySelector(".rev-detail");

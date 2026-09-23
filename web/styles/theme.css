@@ -4338,16 +4338,20 @@ a.stat:hover .stat-go {
 }
 
 .review-pill b { font-variant-numeric: tabular-nums; }
-.review-pill:hover { color: var(--text-main); background: rgba(127, 127, 127, 0.12); }
+/* Written as `.nav-right a.review-pill…` on purpose: the bar's own rule for its
+   links, `.nav-right a:not(.button)`, is 0,2,1 and paints every link grey. At
+   0,2,0 these lost to it, so "something is waiting" was never coloured
+   anywhere but on the review screen itself. */
+.nav-right a.review-pill:hover { color: var(--text-main); background: rgba(127, 127, 127, 0.12); }
 
 /* Something is waiting: the colour this product already uses for "waiting",
    not the accent — which is what marks the page you are on, and the two would
    be shouting the same colour at each other on the one control that is often
    both. */
-.review-pill.has { color: var(--hue-hold); border-color: rgba(180, 83, 9, 0.28); }
+.nav-right a.review-pill.has { color: var(--hue-hold); border-color: rgba(180, 83, 9, 0.28); }
 
-.review-pill.on,
-.review-pill.on.has {
+.nav-right a.review-pill.on,
+.nav-right a.review-pill.on.has {
   color: var(--accent);
   border-color: var(--accent-line);
   background: var(--accent-wash);
