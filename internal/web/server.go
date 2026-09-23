@@ -254,6 +254,11 @@ func (s *Server) routes() {
 	private("PATCH /api/orgs/{org}", s.handleRenameOrganization)
 	private("DELETE /api/orgs/{org}", s.handleDeleteOrganization)
 	private("PATCH /api/orgs/{org}/repos/{repo}", s.handleUpdateRepository)
+	// A repository's page in the panel, and the team of an organisation: who
+	// works where, changed by whoever runs it.
+	private("GET /api/orgs/{org}/repos/{repo}/panel", s.handleRepositoryPanel)
+	private("GET /api/orgs/{org}/team", s.handleTeam)
+	private("POST /api/orgs/{org}/team", s.handleTeamChange)
 	private("DELETE /api/orgs/{org}/repos/{repo}", s.handleDeleteRepository)
 
 	private("PATCH /api/people/{id}", s.handleUpdatePerson)
