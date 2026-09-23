@@ -97,7 +97,13 @@ const shoot = async (name: string, whole = false) => {
   // has no content height to clip to, and is photographed as the window.
   const height = whole ? HEIGHT : await evaluate(`
     const main = document.querySelector("main");
-    const bottom = main ? main.getBoundingClientRect().bottom + window.scrollY : 0;
+    // The panel scrolls inside its content column, so its height is that
+    // column's content rather than the box it is drawn in.
+    const column = document.querySelector(".admin-main");
+    const bottom = Math.max(
+      main ? main.getBoundingClientRect().bottom + window.scrollY : 0,
+      column ? column.getBoundingClientRect().top + column.scrollHeight : 0,
+    );
     return Math.min(Math.max(Math.ceil(bottom) + 24, 320), 2000);
   `);
 

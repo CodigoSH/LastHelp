@@ -1888,6 +1888,25 @@ body.admin-view > main {
   overflow-y: auto;
 }
 
+/* The screen scrolls inside its own column, as Lastboard's drawer does, and
+   not the document. The public pages hide the document's scrollbar and the
+   panel shows it, so a panel that scrolled the document narrowed the window
+   by the bar's width the moment it opened, and every icon in the bar above
+   slid 10px sideways under the pointer. Wide screens only: on a phone the
+   bar overlays the page and takes no width. */
+@media (min-width: 52.0625rem) {
+  .admin {
+    block-size: calc(100vh - 49px);
+    block-size: calc(100dvh - 49px);
+    min-block-size: 0;
+  }
+  .admin-main { overflow-y: auto; }
+  /* And the document never scrolls under it. Measured: with nothing to
+     scroll, a fraction of a pixel of the bar's border was enough for the
+     browser to draw a scrollbar and take its 10px anyway. */
+  html:has(> body.admin-view) { overflow: hidden; }
+}
+
 /* Lastboard's drawer header, to its numbers: a 64px picture, the name at 16px
    and the role in a small monospaced badge, centred over a rule. It runs out
    to the sidebar's edges, as the drawer's does. */
@@ -6042,7 +6061,8 @@ a.stat:hover .stat-go {
 .panel-indicator { fill: currentColor; opacity: 0; transition: opacity 0.2s; }
 .panel-indicator.on { opacity: 1; }
 
-.icon-button.cannot {
+.icon-button.cannot,
+.nav-right a.review-pill.cannot {
   opacity: 0.3;
   pointer-events: none;
   filter: grayscale(1);
@@ -6766,7 +6786,7 @@ a.stat:hover .stat-go {
 .si-text { display: grid; gap: 2px; min-inline-size: 0; }
 .si-name { font-size: 14px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .si-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
-.si-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-inline-start: auto; }
+.si-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-inline-start: auto; }
 .si-actions { display: flex; gap: 4px; flex: none; }
 
 /* Their small monospaced tag: a role, a slug, a state. */
@@ -6797,7 +6817,7 @@ a.stat:hover .stat-go {
 
 .logo-row { display: flex; align-items: center; gap: 12px; }
 .logo-row input { flex: 1; }
-.org-tags { display: flex; gap: 6px; margin: 0 0 8px; }
+.org-tags { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
 
 /* Their segmented control, for the theme: small, one line, the chosen segment
    raised. The three large tiles it replaces were this product's own. */

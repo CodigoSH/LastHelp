@@ -484,6 +484,8 @@ async function main() {
     JSON.stringify(queued),
   );
 
+  // The detail is drawn after the list: wait for the button, not for a time.
+  await waitFor(".rev-detail [data-act='published']");
   await evaluate(`document.querySelector(".rev-detail [data-act='published']").click()`);
   await sleep(900);
   const emptied = await evaluate(`return document.querySelectorAll('[data-what="report"]').length`);
@@ -3004,6 +3006,58 @@ async function main() {
     barra.acento,
   );
 
+  // One mode at a time, as Lastboard's bar does it: arranging the front page,
+  // the panel and the review screen each grey out the other two and leave
+  // only their own control answering — and nothing leaves the bar, so no icon
+  // moves under the pointer when a mode starts. The panel's icon disappeared
+  // to nobody and Review stayed live inside the panel, which is what this
+  // measures: which answer, and where each one is.
+  const modos: Record<string, any> = {};
+  const leerBarra = `
+    const bar = document.querySelector("body > nav");
+    const uno = (sel) => {
+      const el = bar.querySelector(sel);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: Math.round(r.left), vivo: !el.classList.contains("cannot") && !el.disabled &&
+               getComputedStyle(el).pointerEvents !== "none" };
+    };
+    return { lapiz: uno("[data-edit-page], [data-edit-done]"), panel: uno("[data-panel-toggle]"),
+             revision: uno("[data-review]"),
+             doc: document.documentElement.scrollHeight + "/" + innerHeight + "/" + document.documentElement.clientWidth + "/" + innerWidth,
+             admin: document.querySelector(".admin") ? Math.round(document.querySelector(".admin").getBoundingClientRect().bottom) : 0 };`;
+  modos.portada = await evaluate(leerBarra);
+  modos.editando = await evaluate(`
+    document.querySelector("body > nav [data-edit-page]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+    const leer = () => { ${leerBarra} };
+    const v = leer();
+    document.querySelector("body > nav [data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 700));
+    return v;
+  `);
+  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  modos.panel = await evaluate(leerBarra);
+  await goTo("/review", ".rev-list, .rev-empty");
+  modos.revision = await evaluate(leerBarra);
+  await goTo("/", ".landing-grid");
+  const vivos = (m: any) =>
+    ["lapiz", "panel", "revision"].filter((k) => m?.[k]?.vivo).join(",");
+  const presentes = Object.values(modos).every((m: any) => m.lapiz && m.panel && m.revision);
+  const quietos = ["panel", "revision"].every((k) =>
+    new Set([modos.portada, modos.panel, modos.revision].map((m: any) => m[k]?.x)).size === 1);
+  check(
+    "one mode at a time in the bar: the others greyed, none gone, none moved",
+    presentes && quietos &&
+      vivos(modos.portada) === "lapiz,panel,revision" &&
+      vivos(modos.editando) === "lapiz" &&
+      vivos(modos.panel) === "panel" &&
+      vivos(modos.revision) === "revision",
+    JSON.stringify(Object.fromEntries(Object.entries(modos).map(([k, m]) =>
+      [k, `${vivos(m)} @ ${m.lapiz?.x}/${m.panel?.x}/${m.revision?.x} doc=${m.doc} admin=${m.admin}`]))) +
+      ` presentes=${presentes} quietos=${quietos}`,
+  );
+
   // One of three blocks that write their own page: the section checks capture
   // what was here, this one and the next write over it, and the last one puts
   // it back. They are a sequence, not three independent checks — moving one out
@@ -3825,8 +3879,9 @@ async function main() {
 
   // The bar while the screen is open: the icon that opened it is the way out
   // and goes back where you were; the panel's toggle is greyed, one mode at a
-  // time, as Lastboard greys its bar while its status page is up.
-  await goTo("/panel/organizations", ".admin-main");
+  // time, as Lastboard greys its bar while its status page is up. Opened from
+  // a public page: inside the panel the icon is greyed, one mode at a time.
+  await goTo("/codigosh/lastboard", ".items, .empty");
   await evaluate(`document.querySelector(".review-pill").click()`);
   await waitFor(".review");
   const barraEnRevision = await evaluate(`
@@ -3838,12 +3893,12 @@ async function main() {
     };
   `);
   await evaluate(`document.querySelector(".review-pill").click()`);
-  await waitFor(".admin-main");
+  await waitFor(".items, .empty");
   const vuelta = await evaluate(`return location.pathname`);
   check(
     "while reviewing, the bar's icon is the way back and the panel toggle is greyed",
     barraEnRevision.panelApagado === true && barraEnRevision.noResponde === true &&
-      barraEnRevision.salida === "/panel/organizations" && vuelta === "/panel/organizations",
+      barraEnRevision.salida === "/codigosh/lastboard" && vuelta === "/codigosh/lastboard",
     JSON.stringify({ barra: barraEnRevision, vuelta }),
   );
 
@@ -4055,6 +4110,22 @@ async function main() {
       body: JSON.stringify({ username: "alex", password: "una contraseña larga de verdad" }) });
   `);
   await goTo("/panel/codigosh", ".repositories");
+  // What a repository takes, as the marks of its kinds and not as words; each
+  // named, because the picture is all a screen reader would otherwise get.
+  const marcas = await evaluate(`
+    const fila = [...document.querySelectorAll(".repositories .settings-item")]
+      .find(li => li.textContent.includes("Lastboard"));
+    return {
+      marcas: [...(fila?.querySelectorAll("[data-accepts]") ?? [])].map(m => m.dataset.accepts + ":" + (m.getAttribute("aria-label") ? "named" : "unnamed")),
+      conIcono: [...(fila?.querySelectorAll("[data-accepts]") ?? [])].every(m => !!m.querySelector("svg")),
+      palabras: [...(fila?.querySelectorAll(".chip") ?? [])].length,
+    };
+  `);
+  check(
+    "a repository's row says what it takes with the kinds' marks, each one named",
+    JSON.stringify(marcas.marcas) === '["bug:named","idea:named"]' && marcas.conIcono && marcas.palabras === 0,
+    JSON.stringify(marcas),
+  );
   await evaluate(`[...document.querySelectorAll(".repositories .si-main")]
     .find(a => a.textContent.includes("Lastboard"))?.click()`);
   await waitFor(".admin-main form.repo-settings");

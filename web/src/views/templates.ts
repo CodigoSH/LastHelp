@@ -2733,6 +2733,22 @@ function kindMark(kind: string, size = 16): string {
   }</span>`;
 }
 
+/**
+ * What a repository takes, as the marks of its kinds rather than as words:
+ * the same coloured mark Review puts beside a report of that kind, so the bug
+ * on a repository's row is the bug on every report in it. Bare, not in a
+ * tile: a tile beside the row's buttons reads as one more button. Named for
+ * whoever cannot see the picture, since the picture is all there is.
+ */
+function acceptsMarks(repo: { accepts_bugs: boolean; accepts_ideas: boolean }, text: Text): string {
+  const mark = (kind: string) =>
+    `<span class="kind kind-${kind}" role="img" title="${escapeAttr(text.t(`kind.${kind}`))}"
+       aria-label="${escapeAttr(text.t(`kind.${kind}`))}" data-accepts="${kind}">${
+      kind === "bug" ? icons.bug(15) : icons.idea(15)
+    }</span>`;
+  return (repo.accepts_bugs ? mark("bug") : "") + (repo.accepts_ideas ? mark("idea") : "");
+}
+
 /** One report as a row of a list on the dashboard. */
 function briefRow(b: Brief, text: Text, showVotes = false): string {
   return `<li><a class="brief" href="/i/${escapeAttr(b.public_id)}">
@@ -3568,10 +3584,7 @@ export function organizationScreen(
         lead: `<span class="si-mark">${icons.repository(16)}</span>`,
         name: r.name,
         sub: `/${org.slug}/${r.slug}`,
-        tags: [
-          r.accepts_bugs ? `<span class="chip">${escapeHTML(text.t("kind.bug"))}</span>` : "",
-          r.accepts_ideas ? `<span class="chip">${escapeHTML(text.t("kind.idea"))}</span>` : "",
-        ].join(""),
+        tags: acceptsMarks(r, text),
         href: `/panel/${org.slug}/repos/${r.slug}`,
         actions: canManage
           ? `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
@@ -3645,9 +3658,7 @@ export function repositoryScreen(
   const review = `/review?${new URLSearchParams({ mode: "all", moderation: "pending", board }).toString()}`;
   const summary = settingsCard(
     repo.name,
-    `<p class="org-tags"><span class="mono-tag">/${escapeHTML(board)}</span>
-      ${repo.accepts_bugs ? `<span class="chip">${escapeHTML(text.t("kind.bug"))}</span>` : ""}
-      ${repo.accepts_ideas ? `<span class="chip">${escapeHTML(text.t("kind.idea"))}</span>` : ""}</p>
+    `<p class="org-tags"><span class="mono-tag">/${escapeHTML(board)}</span>${acceptsMarks(repo, text)}</p>
     <div class="settings-row">
       <div class="settings-info">
         <h4>${escapeHTML(text.t("repo.pending", { count: text.number(repo.pending) }))}</h4>

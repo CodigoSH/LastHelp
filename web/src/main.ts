@@ -118,8 +118,18 @@ function renderNav(): void {
    * Only on the front page, and only for somebody who can change it.
    */
   const composing = me?.admin === true && location.pathname === "/" && landingEditing;
+  // Arranging the front page, the panel and the review screen are exclusive,
+  // as edit mode, the drawer and the status page are in Lastboard: while one
+  // is on, every other control in the bar is shown and greyed out, and only
+  // the one that leads back out answers. Shown, not removed — a bar whose
+  // icons come and go moves under the pointer, and has to be read again.
+  const inPanel = document.body.classList.contains("admin-view");
+  const inReview = location.pathname === "/review";
+  // The pencil arranges the front page, so it answers there and nowhere else;
+  // on any other page it stays in its place, greyed.
+  const pencilOff = inPanel || inReview || location.pathname !== "/";
   const compose =
-    me?.admin === true && location.pathname === "/"
+    me?.admin === true
       ? composing
         ? // While arranging: a plus that opens a short menu, and the tick that
           // finishes. The dashboard's shape exactly — adding is two decisions,
@@ -139,7 +149,8 @@ function renderNav(): void {
            <button class="icon-button composing" data-edit-done
                    title="${escapeAttr(i18n.t("action.done"))}"
                    aria-label="${escapeAttr(i18n.t("action.done"))}">${icons.check(16)}</button>`
-        : `<button class="icon-button" data-edit-page
+        : `<button class="icon-button${pencilOff ? " cannot" : ""}" data-edit-page
+                   ${pencilOff ? "disabled" : ""}
                    title="${escapeAttr(i18n.t("landing.compose"))}"
                    aria-label="${escapeAttr(i18n.t("landing.compose"))}">${icons.edit(16)}</button>`
       : "";
@@ -154,10 +165,10 @@ function renderNav(): void {
   // clicking will do. Disabled while the front page is being arranged — one
   // mode at a time, and a control that does something else mid-gesture is a
   // control somebody hits by accident.
-  const inPanel = document.body.classList.contains("admin-view");
-  const inReview = location.pathname === "/review";
+  const panelOff = composing || inReview;
   const panel = me
-    ? `<button class="icon-button panel-toggle${composing || inReview ? " cannot" : ""}" data-panel-toggle
+    ? `<button class="icon-button panel-toggle${panelOff ? " cannot" : ""}" data-panel-toggle
+               ${panelOff ? "disabled" : ""}
                aria-pressed="${inPanel}"
                title="${escapeAttr(i18n.t("nav.panel"))}"
                aria-label="${escapeAttr(i18n.t("nav.panel"))}">
@@ -193,8 +204,11 @@ function renderNav(): void {
     me && canTriage
       ? // While the screen is open this is its way out, the way the status
         // icon closes Lastboard's status page: it goes back where you were.
-        `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}"
-             href="${escapeAttr(inReview ? reviewCameFrom : "/review")}" data-review
+        // Greyed while the front page is arranged or the panel is open, with
+        // no address to follow: a link that only looks disabled still opens
+        // from the keyboard.
+        `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}${composing || inPanel ? " cannot" : ""}"
+             ${composing || inPanel ? 'aria-disabled="true" tabindex="-1"' : `href="${escapeAttr(inReview ? reviewCameFrom : "/review")}"`} data-review
              title="${escapeAttr(i18n.t("review.title"))}"
              aria-label="${escapeAttr(i18n.t("review.title"))}">
            ${icons.queue(16)}${waiting > 0 ? `<b>${escapeHTML(text.number(waiting))}</b>` : ""}
