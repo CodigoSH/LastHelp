@@ -2706,8 +2706,6 @@ export interface ShellSpec {
   isAdmin: boolean;
   /** True for anybody who may create an organisation. */
   mayAddOrganization: boolean;
-  instance: string;
-  logo?: string;
   avatar?: string;
   content: string;
   /** What is waiting, already narrowed by the server to what this account may open. */
@@ -2744,10 +2742,9 @@ export function adminShell(spec: ShellSpec, text: Text): string {
 
   return `<div class="admin">
     <aside class="side">
-      <a class="brand" href="/">
-        ${brandMark(spec.logo, 26)}
-        <span>${escapeHTML(spec.instance)}</span>
-      </a>
+      <!-- No mark and name at the head of the menu: the bar above already
+           carries both, a few pixels higher, and the two read as the same
+           thing said twice. -->
       <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
         ${group(
           text.t("shell.groupWork"),
@@ -3881,7 +3878,6 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
         <img class="about-logo" src="/logo.svg" alt="" width="72" height="72" />
         <h2 class="about-name">${escapeHTML(text.t("app.name"))}</h2>
         <p class="about-version">${escapeHTML(facts.version || "—")}</p>
-        ${facts.os ? `<p class="about-built">${escapeHTML(`${facts.os} · ${facts.go ?? ""}`.trim())}</p>` : ""}
         <div class="about-update" data-update-zone>${updateZone("checking", text)}</div>
         <button type="button" class="button ghost with-icon about-check" data-check hidden>
           ${icons.update(15)}<span>${escapeHTML(text.t("update.check"))}</span></button>

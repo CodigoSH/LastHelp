@@ -830,6 +830,9 @@ async function main() {
       values: tiles.map(t => t.querySelector(".about-stat-value")?.textContent?.trim() ?? ""),
       meter: meter ? { value: meter.value, max: meter.max, ancho: Math.round(r.width), alto: Math.round(r.height) } : null,
       links: [...document.querySelectorAll(".about-links a")].map(a => a.getAttribute("href")),
+      // Under the version, nothing about the build: the platform and the
+      // compiler were a line nobody opening this page came for.
+      plataforma: /linux|darwin|windows|go1\./.test(document.querySelector(".about-hero")?.textContent ?? ""),
       // The name sits under its mark. The panel's heading rule gave every h2
       // 36px above it and pushed the name half a card away from the logo.
       bajoElLogo: Math.round(
@@ -844,11 +847,12 @@ async function main() {
     JSON.stringify(about.values),
   );
   check(
-    "About sits together: the name under its mark, the disk as a bar with a real length, the links out",
+    "About sits together: the name under its mark, no build line, the disk as a bar with a real length, the links out",
     about.meter !== null && about.meter.max > 0 && about.meter.value >= 0 &&
       about.meter.value <= about.meter.max && about.meter.ancho > 100 && about.meter.alto >= 4 &&
-      about.links.length === 2 && about.bajoElLogo >= 8 && about.bajoElLogo <= 20,
-    JSON.stringify({ meter: about.meter, links: about.links, bajoElLogo: about.bajoElLogo }),
+      about.links.length === 2 && about.bajoElLogo >= 8 && about.bajoElLogo <= 20 &&
+      about.plataforma === false,
+    JSON.stringify({ meter: about.meter, links: about.links, bajoElLogo: about.bajoElLogo, plataforma: about.plataforma }),
   );
 
   // 11c. The panel on a phone: its menu is a strip across the top that scrolls
@@ -980,6 +984,10 @@ async function main() {
       // the side. A link to a page in both is the fault this was written for.
       barraVisible: getComputedStyle(document.querySelector("body > nav")).display !== "none",
       enlacesEnLaBarra: document.querySelectorAll("body > nav a[href^='/panel']").length,
+      // One mark on screen. The menu used to open with the installation's
+      // mark and name a few pixels under the bar's, the same thing twice.
+      marcasALaVista: [...document.querySelectorAll(".brand-logo")]
+        .filter(m => m.getBoundingClientRect().width > 0).length,
     };`);
   check(
     "the administration shows its options down one side",
@@ -987,9 +995,9 @@ async function main() {
     `${sidebar.items.join(" · ")} — on "${sidebar.current}" as ${sidebar.who}`,
   );
   check(
-    "and does not stack two navigations on top of each other",
-    sidebar.barraVisible === true && sidebar.enlacesEnLaBarra === 0,
-    JSON.stringify({ barra: sidebar.barraVisible, enlaces: sidebar.enlacesEnLaBarra }),
+    "and does not stack two navigations, or two marks, on top of each other",
+    sidebar.barraVisible === true && sidebar.enlacesEnLaBarra === 0 && sidebar.marcasALaVista === 1,
+    JSON.stringify({ barra: sidebar.barraVisible, enlaces: sidebar.enlacesEnLaBarra, marcas: sidebar.marcasALaVista }),
   );
 
   // The bar on the chosen row is a join between it and the panel it opened, so

@@ -1353,8 +1353,6 @@ async function showInShell(content: string, path: string): Promise<void> {
         who: me?.username ?? "",
         isAdmin: me?.admin === true,
         mayAddOrganization: me?.admin === true,
-        instance: instanceName || i18n.t("app.name"),
-        logo: instanceLogo,
         avatar: me?.avatar,
         waiting: me?.pending,
         content,
