@@ -296,7 +296,7 @@
   "panel.teamTools": "Gereedschap van het team",
   "panel.teamToolsHelp": "Alleen zichtbaar voor mensen met een rol op dit bord.",
   "panel.token": "Toegangstoken",
-  "panel.tokenHelp": "Versleuteld bewaard en nooit meer getoond. Vereist lees- en schrijftoegang tot issues.",
+  "panel.tokenHelp": "Bewaard op deze server en nooit meer getoond. Heeft lees- en schrijftoegang tot issues nodig.",
   "panel.webhookPath": "Bezorg hier",
   "panel.webhookPathHelp": "Voeg deze URL toe aan de webhookinstellingen van je forge. Nodig om een melding te sluiten wanneer de issue ervan sluit.",
   "panel.webhookSecret": "Webhook-geheim",

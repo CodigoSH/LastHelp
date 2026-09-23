@@ -296,7 +296,7 @@
   "panel.teamTools": "Ekip araçları",
   "panel.teamToolsHelp": "Yalnızca bu panoda rolü olan kişilere görünür.",
   "panel.token": "Erişim anahtarı",
-  "panel.tokenHelp": "Şifreli saklanır ve bir daha gösterilmez. Konulara okuma ve yazma erişimi gerekir.",
+  "panel.tokenHelp": "Bu sunucuda saklanır ve bir daha gösterilmez. Sorunlara okuma ve yazma erişimi gerekir.",
   "panel.webhookPath": "Buraya gönder",
   "panel.webhookPathHelp": "Bu URL'yi forge'unuzun webhook ayarlarına ekleyin. Bir bildirimin, konusu kapandığında kapanması için gerekir.",
   "panel.webhookSecret": "Webhook parolası",

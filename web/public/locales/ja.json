@@ -296,7 +296,7 @@
   "panel.teamTools": "チームの操作",
   "panel.teamToolsHelp": "このボードで役割を持つ人だけに表示されます。",
   "panel.token": "アクセストークン",
-  "panel.tokenHelp": "暗号化して保存され、二度と表示されません。課題の読み取りと書き込みの権限が必要です。",
+  "panel.tokenHelp": "このサーバーに保存され、再表示されません。イシューの読み書き権限が必要です。",
   "panel.webhookPath": "ここに送る",
   "panel.webhookPathHelp": "この URL をフォージのウェブフック設定に追加してください。課題が閉じたときに報告を閉じるために必要です。",
   "panel.webhookSecret": "Webhook のシークレット",

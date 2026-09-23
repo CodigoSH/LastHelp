@@ -296,7 +296,7 @@
   "panel.teamTools": "Narzędzia zespołu",
   "panel.teamToolsHelp": "Widoczne tylko dla osób z rolą na tej tablicy.",
   "panel.token": "Token dostępu",
-  "panel.tokenHelp": "Przechowywany zaszyfrowany i nigdy więcej nie pokazywany. Wymaga prawa odczytu i zapisu zadań.",
+  "panel.tokenHelp": "Przechowywany na tym serwerze i nigdy więcej nie pokazywany. Wymaga dostępu do odczytu i zapisu zgłoszeń.",
   "panel.webhookPath": "Dostarczaj tutaj",
   "panel.webhookPathHelp": "Dodaj ten adres URL w ustawieniach webhooka swojej forge. Potrzebny, aby zgłoszenie zamykało się razem ze swoim zadaniem.",
   "panel.webhookSecret": "Sekret webhooka",

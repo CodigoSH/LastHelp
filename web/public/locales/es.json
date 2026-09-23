@@ -296,7 +296,7 @@
   "panel.teamTools": "Herramientas del equipo",
   "panel.teamToolsHelp": "Visible solo para quienes tienen un rol en este tablero.",
   "panel.token": "Token de acceso",
-  "panel.tokenHelp": "Se guarda cifrado y no se vuelve a mostrar. Requiere acceso de lectura y escritura a incidencias.",
+  "panel.tokenHelp": "Se guarda en este servidor y no vuelve a mostrarse. Necesita permiso de lectura y escritura en las incidencias.",
   "panel.webhookPath": "Entregar aquí",
   "panel.webhookPathHelp": "Añade esta URL a los ajustes de webhook de tu forja. Necesaria para cerrar un reporte cuando se cierra su incidencia.",
   "panel.webhookSecret": "Secreto del webhook",

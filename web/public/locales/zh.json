@@ -296,7 +296,7 @@
   "panel.teamTools": "团队工具",
   "panel.teamToolsHelp": "仅对在此看板拥有角色的人可见。",
   "panel.token": "访问令牌",
-  "panel.tokenHelp": "加密保存，且不会再次显示。需要对议题的读写权限。",
+  "panel.tokenHelp": "保存在此服务器上，不再显示。需要议题的读写权限。",
   "panel.webhookPath": "投递到这里",
   "panel.webhookPathHelp": "把此网址添加到代码平台的 webhook 设置中。议题关闭时要一并关闭反馈，就需要它。",
   "panel.webhookSecret": "Webhook 密钥",

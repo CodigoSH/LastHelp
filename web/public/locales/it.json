@@ -296,7 +296,7 @@
   "panel.teamTools": "Strumenti del team",
   "panel.teamToolsHelp": "Visibile solo a chi ha un ruolo su questa bacheca.",
   "panel.token": "Token di accesso",
-  "panel.tokenHelp": "Memorizzato cifrato e mai più mostrato. Richiede accesso in lettura e scrittura alle issue.",
+  "panel.tokenHelp": "Conservato su questo server, non viene più mostrato. Richiede accesso in lettura e scrittura alle issue.",
   "panel.webhookPath": "Consegna qui",
   "panel.webhookPathHelp": "Aggiungi questo URL nelle impostazioni webhook della tua forge. Serve per chiudere una segnalazione quando si chiude la sua issue.",
   "panel.webhookSecret": "Segreto del webhook",

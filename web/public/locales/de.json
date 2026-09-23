@@ -296,7 +296,7 @@
   "panel.teamTools": "Werkzeuge des Teams",
   "panel.teamToolsHelp": "Nur für Personen mit einer Rolle auf diesem Board sichtbar.",
   "panel.token": "Zugriffstoken",
-  "panel.tokenHelp": "Wird verschlüsselt gespeichert und nie wieder angezeigt. Erfordert Lese- und Schreibzugriff auf Issues.",
+  "panel.tokenHelp": "Wird auf diesem Server gespeichert und nie wieder angezeigt. Braucht Lese- und Schreibzugriff auf Issues.",
   "panel.webhookPath": "Hierhin zustellen",
   "panel.webhookPathHelp": "Tragen Sie diese URL in den Webhook-Einstellungen Ihrer Forge ein. Nötig, damit eine Meldung schließt, wenn ihr Issue schließt.",
   "panel.webhookSecret": "Webhook-Geheimnis",

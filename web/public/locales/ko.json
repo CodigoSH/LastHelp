@@ -296,7 +296,7 @@
   "panel.teamTools": "팀 도구",
   "panel.teamToolsHelp": "이 보드에서 역할이 있는 사람에게만 보입니다.",
   "panel.token": "액세스 토큰",
-  "panel.tokenHelp": "암호화되어 저장되며 다시 표시되지 않습니다. 이슈에 대한 읽기와 쓰기 권한이 필요합니다.",
+  "panel.tokenHelp": "이 서버에 저장되며 다시 표시되지 않습니다. 이슈 읽기·쓰기 권한이 필요합니다.",
   "panel.webhookPath": "여기로 보내기",
   "panel.webhookPathHelp": "이 URL을 포지의 웹훅 설정에 추가하세요. 이슈가 닫힐 때 신고를 닫으려면 필요합니다.",
   "panel.webhookSecret": "웹훅 비밀키",

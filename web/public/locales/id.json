@@ -296,7 +296,7 @@
   "panel.teamTools": "Perkakas tim",
   "panel.teamToolsHelp": "Hanya terlihat oleh orang yang punya peran di papan ini.",
   "panel.token": "Token akses",
-  "panel.tokenHelp": "Disimpan terenkripsi dan tidak pernah ditampilkan lagi. Memerlukan akses baca dan tulis ke isu.",
+  "panel.tokenHelp": "Disimpan di server ini dan tidak ditampilkan lagi. Memerlukan akses baca dan tulis ke isu.",
   "panel.webhookPath": "Kirim ke sini",
   "panel.webhookPathHelp": "Tambahkan URL ini di pengaturan webhook forge Anda. Diperlukan agar laporan tertutup ketika isunya ditutup.",
   "panel.webhookSecret": "Rahasia webhook",

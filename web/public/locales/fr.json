@@ -296,7 +296,7 @@
   "panel.teamTools": "Outils de l'équipe",
   "panel.teamToolsHelp": "Visible uniquement par les personnes ayant un rôle sur ce tableau.",
   "panel.token": "Jeton d'accès",
-  "panel.tokenHelp": "Stocké chiffré et jamais réaffiché. Demande un accès en lecture et en écriture aux tickets.",
+  "panel.tokenHelp": "Conservé sur ce serveur, jamais réaffiché. Nécessite un accès en lecture et en écriture aux tickets.",
   "panel.webhookPath": "Livrer ici",
   "panel.webhookPathHelp": "Ajoutez cette URL dans les réglages de webhook de votre forge. Nécessaire pour fermer un signalement quand son ticket se ferme.",
   "panel.webhookSecret": "Secret du webhook",

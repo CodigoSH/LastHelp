@@ -296,7 +296,7 @@
   "panel.teamTools": "Ferramentas da equipa",
   "panel.teamToolsHelp": "Visível apenas para quem tem um papel neste quadro.",
   "panel.token": "Token de acesso",
-  "panel.tokenHelp": "Guardado cifrado e nunca mais mostrado. Precisa de acesso de leitura e escrita às issues.",
+  "panel.tokenHelp": "Guardado neste servidor e nunca mais mostrado. Precisa de acesso de leitura e escrita às issues.",
   "panel.webhookPath": "Entregar aqui",
   "panel.webhookPathHelp": "Adicione este URL nas definições de webhook da sua forja. Necessário para fechar um relato quando a issue dele fecha.",
   "panel.webhookSecret": "Segredo do webhook",

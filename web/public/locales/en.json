@@ -296,7 +296,7 @@
   "panel.teamTools": "Team tools",
   "panel.teamToolsHelp": "Visible only to people with a role on this board.",
   "panel.token": "Access token",
-  "panel.tokenHelp": "Stored encrypted and never shown again. Requires read and write access to issues.",
+  "panel.tokenHelp": "Kept on this server, never shown again. Needs read and write access to issues.",
   "panel.webhookPath": "Deliver here",
   "panel.webhookPathHelp": "Add this URL to the webhook settings of your forge. Required to close a report when its issue closes.",
   "panel.webhookSecret": "Webhook secret",
