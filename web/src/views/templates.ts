@@ -3640,20 +3640,61 @@ export function personalizationScreen(
           </div>
           <p class="hint">${escapeHTML(text.t("setup.instanceNameHelp"))} ${escapeHTML(text.t("personalization.logoHelp"))}</p>
         </div>
-        <div class="field">
-          <label for="accent">${escapeHTML(text.t("personalization.accent"))}</label>
-          <div class="accent-row">
-            <input type="color" id="accent" name="accent" value="${escapeAttr(instance.accent || "#e8520e")}" />
-            <button type="button" class="button ghost" data-reset-accent>${escapeHTML(text.t("personalization.accentReset"))}</button>
-          </div>
-          <p class="hint">${escapeHTML(text.t("personalization.accentHelp"))}</p>
-        </div>
+        ${accentChoice(instance.accent, text)}
         <p class="form-error" role="alert" hidden></p>
         <div class="settings-actions">
           <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>`,
         { lead: text.t("personalization.lead") },
       )}
     </form>`;
+}
+
+/**
+ * Lastboard's accent picker: seven swatches and an eighth for any colour, the
+ * chosen one ringed in white with a tick.
+ *
+ * The house orange is one of the seven and choosing it stores nothing — the
+ * default — so an installation that picked it follows the default rather than
+ * freezing today's value. The colour of a swatch is its class, not a style:
+ * this page's policy drops style attributes. The eighth takes whatever was
+ * chosen through a rule, set from main.ts.
+ */
+export const ACCENTS: [string, string][] = [
+  ["blue", "#228be6"],
+  ["indigo", "#4c6ef5"],
+  ["cyan", "#15aabf"],
+  ["teal", "#12b886"],
+  ["orange", "#e8520e"],
+  ["red", "#fa5252"],
+  ["grape", "#be4bdb"],
+];
+
+const TICK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.42L9 19 21 7l-1.42-1.42z"/></svg>`;
+
+/** Their palette, filled with its wells cut out — copied, not approximated. */
+const PALETTE = `<svg class="acc-palette" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5 9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm3-3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm5 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm3 3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg>`;
+
+function accentChoice(current: string, text: Text): string {
+  const value = (current || "").toLowerCase();
+  const preset = ACCENTS.find(([, hex]) => hex === (value || "#e8520e"));
+  const custom = !preset;
+  return `<div class="field">
+    <label>${escapeHTML(text.t("personalization.accent"))}</label>
+    <input type="hidden" name="accent" id="accent" value="${escapeAttr(value)}" />
+    <div class="color-grid" role="radiogroup" aria-label="${escapeAttr(text.t("personalization.accent"))}">
+      ${ACCENTS.map(([name, hex]) => {
+        const on = preset?.[0] === name;
+        return `<button type="button" class="accent-swatch acc-${name}${on ? " on" : ""}" role="radio"
+          aria-checked="${on}" aria-label="${escapeAttr(hex)}"
+          data-accent="${name === "orange" ? "" : escapeAttr(hex)}">${TICK}</button>`;
+      }).join("")}
+      <label class="accent-swatch acc-custom${custom ? " on" : ""}" aria-label="${escapeAttr(text.t("personalization.accent"))}">
+        ${PALETTE}
+        <input type="color" data-accent-custom value="${escapeAttr(custom && value ? value : "#e8520e")}" />
+      </label>
+    </div>
+    <p class="hint">${escapeHTML(text.t("personalization.accentHelp"))}</p>
+  </div>`;
 }
 
 /** The organisations, as cards. */

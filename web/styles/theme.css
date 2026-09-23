@@ -2724,19 +2724,6 @@ a.stat:hover {
   unicode-bidi: isolate;
 }
 
-.accent-row {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.accent-row input[type="color"] {
-  inline-size: 3rem;
-  block-size: 2.25rem;
-  padding: 0.15rem;
-  cursor: pointer;
-}
-
 .restore-note {
   margin: 0.75rem 0 0;
   font-size: 0.9rem;
@@ -6897,4 +6884,72 @@ a.stat:hover .stat-go {
   border: 1px solid var(--border);
   border-radius: 10px;
   object-fit: contain;
+}
+
+/* Lastboard's accent swatches, to their numbers: 32px squares with a 4px
+   radius and a faint border, growing a little under the pointer; the chosen
+   one ringed in white with a glow and its tick shown. The eighth is a
+   rainbow until a colour of its own is chosen, and the device's own colour
+   picker sits invisibly over it. */
+.color-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* Through the grid: the eighth is a <label>, and ".field label" (0,1,1) makes
+   every label in a field a block, which dropped its palette into the corner. */
+.color-grid > .accent-swatch {
+  position: relative;
+  display: flex;
+  margin: 0;
+  align-items: center;
+  justify-content: center;
+  inline-size: 32px;
+  block-size: 32px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  background-clip: padding-box;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.accent-swatch:hover { transform: scale(1.1); border-color: rgba(255, 255, 255, 0.2); z-index: 2; }
+
+.accent-swatch.on {
+  border-color: #fff;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.accent-swatch svg { inline-size: 18px; block-size: 18px; fill: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.accent-swatch:not(.acc-custom) svg { display: none; }
+.accent-swatch.on:not(.acc-custom) svg { display: block; }
+
+.acc-blue { background: #228be6; }
+.acc-indigo { background: #4c6ef5; }
+.acc-cyan { background: #15aabf; }
+.acc-teal { background: #12b886; }
+.acc-orange { background: #e8520e; }
+.acc-red { background: #fa5252; }
+.acc-grape { background: #be4bdb; }
+
+.acc-custom {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: conic-gradient(from 0deg, red, yellow, lime, aqua, blue, magenta, red);
+}
+
+.acc-custom .acc-palette { pointer-events: none; }
+
+.acc-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accent-swatch { transition: none; }
 }

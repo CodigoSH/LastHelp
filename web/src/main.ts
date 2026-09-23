@@ -3361,9 +3361,29 @@ async function showPersonalization(): Promise<void> {
     instanceLoaded = false;
     await render();
   });
-  root?.querySelector<HTMLButtonElement>("[data-reset-accent]")?.addEventListener("click", async () => {
-    await api.post("/api/instance", { ...instance, accent: "" }).catch(showFormError);
-    await render();
+  // The accent swatches. Choosing one writes it into the form's hidden field,
+  // which the Save button sends; the eighth takes any colour and wears it,
+  // through a rule because this page's policy drops style attributes.
+  const accentField = root?.querySelector<HTMLInputElement>("#accent");
+  const swatches = [...(root?.querySelectorAll<HTMLElement>(".color-grid .accent-swatch") ?? [])];
+  const choose = (chosen: HTMLElement | null, value: string) => {
+    if (accentField) accentField.value = value;
+    for (const s of swatches) {
+      const on = s === chosen;
+      s.classList.toggle("on", on);
+      s.setAttribute("aria-checked", String(on));
+    }
+  };
+  const paintCustom = (hex: string) =>
+    setRule("accent-custom", /^#[0-9a-f]{6}$/i.test(hex) ? `.acc-custom.on{background:${hex}}` : undefined);
+  root?.querySelectorAll<HTMLButtonElement>("[data-accent]").forEach((b) =>
+    b.addEventListener("click", () => choose(b, b.dataset.accent ?? "")),
+  );
+  const customInput = root?.querySelector<HTMLInputElement>("[data-accent-custom]");
+  if (customInput?.closest(".accent-swatch")?.classList.contains("on")) paintCustom(customInput.value);
+  customInput?.addEventListener("input", () => {
+    choose(customInput.closest<HTMLElement>(".accent-swatch"), customInput.value.toLowerCase());
+    paintCustom(customInput.value);
   });
 
   onSubmit("form.instance-settings", async (data) => {

@@ -943,6 +943,35 @@ async function main() {
     JSON.stringify({ piezas, receta: receta.slice(0, 6) }),
   );
 
+  // 11e. The accent is chosen as in Lastboard: seven swatches and an eighth
+  //      for any colour. A swatch writes the form's field and is the only one
+  //      ringed; a colour of one's own paints the eighth; and its palette sits
+  //      in the middle of it — it fell into the corner when a label rule made
+  //      the swatch a block.
+  await goTo("/panel/personalization", ".color-grid");
+  const acento = await evaluate(`
+    document.querySelector(".acc-blue").click();
+    await new Promise(r => setTimeout(r, 200));
+    const azul = { campo: document.querySelector("#accent").value,
+      marcadas: [...document.querySelectorAll(".accent-swatch.on")].length,
+      esAzul: document.querySelector(".acc-blue").classList.contains("on") };
+    const propio = document.querySelector("[data-accent-custom]");
+    propio.value = "#12ab34"; propio.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 200));
+    const caja = document.querySelector(".acc-custom").getBoundingClientRect();
+    const icono = document.querySelector(".acc-custom svg").getBoundingClientRect();
+    return { azul, campo: document.querySelector("#accent").value,
+      pintada: getComputedStyle(document.querySelector(".acc-custom")).backgroundColor,
+      descentrado: Math.round(Math.abs((icono.x + icono.width / 2) - (caja.x + caja.width / 2)) +
+        Math.abs((icono.y + icono.height / 2) - (caja.y + caja.height / 2))) };
+  `);
+  check(
+    "the accent is chosen from Lastboard's swatches, and the eighth takes any colour",
+    acento.azul.campo === "#228be6" && acento.azul.marcadas === 1 && acento.azul.esAzul === true &&
+      acento.campo === "#12ab34" && acento.pintada === "rgb(18, 171, 52)" && acento.descentrado <= 2,
+    JSON.stringify(acento),
+  );
+
   const langPicker = await evaluate(`return !!document.querySelector("body > nav select");`);
   check("no language picker rides along in the top bar", langPicker === false);
 
