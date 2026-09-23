@@ -3915,6 +3915,31 @@ async function main() {
     `${collaborator.groups.join(" · ")} — ${collaborator.items.join(", ")}`,
   );
 
+  // 12a. And the administrator's screens are not theirs by address either.
+  //      The menu never offered them, but typing /panel/about drew the screen
+  //      from the server's refusal: a version of "—" and "Could not reach the
+  //      release server", which was false. Each one sends them to the
+  //      overview now, and the organisation wizard with them.
+  const ajenas: string[] = [];
+  for (const ruta of ["/panel/about", "/panel/people", "/panel/personalization", "/panel/backups", "/panel/new"]) {
+    await goTo(ruta, ".admin-main > *");
+    await sleep(300);
+    const r = await evaluate(`return { donde: location.pathname,
+      falso: document.body.textContent.includes("Could not reach the release server") }`);
+    if (r.donde !== "/panel" || r.falso) ajenas.push(`${ruta} → ${r.donde}${r.falso ? " (false message)" : ""}`);
+  }
+  // Adding a repository is the owner's: a collaborator on one board is sent
+  // back to the organisation's page instead of into its wizard.
+  await goTo("/panel/codigosh/new", ".admin-main > *");
+  await sleep(300);
+  const asistente = await evaluate(`return location.pathname`);
+  if (asistente !== "/panel/codigosh") ajenas.push(`/panel/codigosh/new → ${asistente}`);
+  check(
+    "a collaborator who types an administrator's address is sent to their overview",
+    ajenas.length === 0,
+    JSON.stringify(ajenas),
+  );
+
   // 12b. And their listing is theirs. The screen is the same one the
   //      administrator uses, and the whole question is whether what it shows
   //      comes from the roles this account holds rather than from the address

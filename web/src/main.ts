@@ -1579,6 +1579,32 @@ function isAdministrator(): boolean {
   return me?.admin === true;
 }
 
+/**
+ * A screen only the administrator is offered: signed in, and an administrator,
+ * or sent back to the overview.
+ *
+ * The server refuses the data on these screens to anybody else, so nothing
+ * leaks without this. What it stops is the screen drawing itself anyway from
+ * a refusal: a collaborator who typed /panel/about saw a version of "—" and
+ * "Could not reach the release server", which was false — it was reached, and
+ * said no. The menu does not offer these screens; the address should not
+ * either.
+ */
+async function requireAdministrator(): Promise<boolean> {
+  if (!(await requirePanel())) return false;
+  if (isAdministrator()) return true;
+  go("/panel");
+  return false;
+}
+
+/** The same, for what belongs to whoever owns one organisation. */
+async function requireOwner(orgSlug: string): Promise<boolean> {
+  if (!(await requirePanel())) return false;
+  if (ownsOrganization(orgSlug)) return true;
+  go(`/panel/${encodeURIComponent(orgSlug)}`);
+  return false;
+}
+
 /** Signed in, or sent to the door. Every panel screen starts here. */
 async function requirePanel(): Promise<boolean> {
   me = await api.get<Me>("/api/me").catch(() => null);
@@ -1680,7 +1706,7 @@ async function showAppearance(): Promise<void> {
 }
 
 async function showPeople(): Promise<void> {
-  if (!(await requirePanel())) return;
+  if (!(await requireAdministrator())) return;
   const body = await api
     .get<{ people: Parameters<typeof views.peopleScreen>[0] }>("/api/people")
     .catch(() => null);
@@ -1847,7 +1873,7 @@ async function showPeople(): Promise<void> {
 }
 
 async function showBackups(): Promise<void> {
-  if (!(await requirePanel())) return;
+  if (!(await requireAdministrator())) return;
   await showInShell(views.backupScreen(text), "/panel/backups");
 
   const file = root?.querySelector<HTMLInputElement>("#restore-file");
@@ -1887,7 +1913,7 @@ async function showBackups(): Promise<void> {
 }
 
 async function showAbout(): Promise<void> {
-  if (!(await requirePanel())) return;
+  if (!(await requireAdministrator())) return;
   // Asked of the server rather than assembled from what the page happens to
   // know: uptime, disk and memory are facts about the machine, and the browser
   // has none of them.
@@ -2677,6 +2703,7 @@ function showSetupDone(): void {
 }
 
 async function showOrganizationWizard(step: 1 | 2): Promise<void> {
+  if (!(await requireAdministrator())) return;
   await showInShell(views.organizationWizard(step, text, draft.forge), "/panel/new");
 
   if (step === 1) {
@@ -2727,6 +2754,7 @@ async function showOrganizationWizard(step: 1 | 2): Promise<void> {
 }
 
 async function showRepositoryWizard(orgSlug: string, step: 1 | 2): Promise<void> {
+  if (!(await requireOwner(orgSlug))) return;
   const body = await api.get<{
     organization: OrganizationSummary & { forge?: string };
   }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
@@ -3310,7 +3338,7 @@ async function showOrganizationsPanel(): Promise<void> {
 
 /** The name, the logo and the accent of this installation. */
 async function showPersonalization(): Promise<void> {
-  if (!(await requirePanel())) return;
+  if (!(await requireAdministrator())) return;
   const instance = (await api
     .get<{ name: string; logo: string; accent: string }>("/api/instance")
     .catch(() => null)) ?? { name: "", logo: "", accent: "" };
