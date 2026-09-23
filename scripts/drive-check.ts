@@ -988,11 +988,21 @@ async function main() {
       // mark and name a few pixels under the bar's, the same thing twice.
       marcasALaVista: [...document.querySelectorAll(".brand-logo")]
         .filter(m => m.getBoundingClientRect().width > 0).length,
+      // The whole sidebar fits the window, foot and all: it was a window tall
+      // but hung below the bar, so "Sign out" sat under the fold.
+      pieBajo: Math.round(document.querySelector(".side-foot .link")?.getBoundingClientRect().bottom ?? 99999),
+      lateralBajo: Math.round(document.querySelector(".side")?.getBoundingClientRect().bottom ?? 99999),
+      ventana: innerHeight,
     };`);
   check(
     "the administration shows its options down one side",
     sidebar.items.length >= 3 && Boolean(sidebar.current) && Boolean(sidebar.who),
     `${sidebar.items.join(" · ")} — on "${sidebar.current}" as ${sidebar.who}`,
+  );
+  check(
+    "the whole sidebar fits the window, sign-out included, without scrolling",
+    sidebar.pieBajo <= sidebar.ventana && sidebar.lateralBajo <= sidebar.ventana,
+    JSON.stringify({ pie: sidebar.pieBajo, lateral: sidebar.lateralBajo, ventana: sidebar.ventana }),
   );
   check(
     "and does not stack two navigations, or two marks, on top of each other",

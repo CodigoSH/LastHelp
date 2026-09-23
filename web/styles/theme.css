@@ -1852,9 +1852,16 @@ body.admin-view > main {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  /* Held under the bar, and only as tall as what is left of the window. It
+     was 100vh tall from the top of the window but hung below the bar, so its
+     foot sat 49px past the bottom edge — the bar's 48 and its border — and
+     "Sign out" was below the fold on every screen, a 27-inch one included.
+     dvh rather than vh where it exists, so a phone's browser bar is counted
+     too. */
   position: sticky;
-  top: 0;
-  block-size: 100vh;
+  top: 49px;
+  block-size: calc(100vh - 49px);
+  block-size: calc(100dvh - 49px);
   overflow-y: auto;
 }
 
