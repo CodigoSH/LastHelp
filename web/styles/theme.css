@@ -2051,13 +2051,42 @@ body.admin-view > main {
     border-end-end-radius: 8px;
   }
 
+  /* The links live inside a <nav> and it stayed a block, so the strip laid
+     out three things in a row — the nav, the public link and the foot — and
+     the nav stacked its eight links down the middle of it. */
+  .side nav {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* In a strip, what separates the way out from the menu is a rule beside it,
+     not above it. Written through .side because the rule for the sidebar
+     comes later in the file and would otherwise keep its top border and its
+     margin here. */
+  .side .side-public {
+    margin: 0;
+    margin-inline-start: 0.4rem;
+    padding-block: 0.5rem;
+    padding-inline-start: 0.9rem;
+    border-block-start: 0;
+    border-inline-start: 1px solid var(--border);
+    border-radius: 0;
+    white-space: nowrap;
+  }
+
+  /* To the end of the strip, in the reading direction: a physical left margin
+     would push it the wrong way in Arabic. */
   .side-foot {
-    margin: 0 0 0 auto;
+    margin: 0;
+    margin-inline-start: auto;
     padding: 0;
     border: 0;
     grid-auto-flow: column;
     align-items: center;
   }
+
+  .side-foot .link { white-space: nowrap; }
 }
 
 /* The theme choice: three tiles with a drawing on each, the chosen one outlined

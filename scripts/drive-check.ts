@@ -851,6 +851,33 @@ async function main() {
     JSON.stringify({ meter: about.meter, links: about.links, bajoElLogo: about.bajoElLogo }),
   );
 
+  // 11c. The panel on a phone: its menu is a strip across the top that scrolls
+  //      sideways, every link on the one line. The links live inside a <nav>
+  //      that stayed a block, so they stacked down the middle of the strip
+  //      with "Public site" and "Sign out" adrift beside them, and "Sign out"
+  //      broke over two lines.
+  await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
+  await goTo("/panel/about", ".about-hero");
+  const franja = await evaluate(`
+    const side = document.querySelector(".side");
+    const fila = [...side.querySelectorAll(".side-item, .side-foot .link")];
+    const tops = fila.map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2));
+    const salir = side.querySelector(".side-foot .link")?.getBoundingClientRect();
+    return {
+      enlaces: fila.length,
+      alturas: Math.max(...tops) - Math.min(...tops),
+      franja: Math.round(side.getBoundingClientRect().height),
+      salirEnUnaLinea: salir ? salir.height < 40 : false,
+      desplazaDeLado: side.scrollWidth > side.clientWidth,
+    };
+  `);
+  await page.send("Emulation.clearDeviceMetricsOverride", {});
+  check(
+    "on a phone the panel's menu is one strip across the top, every link on the one line",
+    franja.enlaces >= 8 && franja.alturas <= 4 && franja.franja < 80 && franja.salirEnUnaLinea === true,
+    JSON.stringify(franja),
+  );
+
   const langPicker = await evaluate(`return !!document.querySelector("body > nav select");`);
   check("no language picker rides along in the top bar", langPicker === false);
 
