@@ -27,6 +27,7 @@ import { wireWords } from "./services/words";
 import { NoWebP, putImage } from "./services/landingImage";
 import { attachChartHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
+import { watchSelects } from "./services/select";
 import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
 import { icons } from "./views/icons";
@@ -3120,6 +3121,12 @@ function keyboardFor(on: {
       return;
     }
     if (target?.isContentEditable) return;
+    // Nor from a dropdown: its trigger is a button, and "p" pressed on the
+    // filter somebody just used would publish whatever is chosen behind it.
+    if (target?.closest(".sel")) {
+      if (event.key === "Escape") target.blur();
+      return;
+    }
     if (event.metaKey || event.ctrlKey || event.altKey) return;
 
     switch (event.key) {
@@ -3550,5 +3557,8 @@ void (async () => {
   // Once, for every dialog the product will ever draw.
   wireDialogs();
   wirePanelToggle();
+  // And for every select: the house dropdown over each one, wherever it is
+  // drawn, now or later.
+  watchSelects();
   await render();
 })();

@@ -3292,7 +3292,14 @@ async function main() {
   // La ficha, al lado y entera: el cuerpo completo sin abrir otra pantalla.
   const ficha = await evaluate(`
     const det = document.querySelector(".rev-detail");
+    // Lo que separa cada parte de la siguiente. Las respuestas no llevaban
+    // margen debajo y las tres decisiones salían pegadas a su caja.
+    const partes = [...(det.querySelector("[data-detail]")?.children ?? [])];
+    const huecos = partes.slice(1).map((p, i) =>
+      Math.round(p.getBoundingClientRect().top - partes[i].getBoundingClientRect().bottom));
     return {
+      huecos,
+      conRespuestas: !!det.querySelector(".answers"),
       titulo: det.querySelector(".rev-title")?.textContent?.trim() ?? "",
       cuerpo: (det.querySelector(".rev-full")?.textContent ?? "").trim().length,
       decisiones: det.querySelectorAll("[data-act]").length,
@@ -3301,7 +3308,9 @@ async function main() {
   `);
   check(
     "and the one chosen is read beside it, whole, with its decision there",
-    ficha.titulo !== "" && ficha.cuerpo > 20 && ficha.decisiones === 3 && ficha.sinDesplazar === true,
+    ficha.titulo !== "" && ficha.cuerpo > 20 && ficha.decisiones === 3 && ficha.sinDesplazar === true &&
+      // Y cada parte separada de la siguiente, respuestas incluidas.
+      ficha.conRespuestas === true && ficha.huecos.length >= 3 && ficha.huecos.every((h: number) => h >= 12),
     JSON.stringify(ficha),
   );
 
@@ -3446,13 +3455,15 @@ async function main() {
     const cortas = [];
     let medidas = 0;
     for (const [f, key] of Object.entries(keys)) {
-      const sel = document.querySelector('[data-f="' + f + '"]');
-      if (!sel) { cortas.push(f + ": no select"); continue; }
+      // The control people see: the house dropdown's trigger, not the select
+      // it stands over, which is out of sight.
+      const sel = document.querySelector('[data-f="' + f + '"]')?.closest(".sel")?.querySelector(".sel-trigger");
+      if (!sel) { cortas.push(f + ": no dropdown"); continue; }
       const cs = getComputedStyle(sel);
       const ctx = document.createElement("canvas").getContext("2d");
       ctx.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
-      // The arrow takes about twenty pixels of what the padding leaves.
-      const room = sel.clientWidth - parseFloat(cs.paddingInlineStart) - parseFloat(cs.paddingInlineEnd) - 20;
+      // The chevron and its gap take 24 pixels of what the padding leaves.
+      const room = sel.clientWidth - parseFloat(cs.paddingInlineStart) - parseFloat(cs.paddingInlineEnd) - 24;
       for (const l of langs) {
         medidas++;
         const w = ctx.measureText(cats[l][key]).width;
@@ -3467,6 +3478,88 @@ async function main() {
     caben.medidas === 60 && caben.cortas.length === 0,
     JSON.stringify(caben),
   );
+
+  // The house dropdown, not the browser's. No select is left on screen, and
+  // the one that is drawn opens a list under its trigger, inside the window,
+  // with every option — and a choice made in it is the select's choice.
+  const desplegable = await evaluate(`
+    const selects = [...document.querySelectorAll("select")];
+    const nativasALaVista = selects.filter(s => {
+      const r = s.getBoundingClientRect();
+      return r.width > 1 || r.height > 1;
+    }).length;
+    const trigger = document.querySelector('[data-f="moderation"]')?.closest(".sel")?.querySelector(".sel-trigger");
+    trigger?.click();
+    await new Promise(r => setTimeout(r, 350));
+    const lista = document.querySelector(".sel-list.open");
+    const t = trigger?.getBoundingClientRect();
+    const l = lista?.getBoundingClientRect();
+    return {
+      selects: selects.length,
+      nativasALaVista,
+      abierta: !!lista,
+      opciones: lista?.querySelectorAll('[role="option"]').length ?? 0,
+      esperadas: document.querySelector('[data-f="moderation"]')?.options.length ?? -1,
+      debajo: l && t ? Math.round(l.top - t.bottom) : null,
+      mismoAncho: l && t ? Math.abs(l.width - t.width) < 1 : false,
+      dentro: l ? l.bottom <= innerHeight && l.left >= 0 && l.right <= innerWidth : false,
+    };
+  `);
+  check(
+    "the archive's dropdowns are the house's: no browser select on screen, a list under its trigger",
+    desplegable.selects >= 3 && desplegable.nativasALaVista === 0 && desplegable.abierta === true &&
+      desplegable.opciones === desplegable.esperadas && desplegable.opciones >= 2 &&
+      desplegable.debajo !== null && desplegable.debajo >= 0 && desplegable.debajo <= 12 &&
+      desplegable.mismoAncho === true && desplegable.dentro === true,
+    JSON.stringify(desplegable),
+  );
+  await evaluate(`
+    document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
+    // By value, not by words: by this point the pass reads Arabic.
+    const nativa = document.querySelector('[data-f="moderation"]');
+    const i = [...nativa.options].findIndex(o => o.value === "published");
+    document.querySelector('.sel-list.open [data-i="' + i + '"]')?.click();
+  `);
+  await waitFor("#app > :not([data-leaving]) .rev-filter");
+  const elegida = await evaluate(`
+    return {
+      direccion: new URLSearchParams(location.search).get("moderation"),
+      rotulo: document.querySelector('[data-f="moderation"]')?.closest(".sel")?.querySelector(".sel-value")?.textContent?.trim() ?? "",
+      esperado: document.querySelector('[data-f="moderation"]')?.selectedOptions[0]?.textContent?.trim() ?? "(none)",
+      encendida: document.querySelector('[data-f="moderation"]')?.closest(".sel")?.classList.contains("set") ?? false,
+    };
+  `);
+  check(
+    "and choosing from its list narrows the archive like the select would",
+    elegida.direccion === "published" && elegida.rotulo !== "" && elegida.rotulo === elegida.esperado &&
+      elegida.encendida === true,
+    JSON.stringify(elegida),
+  );
+
+  // Scrollbars: Lastboard's thin, border-coloured one inside the product, and
+  // none on the public pages, where the page is the product and a gutter down
+  // its edge belongs to the operating system.
+  const barraDeLaLista = await evaluate(`
+    const lista = document.querySelector(".rev-list");
+    const sonda = document.createElement("i");
+    sonda.style.color = "var(--border)";
+    document.body.append(sonda);
+    const borde = getComputedStyle(sonda).color;
+    sonda.remove();
+    const cs = getComputedStyle(lista);
+    return { ancho: cs.scrollbarWidth, color: cs.scrollbarColor, borde };
+  `);
+  await goTo("/", "#app > *");
+  const enPublico = await evaluate(`return getComputedStyle(document.documentElement).scrollbarWidth`);
+  await goTo("/panel", ".side-item");
+  const enElPanel = await evaluate(`return getComputedStyle(document.documentElement).scrollbarWidth`);
+  check(
+    "scrollbars are the house's: thin and border-coloured inside, none on the public pages",
+    barraDeLaLista.ancho === "thin" && barraDeLaLista.color.startsWith(barraDeLaLista.borde) &&
+      enPublico === "none" && enElPanel !== "none",
+    JSON.stringify({ lista: barraDeLaLista, enPublico, enElPanel }),
+  );
+  await goTo("/review?mode=all", ".rev-filter");
 
   // A narrowing that finds nothing says so, and offers the way back.
   await goTo("/review?mode=all&q=zzzz-nothing-says-this", ".rev-empty");

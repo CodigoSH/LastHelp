@@ -280,9 +280,32 @@ body::before {
   opacity: 0.75;
 }
 
-:root {
-  scrollbar-color: var(--border-strong) transparent;
+/* Scrollbars: Lastboard's, everywhere.
+ *
+ * Thin and the colour of a border, on every element rather than through a
+ * class, so a new scrolling box inherits them without anybody deciding to —
+ * this is the rule its components share (src/styles/shared.css), which is
+ * what somebody actually sees there: its modals, drawers and status page.
+ * The standard properties are the ones that take effect in current engines;
+ * the webkit ones stay underneath for those that only know them.
+ *
+ * And none on the public pages. Lastboard's board scrolls with its bar
+ * hidden — "stealth scroll" — because the page is the product and a grey
+ * gutter down its edge is the operating system's, not the page's. Scrolling
+ * still works by wheel, touch and keyboard. The panel keeps its bar: that is
+ * a tool, and there the bar says how much more of the list there is. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
+
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+html:has(> body:not(.admin-view)) { scrollbar-width: none; }
+html:has(> body:not(.admin-view))::-webkit-scrollbar { display: none; }
 
 /*
  * Entrance, once, in the normal flow.
@@ -940,6 +963,172 @@ input, textarea, select {
 }
 
 input:hover, textarea:hover, select:hover { border-color: var(--border-strong); }
+
+/* The house dropdown — Lastboard's Select.css, ported (web/src/services/
+ * select.ts puts it over every <select>).
+ *
+ * The trigger takes the field's own padding, border and background, so it
+ * sits at the height of the inputs beside it; the look is theirs: the inset
+ * shade, the chevron that turns and lights up, the accent ring while open.
+ * Custom properties for a compact size, as theirs has. */
+.sel {
+  position: relative;
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+/* Out of sight and out of the way, and still in the form: it is what a form
+   submits and what the code reads. Not display:none — a hidden control that
+   is required cannot be focused, and the browser then refuses the form with
+   no field to point at. */
+.sel > select.sel-native {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sel-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: var(--sel-padding, 0.55rem 0.7rem);
+  border: 1px solid var(--border);
+  border-radius: var(--sel-radius, var(--radius));
+  background: var(--panel);
+  color: var(--text-main);
+  font: inherit;
+  font-size: var(--sel-font-size, inherit);
+  line-height: inherit;
+  text-align: start;
+  cursor: pointer;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition:
+    border-color 0.2s var(--ease),
+    background-color 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
+}
+
+.sel-trigger:hover { border-color: var(--text-dim); }
+.sel-trigger:disabled { opacity: 0.55; cursor: default; }
+
+.sel-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  border-radius: var(--sel-radius, var(--radius));
+  box-shadow: var(--ring);
+}
+
+.sel.open .sel-trigger {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.05);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+}
+
+/* Block, not flex: an ellipsis never applies to a flex container. */
+.sel-value {
+  display: block;
+  min-inline-size: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sel-icon {
+  inline-size: 16px;
+  block-size: 16px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.5;
+  transition: transform 0.2s var(--ease), opacity 0.2s var(--ease);
+}
+
+.sel.open .sel-icon { transform: rotate(180deg); opacity: 1; color: var(--accent); }
+
+/* Measures where a fixed box lands, so the list can be put where it is
+   meant to be even under a dialog that is still arriving. */
+.sel-probe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  inline-size: 0;
+  block-size: 0;
+  pointer-events: none;
+}
+
+/* The list. Fixed, so no scrolling box it sits in can cut it off; its place
+   is written as a rule when it opens. Physical top and left on purpose: they
+   are screen coordinates measured by the script, and those do not mirror. */
+.sel-list {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  max-block-size: 0;
+  opacity: 0;
+  overflow: hidden;
+  outline: none;
+  transform: translateY(-8px);
+  transition:
+    max-block-size 0.2s var(--ease),
+    opacity 0.2s var(--ease),
+    transform 0.2s var(--ease);
+}
+
+.sel-list.open {
+  max-block-size: 300px;
+  opacity: 1;
+  transform: translateY(0);
+  overflow-y: auto;
+}
+
+.sel-option {
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.sel-option:hover,
+.sel-option.active { background: rgba(127, 127, 127, 0.12); }
+
+.sel-option.selected {
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+  font-weight: 500;
+}
+
+.sel-option.selected:hover,
+.sel-option.selected.active { background: rgba(var(--accent-rgb), 0.15); }
+
+/* In a row with its label, the control is as wide as its longest option
+   rather than the whole row. */
+.status-control .sel { inline-size: auto; min-inline-size: 12rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sel-list,
+  .sel-icon,
+  .sel-trigger { transition: none; }
+}
 
 textarea { resize: vertical; }
 
@@ -1610,7 +1799,6 @@ summary:focus-visible,
 }
 
 .field input,
-.field select,
 .field textarea {
   inline-size: 100%;
   margin: 0;
@@ -1795,11 +1983,6 @@ body.admin-view > main {
   font-size: 0.82rem;
   color: var(--text-dim);
   overflow-wrap: anywhere;
-}
-
-.side-foot select {
-  margin: 0;
-  font-size: 0.9rem;
 }
 
 /* The panel uses the window it is given.
@@ -3715,16 +3898,6 @@ a.stat:hover .stat-go {
 
 .chip.waiting .icon { color: inherit; }
 
-/* The controls of a listing sit on their own line on a narrow window rather
-   than squeezing the search into three characters. */
-.controls select {
-  padding: 0.4rem 0.6rem;
-  border-radius: 999px;
-  background: var(--surface-dim);
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-
 .tabs .count-chip {
   margin-inline-start: 0.4rem;
   padding: 0 0.35rem;
@@ -4047,8 +4220,6 @@ a.stat:hover .stat-go {
   box-shadow: var(--card-shadow);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
 }
 
 /*
@@ -4478,20 +4649,23 @@ a.stat:hover .stat-go {
 
 /* Two to a row, at every width. Three fitted in English and not in Greek or
    Japanese — "Οποιαδήποτε κατάσταση" is 141px where a third of the column
-   leaves 130 — and a select cuts its label short without a word. Two also
-   make the four of them a square rather than three and a stray. */
-.rev-narrow select {
-  flex: 1 1 calc(50% - 3px);
-  min-inline-size: 0;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  color: var(--text-dim);
+   leaves 130 — and a label that does not fit is cut short. Two also make the
+   four of them a square rather than three and a stray.
+ *
+ * The house dropdown at its compact size, which is what Lastboard's exposes
+ * its custom properties for: the same control on the same line as a search
+ * box, at the search box's height. */
+.rev-narrow {
+  --sel-padding: 5px 10px;
+  --sel-font-size: 12px;
+  --sel-radius: var(--radius-sm);
 }
 
+.rev-narrow .sel { flex: 1 1 calc(50% - 3px); inline-size: auto; }
+.rev-narrow .sel-trigger { color: var(--text-dim); }
+
 /* A narrowing that is on says so: the same accent a chosen row carries. */
-.rev-narrow select.set {
+.rev-narrow .sel.set .sel-trigger {
   color: var(--text-main);
   border-color: var(--accent-line);
   background: var(--accent-wash);
@@ -4603,15 +4777,25 @@ a.stat:hover .stat-go {
 
 .rev-w { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
 
-.rev-meta { display: flex; align-items: center; gap: 8px; margin-block-end: 14px; flex-wrap: wrap; }
+/* The detail is a column with one gap, not a stack of margins. Each part used
+   to carry its own space underneath, and the two that carried none — the
+   answers and the state of a decided report — sat touching what came next:
+   the three decisions glued to the bottom of "What was asked". A part added
+   tomorrow gets the same space without having to know it needs one. */
+.rev-detail [data-detail] { display: flex; flex-direction: column; gap: 18px; }
+.rev-detail [data-detail] > * { margin-block: 0; }
+.rev-detail .answers { margin: 0; }
+.rev-detail [data-detail] > .status { align-self: flex-start; }
+
+.rev-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .rev-when { color: var(--text-dim); font-size: 0.82rem; }
-.rev-title { font-size: 1.5rem; margin: 0 0 12px; line-height: 1.25; }
-.rev-full { color: var(--text-main); line-height: 1.65; margin-block-end: 20px; }
+.rev-title { font-size: 1.5rem; line-height: 1.25; }
+.rev-full { color: var(--text-main); line-height: 1.65; }
 .rev-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .rev-nothing { color: var(--text-dim); }
 /* What a message is about, above the decision and not below it: read blind is
    decided blind. */
-.rev-onwhat { color: var(--text-dim); font-size: .9rem; margin-block-end: 20px; }
+.rev-onwhat { color: var(--text-dim); font-size: .9rem; }
 .rev-empty { padding-block-start: 2rem; }
 
 .rev-foot {
