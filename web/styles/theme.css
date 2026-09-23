@@ -31,6 +31,9 @@
   /* The sheet the panel is laid on: Lastboard's --surface-solid, measured on
      its drawer — white here, #242424 in the dark. */
   --sheet: #ffffff;
+  /* A row pointed at, in the accent — Lastboard's --surface-hover, measured:
+     6% here, 10% in the dark. */
+  --surface-hover: rgba(var(--accent-rgb), 0.06);
   --surface-dim: #eef0f4;
   --text-main: #12151b;
   --text-dim: #5b6470;
@@ -129,6 +132,7 @@
   --dark-panel: #1a1a1a;
   --dark-surface-dim: #242424;
   --dark-sheet: #242424;
+  --dark-surface-hover: rgba(var(--accent-rgb), 0.1);
   --dark-text-main: #e9ecf2;
   --dark-text-dim: #98a2b1;
   --dark-border: #333333;
@@ -155,6 +159,7 @@
     --canvas-glass: var(--dark-canvas-glass);
     --panel: var(--dark-panel);
     --sheet: var(--dark-sheet);
+    --surface-hover: var(--dark-surface-hover);
     --surface-dim: var(--dark-surface-dim);
     --text-main: var(--dark-text-main);
     --text-dim: var(--dark-text-dim);
@@ -180,6 +185,7 @@
   --canvas-glass: var(--dark-canvas-glass);
   --panel: var(--dark-panel);
   --sheet: var(--dark-sheet);
+  --surface-hover: var(--dark-surface-hover);
   --surface-dim: var(--dark-surface-dim);
   --text-main: var(--dark-text-main);
   --text-dim: var(--dark-text-dim);
@@ -1939,12 +1945,15 @@ body.admin-view > main {
   text-decoration: none;
   font-size: 13px;
   line-height: 1.3;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.side-item:hover { color: var(--text-main); }
-
+/* Pointed at: the accent, faintly, and the words brought up — theirs, measured
+   by moving a pointer over their menu. It was a neutral grey here, which read
+   as a different product the moment the pointer moved. */
 .side-item:hover {
-  background: rgba(127, 127, 127, 0.12);
+  background: var(--surface-hover);
+  color: var(--text-main);
 }
 
 /*

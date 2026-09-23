@@ -1062,6 +1062,34 @@ async function main() {
     sidebar.pieBajo <= sidebar.ventana && sidebar.lateralBajo <= sidebar.ventana,
     JSON.stringify({ pie: sidebar.pieBajo, lateral: sidebar.lateralBajo, ventana: sidebar.ventana }),
   );
+  // Pointed at, a menu row lights in the accent, as Lastboard's does — with a
+  // real pointer through the protocol, because a synthetic mouseover does not
+  // set :hover. It was a neutral grey here.
+  const fila = await evaluate(`
+    const it = [...document.querySelectorAll(".side-item")].find(a => !a.hasAttribute("aria-current"));
+    const r = it.getBoundingClientRect();
+    window.__fila = it;
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  `);
+  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 900, y: 600 });
+  await sleep(150);
+  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: fila.x, y: fila.y });
+  await sleep(400);
+  const encima = await evaluate(`
+    const sonda = document.createElement("i");
+    sonda.style.backgroundColor = "var(--surface-hover)";
+    document.body.append(sonda);
+    const esperado = getComputedStyle(sonda).backgroundColor;
+    sonda.remove();
+    return { fondo: getComputedStyle(window.__fila).backgroundColor, esperado,
+      acento: getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() };
+  `);
+  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 900, y: 600 });
+  check(
+    "a menu row pointed at lights in the accent, as Lastboard's does",
+    encima.fondo === encima.esperado && encima.fondo.replace(/\s/g, "").includes(encima.acento.replace(/\s/g, "")),
+    JSON.stringify(encima),
+  );
   check(
     "and does not stack two navigations, or two marks, on top of each other",
     sidebar.barraVisible === true && sidebar.enlacesEnLaBarra === 0 && sidebar.marcasALaVista === 1,
