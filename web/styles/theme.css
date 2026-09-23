@@ -1865,26 +1865,72 @@ body.admin-view > main {
   overflow-y: auto;
 }
 
+/* Lastboard's drawer header, to its numbers: a 64px picture, the name at 16px
+   and the role in a small monospaced badge, centred over a rule. It runs out
+   to the sidebar's edges, as the drawer's does. */
+.side-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: -1.25rem -0.9rem 0.75rem;
+  padding: 32px 16px 24px;
+  border-block-end: 1px solid var(--border);
+  text-align: center;
+}
+
+.side-head .avatar {
+  inline-size: 64px;
+  block-size: 64px;
+  font-size: 24px;
+  margin-block-end: 6px;
+}
+
+.side-head .who {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+.side-role {
+  padding: 2px 10px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: 2px;
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Their section label: monospaced, ten pixels, quiet. */
 .side-label {
   margin: 1rem 0 0.35rem;
-  padding-inline-start: 0.6rem;
-  font-size: 0.72rem;
+  padding-inline-start: 16px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   color: var(--text-dim);
 }
 
+/* Their menu item: 13px, dimmed until it is pointed at or chosen. */
 .side-item {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.5rem 0.6rem;
-  border-radius: 8px;
-  color: var(--text-main);
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  color: var(--text-dim);
   text-decoration: none;
-  font-size: 0.95rem;
+  font-size: 13px;
   line-height: 1.3;
 }
+
+.side-item:hover { color: var(--text-main); }
 
 .side-item:hover {
   background: rgba(127, 127, 127, 0.12);
@@ -1971,13 +2017,7 @@ body.admin-view > main {
   gap: 0.5rem;
 }
 
-.side-foot .who {
-  margin: 0;
-  padding-inline-start: 0.6rem;
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  overflow-wrap: anywhere;
-}
+
 
 /* The panel uses the window it is given.
  *
@@ -2032,8 +2072,10 @@ body.admin-view > main {
     padding: 0.6rem 0.75rem;
   }
 
-  .side-label,
-  .side-foot .who {
+  /* In a strip there is no room for the header: the name is on the Profile
+     screen anyway, and a band only has space for the places to go. */
+  .side-head,
+  .side-label {
     display: none;
   }
 
@@ -2611,25 +2653,6 @@ a.stat:hover {
   object-fit: cover;
 }
 
-.side-who {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-inline-size: 0;
-}
-
-.side-who .avatar {
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
-  font-size: 0.7rem;
-}
-
-.side-who .who {
-  padding: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* A card whose whole face is a link, with its controls floating over the
    corner. The link is the <a>, not the <li>, so the buttons are not inside it —
@@ -6587,4 +6610,352 @@ a.stat:hover .stat-go {
 .resize-handle:hover {
   opacity: 1;
   transform: scale(1.1);
+}
+
+/*
+ * Lastboard's settings panel, ported whole into this one.
+ *
+ * Measured off its binary, section by section (My profile, Look & feel,
+ * Personalization, Users, Data), not off its stylesheet alone: every panel
+ * screen here is the same kind of thing as one of those, and a person who
+ * uses both products should not be able to tell which one they are in.
+ *
+ * The recipe, from SettingsContent.css and Button.css:
+ *   - cards with no icon: a whisper of fill, a border, radius 10, 16 by 20 of
+ *     padding, one under another, 16 apart;
+ *   - the card's name at 11px, semibold, in dim capitals spaced 0.08em;
+ *   - labels at 12px, dim; fields 36px tall, 13px, radius 8, a slight inset
+ *     shade, no wider than 420px;
+ *   - buttons outlined — 2px of accent for the one that commits, 1px of
+ *     border for the rest — 36px, 13px, capitals spaced 0.05em;
+ *   - rows with what a thing is on one side and its control at the end of
+ *     the line, a rule between them.
+ *
+ * Scoped to the panel's content, and never the new-organisation wizard,
+ * which belongs with sign-up and sign-in: the screens that ask for one thing
+ * wear Lastboard's sign-in, which is a filled button.
+ */
+.admin-main {
+  --field: 420px;
+  --control-h: 36px;
+  --radius-control: 8px;
+  --sel-padding: 0 12px;
+  --sel-font-size: 13px;
+  --sel-radius: var(--radius-control);
+}
+
+/* The page's own name is the item chosen in the menu, as in their drawer. The
+   heading stays for whoever reads the page out loud. */
+.admin-main > h1:not(.visually-hidden) { font-size: 1.35rem; }
+
+.settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  max-inline-size: 760px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-main .bento-card {
+  gap: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(128, 128, 128, 0.04);
+  box-shadow: none;
+}
+
+.admin-main .bento-card .card-head { gap: 0; color: inherit; margin: 0 0 4px; }
+.admin-main .bento-card .card-head > .icon { display: none; }
+
+/* 13px, measured on their panel: the stylesheet says 11 and a later rule
+   raises it, so reading the file alone gives the wrong number. */
+.admin-main .bento-card .card-head h3,
+.admin-main .card-top h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-block-end: 4px;
+}
+
+.admin-main .bento-card .card-sub {
+  display: block;
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+/* Fields: their form group, label and control. */
+.admin-main :not(.wizard) .field { margin-block: 0 16px; max-inline-size: var(--field); }
+.admin-main :not(.wizard) .field > label {
+  display: block;
+  margin-block-end: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.admin-main :not(.wizard) .field input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]),
+.admin-main :not(.wizard) .field textarea,
+.admin-main .input-row input,
+.admin-main .logo-row input {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: var(--field);
+  min-block-size: var(--control-h);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+}
+
+.admin-main :not(.wizard) .field textarea { padding-block: 8px; }
+.admin-main :not(.wizard) .field .hint { margin: 4px 0 0; font-size: 11px; color: var(--text-dim); }
+.admin-main :not(.wizard) .field .sel { max-inline-size: var(--field); }
+.admin-main .sel-trigger { min-block-size: var(--control-h); }
+
+/* A field and the button that commits it, on one line. */
+.input-row { display: flex; gap: 8px; align-items: center; }
+.input-row input { flex: 1; }
+.input-row .button { flex: none; }
+
+/* What closes a form: aligned with the fields, as wide as its label. */
+.settings-actions { display: flex; margin-block-start: 24px; }
+.settings-actions .button { min-inline-size: 160px; }
+
+/* Buttons: theirs. */
+.admin-main .button:not(.wizard .button) {
+  block-size: var(--control-h);
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transform: none;
+}
+
+.admin-main .button:not(.wizard .button):hover {
+  border-color: var(--border-strong);
+  background: var(--panel);
+  color: var(--text-main);
+  box-shadow: none;
+  transform: none;
+}
+
+.admin-main .button:not(.wizard .button):active { transform: translateY(1px); }
+
+.admin-main .button.primary:not(.wizard .button) {
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+}
+
+.admin-main .button.primary:not(.wizard .button):hover {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+}
+
+.admin-main .button.danger:not(.wizard .button) {
+  border: 2px solid var(--danger-color);
+  background: transparent;
+  color: var(--danger-color);
+}
+
+.admin-main .button.danger:not(.wizard .button):hover {
+  background: rgba(var(--danger-rgb), 0.1);
+  color: var(--danger-color);
+}
+
+.admin-main .button .icon { inline-size: 14px; block-size: 14px; }
+
+/* A dialog's two buttons share its width, as theirs do. */
+.admin-main .modal-foot .button { flex: 1; justify-content: center; }
+
+/* The row: what a thing is, and the one thing you do to it at the end. */
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 32px;
+  align-items: center;
+  min-block-size: 56px;
+  padding: 14px 0;
+  border-block-end: 1px solid var(--border);
+}
+
+.settings-row:last-of-type { border-block-end: 0; padding-block-end: 0; }
+.settings-info h4 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
+.settings-info p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim); max-inline-size: 56ch; }
+.settings-info .settings-danger { color: var(--danger-color); font-weight: 600; }
+
+/* Their list of users: a row per thing, a surface and a border, the accent
+   when pointed at, the actions at the far end. */
+.settings-list { display: grid; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(128, 128, 128, 0.04);
+  transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease);
+}
+
+.settings-item:hover { border-color: rgba(var(--accent-rgb), 0.4); background: rgba(var(--accent-rgb), 0.04); }
+
+.si-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-inline-size: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.si-main .avatar { inline-size: 36px; block-size: 36px; font-size: 13px; flex: none; }
+.si-mark { display: grid; place-items: center; inline-size: 36px; block-size: 36px; flex: none; color: var(--text-dim); }
+.si-text { display: grid; gap: 2px; min-inline-size: 0; }
+.si-name { font-size: 14px; font-weight: 600; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.si-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-inline-start: auto; }
+.si-actions { display: flex; gap: 4px; flex: none; }
+
+/* Their small monospaced tag: a role, a slug, a state. */
+.mono-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(128, 128, 128, 0.06);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mono-tag.accent {
+  border-color: rgba(var(--accent-rgb), 0.2);
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+}
+
+/* Their profile header: the picture, and the name with its tags beside it. */
+.profile-head { display: flex; align-items: center; gap: 20px; margin: 8px 0 32px; }
+.profile-who { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.profile-name { font-size: 17.5px; font-weight: 600; }
+.profile-role { font-size: 16px; color: var(--text-main); }
+
+.logo-row { display: flex; align-items: center; gap: 12px; }
+.logo-row input { flex: 1; }
+.org-tags { display: flex; gap: 6px; margin: 0 0 8px; }
+
+/* Their segmented control, for the theme: small, one line, the chosen segment
+   raised. The three large tiles it replaces were this product's own. */
+.admin-main .theme-choice {
+  display: flex;
+  gap: 2px;
+  max-inline-size: 290px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-dim);
+}
+
+.admin-main .theme-choice button {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-inline-size: 0;
+  min-block-size: 0;
+  padding: 8px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.admin-main .theme-choice button .icon { inline-size: 14px; block-size: 14px; color: inherit; }
+.admin-main .theme-choice button:hover { background: var(--border); color: var(--text-main); }
+
+.admin-main .theme-choice button[aria-pressed="true"] {
+  border-color: var(--border);
+  background: var(--panel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.admin-main .theme-choice button[aria-pressed="true"] .icon { color: inherit; }
+
+/* Overview has no twin in Lastboard, so it wears the same card: no icons, the
+   quiet capital name, the number under it. */
+.admin-main .dash-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(128, 128, 128, 0.04);
+  box-shadow: none;
+}
+
+.admin-main .dash-card > h3 {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.admin-main .dash-card .stat .label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-main .dash-card .stat .label .icon { display: none; }
+
+@media (max-width: 40rem) {
+  .settings-row { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+  .profile-head { flex-direction: column; align-items: flex-start; }
+  .si-tags { display: none; }
+}
+
+/* Their logo is a square tile with a border beside the name, not a round
+   portrait: a mark is not a face. */
+.logo-row .avatar,
+.logo-row .logo-preview {
+  inline-size: 48px;
+  block-size: 48px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  object-fit: contain;
 }

@@ -1241,7 +1241,7 @@ export function memberHome(
   text: Text,
 ): string {
   if (memberships.length === 0) {
-    return `<h1>${escapeHTML(text.t("shell.overview"))}</h1>
+    return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
       ${emptyState(text.t("overview.noRoles"), icons.person(28))}`;
   }
 
@@ -1259,7 +1259,7 @@ export function memberHome(
     })
     .join("");
 
-  return `<h1>${escapeHTML(text.t("shell.overview"))}</h1>
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
     <p class="lead">${escapeHTML(text.t("overview.memberLead"))}</p>
     <ul class="bento">${cards}</ul>`;
 }
@@ -1403,8 +1403,9 @@ export function connectionForms(
       </li>`
     : "";
 
-  return `<h2>${escapeHTML(text.t("panel.settings"))}</h2>
-    <ul class="bento wide">${forgeCard}${address}${channelCard}</ul>`;
+  // Cards like every other in the panel, one under another; each names itself,
+  // so no heading over them.
+  return `<ul class="settings settings-cards">${forgeCard}${address}${channelCard}</ul>`;
 }
 
 /** The team's triage controls on one item: rewrite, reply, and merge a duplicate away. */
@@ -2742,9 +2743,14 @@ export function adminShell(spec: ShellSpec, text: Text): string {
 
   return `<div class="admin">
     <aside class="side">
-      <!-- No mark and name at the head of the menu: the bar above already
-           carries both, a few pixels higher, and the two read as the same
-           thing said twice. -->
+      <!-- No installation mark here: the bar above carries it. What heads the
+           menu is Lastboard's drawer header — who is acting: the picture, the
+           name and the role. -->
+      <div class="side-head">
+        ${avatar(spec.who, spec.avatar)}
+        <span class="who">${escapeHTML(spec.who)}</span>
+        ${spec.isAdmin ? `<span class="side-role">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+      </div>
       <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
         ${group(
           text.t("shell.groupWork"),
@@ -2782,10 +2788,6 @@ export function adminShell(spec: ShellSpec, text: Text): string {
         ${icons.open()}<span>${escapeHTML(text.t("shell.publicSite"))}</span>
       </a>
       <div class="side-foot">
-        <div class="side-who">
-          ${avatar(spec.who, spec.avatar)}
-          <span class="who">${escapeHTML(spec.who)}</span>
-        </div>
         <button class="link with-icon" data-signout>${icons.signOut(16)}<span>${escapeHTML(text.t("nav.signOut"))}</span></button>
       </div>
     </aside>
@@ -3091,7 +3093,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
   };
 
   return `<div class="screen-head">
-      <h1>${escapeHTML(text.t("shell.overview"))}</h1>
+      <h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
     </div>
     ${total === 0 ? `<p class="lead">${escapeHTML(text.t("overview.emptyLead"))}</p>` : ""}
 
@@ -3479,57 +3481,91 @@ export function reviewDetail(
     }`;
 }
 
+/**
+ * A card of Lastboard's settings panel.
+ *
+ * Its recipe, which every panel screen now wears: no icon, the card's name in
+ * small quiet capitals, what it is for underneath, then its contents. An
+ * action that belongs to the whole card — adding a user, adding a repository
+ * — sits at the end of the title's line, as "+ Add user" does there.
+ */
+function settingsCard(title: string, body: string, opts: { lead?: string; action?: string; tag?: string } = {}): string {
+  return `<section class="bento-card settings-card">
+    <div class="card-top"><h3>${escapeHTML(title)}</h3>${opts.action ?? ""}</div>
+    ${opts.lead ? `<p class="card-sub">${escapeHTML(opts.lead)}</p>` : ""}
+    ${body}
+  </section>`;
+}
+
+/**
+ * One thing in a list, as Lastboard lists its users: a row with what it is on
+ * one side and what can be done to it on the other.
+ */
+function settingsItem(spec: {
+  lead: string;
+  name: string;
+  sub?: string;
+  tags?: string;
+  href?: string;
+  actions?: string;
+  attrs?: string;
+}): string {
+  const main = `${spec.lead}<span class="si-text"><span class="si-name">${escapeHTML(spec.name)}</span>${
+    spec.sub ? `<span class="si-sub">${escapeHTML(spec.sub)}</span>` : ""
+  }</span>${spec.tags ? `<span class="si-tags">${spec.tags}</span>` : ""}`;
+  return `<li class="settings-item" ${spec.attrs ?? ""}>
+    ${spec.href ? `<a class="si-main" href="${escapeAttr(spec.href)}">${main}</a>` : `<div class="si-main">${main}</div>`}
+    ${spec.actions ? `<div class="si-actions">${spec.actions}</div>` : ""}
+  </li>`;
+}
+
 export function profileScreen(
   me: { username: string; name?: string; avatar?: string; admin: boolean },
   text: Text,
 ): string {
-  return `<h1>${escapeHTML(text.t("shell.profile"))}</h1>
-
-    <div class="identity">
-      ${imagePicker(
-        {
-          what: "avatar",
-          current: me.avatar,
-          initials: me.name || me.username,
-          label: text.t("profile.picture"),
-          big: true,
-        },
-        text,
-      )}
-      <div>
-        <div class="name">${escapeHTML(me.name || me.username)}</div>
-        <div class="card-sub">
-          <span class="tag">${escapeHTML(me.username)}</span>
-          ${me.admin ? `<span class="chip accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+  // Lastboard's "My profile" and "System password", card for card: the
+  // picture, the name and the role; the name you appear under, with its save
+  // button on the same line; and the password, closed by one button aligned
+  // with the fields rather than stretched across the card.
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.profile"))}</h1>
+    <div class="settings">
+      ${settingsCard(
+        text.t("shell.profile"),
+        `<div class="profile-head">
+          ${imagePicker(
+            { what: "avatar", current: me.avatar, initials: me.name || me.username, label: text.t("profile.picture"), big: true },
+            text,
+          )}
+          <div class="profile-who">
+            <span class="profile-name">${escapeHTML(me.name || me.username)}</span>
+            ${me.admin ? `<span class="profile-role">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+          </div>
         </div>
-      </div>
-    </div>
-
-    <ul class="bento">
-      <li class="bento-card">
-        <div class="card-head">${icons.person()}<h3>${escapeHTML(text.t("profile.name"))}</h3></div>
-        <span class="card-sub">${escapeHTML(text.t("profile.nameHelp"))}</span>
         <form class="profile-name">
-          ${field({ id: "display-name", name: "display_name", label: text.t("profile.name"), value: me.name ?? "", example: "Alex" }, text)}
+          <div class="field">
+            <label for="display-name">${escapeHTML(text.t("profile.name"))}</label>
+            <div class="input-row">
+              <input type="text" id="display-name" name="display_name" value="${escapeAttr(me.name ?? "")}" placeholder="Alex" />
+              <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button>
+            </div>
+            <p class="hint">${escapeHTML(text.t("profile.nameHelp"))}</p>
+          </div>
           <p class="form-error" role="alert" hidden></p>
-          <div class="wizard-actions"><span class="spacer"></span>
-            <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
-        </form>
-      </li>
-
-      <li class="bento-card">
-        <div class="card-head">${icons.warning()}<h3>${escapeHTML(text.t("profile.password"))}</h3></div>
-        <span class="card-sub">${escapeHTML(text.t("profile.passwordHelp"))}</span>
-        <form class="profile-password">
+        </form>`,
+      )}
+      ${settingsCard(
+        text.t("profile.password"),
+        `<form class="profile-password">
           ${field({ id: "current-password", name: "current", label: text.t("profile.current"), type: "password", required: true, autocomplete: "current-password" }, text)}
           ${field({ id: "new-password", name: "new", label: text.t("profile.new"), type: "password", required: true, autocomplete: "new-password" }, text)}
           ${field({ id: "new-password-again", name: "again", label: text.t("auth.passwordAgain"), type: "password", required: true, autocomplete: "new-password" }, text)}
           <p class="form-error" role="alert" hidden></p>
-          <div class="wizard-actions"><span class="spacer"></span>
+          <div class="settings-actions">
             <button class="button primary" type="submit">${escapeHTML(text.t("profile.change"))}</button></div>
-        </form>
-      </li>
-    </ul>`;
+        </form>`,
+        { lead: text.t("profile.passwordHelp") },
+      )}
+    </div>`;
 }
 
 /** Language and look, which belong to the reader rather than to the server. */
@@ -3539,20 +3575,25 @@ export function appearanceScreen(
   theme: string,
   text: Text,
 ): string {
-  return `<h1>${escapeHTML(text.t("shell.appearance"))}</h1>
-    <p class="lead">${escapeHTML(text.t("appearance.lead"))}</p>
-    <div class="wizard-card">
-      ${choiceField({
-        id: "appearance-language",
-        name: "language",
-        label: text.t("shell.language"),
-        options: languages.map((l) => [l.code, l.name] as [string, string]),
-        selected: language,
-      })}
-      <div class="field">
-        <label>${escapeHTML(text.t("shell.theme"))}</label>
-        ${themeChoice(theme, text)}
-      </div>
+  // Lastboard's "Look & feel": one card, a label over each control, and the
+  // theme as its segmented control rather than three large tiles.
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.appearance"))}</h1>
+    <div class="settings">
+      ${settingsCard(
+        text.t("shell.appearance"),
+        `${choiceField({
+          id: "appearance-language",
+          name: "language",
+          label: text.t("shell.language"),
+          options: languages.map((l) => [l.code, l.name] as [string, string]),
+          selected: language,
+        })}
+        <div class="field">
+          <label>${escapeHTML(text.t("shell.theme"))}</label>
+          ${themeChoice(theme, text)}
+        </div>`,
+        { lead: text.t("appearance.lead") },
+      )}
     </div>`;
 }
 
@@ -3582,22 +3623,23 @@ export function personalizationScreen(
   instance: { name: string; logo: string; accent: string },
   text: Text,
 ): string {
-  return `<h1>${escapeHTML(text.t("shell.personalization"))}</h1>
-    <p class="lead">${escapeHTML(text.t("personalization.lead"))}</p>
-
-    <form class="instance-settings">
-      <div class="wizard-card">
-        ${field({ id: "instance-name", name: "name", label: text.t("setup.instanceName"), hint: text.t("setup.instanceNameHelp"), value: instance.name, example: "Acme" }, text)}
-
-        <div class="field">
-          <label>${escapeHTML(text.t("personalization.logo"))}</label>
-          ${imagePicker(
-            { what: "logo", current: instance.logo, initials: instance.name || "L", label: text.t("personalization.logo") },
-            text,
-          )}
-          <p class="hint">${escapeHTML(text.t("personalization.logoHelp"))}</p>
+  // Lastboard's "Logo & panel name": the mark and the name side by side, as one
+  // thing — they are what the header shows together — and the accent below.
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.personalization"))}</h1>
+    <form class="instance-settings settings">
+      ${settingsCard(
+        text.t("shell.personalization"),
+        `<div class="field">
+          <label for="instance-name">${escapeHTML(text.t("setup.instanceName"))}</label>
+          <div class="logo-row">
+            ${imagePicker(
+              { what: "logo", current: instance.logo, initials: instance.name || "L", label: text.t("personalization.logo") },
+              text,
+            )}
+            <input type="text" id="instance-name" name="name" value="${escapeAttr(instance.name)}" placeholder="Acme" />
+          </div>
+          <p class="hint">${escapeHTML(text.t("setup.instanceNameHelp"))} ${escapeHTML(text.t("personalization.logoHelp"))}</p>
         </div>
-
         <div class="field">
           <label for="accent">${escapeHTML(text.t("personalization.accent"))}</label>
           <div class="accent-row">
@@ -3606,10 +3648,11 @@ export function personalizationScreen(
           </div>
           <p class="hint">${escapeHTML(text.t("personalization.accentHelp"))}</p>
         </div>
-      </div>
-      <p class="form-error" role="alert" hidden></p>
-      <div class="wizard-actions"><span class="spacer"></span>
-        <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="settings-actions">
+          <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>`,
+        { lead: text.t("personalization.lead") },
+      )}
     </form>`;
 }
 
@@ -3619,31 +3662,34 @@ export function organizationsScreen(
   may: { canAdd: boolean; canManage: (slug: string) => boolean; canDelete: boolean },
   text: Text,
 ): string {
-  const cards = orgs
-    .map(
-      (o) => `<li class="bento-card">
-        <a class="card-link" href="/panel/${escapeAttr(o.slug)}">
-          <div class="card-head">${icons.organization()}<h3>${escapeHTML(o.name)}</h3></div>
-          <span class="card-sub">/${escapeHTML(o.slug)}</span>
-        </a>
-        ${
-          may.canManage(o.slug)
-            ? `<div class="card-actions">
-                 ${iconButton("edit", text.t("action.edit"), `data-edit-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
-                 ${may.canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`) : ""}
-               </div>`
-            : ""
-        }
-      </li>`,
+  const rows = orgs
+    .map((o) =>
+      settingsItem({
+        lead: `<span class="si-mark">${icons.organization(16)}</span>`,
+        name: o.name,
+        sub: `/${o.slug}`,
+        href: `/panel/${o.slug}`,
+        actions: may.canManage(o.slug)
+          ? `${iconButton("edit", text.t("action.edit"), `data-edit-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
+             ${may.canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`) : ""}`
+          : "",
+      }),
     )
     .join("");
 
-  return `<div class="screen-head">
-      <h1>${escapeHTML(text.t("shell.organizations"))}</h1>
-      ${may.canAdd ? actionButton("add", text.t("panel.newOrganization"), 'data-add-org data-open-modal="org-modal"', "primary") : ""}
-    </div>
-    <p class="lead">${escapeHTML(text.t("organizations.lead"))}</p>
-    ${orgs.length === 0 ? `${emptyState(text.t("panel.firstStep"), icons.organization(28))}` : `<ul class="bento">${cards}</ul>`}`;
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.organizations"))}</h1>
+    <div class="settings">
+      ${settingsCard(
+        text.t("shell.organizations"),
+        orgs.length === 0
+          ? emptyState(text.t("panel.firstStep"), icons.organization(28))
+          : `<ul class="settings-list">${rows}</ul>`,
+        {
+          lead: text.t("organizations.lead"),
+          action: may.canAdd ? actionButton("add", text.t("panel.newOrganization"), 'data-add-org data-open-modal="org-modal"', "primary") : "",
+        },
+      )}
+    </div>`;
 }
 
 /** One organisation: its repositories, and what can be done to it. */
@@ -3655,41 +3701,39 @@ export function organizationScreen(
   canDelete: boolean,
   text: Text,
 ): string {
-  const cards = repos
-    .map(
-      (r) => `<li class="bento-card">
-        <a class="card-link" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}/queue">
-          <div class="card-head">${icons.repository()}<h3>${escapeHTML(r.name)}</h3></div>
-          <span class="card-sub">/${escapeHTML(org.slug)}/${escapeHTML(r.slug)}</span>
-          <span class="card-sub">${[
-            r.accepts_bugs ? escapeHTML(text.t("repo.acceptsBugs")) : "",
-            r.accepts_ideas ? escapeHTML(text.t("repo.acceptsIdeas")) : "",
-          ]
-            .filter(Boolean)
-            .join(" · ")}</span>
-        </a>
-        ${
-          canManage
-            ? `<div class="card-actions">
-                 ${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
-                 ${iconButton("edit", text.t("action.edit"), `data-edit-repo="${escapeAttr(r.slug)}"`)}
-                 ${canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}
-               </div>`
-            : ""
-        }
-      </li>`,
+  const rows = repos
+    .map((r) =>
+      settingsItem({
+        lead: `<span class="si-mark">${icons.repository(16)}</span>`,
+        name: r.name,
+        sub: `/${org.slug}/${r.slug}`,
+        tags: [
+          r.accepts_bugs ? `<span class="chip">${escapeHTML(text.t("kind.bug"))}</span>` : "",
+          r.accepts_ideas ? `<span class="chip">${escapeHTML(text.t("kind.idea"))}</span>` : "",
+        ].join(""),
+        href: `/${org.slug}/${r.slug}/queue`,
+        actions: canManage
+          ? `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
+             ${iconButton("edit", text.t("action.edit"), `data-edit-repo="${escapeAttr(r.slug)}"`)}
+             ${canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`
+          : "",
+      }),
     )
     .join("");
 
   return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a></p>
-    <div class="screen-head">
-      <h1>${escapeHTML(org.name)}</h1>
-      ${canManage ? actionButton("add", text.t("panel.newRepository"), 'data-add-repo data-open-modal="repo-modal"', "primary") : ""}
-    </div>
-    <p class="lead"><span class="tag">/${escapeHTML(org.slug)}</span>
-      ${org.forge && org.forge !== "none" ? `<span class="chip accent">${escapeHTML(org.forge)}</span>` : ""}</p>
-
-    ${repos.length === 0 ? `${emptyState(text.t("organizations.noRepositories"), icons.repository(28))}` : `<ul class="bento repositories">${cards}</ul>`}`;
+    <h1 class="visually-hidden">${escapeHTML(org.name)}</h1>
+    <div class="settings">
+      ${settingsCard(
+        org.name,
+        `<p class="org-tags"><span class="mono-tag">/${escapeHTML(org.slug)}</span>
+          ${org.forge && org.forge !== "none" ? `<span class="mono-tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>
+        ${repos.length === 0 ? emptyState(text.t("organizations.noRepositories"), icons.repository(28)) : `<ul class="settings-list repositories">${rows}</ul>`}`,
+        {
+          action: canManage ? actionButton("add", text.t("panel.newRepository"), 'data-add-repo data-open-modal="repo-modal"', "primary") : "",
+        },
+      )}
+    </div>`;
 }
 
 /** Who may act here, what each of them is, and where. */
@@ -3706,44 +3750,37 @@ export function peopleScreen(
   text: Text,
 ): string {
   const rows = people
-    .map(
-      (p) => `<li class="bento-card person-card" data-person="${p.id}">
-        <div class="person-head">
-          ${avatar(p.name || p.username, p.avatar)}
-          <div>
-            <div class="name">${escapeHTML(p.name || p.username)}</div>
-            <div class="card-sub"><span class="tag">${escapeHTML(p.username)}</span></div>
-          </div>
-        </div>
-        <div class="person-tags">
-          ${p.admin ? `<span class="chip accent">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
-          ${p.disabled ? `<span class="chip">${escapeHTML(text.t("people.disabled"))}</span>` : ""}
-          ${
-            p.grants.length === 0 && !p.admin
-              ? `<span class="chip">${escapeHTML(text.t("people.noRoles"))}</span>`
-              : p.grants
-                  .map(
-                    (g) =>
-                      `<span class="chip">${escapeHTML(text.t(`role.${g.role}`))} · ${escapeHTML(g.where ?? "")}</span>`,
-                  )
-                  .join("")
-          }
-        </div>
-        <div class="card-actions">
-          ${iconButton("person", text.t("people.roles"), `data-roles-person="${p.id}" data-username="${escapeAttr(p.username)}"`)}
+    .map((p) =>
+      settingsItem({
+        attrs: `data-person="${p.id}"`,
+        lead: avatar(p.name || p.username, p.avatar),
+        name: p.name || p.username,
+        sub: p.username,
+        tags: [
+          p.admin ? `<span class="mono-tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : "",
+          p.disabled ? `<span class="mono-tag">${escapeHTML(text.t("people.disabled"))}</span>` : "",
+          p.grants.length === 0 && !p.admin
+            ? `<span class="mono-tag">${escapeHTML(text.t("people.noRoles"))}</span>`
+            : p.grants
+                .map((g) => `<span class="mono-tag">${escapeHTML(text.t(`role.${g.role}`))} · ${escapeHTML(g.where ?? "")}</span>`)
+                .join(""),
+        ].join(""),
+        actions: `${iconButton("person", text.t("people.roles"), `data-roles-person="${p.id}" data-username="${escapeAttr(p.username)}"`)}
           ${iconButton("edit", text.t("action.edit"), `data-edit-person="${p.id}" data-name="${escapeAttr(p.name)}" data-username="${escapeAttr(p.username)}"`)}
-          ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-person="${p.id}" data-name="${escapeAttr(p.username)}"`)}
-        </div>
-      </li>`,
+          ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-person="${p.id}" data-name="${escapeAttr(p.username)}"`)}`,
+      }),
     )
     .join("");
 
-  return `<div class="screen-head">
-      <h1>${escapeHTML(text.t("shell.people"))}</h1>
-      ${actionButton("add", text.t("people.add"), 'data-open-modal="person-modal"', "primary")}
-    </div>
-    <p class="lead">${escapeHTML(text.t("people.lead"))}</p>
-    <ul class="bento wide">${rows}</ul>`;
+  // Lastboard's "Users": one card, the way to add somebody at the end of its
+  // title, and a row per person with what can be done to them at the far end.
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.people"))}</h1>
+    <div class="settings">
+      ${settingsCard(text.t("shell.people"), `<ul class="settings-list">${rows}</ul>`, {
+        lead: text.t("people.lead"),
+        action: actionButton("add", text.t("people.add"), 'data-open-modal="person-modal"', "primary"),
+      })}
+    </div>`;
 }
 
 /**
@@ -3754,25 +3791,36 @@ export function peopleScreen(
  * since, which is why it says so and asks again.
  */
 export function backupScreen(text: Text): string {
-  return `<h1>${escapeHTML(text.t("shell.backups"))}</h1>
-    <p class="lead">${escapeHTML(text.t("backups.lead"))}</p>
-
-    <ul class="bento">
-      <li class="bento-card">
-        <div class="card-head">${icons.download()}<h3>${escapeHTML(text.t("backups.take"))}</h3></div>
-        <span class="card-sub">${escapeHTML(text.t("backups.help"))}</span>
-        <p><a class="button primary with-icon" href="/api/backup" download>${icons.download()}<span>${escapeHTML(text.t("backups.download"))}</span></a></p>
-      </li>
-
-      <li class="bento-card">
-        <div class="card-head">${icons.upload()}<h3>${escapeHTML(text.t("backups.restore"))}</h3></div>
-        <span class="card-sub">${escapeHTML(text.t("backups.restoreHelp"))}</span>
-        <p class="notice">${icons.warning()} ${escapeHTML(text.t("backups.restoreWarning"))}</p>
-        <input type="file" accept=".db,application/octet-stream" id="restore-file" hidden />
-        ${actionButton("upload", text.t("backups.chooseFile"), "data-pick-restore", "danger")}
-        <p class="restore-note" hidden></p>
-      </li>
-    </ul>`;
+  // Lastboard's "Full backup": one card, a row for taking one and a row for
+  // putting one back, each with its button at the end of the line and a rule
+  // between them. The warning is the restore row's own description, in red,
+  // as theirs is.
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.backups"))}</h1>
+    <div class="settings">
+      ${settingsCard(
+        text.t("shell.backups"),
+        `<div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("backups.take"))}</h4>
+            <p>${escapeHTML(text.t("backups.help"))}</p>
+          </div>
+          <a class="button primary with-icon" href="/api/backup" download>${icons.download()}<span>${escapeHTML(text.t("backups.download"))}</span></a>
+        </div>
+        <div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("backups.restore"))}</h4>
+            <p>${escapeHTML(text.t("backups.restoreHelp"))}</p>
+            <p class="settings-danger">${escapeHTML(text.t("backups.restoreWarning"))}</p>
+          </div>
+          <div>
+            <input type="file" accept=".db,application/octet-stream" id="restore-file" hidden />
+            ${actionButton("upload", text.t("backups.chooseFile"), "data-pick-restore", "ghost")}
+          </div>
+        </div>
+        <p class="restore-note" hidden></p>`,
+        { lead: text.t("backups.lead") },
+      )}
+    </div>`;
 }
 
 /** What is running, where it came from, and whether there is more of it. */

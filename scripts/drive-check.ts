@@ -316,7 +316,8 @@ async function main() {
     f.querySelector('[name=slug]').value = "codigosh";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await new Promise(r => setTimeout(r, 1100));
-    return [...document.querySelectorAll(".bento-card h3")].map(e => e.textContent.trim());
+    // A row per organisation, as Lastboard lists its users.
+    return [...document.querySelectorAll(".settings-list .si-name")].map(e => e.textContent.trim());
   `);
   check(
     "an organisation is added from a modal, not from a form left on the page",
@@ -333,7 +334,7 @@ async function main() {
     f.querySelector('[name=slug]').value = "lastboard";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await new Promise(r => setTimeout(r, 1100));
-    return [...document.querySelectorAll(".repositories h3")].map(e => e.textContent.trim());
+    return [...document.querySelectorAll(".repositories .si-name")].map(e => e.textContent.trim());
   `);
   check(
     "a repository is added the same way",
@@ -883,6 +884,46 @@ async function main() {
     "on a phone the panel's menu is one strip across the top, every link on the one line",
     franja.enlaces >= 8 && franja.alturas <= 4 && franja.franja < 80 && franja.salirEnUnaLinea === true,
     JSON.stringify(franja),
+  );
+
+  // 11d. The panel wears Lastboard's settings recipe on every screen, measured
+  //      on the page rather than read from the stylesheet: the button that
+  //      commits is outlined, not filled; a card's name is 13px capitals; and
+  //      no card carries an icon of its own. A panel restyled in pieces of its
+  //      own read as a different product, and nothing but a screenshot said so.
+  const receta: string[] = [];
+  let piezas = 0;
+  for (const ruta of ["/panel", "/panel/organizations", "/panel/codigosh", "/panel/people",
+    "/panel/backups", "/panel/account", "/panel/appearance", "/panel/personalization"]) {
+    await goTo(ruta, ".admin-main > *");
+    await sleep(250);
+    const r = await evaluate(`
+      const fallos = [];
+      let n = 0;
+      for (const b of document.querySelectorAll(".admin-main .button.primary")) {
+        if (b.closest(".wizard, dialog")) continue;
+        n++;
+        const c = getComputedStyle(b);
+        if (c.backgroundImage !== "none" || !/rgba\\(0, 0, 0, 0\\)|transparent/.test(c.backgroundColor) || c.borderTopWidth !== "2px" || c.textTransform !== "uppercase")
+          fallos.push("button " + b.textContent.trim().slice(0, 20) + ": " + c.backgroundColor + " " + c.borderTopWidth);
+      }
+      for (const t of document.querySelectorAll(".admin-main .card-top h3, .admin-main .bento-card .card-head h3, .admin-main .dash-card > h3")) {
+        n++;
+        const c = getComputedStyle(t);
+        if (c.fontSize !== "13px" || c.textTransform !== "uppercase") fallos.push("title " + t.textContent.trim().slice(0, 20) + ": " + c.fontSize);
+      }
+      for (const i of document.querySelectorAll(".admin-main .bento-card .card-head > .icon")) {
+        if (i.getBoundingClientRect().width > 0) fallos.push("card icon shown");
+      }
+      return { n, fallos };
+    `);
+    piezas += r.n;
+    for (const f of r.fallos) receta.push(`${ruta}: ${f}`);
+  }
+  check(
+    "every panel screen wears Lastboard's settings recipe: outlined buttons, quiet 13px titles, no card icons",
+    piezas > 15 && receta.length === 0,
+    JSON.stringify({ piezas, receta: receta.slice(0, 6) }),
   );
 
   const langPicker = await evaluate(`return !!document.querySelector("body > nav select");`);
