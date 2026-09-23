@@ -2519,6 +2519,24 @@ async function main() {
         // Where the header actually sits inside the module, not which class it
         // carries: a class says what was asked for, a box says what happened.
         mitad: head ? (head.getBoundingClientRect().top - cb.top) > cb.height / 2 : null,
+        // And when the name IS the pill, whether it is whole.
+        //
+        // This is the most fragile piece of the system, because it lives half
+        // outside its own box: it has been cut in two twice, once by
+        // specificity and once by the tile clipping. A pill two pixels short
+        // looks exactly like one that is fine, so it is measured rather than
+        // looked at — the clearance to the module's edge, which has to be
+        // NEGATIVE because the whole point is that it sits on the line.
+        montada: (() => {
+          const pill = cell.querySelector(".section-legend");
+          if (!pill) return null;
+          const pb = pill.getBoundingClientRect();
+          return {
+            holgura: Math.round(pb.top - cb.top),
+            alto: Math.round(pb.height),
+            recorta: getComputedStyle(cell).overflow,
+          };
+        })(),
       };
     };
 
@@ -2541,6 +2559,18 @@ async function main() {
     return { arriba: leer(), abajo: await poner("bottom"),
              enPildora: await poner("pill"), sinNombre: await poner("off") };
   `);
+  check(
+    "and a name worn on the border is whole, not cut in half by its own module",
+    donde.enPildora.montada !== null &&
+      // Above the line by roughly half of itself, which is what "on the
+      // border" means. Cut off would read as nought or worse.
+      donde.enPildora.montada.holgura < 0 &&
+      donde.enPildora.montada.alto > 8 &&
+      // And the module lets it out, which is the one exception to a tile that
+      // clips everything.
+      donde.enPildora.montada.recorta === "visible",
+    JSON.stringify(donde.enPildora.montada),
+  );
   check(
     "a module's name goes where the operator puts it, in four places",
     donde.arriba.cabecera === true && donde.arriba.pildora === false && donde.arriba.mitad === false &&
