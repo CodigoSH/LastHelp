@@ -8,3 +8,4 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+overview.secActivity

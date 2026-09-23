@@ -820,14 +820,14 @@ async function main() {
   // 11b. About, which is the page somebody keeping a server running opens:
   //      the machine's health, each fact a number, and how full the disk is
   //      as a bar that is an attribute rather than a style.
-  await goTo("/panel/about", ".about-stat");
+  await goTo("/panel/about", ".metric");
   const about = await evaluate(`
-    const tiles = [...document.querySelectorAll(".about-stat")];
+    const tiles = [...document.querySelectorAll(".metric")];
     const meter = document.querySelector(".about-meter");
     const r = meter?.getBoundingClientRect();
     return {
       tiles: tiles.length,
-      values: tiles.map(t => t.querySelector(".about-stat-value")?.textContent?.trim() ?? ""),
+      values: tiles.map(t => t.querySelector(".metric-value")?.textContent?.trim() ?? ""),
       meter: meter ? { value: meter.value, max: meter.max, ancho: Math.round(r.width), alto: Math.round(r.height) } : null,
       links: [...document.querySelectorAll(".about-links a")].map(a => a.getAttribute("href")),
       // Under the version, nothing about the build: the platform and the
@@ -3298,9 +3298,23 @@ async function main() {
   // pinning the order the cards happen to be in.
   const tiles = await evaluate(`
     const cards = [...document.querySelectorAll('.dash-card:has(.stat)')];
+    const dentro = (el, box) => el.left >= box.left - 1 && el.right <= box.right + 1;
     return {
       stats: cards.length,
       links: cards.map(c => c.querySelector("a.stat")?.getAttribute("href") ?? ""),
+      // Each tile's label is whole and nothing sits on it. In a tile a sixth
+      // of the window wide, "Organisations" was cut short and the arrow sat
+      // on "Published".
+      tapadas: cards.filter(c => {
+        const box = c.getBoundingClientRect();
+        const label = c.querySelector(".metric-label")?.getBoundingClientRect();
+        const go = c.querySelector(".stat-go")?.getBoundingClientRect();
+        if (!label) return true;
+        const pisa = go && !(go.bottom <= label.top || go.top >= label.bottom ||
+          go.right <= label.left || go.left >= label.right);
+        const cortada = c.querySelector(".metric-label").scrollWidth > c.querySelector(".metric-label").clientWidth + 1;
+        return !dentro(label, box) || pisa || cortada;
+      }).map(c => c.dataset.card),
     };
   `);
   check(
@@ -3309,6 +3323,11 @@ async function main() {
       tiles.links.every((href: string) => href.length > 0) &&
       tiles.links.filter((href: string) => href.startsWith("/panel/reports")).length >= 2,
     JSON.stringify(tiles.links),
+  );
+  check(
+    "and every number's label is whole, with nothing sitting on it",
+    tiles.tapadas.length === 0,
+    JSON.stringify(tiles.tapadas),
   );
 
   // 11f. The listing itself: everything this account may triage, wherever it

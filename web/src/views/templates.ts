@@ -2942,19 +2942,41 @@ function briefRow(b: Brief, text: Text, showVotes = false): string {
 export function overviewScreen(data: OverviewData, text: Text): string {
   const number = (value: number) => escapeHTML(text.number(value));
 
+  // A number, in the panel's metric tile — the same one About uses for the
+  // server's health: what it is in a small-capitals label beside an accent
+  // tile, and the number at the size of a number. Each is a way into the
+  // listing it counts.
   const stat = (id: string, value: number, label: string, icon: string, href?: string) => {
-    const inner = `<span class="value">${number(value)}</span>
-      <span class="label">${icon}${escapeHTML(label)}</span>`;
+    // In a tile a sixth of the window wide, the icon, the label and the arrow
+    // do not fit on one line — "Organisations" was cut and the arrow sat on
+    // "Published". So the icon and the arrow share the top, the number is
+    // under them, and the label is at the foot, where it may take two lines.
+    const go = href ? `<span class="stat-go" aria-hidden="true">${icons.chevron(14)}</span>` : "";
+    const inner = `<span class="metric-head"><span class="metric-icon">${icon}</span>${go}</span>
+      <span class="metric-value">${number(value)}</span>
+      <span class="metric-label">${escapeHTML(label)}</span>`;
     return card(
       id,
       href
-        ? `<a class="stat" href="${escapeAttr(href)}">${inner}<span class="stat-go" aria-hidden="true">${icons.chevron(14)}</span></a>`
-        : `<div class="stat">${inner}</div>`,
+        ? `<a class="stat metric" href="${escapeAttr(href)}">${inner}</a>`
+        : `<div class="stat metric">${inner}</div>`,
       "narrow",
     );
   };
 
-  const bars = (id: string, title: string, counts: Record<string, number>, label: (key: string) => string) => {
+  // Every card is headed the same way as a metric: its icon in the accent tile
+  // and its name in small capitals, so the page reads as one set of parts.
+  const head = (icon: string, title: string, extra = "") =>
+    `<h3 class="card-head"><span class="metric-icon">${icon}</span>
+       <span class="metric-label">${escapeHTML(title)}</span>${extra}</h3>`;
+
+  const bars = (
+    id: string,
+    icon: string,
+    title: string,
+    counts: Record<string, number>,
+    label: (key: string) => string,
+  ) => {
     const entries = Object.entries(counts).filter(([, n]) => n > 0);
     const body =
       entries.length === 0
@@ -2970,8 +2992,13 @@ export function overviewScreen(data: OverviewData, text: Text): string {
               </div>`;
             })
             .join("")}</div>`;
-    return card(id, `<h3>${escapeHTML(title)}</h3>${body}`, "wide");
+    return card(id, `${head(icon, title)}${body}`, "wide");
   };
+
+  function section(title: string): string {
+    return `<li class="dash-sec"><div class="sec-head"><span class="sec-pill">${escapeHTML(title)}</span>
+      <span class="sec-rule"></span></div></li>`;
+  }
 
   function card(id: string, body: string, size: string): string {
     return `<li class="dash-card ${size}" data-card="${escapeAttr(id)}">${body}</li>`;
@@ -2986,8 +3013,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
   // box — the shape of "nothing yet" is still the shape of the chart.
   const activity = card(
     "activity",
-    `<h3>${escapeHTML(text.t("overview.activity"))}
-       <span class="count-chip">${number(arrived)}</span></h3>
+    `${head(icons.clock(16), text.t("overview.activity"), `<span class="count-chip">${number(arrived)}</span>`)}
      <div class="chart-wrap">
        ${areaChart(
          series.map((day) => day.reports),
@@ -3009,7 +3035,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
 
   const kinds = card(
     "kinds",
-    `<h3>${escapeHTML(text.t("overview.byKind"))}</h3>
+    `${head(icons.overview(16), text.t("overview.byKind"))}
      <div class="donut-row">
        ${donut(
          [
@@ -3028,10 +3054,10 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     "wide",
   );
 
-  const list = (id: string, title: string, rows: Brief[], votes: boolean) =>
+  const list = (id: string, icon: string, title: string, rows: Brief[], votes: boolean) =>
     card(
       id,
-      `<h3>${escapeHTML(title)}</h3>
+      `${head(icon, title)}
        ${
          rows.length === 0
            ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
@@ -3045,8 +3071,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
   // thing that is waiting rather than being the third grey number in a row.
   const boards = card(
     "boards",
-    `<h3>${escapeHTML(text.t("portal.boards"))}
-       <span class="count-chip">${number(data.repositories)}</span></h3>
+    `${head(icons.repository(16), text.t("portal.boards"), `<span class="count-chip">${number(data.repositories)}</span>`)}
      ${
        (data.boards ?? []).length === 0
          ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
@@ -3083,10 +3108,10 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     people: stat("people", data.people, text.t("shell.people"), icons.people(), "/panel/people"),
     activity,
     kinds,
-    statuses: bars("statuses", text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`)),
-    moderation: bars("moderation", text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`)),
-    top: list("top", text.t("board.sortVotes"), data.top ?? [], true),
-    recent: list("recent", text.t("overview.recent"), data.recent ?? [], false),
+    statuses: bars("statuses", icons.queue(16), text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`)),
+    moderation: bars("moderation", icons.check(16), text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`)),
+    top: list("top", icons.idea(16), text.t("board.sortVotes"), data.top ?? [], true),
+    recent: list("recent", icons.bug(16), text.t("overview.recent"), data.recent ?? [], false),
     boards,
   };
 
@@ -3096,7 +3121,17 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     ${total === 0 ? `<p class="lead">${escapeHTML(text.t("overview.emptyLead"))}</p>` : ""}
 
     <ul class="dashboard">
-      ${overviewCards.map((name) => all[name]).join("")}
+      ${overviewCards
+        .map((name) =>
+          // Two sections under the numbers, named with the section head About
+          // uses: what is happening, and the reports themselves.
+          name === "activity"
+            ? section(text.t("overview.secActivity")) + all[name]
+            : name === "top"
+              ? section(text.t("overview.reports")) + all[name]
+              : all[name],
+        )
+        .join("")}
     </ul>`;
 }
 
@@ -3806,12 +3841,12 @@ export interface ServerFacts {
  */
 export function aboutScreen(facts: ServerFacts, text: Text): string {
   const tile = (icon: string, label: string, value: string, sub = "", extra = "") =>
-    `<li class="about-stat">
-      <div class="about-stat-head"><span class="about-stat-icon">${icon}</span>
-        <span class="about-stat-label">${escapeHTML(label)}</span></div>
-      <strong class="about-stat-value">${escapeHTML(value)}</strong>
+    `<li class="metric">
+      <div class="metric-head"><span class="metric-icon">${icon}</span>
+        <span class="metric-label">${escapeHTML(label)}</span></div>
+      <strong class="metric-value">${escapeHTML(value)}</strong>
       ${extra}
-      ${sub ? `<span class="about-stat-sub">${escapeHTML(sub)}</span>` : ""}
+      ${sub ? `<span class="metric-sub">${escapeHTML(sub)}</span>` : ""}
     </li>`;
 
   const stats: string[] = [];
@@ -3883,8 +3918,8 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
           ${icons.update(15)}<span>${escapeHTML(text.t("update.check"))}</span></button>
       </section>
 
-      <section class="about-row">
-        <div class="about-row-text">
+      <section class="setting-row">
+        <div class="setting-text">
           <h3>${escapeHTML(text.t("update.beta"))}</h3>
           <p>${escapeHTML(text.t("update.channelHelp"))}</p>
         </div>
@@ -3898,9 +3933,9 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
       ${
         stats.length === 0
           ? ""
-          : `<div class="about-sec"><span class="about-pill">${escapeHTML(text.t("about.server"))}</span>
-               <span class="about-rule"></span></div>
-             <ul class="about-stats">${stats.join("")}</ul>`
+          : `<div class="sec-head"><span class="sec-pill">${escapeHTML(text.t("about.server"))}</span>
+               <span class="sec-rule"></span></div>
+             <ul class="metrics">${stats.join("")}</ul>`
       }
 
       <footer class="about-foot">
