@@ -161,8 +161,38 @@ function renderNav(): void {
        </button>`
     : "";
 
+  /**
+   * What is waiting, and the way into it.
+   *
+   * Shown to whoever may triage something — a collaborator on a repository or
+   * the owner of an organisation — and NOT to an administrator as such: the
+   * person who moderates daily is usually the first and not the second, and
+   * hanging this off `admin` would hide it from exactly them.
+   *
+   * Never hidden when the queue is empty. It disappears in the dashboard in
+   * this house when the FEATURE is off, which is a decision of installation; a
+   * control that comes and goes with the work is one nobody learns is there,
+   * and it takes away the only way to see that you are finished.
+   *
+   * The count is the server's, already narrowed to the boards this account may
+   * open — the page has no way to know which those are, and a number it worked
+   * out itself would be a second opinion on a permission.
+   */
+  const canTriage = (me?.memberships?.length ?? 0) > 0;
+  const waiting = (me?.pending?.reports ?? 0) + (me?.pending?.messages ?? 0);
+  const inReview = location.pathname === "/review";
+  const review =
+    me && canTriage
+      ? `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}"
+             href="/review" data-review
+             title="${escapeAttr(i18n.t("review.title"))}"
+             aria-label="${escapeAttr(i18n.t("review.title"))}">
+           ${icons.queue(16)}${waiting > 0 ? `<b>${escapeHTML(text.number(waiting))}</b>` : ""}
+         </a>`
+      : "";
+
   const account = me
-    ? `${compose}${panel}`
+    ? `${compose}${review}${panel}`
     : // Not on the sign-in page itself: a link to where you already are is the
       // third thing on that screen saying the same word.
       location.pathname === "/sign-in"
@@ -1900,7 +1930,11 @@ async function render(): Promise<void> {
     if (path === "/setup/instance") return showSetupStep(3);
     if (path === "/setup/done") return showSetupDone();
     if (path === "/panel") return await showPanel();
-    if (path === "/panel/reports") return await showReports();
+    if (path === "/review") return await showReview();
+    // Where the queue used to live. Kept as a door rather than a 404: it is in
+    // people's history and in links they sent each other, and the archive it
+    // used to hold is a mode of the screen that replaced it.
+    if (path === "/panel/reports") return go("/review" + location.search);
     if (path === "/panel/updates") return await showUpdates();
     if (path === "/panel/account") return await showProfile();
     if (path === "/panel/appearance") return await showAppearance();
@@ -2744,91 +2778,213 @@ async function showPanel(): Promise<void> {
  * the screen redraws from it, so there is one source of truth for what is on
  * screen instead of two that drift.
  */
-async function showReports(): Promise<void> {
+/**
+ * Reviewing what is waiting.
+ *
+ * A place, not a layer: it has its own address, so a filtered view can be sent
+ * to somebody and a reload lands back on it. Lastboard's equivalent is an
+ * overlay because that product has no router; copying the overlay would be
+ * importing a limitation rather than the design.
+ */
+async function showReview(): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
 
   const query = new URLSearchParams(location.search);
-  const filters: views.ReportFilters = {
-    moderation: query.get("moderation") ?? "",
-    kind: query.get("kind") ?? "",
-    status: query.get("status") ?? "",
-    board: query.get("board") ?? "",
-    sort: query.get("sort") ?? "",
-    q: query.get("q") ?? "",
-  };
+  const mode = query.get("mode") === "all" ? "all" : "pending";
 
   const data = await api
-    .get<views.ReportsData>(`/api/reports?${new URLSearchParams({ ...filters }).toString()}`)
+    .get<views.ReportsData>(
+      `/api/reports?${new URLSearchParams(mode === "pending" ? { moderation: "pending" } : {}).toString()}`,
+    )
     .catch(() => null);
   if (!data) {
-    await showInShell(views.emptyState(i18n.t("error.forbidden"), icons.warning(28)), "/panel/reports");
+    show(views.failureScreen(i18n.t("error.forbidden"), text));
     return;
   }
 
-  // The messages waiting, across every board this account may triage. Failing
-  // softly: the reports are what somebody came to this screen for, and a queue
-  // that cannot be read is not a reason to show them nothing.
-  //
-  // Only on the unfiltered view. The filters on this screen are about reports —
-  // kind, status, moderation — and none of them mean anything to a message, so
-  // showing the same messages under every combination would make them look like
-  // they answer a question they do not.
-  const untouched = !filters.moderation && !filters.kind && !filters.status && !filters.board && !filters.q;
-  if (untouched) {
+  // Messages only in the pending mode, and that is not the old screen's rule
+  // in disguise: there they vanished when an unrelated report filter moved,
+  // which made a whole queue look like it answered a question it did not.
+  // Here the two modes ARE the question — what is waiting, or everything ever
+  // — and a message that has been dealt with is not waiting.
+  if (mode === "pending") {
     const waiting = await api
       .get<{ comments: views.WaitingComment[] }>("/api/panel/comments")
       .catch(() => ({ comments: [] as views.WaitingComment[] }));
     data.comments = waiting.comments ?? [];
   }
 
-  await showInShell(views.reportsScreen(data, filters, text), "/panel/reports");
-  bindCommentDecisions();
+  const rows = data.items ?? [];
+  let chosen = query.get("at") ?? rows[0]?.public_id ?? "";
 
-  // One place that turns "what is on screen" into an address, so a control
-  // added later cannot forget half of it.
-  const narrow = (change: Partial<views.ReportFilters>) => {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries({ ...filters, ...change })) {
-      if (value) next.set(key, String(value));
+  show(views.reviewScreen(data, mode, chosen, text));
+  renderNav();
+  await wireReview(data, mode, () => chosen, (id) => (chosen = id));
+}
+
+/**
+ * The two panes, the keyboard, and what a decision does.
+ *
+ * A decision removes the row and moves to the next one rather than redrawing
+ * the screen: the list is what somebody is working down, and rebuilding it
+ * puts them back at the top after every single item.
+ */
+async function wireReview(
+  data: views.ReportsData,
+  mode: "pending" | "all",
+  current: () => string,
+  choose: (id: string) => void,
+): Promise<void> {
+  const pane = root?.querySelector<HTMLElement>("[data-detail]");
+  const rowOf = (id: string) => data.items.find((r) => r.public_id === id) ?? null;
+  // A message is selected by "c:<id>", which is not a report's public id: the
+  // list holds both kinds and the pane has to draw whichever was chosen.
+  const commentOf = (id: string) =>
+    id.startsWith("c:")
+      ? ((data.comments ?? []).find((c) => String(c.id) === id.slice(2)) ?? null)
+      : null;
+  const fields = new Map<string, ReportField[]>();
+
+  const draw = async (id: string) => {
+    if (!pane) return;
+    const note = commentOf(id);
+    if (note) {
+      pane.innerHTML = views.reviewDetail(null, [], text, note);
+      return;
     }
-    const search = next.toString();
-    go(`/panel/reports${search ? `?${search}` : ""}`);
+    const row = rowOf(id);
+    if (row && !fields.has(id)) {
+      const full = await api
+        .get<{ fields?: ReportField[] }>(`/api/items/${encodeURIComponent(id)}`)
+        .catch(() => ({ fields: [] as ReportField[] }));
+      fields.set(id, full.fields ?? []);
+    }
+    pane.innerHTML = views.reviewDetail(row, fields.get(id) ?? [], text);
   };
 
-  for (const attr of ["moderation", "kind"] as const) {
-    root?.querySelectorAll<HTMLButtonElement>(`[data-${attr}]`).forEach((button) =>
-      button.addEventListener("click", () => narrow({ [attr]: button.dataset[attr] ?? "" })),
-    );
+  const select = (id: string) => {
+    choose(id);
+    for (const el of root?.querySelectorAll<HTMLElement>("[data-pick]") ?? []) {
+      el.classList.toggle("on", el.dataset.pick === id);
+    }
+    root?.querySelector<HTMLElement>(`[data-pick="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest" });
+    // The address follows the selection, so what somebody is looking at is
+    // what they can send.
+    const next = new URLSearchParams(location.search);
+    next.set("at", id);
+    history.replaceState({}, "", `/review?${next.toString()}`);
+    void draw(id);
+  };
+
+  for (const el of root?.querySelectorAll<HTMLElement>("[data-pick]") ?? []) {
+    el.addEventListener("click", () => select(el.dataset.pick ?? ""));
   }
-  root?.querySelector<HTMLSelectElement>("[data-status]")?.addEventListener("change", (event) =>
-    narrow({ status: (event.currentTarget as HTMLSelectElement).value }),
-  );
-  root?.querySelector<HTMLSelectElement>("[data-board]")?.addEventListener("change", (event) =>
-    narrow({ board: (event.currentTarget as HTMLSelectElement).value }),
-  );
+  for (const el of root?.querySelectorAll<HTMLElement>("[data-mode]") ?? []) {
+    el.addEventListener("click", () => go(`/review?mode=${el.dataset.mode}`));
+  }
+  root?.querySelector<HTMLElement>("[data-leave]")?.addEventListener("click", () => go("/panel"));
 
-  const search = root?.querySelector<HTMLInputElement>("[data-q]");
-  search?.addEventListener(
-    "input",
-    debounce(() => narrow({ q: search.value }), 350),
-  );
+  if (current()) void draw(current());
 
-  // Triage from the list. The screen is redrawn rather than the row removed:
-  // under "everything" a published report stays, wearing its new state, and a
-  // row that vanished would read as a report that was deleted.
-  root?.querySelectorAll<HTMLButtonElement>(".queue-row [data-act]").forEach((button) =>
-    button.addEventListener("click", async () => {
-      const id = button.closest<HTMLLIElement>("li[data-id]")?.dataset.id;
-      if (!id) return;
-      try {
-        await api.post(`/api/items/${encodeURIComponent(id)}/moderation`, { state: button.dataset.act });
-        await render();
-      } catch (err) {
-        report(err);
-      }
-    }),
-  );
+  const order = () => [...(root?.querySelectorAll<HTMLElement>("[data-pick]") ?? [])];
+  const step = (by: number) => {
+    const all = order();
+    const at = all.findIndex((el) => el.dataset.pick === current());
+    const next = all[Math.min(all.length - 1, Math.max(0, at + by))];
+    if (next) select(next.dataset.pick ?? "");
+  };
+
+  const decide = async (state: string) => {
+    const id = current();
+    if (!id) return;
+    const all = order();
+    const at = all.findIndex((el) => el.dataset.pick === id);
+    const after = all[at + 1] ?? all[at - 1];
+    try {
+      const comment = id.startsWith("c:");
+      await api.post(
+        comment
+          ? `/api/comments/${encodeURIComponent(id.slice(2))}/moderation`
+          : `/api/items/${encodeURIComponent(id)}/moderation`,
+        { state: comment && state === "spam" ? "rejected" : state },
+      );
+    } catch (err) {
+      report(err);
+      return;
+    }
+    // Gone from the list and from the data behind it, so stepping and counting
+    // agree with what is on the screen.
+    all[at]?.remove();
+    data.items = data.items.filter((r) => r.public_id !== id);
+    if (id.startsWith("c:")) {
+      data.comments = (data.comments ?? []).filter((c) => String(c.id) !== id.slice(2));
+    }
+    if (after) select(after.dataset.pick ?? "");
+    else if (pane) pane.innerHTML = views.reviewDetail(null, [], text);
+    renderNav();
+  };
+
+  for (const el of root?.querySelectorAll<HTMLButtonElement>("[data-act]") ?? []) {
+    el.addEventListener("click", () => void decide(el.dataset.act ?? ""));
+  }
+  // Delegated, because the detail pane is rewritten on every selection and a
+  // listener bound to its buttons would die with them.
+  pane?.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-act]");
+    if (button) void decide(button.dataset.act ?? "");
+  });
+
+  reviewKeys?.();
+  reviewKeys = keyboardFor({ step, decide, mode });
+}
+
+/** Set while the review screen is up, so its keys are removed when it is not. */
+let reviewKeys: (() => void) | null = null;
+
+function keyboardFor(on: {
+  step: (by: number) => void;
+  decide: (state: string) => Promise<void>;
+  mode: string;
+}): () => void {
+  const handler = (event: KeyboardEvent) => {
+    // Never while somebody is typing: a queue with single-letter shortcuts and
+    // a search box is a queue that approves things while you look for one.
+    const target = event.target as HTMLElement | null;
+    if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+    if (target?.isContentEditable) return;
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    switch (event.key) {
+      case "ArrowDown":
+      case "j":
+        event.preventDefault();
+        on.step(1);
+        break;
+      case "ArrowUp":
+      case "k":
+        event.preventDefault();
+        on.step(-1);
+        break;
+      case "p":
+      case "P":
+        void on.decide("published");
+        break;
+      case "r":
+      case "R":
+        void on.decide("rejected");
+        break;
+      case "s":
+      case "S":
+        void on.decide("spam");
+        break;
+      case "Escape":
+        go("/panel");
+        break;
+    }
+  };
+  window.addEventListener("keydown", handler);
+  return () => window.removeEventListener("keydown", handler);
 }
 
 /** The organisations, as cards, with the way to add one. */

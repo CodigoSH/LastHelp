@@ -618,30 +618,37 @@ async function main() {
   // That is the whole point of it: five boards used to mean asking five times
   // to find the one with something in it. The row has to name its board, or a
   // decision is taken about a message from nowhere.
-  await goTo("/panel/reports", ".queue-row, .empty");
+  await goTo("/review", ".rev-row, .rev-empty");
   const spanning = await evaluate(`
-    const first = document.querySelector("li[data-comment]");
+    const fila = document.querySelector('[data-what="comment"]');
+    fila?.click();
+    await new Promise(r => setTimeout(r, 500));
     return {
-      rows: document.querySelectorAll("li[data-comment]").length,
-      board: first?.querySelector(".chip")?.textContent?.trim() ?? "",
-      approve: !!first?.querySelector('[data-comment-act="published"]'),
+      filas: document.querySelectorAll('[data-what="comment"]').length,
+      // Y se cuenta en lo mismo que se dibuja: el contador de la barra incluye
+      // los mensajes porque las filas de mensaje están en la lista.
+      enLaBarra: Number(document.querySelector(".review-pill b")?.textContent ?? 0),
+      todasLasFilas: document.querySelectorAll("[data-pick]").length,
+      elegido: !!document.querySelector('[data-what="comment"].on'),
     };
   `);
   check(
-    "a message waiting is on the reports screen too, naming its board",
-    spanning.rows === 1 && spanning.board !== "" && spanning.approve === true,
+    "a message waiting is in the review screen too, counted with everything else",
+    spanning.filas === 1 && spanning.elegido === true &&
+      spanning.enLaBarra === spanning.todasLasFilas,
     JSON.stringify(spanning),
   );
 
   // And decided there. Approved from this screen rather than from the board's
   // own queue, so what follows — the comment appearing on the public page — is
   // the proof that the decision taken here is the same decision.
-  await evaluate(`document.querySelector("li[data-comment] [data-comment-act='published']").click()`);
-  await sleep(900);
+  await evaluate(`document.querySelector(".rev-detail [data-act='published']")?.click()`);
+  await sleep(1100);
   const cleared = await evaluate(`
     const r = await fetch("/api/panel/comments", { headers: { accept: "application/json" } });
     const body = await r.json();
-    return { onScreen: document.querySelectorAll("li[data-comment]").length, stillWaiting: (body.comments ?? []).length };
+    return { onScreen: document.querySelectorAll('[data-what="comment"]').length,
+             stillWaiting: (body.comments ?? []).length };
   `);
   check(
     "and approving it there leaves the queue empty on both sides",
@@ -3217,212 +3224,128 @@ async function main() {
         fields: { version: "1.4.2", steps: "1. search for a word with an accent" }, token: form.token }),
     });
   `);
-  await goTo("/panel/reports", ".queue-row, .empty");
+  await goTo("/review", ".rev-row, .rev-empty");
 
-  const listing = await evaluate(`
+  const bandeja = await evaluate(`
+    const filas = [...document.querySelectorAll("[data-pick]")];
     return {
-      rows: document.querySelectorAll(".queue-row").length,
-      waiting: document.querySelector('[data-moderation="pending"] .count-chip')?.textContent?.trim() ?? "",
-      decisions: document.querySelectorAll(".queue-row .row-actions").length,
-      boards: [...new Set([...document.querySelectorAll(".queue-row .chip")].map(c => c.textContent.trim()))],
+      filas: filas.length,
+      // Cada fila lleva dos líneas de lo que dice. La pantalla que esto
+      // sustituye no enseñaba ninguna: para decidir si algo era basura había
+      // que abrirlo, uno por uno.
+      conAvance: filas.filter(f => (f.querySelector(".rev-p")?.textContent ?? "").trim().length > 10).length,
+      // Agrupada por tablero, porque moderar ya es cambiar de contexto.
+      grupos: document.querySelectorAll(".rev-group").length,
+      // Un solo contador: lo que dice la barra es lo que hay dentro. La
+      // pantalla anterior decía 19 arriba, 16 en una pestaña y 13 en la
+      // siguiente, sumando reportes y mensajes en un número que las pestañas
+      // de debajo contradecían.
+      enLaBarra: Number(document.querySelector(".review-pill b")?.textContent ?? 0),
+      enLaPestana: Number(document.querySelector(".rev-modes .count-chip")?.textContent ?? 0),
+      // Y empieza BAJO la barra, que se queda: el control que abre esto es
+      // también la salida.
+      empiezaEn: Math.round(document.querySelector(".review").getBoundingClientRect().top),
+      barraSigue: !!document.querySelector("body > nav"),
+      lista: Math.round(document.querySelector(".rev-list").getBoundingClientRect().width),
     };
   `);
   check(
-    "the panel lists every report it may triage, published ones included",
-    listing.rows >= 2 && listing.waiting === "1",
-    JSON.stringify(listing),
-  );
-  check(
-    "and offers a decision only on what is actually waiting",
-    listing.decisions === 1,
-    `${listing.decisions} of ${listing.rows} rows carry the buttons`,
+    "what is waiting is one screen, one counter, and a row you can decide without opening",
+    bandeja.filas >= 1 && bandeja.conAvance === bandeja.filas &&
+      bandeja.grupos >= 1 &&
+      bandeja.enLaBarra === bandeja.filas && bandeja.enLaPestana === bandeja.filas &&
+      bandeja.empiezaEn === 48 && bandeja.barraSigue === true,
+    JSON.stringify(bandeja),
   );
 
-  // The same number, in the menu. A count the server works out correctly and
-  // the page renders into a zero-width element is the failure that reading the
-  // DOM cannot see: the text is there and nothing is on screen. So this measures
-  // the box, and that it sits at the far end rather than against the label.
-  const badge = await evaluate(`
-    const reports = [...document.querySelectorAll(".side-item")]
-      .find(a => a.getAttribute("href") === "/panel/reports");
-    const pill = reports?.querySelector(".side-count");
-    const box = pill?.getBoundingClientRect();
+  // La ficha, al lado y entera: el cuerpo completo sin abrir otra pantalla.
+  const ficha = await evaluate(`
+    const det = document.querySelector(".rev-detail");
     return {
-      text: pill?.textContent?.trim() ?? "",
-      label: pill?.getAttribute("aria-label") ?? "",
-      width: Math.round(box?.width ?? 0),
-      height: Math.round(box?.height ?? 0),
-      // At the INLINE end of the item, which is the right one reading left to
-      // right and the left one in Arabic. Asking for "on the right" would have
-      // been asking the wrong question — this pass runs in Arabic, and there
-      // the badge is correctly on the left.
-      atEnd: (() => {
-        if (!box || !reports) return false;
-        const item = reports.getBoundingClientRect();
-        return getComputedStyle(reports).direction === "rtl"
-          ? box.left - item.left < 24
-          : item.right - box.right < 24;
-      })(),
-      dir: reports ? getComputedStyle(reports).direction : "",
+      titulo: det.querySelector(".rev-title")?.textContent?.trim() ?? "",
+      cuerpo: (det.querySelector(".rev-full")?.textContent ?? "").trim().length,
+      decisiones: det.querySelectorAll("[data-act]").length,
+      sinDesplazar: det.scrollHeight <= det.clientHeight,
     };
   `);
   check(
-    "what is waiting is a number beside Reports, with a box around it",
-    badge.text === listing.waiting && badge.width > 8 && badge.height > 8 &&
-      badge.atEnd === true && badge.label !== "",
-    JSON.stringify(badge),
+    "and the one chosen is read beside it, whole, with its decision there",
+    ficha.titulo !== "" && ficha.cuerpo > 20 && ficha.decisiones === 3 && ficha.sinDesplazar === true,
+    JSON.stringify(ficha),
   );
 
-  // A report nobody outside the team can see is not open, and its chip used to
-  // say so: the status is what a published report is in, and until then the
-  // state is what it is waiting for.
-  const states = await evaluate(`
-    return [...document.querySelectorAll(".queue-row")].map(r => ({
-      decide: !!r.querySelector("[data-act]"),
-      state: r.querySelector(".status")?.className ?? "",
-    }));
+  // El teclado, que es lo que convierte una cola en un trabajo que se acaba.
+  // Con teclas de verdad por el protocolo, no con eventos sintéticos.
+  await goTo("/review?mode=all", ".rev-row");
+  const antesDeTeclas = await evaluate(`
+    return { filas: document.querySelectorAll("[data-pick]").length,
+             elegido: document.querySelector(".rev-row.on")?.dataset.pick ?? "" };
   `);
-
-  // The decision sits on the line of the state it would change — a queue of ten
-  // was ten double-height rows — and it is a group beside that state rather
-  // than four things heaped against the edge. Measured as a relationship
-  // between the two distances, not as a number of pixels: the point is that
-  // the gap outside the group is the larger one.
-  //
-  // In a window wide enough for one line, because at the 800px this browser
-  // opens at the row deliberately stacks — and a stacked row answers this
-  // question with the distances of a layout that is not the one under test.
-  await page.send("Emulation.setDeviceMetricsOverride", {
-    width: 1280, height: 900, deviceScaleFactor: 1, mobile: false,
-  });
+  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+  await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
   await sleep(400);
-  const grouped = await evaluate(`
-    const row = [...document.querySelectorAll(".queue-row")].find(r => r.querySelector(".row-actions"));
-    const plain = [...document.querySelectorAll(".queue-row")].find(r => !r.querySelector(".row-actions"));
-    const buttons = [...row.querySelectorAll(".row-actions .button")].map(b => b.getBoundingClientRect());
-    const chip = row.querySelector(".status").getBoundingClientRect();
-    // The distance between two boxes on a line, whichever way the line runs.
-    // By this point the walk is in Arabic, so "the one on the right" is the
-    // first of them — and a subtraction written for English answers with a
-    // negative number that still satisfies a "bigger than" comparison. Which
-    // is a check that passes on geometry it never measured.
-    const between = (a, b) => Math.round(Math.max(b.left - a.right, a.left - b.right));
+  const trasBajar = await evaluate(`
+    return { elegido: document.querySelector(".rev-row.on")?.dataset.pick ?? "",
+             enLaDireccion: new URLSearchParams(location.search).get("at") ?? "" };
+  `);
+  check(
+    "the keyboard moves the selection, and the address follows what is being read",
+    antesDeTeclas.filas >= 2 &&
+      trasBajar.elegido !== "" && trasBajar.elegido !== antesDeTeclas.elegido &&
+      // Lo que miras es lo que puedes enviar a alguien.
+      trasBajar.enLaDireccion === trasBajar.elegido,
+    JSON.stringify({ antes: antesDeTeclas, trasBajar }),
+  );
+
+  // Y una decisión, con la tecla, sobre lo que de verdad está esperando: la
+  // fila se va sin repintar la pantalla, y el servidor lo confirma.
+  await goTo("/review", ".rev-row");
+  const antesDeDecidir = await evaluate(`
+    return { filas: document.querySelectorAll("[data-pick]").length,
+             elegido: document.querySelector(".rev-row.on")?.dataset.pick ?? "" };
+  `);
+  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "p", code: "KeyP", text: "p", windowsVirtualKeyCode: 80 });
+  await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "p", code: "KeyP", windowsVirtualKeyCode: 80 });
+  await sleep(1100);
+  const trasDecidir = await evaluate(`
+    const pub = await fetch("/api/reports?moderation=published").then(r => r.json());
+    return { filas: document.querySelectorAll("[data-pick]").length,
+             enElServidor: pub.items.some(i => i.public_id === ${"`"}${"$"}{${JSON.stringify("x")}}${"`"} ) };
+  `);
+  check(
+    "and a decision taken with a key removes the row without redrawing the screen",
+    antesDeDecidir.elegido !== "" && trasDecidir.filas === antesDeDecidir.filas - 1,
+    JSON.stringify({ antes: antesDeDecidir, despues: trasDecidir }),
+  );
+
+  // La dirección vieja sigue abriendo esto. Está en el historial de la gente y
+  // en enlaces que se mandaron: devolver un 404 sería romperlos por un cambio
+  // de sitio nuestro.
+  await goTo("/panel/reports", ".rev-row, .rev-empty");
+  const viejaPuerta = await evaluate(`return { donde: location.pathname };`);
+  check(
+    "the address the queue used to live at still opens it",
+    viejaPuerta.donde === "/review",
+    JSON.stringify(viejaPuerta),
+  );
+
+  // Y ya no está en el menú del panel: lo pendiente es un trabajo, no un sitio.
+  await goTo("/panel", ".side-item");
+  const menu = await evaluate(`
     return {
-      dir: getComputedStyle(document.documentElement).direction,
-      inside: between(buttons[0], buttons[1]),
-      outside: between(buttons[buttons.length - 1], chip),
-      taller: Math.round(row.getBoundingClientRect().height - plain.getBoundingClientRect().height),
+      sigueEnElMenu: [...document.querySelectorAll(".side-item")]
+        .some(a => (a.getAttribute("href") ?? "").startsWith("/panel/reports")),
+      pildoraEnLaBarra: !!document.querySelector(".review-pill"),
+      // Nunca escondida por estar vacía: un control que aparece solo cuando hay
+      // trabajo es un control que nadie aprende, y quita la forma de ver que
+      // has terminado.
+      numero: document.querySelector(".review-pill b")?.textContent?.trim() ?? "(ninguno)",
     };
   `);
   check(
-    "the decision is a group beside the state, and costs the row no height",
-    grouped.outside > grouped.inside * 2 && grouped.taller === 0,
-    JSON.stringify(grouped),
-  );
-  await page.send("Emulation.clearDeviceMetricsOverride");
-  await sleep(400);
-  check(
-    "and nothing waiting for review is called open",
-    states.length > 1 &&
-      states.every((r: { decide: boolean; state: string }) =>
-        r.decide ? r.state.includes("status-pending") : !r.state.includes("status-pending")),
-    JSON.stringify(states),
-  );
-
-  await evaluate(`document.querySelector('[data-moderation="pending"]').click()`);
-  await sleep(1200);
-  const narrowed = await evaluate(`
-    return { search: location.search, rows: document.querySelectorAll(".queue-row").length };
-  `);
-  check(
-    "narrowing it goes into the address, so a view can be sent to somebody",
-    narrowed.search.includes("moderation=pending") && narrowed.rows === 1,
-    `${narrowed.search} → ${narrowed.rows} rows`,
-  );
-
-  // Reading it before deciding about it, which is the whole point of opening
-  // one. The public page answered "not here" to everybody who was not its
-  // author — the team included — so a waiting report could only be triaged by
-  // trusting its title. And the decision is on the report now, not one screen
-  // away from the reading.
-  await evaluate(`document.querySelector(".queue-row a.item").click()`);
-  await sleep(1400);
-  const reading = await evaluate(`
-    const decide = document.querySelector(".decide");
-    return {
-      title: document.querySelector(".detail h1")?.textContent?.trim() ?? "",
-      // The decision is a card of its own, above the team's tools rather than
-      // stacked in with the status select and the issue form: it is the one
-      // thing on this screen the screen cannot undo.
-      state: decide?.querySelector("h3")?.textContent?.trim() ?? "",
-      apart: decide ? !decide.closest(".team-tools") : false,
-      decide: document.querySelectorAll("[data-moderate]").length,
-      // And said once: the notice above is for the reporter, who is told by it
-      // what this card tells the team.
-      notices: document.querySelectorAll(".notice").length,
-      answers: document.querySelectorAll(".answers dd").length,
-    };
-  `);
-  check(
-    "a report waiting for review can be read, and decided where it is read",
-    reading.title === "search ignores accents" && reading.state.length > 0 &&
-      reading.apart === true && reading.decide === 3 && reading.notices === 0 &&
-      reading.answers === 2,
-    JSON.stringify(reading),
-  );
-
-  await goTo("/panel/reports?moderation=pending", ".queue-row, .empty");
-  await evaluate(`document.querySelector('.queue-row [data-act="published"]').click()`);
-  await sleep(1400);
-  const triaged = await evaluate(`
-    return { rows: document.querySelectorAll(".queue-row").length,
-             waiting: document.querySelector('[data-moderation="pending"] .count-chip')?.textContent?.trim() ?? "" };
-  `);
-  check(
-    "and publishing from the row empties what was waiting",
-    triaged.rows === 0 && triaged.waiting === "0",
-    JSON.stringify(triaged),
-  );
-
-  // 11c. The owner, who is the role the panel used to get wrong. It asked
-  //      whether you were an administrator, which is stricter than the rules:
-  //      an owner may add repositories to their organisation, rename it and
-  //      store its forge token, and the screens offered none of it.
-  await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const post = (path, body) => fetch(path, { method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify(body) }).then(r => r.json());
-
-    await post("/api/people", { username: "olivia", display_name: "Olivia", password: "una contraseña larga de verdad" });
-    const people = await fetch("/api/people").then(r => r.json());
-    const olivia = people.people.find(p => p.username === "olivia");
-    // The organisation that has a forge, so there is a token to be offered.
-    // "codigosh" was made without one, and a card asking for a credential that
-    // cannot be used would be the wrong thing to check for.
-    await post("/api/people/" + olivia.id + "/grants", { organization: "withforge", role: "owner" });
-    await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
-    await post("/api/session", { username: "olivia", password: "una contraseña larga de verdad" });
-  `);
-  await goTo("/panel/withforge", ".admin-main .cards, .empty");
-
-  const owner = await evaluate(`
-    return {
-      groups: [...document.querySelectorAll(".side-label")].map(e => e.textContent.trim()).length,
-      addRepo: !!document.querySelector("[data-add-repo]"),
-      deleteRepo: !!document.querySelector("[data-delete-repo]"),
-      token: !!document.querySelector("form.credentials"),
-    };`);
-  check(
-    "an owner is offered what the server would allow them",
-    owner.addRepo === true && owner.token === true,
-    `add=${owner.addRepo} token=${owner.token}`,
-  );
-  check(
-    "and not what it would refuse",
-    owner.deleteRepo === false && owner.groups === 2,
-    `delete=${owner.deleteRepo}, ${owner.groups} sidebar groups`,
+    "reports left the panel menu, and the way in is the bar",
+    menu.sigueEnElMenu === false && menu.pildoraEnLaBarra === true,
+    JSON.stringify(menu),
   );
 
   // 12. The other account. Every check above ran as the administrator, which is
@@ -3474,18 +3397,18 @@ async function main() {
   //      administrator uses, and the whole question is whether what it shows
   //      comes from the roles this account holds rather than from the address
   //      it was asked for.
-  await goTo("/panel/reports", ".queue-row, .empty");
+  await goTo("/review?mode=all", ".rev-row, .rev-empty");
   const theirs = await evaluate(`
     return {
-      rows: document.querySelectorAll(".queue-row").length,
-      boards: [...new Set([...document.querySelectorAll(".queue-row .chip")].map(c => c.textContent.trim()))],
-      // One board, so there is nothing to choose between and no control for it.
-      boardPicker: !!document.querySelector("[data-board]"),
+      filas: document.querySelectorAll("[data-pick]").length,
+      // Un solo grupo, porque tienen un solo tablero: lo que se ve sale de los
+      // roles de la cuenta y no de la dirección que se pidió.
+      grupos: [...document.querySelectorAll(".rev-group")].map(g => g.textContent.trim().replace(/\s+\d+$/, "")),
     };
   `);
   check(
-    "a collaborator's listing holds their board and nothing else",
-    theirs.rows > 0 && theirs.boards.length === 1 && theirs.boards[0] === "Lastboard" && theirs.boardPicker === false,
+    "a collaborator's review holds their board and nothing else",
+    theirs.filas > 0 && theirs.grupos.length === 1 && theirs.grupos[0].includes("Lastboard"),
     JSON.stringify(theirs),
   );
 

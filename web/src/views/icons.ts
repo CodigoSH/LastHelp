@@ -33,6 +33,9 @@ export const icons = {
   dots: dotsIcon,
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
   minus: (s?: number) => stroke(`<path d="M5 12h14"/>`, s),
+  /** A message on a report: the speech bubble the product already draws. */
+  comment: (s?: number) =>
+    stroke(`<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`, s),
 
   undo: (s?: number) => stroke(`<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>`, s),
   redo: (s?: number) => stroke(`<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/>`, s),

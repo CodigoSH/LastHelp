@@ -2798,16 +2798,11 @@ export function adminShell(spec: ShellSpec, text: Text): string {
         ${group(
           text.t("shell.groupWork"),
           item("/panel", text.t("shell.overview"), icons.overview()) +
-            // The daily work, and the screen this panel did not have: what is
-            // waiting, what is open and what was closed, across every board
-            // this account has a role in.
-            item(
-              "/panel/reports",
-              text.t("shell.reports"),
-              icons.queue(),
-              "",
-              (spec.waiting?.reports ?? 0) + (spec.waiting?.messages ?? 0),
-            ) +
+            // Reports are not here any more. What is waiting is a job rather
+            // than a place, so it lives on its own full-width screen reached
+            // from the bar above — and the count that used to sit here added
+            // reports and messages into one number the tabs below it then
+            // contradicted.
             item("/panel/organizations", text.t("shell.organizations"), icons.organization()),
         )}
         ${group(
@@ -3168,6 +3163,9 @@ export function overviewScreen(data: OverviewData, text: Text): string {
  */
 export interface ReportRow extends Brief {
   moderation: string;
+  /** Already sent by /api/reports; the row needs it to be decidable at a
+      glance, which is the whole point of the review screen. */
+  body?: string;
   board?: { org: string; repo: string; name: string; organization: string };
 }
 
@@ -3198,140 +3196,198 @@ export interface ReportFilters {
 }
 
 /** Every status either kind can be in, in the order the work goes through. */
-const everyStatus = [
-  "new",
-  "confirmed",
-  "planned",
-  "in_progress",
-  "in_forge",
-  "done",
-  "closed",
-  "declined",
-  "not_reproducible",
-];
+/**
+ * Reviewing what is waiting: one screen, two panes, one job.
+ *
+ * It replaces a list that did three jobs at once — decide what is pending,
+ * search the archive, and moderate messages — with the controls of the second
+ * stacked on top of the first. Measured on that screen with six messages
+ * waiting: the reports visible without scrolling were **none**, on a screen
+ * titled Reports.
+ *
+ * The shape is the house's, not an invention and not a mail client: it is
+ * Lastboard's MonitorPage — a list of 545px capped at 52% with its border, the
+ * detail beside it, starting below the top bar because the bar stays (the icon
+ * that opens this is also the way out). The rows are the menu's recipe, which
+ * is what this product already uses for a chosen row.
+ *
+ * Two rules the old screen broke and this one keeps:
+ *
+ *   - **One counter.** What the bar says is what is in here. The badge used to
+ *     add reports and messages together while the tabs below counted only
+ *     reports, so the same screen showed 19, 16 and 13.
+ *   - **A filter narrows, it never reveals.** The messages used to vanish the
+ *     moment any report filter was touched.
+ */
+export function reviewScreen(
+  data: ReportsData,
+  mode: "pending" | "all",
+  chosen: string,
+  text: Text,
+): string {
+  const rows = data.items ?? [];
+  const waiting = data.comments ?? [];
 
-export function reportsScreen(data: ReportsData, filters: ReportFilters, text: Text): string {
-  const counts = data.counts ?? { moderation: {}, status: {}, kind: {} };
-  const totalOf = (of: Record<string, number>) => Object.values(of).reduce((a, b) => a + b, 0);
+  // Grouped by board, because moderating is already context-switching and
+  // jumping between projects on every row makes it worse.
+  const boards = new Map<string, { name: string; rows: ReportRow[] }>();
+  for (const r of rows) {
+    const key = r.board ? `${r.board.organization} / ${r.board.name}` : text.t("portal.boards");
+    if (!boards.has(key)) boards.set(key, { name: key, rows: [] });
+    boards.get(key)!.rows.push(r);
+  }
 
-  // A tab carries its own number. The point of this screen is knowing there are
-  // three things waiting without having to go and look.
-  const tab = (attr: string, value: string, label: string, count?: number) =>
-    `<button class="tab${(filters as unknown as Record<string, string>)[attr] === value ? " on" : ""}"
-       data-${escapeAttr(attr)}="${escapeAttr(value)}">${escapeHTML(label)}${
-       count === undefined ? "" : `<span class="count-chip">${escapeHTML(text.number(count))}</span>`
-     }</button>`;
+  // Messages hang under the report they are about: six comments on one thing
+  // are one context, not six unrelated rows.
+  const under = new Map<string, WaitingComment[]>();
+  for (const c of waiting) {
+    const key = c.item?.public_id ?? "";
+    if (!under.has(key)) under.set(key, []);
+    under.get(key)!.push(c);
+  }
 
-  const moderationTabs = [
-    tab("moderation", "", text.t("board.all"), totalOf(counts.moderation)),
-    tab("moderation", "pending", text.t("moderation.pending"), counts.moderation.pending ?? 0),
-    tab("moderation", "published", text.t("moderation.published"), counts.moderation.published ?? 0),
-    tab("moderation", "rejected", text.t("moderation.rejected"), counts.moderation.rejected ?? 0),
-    tab("moderation", "spam", text.t("panel.spam"), counts.moderation.spam ?? 0),
-  ].join("");
+  const preview = (body: string) =>
+    `<p class="rev-p">${escapeHTML(body.replace(/\s+/g, " ").trim().slice(0, 180))}</p>`;
 
-  const kindTabs = [
-    tab("kind", "", text.t("board.all")),
-    tab("kind", "bug", text.t("kind.bug"), counts.kind.bug ?? 0),
-    tab("kind", "idea", text.t("kind.idea"), counts.kind.idea ?? 0),
-  ].join("");
+  const commentRow = (c: WaitingComment, onItsOwn: boolean) =>
+    `<button type="button" class="rev-row${onItsOwn ? "" : " child"}${
+      `c:${c.id}` === chosen ? " on" : ""
+    }" data-pick="c:${escapeAttr(String(c.id))}" data-what="comment">
+      <span class="rev-dot msg"></span>
+      <span class="rev-main">
+        <span class="rev-t">${escapeHTML(
+          onItsOwn && c.item?.title ? c.item.title : text.t("review.message"),
+        )}</span>
+        ${preview(c.body ?? "")}
+      </span>
+      <span class="rev-w">${escapeHTML(text.date(c.created_at))}</span>
+    </button>`;
 
-  const option = (value: string, label: string, selected: boolean) =>
-    `<option value="${escapeAttr(value)}"${selected ? " selected" : ""}>${escapeHTML(label)}</option>`;
-
-  const statusSelect = `<select data-status aria-label="${escapeAttr(text.t("panel.status"))}">
-    ${option("", text.t("panel.status"), filters.status === "")}
-    ${everyStatus
-      .filter((s) => (counts.status[s] ?? 0) > 0 || filters.status === s)
-      .map((s) => option(s, text.t(`status.${s}`), filters.status === s))
-      .join("")}
-  </select>`;
-
-  const boardSelect =
-    data.boards.length < 2
-      ? ""
-      : `<select data-board aria-label="${escapeAttr(text.t("portal.boards"))}">
-          ${option("", text.t("portal.boards"), filters.board === "")}
-          ${data.boards
-            .map((b) =>
-              option(`${b.org}/${b.repo}`, `${b.organization} / ${b.name}`, filters.board === `${b.org}/${b.repo}`),
-            )
-            .join("")}
-        </select>`;
-
-  const row = (r: ReportRow) => {
-    const board = r.board
-      ? `<span class="chip">${icons.repository(12)}<span>${escapeHTML(r.board.name)}</span></span>`
-      : "";
-    // `queue-row`, not `report`: the public form is a <form class="report">, and
-    // a row in the queue is not the same thing as the page somebody fills in.
-    // Sharing the name meant the row's flex layout was applied to the form,
-    // which stacked its fields into a narrow column with the button adrift
-    // beside them — on the one page a stranger uses.
-    return `<li class="queue-row" data-id="${escapeAttr(r.public_id)}">
-      <a class="item" href="/i/${escapeAttr(r.public_id)}">
-        ${
-          r.kind === "idea"
-            ? `<span class="score"><span class="count">${escapeHTML(text.number(r.votes))}</span>
-                 <span class="label">${escapeHTML(text.t("item.votesLabel"))}</span></span>`
-            : `<span class="score mark kind-bug" aria-hidden="true">${icons.bug(20)}</span>`
-        }
-        <span class="item-main">
-          <span class="item-title">${escapeHTML(r.title)}</span>
-          <span class="item-meta">
-            ${board}
-            <span class="kind kind-${escapeAttr(r.kind)}">
-              ${r.kind === "bug" ? icons.bug(13) : icons.idea(13)}
-              <span class="kind-name">${escapeHTML(text.t(`kind.${r.kind}`))}</span>
-            </span>
-            <span class="when">${escapeHTML(text.date(r.created_at))}</span>
-          </span>
+  const reportRow = (r: ReportRow) => {
+    const kids = under.get(r.public_id) ?? [];
+    return `<button type="button" class="rev-row${r.public_id === chosen ? " on" : ""}"
+        data-pick="${escapeAttr(r.public_id)}" data-what="report">
+        <span class="rev-dot ${escapeAttr(r.kind)}"></span>
+        <span class="rev-main">
+          <span class="rev-t">${escapeHTML(r.title)}</span>
+          ${preview(r.body ?? "")}
         </span>
-      </a>
-      ${
-        // The decision, on the same line as the state it would change, so a
-        // queue of ten does not become ten double-height rows. Only on what is
-        // actually waiting: three buttons on a report published last March are
-        // three ways to undo somebody's work by mistake.
-        //
-        // Outside the link and not inside it: a button inside an anchor is
-        // markup that navigates when you press it.
-        r.moderation === "pending"
-          ? `<div class="row-actions">
-               <button class="button primary small with-icon" data-act="published">${icons.check(13)}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
-               <button class="button small with-icon" data-act="rejected">${icons.close(13)}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
-               <button class="button danger small with-icon" data-act="spam">${icons.warning(13)}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
-             </div>`
-          : ""
-      }
-      ${stateChip(r, text)}
-    </li>`;
+        <span class="rev-w">${escapeHTML(text.date(r.created_at))}</span>
+      </button>
+      ${kids.map((c) => commentRow(c, false)).join("")}`;
   };
 
-  return `<div class="screen-head">
-      <h1>${escapeHTML(text.t("shell.reports"))}</h1>
+  // A message whose report is not in this list — because the report was dealt
+  // with weeks ago and only the message is waiting — still has to be drawn.
+  // Counting something the list does not show is the fault this screen exists
+  // to fix: the old one said 19 in the bar, 16 on one tab and 13 on the next.
+  const shown = new Set(rows.map((r) => r.public_id));
+  const orphans = waiting.filter((c) => !shown.has(c.item?.public_id ?? ""));
+
+  const list =
+    [...boards.values()]
+      .map(
+        (b) => `<p class="rev-group">${escapeHTML(b.name)}
+        <span class="count-chip">${escapeHTML(text.number(b.rows.length))}</span></p>
+      ${b.rows.map(reportRow).join("")}`,
+      )
+      .join("") +
+    (orphans.length === 0
+      ? ""
+      : `<p class="rev-group">${escapeHTML(text.t("review.messages"))}
+          <span class="count-chip">${escapeHTML(text.number(orphans.length))}</span></p>
+        ${orphans.map((c) => commentRow(c, true)).join("")}`);
+
+  const total = rows.length + waiting.length;
+
+  return `<div class="review">
+    <div class="rev-head">
+      <span class="rev-where">${icons.queue(15)}<span>${escapeHTML(text.t("review.title"))}</span></span>
+      <div class="rev-modes">
+        <button class="tab${mode === "pending" ? " on" : ""}" data-mode="pending">
+          ${escapeHTML(text.t("review.pending"))}
+          <span class="count-chip">${escapeHTML(text.number(total))}</span></button>
+        <button class="tab${mode === "all" ? " on" : ""}" data-mode="all">${escapeHTML(text.t("board.all"))}</button>
+      </div>
+      <span class="rev-spacer"></span>
+      <button type="button" class="icon-button" data-leave
+        title="${escapeAttr(text.t("action.close"))}"
+        aria-label="${escapeAttr(text.t("action.close"))}">${icons.close(18)}</button>
     </div>
-    <div class="controls">
-      <div class="tabs">${moderationTabs}</div>
-      <div class="tabs">${kindTabs}</div>
-      ${statusSelect}
-      ${boardSelect}
-      <label class="search-wrap">
-        ${icons.search(16)}
-        <input class="search" type="search" data-q value="${escapeAttr(filters.q)}"
-               placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
-      </label>
+    <div class="rev-body">
+      <div class="rev-list">${
+        total === 0
+          ? `<div class="rev-empty">${emptyState(text.t("review.clear"), icons.check(28))}</div>`
+          : list
+      }</div>
+      <div class="rev-detail" data-detail></div>
     </div>
-    ${waitingComments(data.comments ?? [], text)}
-    ${
-      data.items.length === 0
-        ? // With messages waiting this screen is not empty, whatever the report
-          // filters say — saying "nothing here" above a queue of them would be
-          // the screen contradicting itself.
-          (data.comments ?? []).length === 0
-          ? emptyState(text.t("reports.empty"), icons.queue(28))
+    <div class="rev-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> ${escapeHTML(text.t("review.keyMove"))}</span>
+      <span><kbd>P</kbd> ${escapeHTML(text.t("panel.approve"))}</span>
+      <span><kbd>R</kbd> ${escapeHTML(text.t("panel.reject"))}</span>
+      <span><kbd>S</kbd> ${escapeHTML(text.t("panel.spam"))}</span>
+      <span><kbd>Esc</kbd> ${escapeHTML(text.t("review.keyLeave"))}</span>
+    </div>
+  </div>`;
+}
+
+/**
+ * What the right-hand pane shows for whatever is selected.
+ *
+ * A report or a message: the list is deliberately heterogeneous — for whoever
+ * is moderating there is one job, and which of the two kinds a row is is a
+ * detail of the row. So this takes either, and both end in the same three
+ * decisions taken with the same keys.
+ */
+export function reviewDetail(
+  row: ReportRow | null,
+  fields: ReportField[],
+  text: Text,
+  comment?: WaitingComment | null,
+): string {
+  if (comment) {
+    return `<div class="rev-meta">
+        <span class="chip">${icons.comment(12)}<span>${escapeHTML(text.t("review.message"))}</span></span>
+        ${comment.board?.name ? `<span class="chip">${icons.repository(12)}<span>${escapeHTML(comment.board.name)}</span></span>` : ""}
+        <span class="rev-when">${escapeHTML(text.date(comment.created_at))} · ${escapeHTML(comment.author)}</span>
+      </div>
+      <h1 class="rev-title">${escapeHTML(comment.body)}</h1>
+      ${
+        // The report it is about, above nothing else: a message read without
+        // knowing what it answers is a decision taken blind. On the old screen
+        // this sat underneath, so you read the comment first and found out
+        // afterwards.
+        comment.item?.public_id
+          ? `<p class="rev-onwhat">${escapeHTML(text.t("review.onReport"))}
+               <a href="/i/${escapeAttr(comment.item.public_id)}">${escapeHTML(comment.item.title)}</a></p>`
           : ""
-        : `<ul class="items reports">${data.items.map(row).join("")}</ul>`
+      }
+      <div class="rev-actions">
+        <button class="button primary with-icon" data-act="published">${icons.check(14)}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+        <button class="button with-icon" data-act="rejected">${icons.close(14)}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+      </div>`;
+  }
+  if (!row) return `<p class="rev-nothing">${escapeHTML(text.t("review.pickOne"))}</p>`;
+  return `<div class="rev-meta">
+      <span class="kind kind-${escapeAttr(row.kind)}">
+        ${row.kind === "bug" ? icons.bug(13) : icons.idea(13)}
+        <span class="kind-name">${escapeHTML(text.t(`kind.${row.kind}`))}</span>
+      </span>
+      ${row.board ? `<span class="chip">${icons.repository(12)}<span>${escapeHTML(row.board.name)}</span></span>` : ""}
+      <span class="rev-when">${escapeHTML(text.date(row.created_at))}</span>
+    </div>
+    <h1 class="rev-title">${escapeHTML(row.title)}</h1>
+    <div class="rev-full">${escapeHTML(row.body ?? "").replace(/\n/g, "<br />")}</div>
+    ${answers(fields, text)}
+    ${
+      row.moderation === "pending"
+        ? `<div class="rev-actions">
+             <button class="button primary with-icon" data-act="published">${icons.check(14)}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
+             <button class="button with-icon" data-act="rejected">${icons.close(14)}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
+             <button class="button danger with-icon" data-act="spam">${icons.warning(14)}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
+           </div>`
+        : stateChip(row, text)
     }`;
 }
 
