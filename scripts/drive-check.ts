@@ -3405,6 +3405,41 @@ async function main() {
     JSON.stringify(buscando),
   );
 
+  // Every select's label fits, in the longest of the twenty languages. The
+  // pass reads English, where three to a row fitted; Greek and Japanese did
+  // not, and a select cuts its label short without a word. Measured against
+  // the catalogues rather than by switching language, so nothing downstream
+  // changes.
+  const labelsFit = `
+    const langs = ["ar","bn","de","el","en","es","fa","fr","hi","id","it","ja","ko","nl","pl","pt","ru","tr","ur","zh"];
+    const cats = {};
+    for (const l of langs) cats[l] = await fetch("/locales/" + l + ".json").then(r => r.json());
+    const keys = { kind: "review.anyKind", moderation: "review.anyModeration", status: "review.anyStatus" };
+    const cortas = [];
+    let medidas = 0;
+    for (const [f, key] of Object.entries(keys)) {
+      const sel = document.querySelector('[data-f="' + f + '"]');
+      if (!sel) { cortas.push(f + ": no select"); continue; }
+      const cs = getComputedStyle(sel);
+      const ctx = document.createElement("canvas").getContext("2d");
+      ctx.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+      // The arrow takes about twenty pixels of what the padding leaves.
+      const room = sel.clientWidth - parseFloat(cs.paddingInlineStart) - parseFloat(cs.paddingInlineEnd) - 20;
+      for (const l of langs) {
+        medidas++;
+        const w = ctx.measureText(cats[l][key]).width;
+        if (w > room) cortas.push(l + " " + f + " " + Math.round(w) + ">" + Math.round(room));
+      }
+    }
+    return { medidas, cortas };
+  `;
+  const caben = await evaluate(labelsFit);
+  check(
+    "every archive filter's label fits in all twenty languages",
+    caben.medidas === 60 && caben.cortas.length === 0,
+    JSON.stringify(caben),
+  );
+
   // A narrowing that finds nothing says so, and offers the way back.
   await goTo("/review?mode=all&q=zzzz-nothing-says-this", ".rev-empty");
   const nada = await evaluate(`
@@ -3467,6 +3502,12 @@ async function main() {
   // "open" and still off the edge is the failure this is for.
   await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
   await goTo("/review?mode=all", ".rev-row");
+  const cabenEnElMovil = await evaluate(labelsFit);
+  check(
+    "and on a phone",
+    cabenEnElMovil.medidas === 60 && cabenEnElMovil.cortas.length === 0,
+    JSON.stringify(cabenEnElMovil),
+  );
   // Off the screen means past the TRAILING edge, which depends on the
   // direction: by this point the pass reads Arabic, and the drawer rightly
   // comes in from the left.

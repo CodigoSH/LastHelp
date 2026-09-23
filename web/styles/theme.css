@@ -4472,10 +4472,12 @@ a.stat:hover .stat-go {
 
 .rev-narrow { display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* Wide enough that the longest label in English still fits: three to a row in
-   the desktop column, two on a phone rather than three cut short. */
+/* Two to a row, at every width. Three fitted in English and not in Greek or
+   Japanese — "Οποιαδήποτε κατάσταση" is 141px where a third of the column
+   leaves 130 — and a select cuts its label short without a word. Two also
+   make the four of them a square rather than three and a stray. */
 .rev-narrow select {
-  flex: 1 1 9rem;
+  flex: 1 1 calc(50% - 3px);
   min-inline-size: 0;
   font-size: 12px;
   padding: 4px 8px;
