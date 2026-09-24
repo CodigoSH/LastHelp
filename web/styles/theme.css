@@ -2045,10 +2045,14 @@ body.admin-view > main {
  *
  * The cap that remains is for very wide screens, where a grid stretched across
  * two metres of monitor stops being a layout and becomes a spreadsheet. */
+/* The column runs to the window's edge: it is what scrolls, and a scroller
+   with a maximum width puts its bar in the middle of a wide screen — 344px
+   short of the edge at 2200px, measured. The measure is its content's,
+   written with no weight so any width a screen sets for itself still wins. */
 .admin-main {
   padding: clamp(1.25rem, 3vw, 2.25rem);
-  max-inline-size: 100rem;
 }
+:where(.admin-main > *) { max-inline-size: 100rem; }
 
 /* Prose still gets a measure. A settings screen that is one form does not want
    the width of a dashboard: a line of help two thousand pixels long is a line

@@ -3111,6 +3111,28 @@ async function main() {
       ` presentes=${presentes} quietos=${quietos}`,
   );
 
+  // The panel scrolls in its content column, so that column has to run to the
+  // window's edge: with a maximum width of its own its scrollbar stood in the
+  // middle of a wide screen, 344px short of the edge at 2200px. Measured wide,
+  // because at the pass's usual width the column fits and the fault cannot
+  // show. And the content keeps its measure: the edge is the column's, not
+  // the dashboard's.
+  await page.send("Emulation.setDeviceMetricsOverride", { width: 2200, height: 900, deviceScaleFactor: 1, mobile: false });
+  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  await sleep(300);
+  const ancho = await evaluate(`
+    const col = document.querySelector(".admin-main").getBoundingClientRect();
+    const first = document.querySelector(".admin-main > :not(h1):not(.visually-hidden)")?.getBoundingClientRect();
+    return { hueco: Math.round(innerWidth - col.right), contenido: Math.round(first?.width ?? 0) };
+  `);
+  await page.send("Emulation.clearDeviceMetricsOverride", {});
+  check(
+    "on a wide screen the panel's scrolling column reaches the window's edge, and its content keeps its measure",
+    ancho.hueco === 0 && ancho.contenido > 0 && ancho.contenido <= 1600,
+    JSON.stringify(ancho),
+  );
+  await goTo("/", ".landing-grid");
+
   // One of three blocks that write their own page: the section checks capture
   // what was here, this one and the next write over it, and the last one puts
   // it back. They are a sequence, not three independent checks — moving one out
