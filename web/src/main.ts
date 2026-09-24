@@ -2864,23 +2864,13 @@ async function showPanel(): Promise<void> {
     .catch(() => null);
 
   if (!data) {
-    // Not an administrator. The numbers count the whole installation, which is
-    // not theirs to see; the places they work in are, with what waits there.
-    const list = await api
-      .get<{ organizations: views.OrganizationRow[] }>("/api/panel/organizations")
-      .catch(() => ({ organizations: [] as views.OrganizationRow[] }));
-    const organizations = await Promise.all(
-      (list.organizations ?? []).map(async (o) => {
-        const page = await api
-          .get<views.OrganizationPanel>(`/api/orgs/${encodeURIComponent(o.slug)}/panel`)
-          .catch(() => null);
-        return { ...o, boards: page?.repositories ?? [] };
-      }),
+    // No role anywhere: nothing to summarise, and nobody to show it to but
+    // the administrator who could grant one.
+    await showInShell(
+      `<h1 class="visually-hidden">${escapeHTML(i18n.t("shell.overview"))}</h1>` +
+        views.emptyState(i18n.t("overview.noRoles"), icons.person(28)),
+      "/panel",
     );
-    // The same number the bar's review icon carries, from the same place, so
-    // the two cannot disagree on one screen.
-    const waiting = (me?.pending?.reports ?? 0) + (me?.pending?.messages ?? 0);
-    await showInShell(views.memberHome({ waiting, organizations }, text), "/panel");
     return;
   }
   await showInShell(views.overviewScreen(data, text), "/panel");

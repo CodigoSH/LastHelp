@@ -4,10 +4,12 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
 // overview is what the panel's front page draws.
@@ -29,6 +31,11 @@ type overview struct {
 	// LastReport is when the most recent report arrived, in seconds. Zero means
 	// none ever has — which is a state worth showing rather than a blank.
 	LastReport int64 `json:"last_report"`
+
+	// Server says the numbers are the whole server's, which only its
+	// administrator is shown; otherwise they are the reader's boards, and the
+	// server-wide cards — people — are not drawn.
+	Server bool `json:"server"`
 
 	// What the numbers above cannot say: whether it is getting busier, what
 	// people are actually asking for, and which board the work is in.
@@ -85,14 +92,40 @@ type boardCount struct {
 // ManageServer rather than ViewPanel. A collaborator gets the repositories they
 // triage from the screens that are already scoped to them.
 func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
-	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+	// The same summary for everybody with a role, over what they may see: the
+	// whole server for its administrator, the boards they work on for anybody
+	// else. It used to be the administrator's alone, and a team member's
+	// overview was a list of where they had roles — which said what they were
+	// and not how their boards were doing.
+	actor, _ := middleware.ActorFrom(r)
+	if !s.may(w, r, authz.ViewPanel, authz.Scope{}) {
 		return
+	}
+	server := actor.Can(authz.ManageServer, authz.Scope{})
+
+	// Which boards, as a fragment over item.repo_id. Built from integers this
+	// server read from its own database, never from the request.
+	scope, orgs := "1 = 1", map[int64]bool{}
+	if !server {
+		boards, err := s.scopedBoards(actor)
+		if err != nil {
+			slog.Error("listing the boards somebody may triage", "error", err)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		ids := []string{"0"}
+		for _, b := range boards {
+			ids = append(ids, strconv.FormatInt(b.repo.ID, 10))
+			orgs[b.org.ID] = true
+		}
+		scope = "repo_id IN (" + strings.Join(ids, ",") + ")"
 	}
 
 	out := overview{
 		Kinds:      map[string]int{},
 		Statuses:   map[string]int{},
 		Moderation: map[string]int{},
+		Server:     server,
 	}
 
 	single := func(query string, into *int) bool {
@@ -102,12 +135,21 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		}
 		return true
 	}
-	if !single(`SELECT count(*) FROM organization`, &out.Organizations) ||
-		!single(`SELECT count(*) FROM repository`, &out.Repositories) ||
-		!single(`SELECT count(*) FROM app_user`, &out.People) ||
-		!single(`SELECT count(*) FROM item WHERE moderation_state = 'pending'`, &out.Pending) ||
-		!single(`SELECT count(*) FROM item WHERE moderation_state = 'published'`, &out.Published) ||
-		!single(`SELECT count(*) FROM vote`, &out.Votes) {
+	if server {
+		if !single(`SELECT count(*) FROM organization`, &out.Organizations) ||
+			!single(`SELECT count(*) FROM repository`, &out.Repositories) ||
+			!single(`SELECT count(*) FROM app_user`, &out.People) {
+			return
+		}
+	} else {
+		out.Organizations = len(orgs)
+		if !single(`SELECT count(*) FROM repository WHERE `+strings.Replace(scope, "repo_id", "id", 1), &out.Repositories) {
+			return
+		}
+	}
+	if !single(`SELECT count(*) FROM item WHERE moderation_state = 'pending' AND `+scope, &out.Pending) ||
+		!single(`SELECT count(*) FROM item WHERE moderation_state = 'published' AND `+scope, &out.Published) ||
+		!single(`SELECT count(*) FROM vote JOIN item ON item.id = vote.item_id WHERE `+scope, &out.Votes) {
 		return
 	}
 
@@ -129,36 +171,36 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		}
 		return rows.Err() == nil
 	}
-	if !grouped(`SELECT kind, count(*) FROM item GROUP BY kind`, out.Kinds) ||
-		!grouped(`SELECT status, count(*) FROM item WHERE moderation_state = 'published' GROUP BY status`, out.Statuses) ||
-		!grouped(`SELECT moderation_state, count(*) FROM item GROUP BY moderation_state`, out.Moderation) {
+	if !grouped(`SELECT kind, count(*) FROM item WHERE `+scope+` GROUP BY kind`, out.Kinds) ||
+		!grouped(`SELECT status, count(*) FROM item WHERE moderation_state = 'published' AND `+scope+` GROUP BY status`, out.Statuses) ||
+		!grouped(`SELECT moderation_state, count(*) FROM item WHERE `+scope+` GROUP BY moderation_state`, out.Moderation) {
 		return
 	}
 
 	// COALESCE, because MAX over no rows is NULL and scanning that into an int64
 	// fails — which would turn "nothing has been reported yet" into a 500.
-	if err := s.db.QueryRow(`SELECT COALESCE(MAX(created_at), 0) FROM item`).Scan(&out.LastReport); err != nil {
+	if err := s.db.QueryRow(`SELECT COALESCE(MAX(created_at), 0) FROM item WHERE ` + scope).Scan(&out.LastReport); err != nil {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
 
 	var err error
-	if out.Series, err = s.activity(30); err != nil {
+	if out.Series, err = s.activity(30, scope); err != nil {
 		slog.Error("reading the activity", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
-	if out.Top, err = s.briefs(`kind = 'idea' AND moderation_state = 'published'`, `vote_count DESC, created_at DESC`, 5); err != nil {
+	if out.Top, err = s.briefs(`kind = 'idea' AND moderation_state = 'published' AND `+scope, `vote_count DESC, created_at DESC`, 5); err != nil {
 		slog.Error("reading the most wanted", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
-	if out.Recent, err = s.briefs(`1 = 1`, `created_at DESC`, 6); err != nil {
+	if out.Recent, err = s.briefs(scope, `created_at DESC`, 6); err != nil {
 		slog.Error("reading the newest", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
-	if out.Boards, err = s.boardCounts(8); err != nil {
+	if out.Boards, err = s.boardCounts(8, strings.Replace(scope, "repo_id", "r.id", 1)); err != nil {
 		slog.Error("counting the boards", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
@@ -172,7 +214,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 // Every day is in the answer, including the empty ones: a chart drawn only from
 // the days something happened has no gaps in it, and therefore says a quiet
 // month was a busy one.
-func (s *Server) activity(days int) ([]dayCount, error) {
+func (s *Server) activity(days int, scope string) ([]dayCount, error) {
 	const day = int64(86400)
 	today := time.Now().UTC().Unix() / day * day
 	from := today - int64(days-1)*day
@@ -180,7 +222,7 @@ func (s *Server) activity(days int) ([]dayCount, error) {
 	counted := map[int64]dayCount{}
 	rows, err := s.db.Query(
 		`SELECT created_at / 86400 * 86400 AS day, kind, count(*)
-		   FROM item WHERE merged_into IS NULL AND created_at >= ?
+		   FROM item WHERE merged_into IS NULL AND created_at >= ? AND `+scope+`
 		  GROUP BY day, kind`, from)
 	if err != nil {
 		return nil, err
@@ -248,7 +290,7 @@ func (s *Server) briefs(where, order string, limit int) ([]itemBrief, error) {
 // A LEFT JOIN, so a board with nothing on it is still a row: a repository
 // missing from this list because nobody has reported anything is exactly the
 // one somebody needs to be reminded of.
-func (s *Server) boardCounts(limit int) ([]boardCount, error) {
+func (s *Server) boardCounts(limit int, scope string) ([]boardCount, error) {
 	rows, err := s.db.Query(
 		`SELECT o.slug, r.slug, r.name, o.name,
 		        COALESCE(SUM(i.moderation_state = 'published'), 0),
@@ -257,6 +299,7 @@ func (s *Server) boardCounts(limit int) ([]boardCount, error) {
 		   FROM repository r
 		   JOIN organization o ON o.id = r.org_id
 		   LEFT JOIN item i ON i.repo_id = r.id AND i.merged_into IS NULL
+		  WHERE ` + scope + `
 		  GROUP BY r.id
 		  ORDER BY 6 DESC, 5 DESC, r.name
 		  LIMIT ` + strconv.Itoa(limit))

@@ -2831,6 +2831,15 @@ body > nav .brand {
   .dashboard { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
+/* A team member's overview has five numbers, not six — the server's people
+   are not theirs — so the wide row is ten columns: two each, and the wide
+   cards half of it, and the first row fills as the administrator's does. */
+@media (min-width: 80rem) {
+  .dashboard.team { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  .dashboard.team .dash-card:not(.wide):not(.full) { grid-column: span 2; }
+  .dashboard.team .dash-card.wide { grid-column: span 5; }
+}
+
 .dash-card {
   position: relative;
   border: 1px solid var(--card-border);
@@ -6727,11 +6736,19 @@ a.stat:hover .stat-go {
   color: var(--accent);
 }
 
-/* Something waiting, in the hue the review pill wears when it has work. */
-.mono-tag.waiting {
-  border-color: color-mix(in srgb, var(--hue-hold) 35%, transparent);
-  color: var(--hue-hold);
+/* A state as a mark: what waits, as the review icon and its count; a forge
+   not connected, as the warning. In the hue the review pill wears when it
+   has work, which is what both of them mean. */
+.state-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
+.state-mark.hold { color: var(--hue-hold); }
+.state-mark b { font-weight: 600; }
 
 /* Their profile header: the picture, and the name with its tags beside it. */
 .profile-head { display: flex; align-items: center; gap: 20px; margin: 8px 0 32px; }

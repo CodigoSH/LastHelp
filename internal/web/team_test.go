@@ -307,3 +307,42 @@ func TestTheOrganisationsListIsWhatTheReaderMayOpen(t *testing.T) {
 		t.Errorf("the administrator's role where they hold none: %v", got)
 	}
 }
+
+// TestTheOverviewIsTheReadersBoards.
+//
+// The same summary for everybody with a role, over what they may see. A
+// collaborator on atlas counts atlas, and nothing of the board next door —
+// neither its reports, nor its votes, nor the server's people.
+func TestTheOverviewIsTheReadersBoards(t *testing.T) {
+	admin, _, collaborator := teamSetup(t)
+	admin.submit("acme", "atlas", "bug", "It crashes on start")
+	admin.submit("other", "elsewhere", "bug", "Somewhere else entirely")
+	admin.submit("other", "elsewhere", "idea", "And an idea there too")
+
+	theirs := decode(t, collaborator.do(http.MethodGet, "/api/overview", nil))
+	if theirs["server"] != false {
+		t.Errorf("a collaborator's overview was said to be the server's: %v", theirs["server"])
+	}
+	if theirs["pending"] != float64(1) || theirs["repositories"] != float64(1) || theirs["organizations"] != float64(1) {
+		t.Errorf("a collaborator on atlas should count atlas alone: pending=%v repositories=%v organizations=%v",
+			theirs["pending"], theirs["repositories"], theirs["organizations"])
+	}
+	if theirs["people"] != float64(0) {
+		t.Errorf("a collaborator was told how many people the server has: %v", theirs["people"])
+	}
+	recent, _ := theirs["recent"].([]any)
+	for _, row := range recent {
+		if m, _ := row.(map[string]any); m["title"] != "It crashes on start" {
+			t.Errorf("a report from another board is in a collaborator's newest: %v", m["title"])
+		}
+	}
+	boards, _ := theirs["boards"].([]any)
+	if len(boards) != 1 {
+		t.Errorf("a collaborator's work per board should be their one board: %v", boards)
+	}
+
+	all := decode(t, admin.do(http.MethodGet, "/api/overview", nil))
+	if all["server"] != true || all["pending"] != float64(3) {
+		t.Errorf("the administrator's overview is the whole server: server=%v pending=%v", all["server"], all["pending"])
+	}
+}

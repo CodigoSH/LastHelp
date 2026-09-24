@@ -4046,24 +4046,25 @@ async function main() {
 
   const collaborator = await evaluate(`
     const me = await fetch("/api/me").then(r => r.json());
+    const value = (card) => Number(document.querySelector('[data-card="' + card + '"] .value')?.textContent ?? -1);
     return {
       groups: [...document.querySelectorAll(".side-label")].map(e => e.textContent.trim()),
       items: [...document.querySelectorAll(".side-item")].map(e => e.textContent.trim()),
-      organizaciones: [...document.querySelectorAll(".member-home [data-org]")].map(e => e.dataset.org),
-      rol: document.querySelector('.member-home [data-org="codigosh"] [data-role]')?.dataset.role ?? "",
-      tableros: [...document.querySelectorAll('.member-home [data-repo] a.si-main')].map(a => a.getAttribute("href")),
-      espera: Number(document.querySelector(".member-home [data-waiting]")?.dataset.waiting ?? -1),
-      servidor: (me.pending?.reports ?? 0) + (me.pending?.messages ?? 0),
+      equipo: !!document.querySelector(".dashboard.team"),
+      personas: !!document.querySelector('[data-card="people"]'),
+      pendientes: value("waiting"),
+      servidor: me.pending?.reports ?? -1,
+      tableros: [...document.querySelectorAll('[data-card="boards"] a')].map(a => a.getAttribute("href")),
       offersToAdd: !!document.querySelector("[data-open-modal]"),
     };`);
-  // Where they work, and the way into each board's own page — not a card per
-  // role saying what they are and leading to a queue that no longer exists.
-  // And what waits for them is the number the bar's icon carries.
+  // The administrator's summary, over their boards: the same screen, so the
+  // two read as one product, and none of the server's own numbers. What waits
+  // is the number the bar counts, and the work per board is their board.
   check(
-    "a collaborator's overview shows where they work and leads into each board",
-    JSON.stringify(collaborator.organizaciones) === '["codigosh"]' && collaborator.rol === "collaborator" &&
-      JSON.stringify(collaborator.tableros) === '["/panel/codigosh/repos/lastboard"]' &&
-      collaborator.espera === collaborator.servidor,
+    "a collaborator's overview is the summary of their boards, not the server's",
+    collaborator.equipo === true && collaborator.personas === false &&
+      collaborator.pendientes === collaborator.servidor &&
+      JSON.stringify(collaborator.tableros) === '["/panel/reports?board=codigosh/lastboard"]',
     JSON.stringify(collaborator),
   );
   check(

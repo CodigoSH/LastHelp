@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { itemView, memberHome, releaseNotes, type Text, updateZone } from "./templates";
+import { itemView, releaseNotes, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -130,33 +130,3 @@ describe("the update zone", () => {
     expect(updateZone(null, text)).not.toContain("about-state ok");
   });
 });
-
-describe("the overview for somebody on a team", () => {
-  const board = { slug: "atlas", name: "Atlas", accepts_bugs: true, accepts_ideas: true, pending: 2 };
-  const row = {
-    slug: "acme", name: "Acme", forge: "forgejo", repositories: 1, pending: 2, can_manage: false, boards: [board],
-  };
-
-  test("an owner is told when the forge is not connected, and led to where it is", () => {
-    const html = memberHome({ waiting: 2, organizations: [{ ...row, role: "owner", can_manage: true, connected: false }] }, text);
-    expect(html).toContain('data-connect="acme"');
-    expect(html).toContain('href="/panel/acme"');
-  });
-
-  test("a collaborator is not, since connecting is not theirs", () => {
-    const html = memberHome({ waiting: 2, organizations: [{ ...row, role: "collaborator" }] }, text);
-    expect(html).not.toContain("data-connect");
-  });
-
-  test("each board leads to its own page and says what waits in it", () => {
-    const html = memberHome({ waiting: 2, organizations: [{ ...row, role: "collaborator" }] }, text);
-    expect(html).toContain('href="/panel/acme/repos/atlas"');
-    expect(html).toContain('data-pending="2"');
-    expect(html).not.toContain("/queue");
-  });
-
-  test("somebody with no organisation is told so", () => {
-    expect(memberHome({ waiting: 0, organizations: [] }, text)).toContain("overview.noRoles");
-  });
-});
-

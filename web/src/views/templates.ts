@@ -1227,85 +1227,6 @@ export function repositoryList(
  * offer no way to set anything up: the only path was curl. A screen that names
  * a problem it cannot help with reads as broken rather than as empty.
  */
-/**
- * The overview for somebody on a team rather than running the server: what is
- * waiting for them, and where they work — each organisation with the boards
- * they work on in it, what waits in each, and, for an owner, the forge when it
- * is not connected yet. Each line leads to the page where that work is done.
- *
- * It used to be a card per role with the role's name on it and a link to a
- * queue that no longer exists, which said what somebody was and nothing about
- * what there was to do.
- */
-export function memberHome(
-  data: {
-    waiting: number;
-    organizations: (OrganizationRow & { boards: OrganizationPanel["repositories"] })[];
-  },
-  text: Text,
-): string {
-  if (data.organizations.length === 0) {
-    return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
-      ${emptyState(text.t("overview.noRoles"), icons.person(28))}`;
-  }
-
-  const waiting = settingsCard(
-    text.t("item.waiting"),
-    `<div class="settings-row">
-      <div class="settings-info">
-        <h4 data-waiting="${data.waiting}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(data.waiting) }))}</h4>
-        <p>${escapeHTML(text.t(data.waiting > 0 ? "overview.waitingHelp" : "review.clear"))}</p>
-      </div>
-      <a class="button primary" href="/review">${escapeHTML(text.t("review.title"))}</a>
-    </div>`,
-  );
-
-  const roleName = (role: string) => (role === "administrator" ? text.t("people.administrator") : text.t(`role.${role}`));
-  const places = data.organizations
-    .map((o) => {
-      const boards = o.boards
-        .map((b) =>
-          settingsItem({
-            attrs: `data-repo="${escapeAttr(o.slug)}/${escapeAttr(b.slug)}"`,
-            lead: `<span class="si-mark">${icons.repository(16)}</span>`,
-            name: b.name,
-            sub: `/${o.slug}/${b.slug}`,
-            tags:
-              (b.pending > 0
-                ? `<span class="mono-tag waiting" data-pending="${b.pending}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(b.pending) }))}</span>`
-                : "") + acceptsMarks(b, text),
-            href: `/panel/${o.slug}/repos/${b.slug}`,
-          }),
-        )
-        .join("");
-      // The one thing an owner is told here that a collaborator is not: a
-      // forge nobody has connected, which is why no issue can be opened.
-      const connect =
-        o.connected === false
-          ? `<div class="settings-row" data-connect="${escapeAttr(o.slug)}">
-              <div class="settings-info">
-                <h4>${escapeHTML(text.t("org.notConnected"))}</h4>
-                <p>${escapeHTML(text.t("overview.notConnectedHelp"))}</p>
-              </div>
-              <a class="button ghost" href="/panel/${escapeAttr(o.slug)}">${escapeHTML(text.t("org.connect"))}</a>
-            </div>`
-          : "";
-      return `<section class="bento-card settings-card" data-org="${escapeAttr(o.slug)}">
-        <div class="card-top">
-          <h3>${escapeHTML(o.name)}</h3>
-          <a class="button ghost" href="/panel/${escapeAttr(o.slug)}">${escapeHTML(text.t("overview.openOrganization"))}</a>
-        </div>
-        <p class="org-tags"><span class="mono-tag${o.role === "owner" ? " accent" : ""}" data-role="${escapeAttr(o.role)}">${escapeHTML(roleName(o.role))}</span></p>
-        ${boards ? `<ul class="settings-list">${boards}</ul>` : `<p class="card-sub">${escapeHTML(text.t("organizations.noRepositories"))}</p>`}
-        ${connect}
-      </section>`;
-    })
-    .join("");
-
-  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
-    <div class="settings member-home">${waiting}${places}</div>`;
-}
-
 
 /** The forge choices, in the order somebody is likely to recognise them. */
 export function forgeOptions(text: Text): [string, string][] {
@@ -2575,6 +2496,9 @@ export interface Brief {
 }
 
 export interface OverviewData {
+  /** The numbers are the whole server's, which only its administrator sees;
+   *  otherwise they are the reader's boards, and people is not theirs. */
+  server?: boolean;
   organizations: number;
   repositories: number;
   people: number;
@@ -2639,6 +2563,17 @@ function acceptsMarks(repo: { accepts_bugs: boolean; accepts_ideas: boolean }, t
       kind === "bug" ? icons.bug(15) : icons.idea(15)
     }</span>`;
   return (repo.accepts_bugs ? mark("bug") : "") + (repo.accepts_ideas ? mark("idea") : "");
+}
+
+/**
+ * What is waiting somewhere, as the review icon and its number — the mark the
+ * bar already uses for the same thing — rather than a word and a number. Named
+ * in full for whoever cannot see it.
+ */
+function waitingMark(count: number, text: Text): string {
+  const label = text.t("shell.waitingCount", { count: text.number(count) });
+  return `<span class="state-mark hold" role="img" data-pending="${count}"
+    title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${icons.queue(14)}<b>${escapeHTML(text.number(count))}</b></span>`;
 }
 
 /** One report as a row of a list on the dashboard. */
@@ -2825,8 +2760,11 @@ export function overviewScreen(data: OverviewData, text: Text): string {
     </div>
     ${total === 0 ? `<p class="lead">${escapeHTML(text.t("overview.emptyLead"))}</p>` : ""}
 
-    <ul class="dashboard">
-      ${overviewCards.map((name) => all[name]).join("")}
+    <ul class="dashboard${data.server === false ? " team" : ""}">
+      ${overviewCards
+        .filter((name) => data.server !== false || name !== "people")
+        .map((name) => all[name])
+        .join("")}
     </ul>`;
 }
 
@@ -3462,13 +3400,14 @@ export function organizationsScreen(
         sub: `/${o.slug} · ${text.t("org.repoCount", { count: text.number(o.repositories) })}`,
         tags: [
           o.pending > 0
-            ? `<span class="mono-tag waiting" data-pending="${o.pending}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(o.pending) }))}</span>`
+            ? waitingMark(o.pending, text)
             : "",
           o.forge && o.forge !== "none"
             ? `<span class="mono-tag" data-forge="${escapeAttr(o.forge)}">${escapeHTML(forgeName(o.forge))}</span>`
             : "",
           o.connected === false
-            ? `<span class="mono-tag waiting" data-connected="false">${escapeHTML(text.t("org.notConnected"))}</span>`
+            ? `<span class="state-mark hold" role="img" data-connected="false"
+                 title="${escapeAttr(text.t("org.notConnected"))}" aria-label="${escapeAttr(text.t("org.notConnected"))}">${icons.warning(15)}</span>`
             : "",
           o.role
             ? `<span class="mono-tag${o.role === "owner" ? " accent" : ""}" data-role="${escapeAttr(o.role)}">${escapeHTML(roleName(o.role))}</span>`
@@ -3555,7 +3494,7 @@ export function organizationScreen(
         sub: `/${org.slug}/${r.slug}`,
         tags:
           (r.pending > 0
-            ? `<span class="mono-tag waiting" data-pending="${r.pending}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(r.pending) }))}</span>`
+            ? waitingMark(r.pending, text)
             : "") + acceptsMarks(r, text),
         href: `/panel/${org.slug}/repos/${r.slug}`,
         actions: `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
