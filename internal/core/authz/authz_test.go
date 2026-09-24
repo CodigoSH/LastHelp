@@ -135,3 +135,33 @@ func TestARepositoryScopeWithoutItsOrganisationDoesNotEscalate(t *testing.T) {
 		t.Error("a collaborator's own repository stopped matching")
 	}
 }
+
+func TestStandingInNamesWhatSomebodyIsInAnOrganisation(t *testing.T) {
+	const acme, other = 1, 2
+	owner := Actor{UserID: 2, Memberships: []Membership{{Role: RoleOwner, Scope: Organization(acme)}}}
+	collaborator := Actor{UserID: 3, Memberships: []Membership{{Role: RoleCollaborator, Scope: Repository(10, acme)}}}
+	both := Actor{UserID: 4, Memberships: []Membership{
+		{Role: RoleCollaborator, Scope: Repository(10, acme)},
+		{Role: RoleOwner, Scope: Organization(acme)},
+	}}
+	admin := Actor{UserID: 1, IsAdministrator: true}
+
+	cases := []struct {
+		name  string
+		actor Actor
+		org   int64
+		want  string
+	}{
+		{"an owner", owner, acme, "owner"},
+		{"an owner elsewhere", owner, other, ""},
+		{"a collaborator", collaborator, acme, "collaborator"},
+		{"a collaborator seen from another organisation", collaborator, other, ""},
+		{"owning outranks collaborating", both, acme, "owner"},
+		{"the administrator where they hold nothing", admin, acme, "administrator"},
+	}
+	for _, c := range cases {
+		if got := c.actor.StandingIn(c.org); got != c.want {
+			t.Errorf("%s: StandingIn = %q, want %q", c.name, got, c.want)
+		}
+	}
+}

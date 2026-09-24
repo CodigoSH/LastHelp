@@ -4169,6 +4169,26 @@ async function main() {
     JSON.stringify(suOrg),
   );
 
+  // 12d''. The list of organisations, as the same collaborator: the ones they
+  //        may open, with what they are there, and no dialog they could not
+  //        send. The public list named every organisation, and a collaborator
+  //        was offered pages that refuse them.
+  await goTo("/panel/organizations", ".admin-main .settings");
+  const suLista = await evaluate(`
+    return {
+      filas: [...document.querySelectorAll(".organizations .settings-item")].map(li => li.dataset.org),
+      rol: document.querySelector('[data-org="codigosh"] [data-role]')?.dataset.role ?? "",
+      acciones: document.querySelectorAll(".organizations .si-actions button").length,
+      dialogos: document.querySelectorAll(".admin-main dialog, dialog form").length,
+    };
+  `);
+  check(
+    "a collaborator's list of organisations is the ones they may open, as what they are there",
+    JSON.stringify(suLista.filas) === '["codigosh"]' && suLista.rol === "collaborator" &&
+      suLista.acciones === 0 && suLista.dialogos === 0,
+    JSON.stringify(suLista),
+  );
+
   // 12e. And as whoever runs it: every card, reached from the organisation's
   //      row, and each one does what it says. The team is changed here and put
   //      back as it was, so nothing downstream counts a different number.
@@ -4180,6 +4200,28 @@ async function main() {
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
       body: JSON.stringify({ username: "alex", password: "una contraseña larga de verdad" }) });
   `);
+  // The list first: what waits in each organisation is the number Review
+  // gives for its boards, and a forge with a token stored is not flagged.
+  await goTo("/panel/organizations", ".organizations");
+  const lista = await evaluate(`
+    const review = await fetch("/api/reports?moderation=pending&limit=200").then(r => r.json());
+    const enRevision = (review.items ?? []).filter(r => r.board?.org === "codigosh").length;
+    const tag = document.querySelector('[data-org="codigosh"] [data-pending]');
+    return {
+      pendientes: tag ? Number(tag.dataset.pending) : 0,
+      enRevision,
+      rol: document.querySelector('[data-org="codigosh"] [data-role]')?.dataset.role ?? "",
+      forja: document.querySelector('[data-org="withforge"] [data-forge]')?.dataset.forge ?? "",
+      sinConectar: !!document.querySelector('[data-org="withforge"] [data-connected="false"]'),
+    };
+  `);
+  check(
+    "the list of organisations says what waits in each, as Review counts it, and which forge is connected",
+    lista.pendientes === lista.enRevision && lista.rol === "owner" &&
+      lista.forja === "forgejo" && lista.sinConectar === false,
+    JSON.stringify(lista),
+  );
+
   await goTo("/panel/codigosh", ".repositories");
   // The organisation in sections, in the order the work goes, and what is
   // waiting in each board said where the board is listed — the same number

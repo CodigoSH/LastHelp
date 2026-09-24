@@ -30,6 +30,7 @@ org.delete
 org.deleteHelp
 org.notConnected
 org.notConnectedHelp
+org.repoCount
 org.teamLead
 repo.addCollaborator
 repo.channelNow

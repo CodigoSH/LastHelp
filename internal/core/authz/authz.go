@@ -169,6 +169,32 @@ func (a Actor) Can(action Action, on Scope) bool {
 	return false
 }
 
+// StandingIn names what this actor is in one organisation, for showing it:
+// an owner there, else a collaborator on something in it, else — an
+// administrator who holds neither — the administrator.
+//
+// It decides nothing. It is here rather than beside the screen that shows it
+// because reading roles is this package's alone, and a second reader of them
+// is where the two start to disagree.
+func (a Actor) StandingIn(orgID int64) string {
+	collaborator := false
+	for _, m := range a.Memberships {
+		switch {
+		case m.Role == RoleOwner && m.Scope.Kind == ScopeOrganization && m.Scope.ID == orgID:
+			return string(RoleOwner)
+		case m.Role == RoleCollaborator && m.Scope.Kind == ScopeRepository && m.Scope.OrgID == orgID:
+			collaborator = true
+		}
+	}
+	if collaborator {
+		return string(RoleCollaborator)
+	}
+	if a.IsAdministrator {
+		return "administrator"
+	}
+	return ""
+}
+
 func (a Actor) hasRole(role Role, kind ScopeKind, id int64) bool {
 	for _, m := range a.Memberships {
 		if m.Role == role && m.Scope.Kind == kind && m.Scope.ID == id {

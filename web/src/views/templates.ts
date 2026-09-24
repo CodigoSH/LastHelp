@@ -3383,21 +3383,58 @@ function accentChoice(current: string, text: Text): string {
   </div>`;
 }
 
-/** The organisations, as cards. */
+/** One organisation in the panel's list, as the server says it. */
+export interface OrganizationRow {
+  slug: string;
+  name: string;
+  forge: string;
+  /** How many of its boards this reader works on. */
+  repositories: number;
+  /** What is waiting in those. */
+  pending: number;
+  /** What the reader is there: owner, collaborator or administrator. */
+  role: string;
+  /** Whether its forge has a token, for whoever connects it. */
+  connected?: boolean;
+  can_manage: boolean;
+}
+
+/**
+ * The organisations the reader may open, each saying what they are there,
+ * how many of its boards they work on, what is waiting in those, and whether
+ * its forge is connected — so where the work is shows before opening anything.
+ */
 export function organizationsScreen(
-  orgs: OrganizationSummary[],
-  may: { canAdd: boolean; canManage: (slug: string) => boolean; canDelete: boolean },
+  orgs: OrganizationRow[],
+  may: { canAdd: boolean; canDelete: boolean },
   text: Text,
 ): string {
+  const forgeName = (forge: string) => forgeOptions(text).find(([value]) => value === forge)?.[1] ?? forge;
+  const roleName = (role: string) => (role === "administrator" ? text.t("people.administrator") : text.t(`role.${role}`));
   const rows = orgs
     .map((o) =>
       settingsItem({
+        attrs: `data-org="${escapeAttr(o.slug)}"`,
         lead: `<span class="si-mark">${icons.organization(16)}</span>`,
         name: o.name,
-        sub: `/${o.slug}`,
+        sub: `/${o.slug} · ${text.t("org.repoCount", { count: text.number(o.repositories) })}`,
+        tags: [
+          o.pending > 0
+            ? `<span class="mono-tag waiting" data-pending="${o.pending}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(o.pending) }))}</span>`
+            : "",
+          o.forge && o.forge !== "none"
+            ? `<span class="mono-tag" data-forge="${escapeAttr(o.forge)}">${escapeHTML(forgeName(o.forge))}</span>`
+            : "",
+          o.connected === false
+            ? `<span class="mono-tag waiting" data-connected="false">${escapeHTML(text.t("org.notConnected"))}</span>`
+            : "",
+          o.role
+            ? `<span class="mono-tag${o.role === "owner" ? " accent" : ""}" data-role="${escapeAttr(o.role)}">${escapeHTML(roleName(o.role))}</span>`
+            : "",
+        ].join(""),
         href: `/panel/${o.slug}`,
-        actions: may.canManage(o.slug)
-          ? `${iconButton("edit", text.t("action.edit"), `data-edit-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
+        actions: o.can_manage
+          ? `${iconButton("edit", text.t("organizations.rename"), `data-edit-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
              ${may.canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`) : ""}`
           : "",
       }),
@@ -3410,7 +3447,7 @@ export function organizationsScreen(
         text.t("shell.organizations"),
         orgs.length === 0
           ? emptyState(text.t("panel.firstStep"), icons.organization(28))
-          : `<ul class="settings-list">${rows}</ul>`,
+          : `<ul class="settings-list organizations">${rows}</ul>`,
         {
           lead: text.t("organizations.lead"),
           action: may.canAdd ? actionButton("add", text.t("panel.newOrganization"), 'data-add-org data-open-modal="org-modal"', "primary") : "",

@@ -254,3 +254,56 @@ func TestAnOrganisationPageShowsEachReaderTheirOwnBoards(t *testing.T) {
 		t.Errorf("the organisation's page returned what the forge credentials are: %s", raw)
 	}
 }
+
+// TestTheOrganisationsListIsWhatTheReaderMayOpen.
+//
+// The public list names every organisation, which is right for a visitor. The
+// panel's names the ones this person may open, with what they are there and
+// what is waiting in the boards they work on.
+func TestTheOrganisationsListIsWhatTheReaderMayOpen(t *testing.T) {
+	admin, owner, collaborator := teamSetup(t)
+	admin.submit("acme", "atlas", "bug", "It crashes on start")
+
+	rows := func(who *instance) map[string]map[string]any {
+		body := decode(t, who.do(http.MethodGet, "/api/panel/organizations", nil))
+		out := map[string]map[string]any{}
+		list, _ := body["organizations"].([]any)
+		for _, row := range list {
+			m, _ := row.(map[string]any)
+			out[m["slug"].(string)] = m
+		}
+		return out
+	}
+
+	theirs := rows(collaborator)
+	if len(theirs) != 1 || theirs["acme"] == nil {
+		t.Fatalf("a collaborator on atlas should be listed acme alone: %v", theirs)
+	}
+	if got := theirs["acme"]; got["role"] != "collaborator" || got["repositories"] != float64(1) ||
+		got["pending"] != float64(1) || got["can_manage"] != false {
+		t.Errorf("a collaborator's row says the wrong thing: %v", got)
+	}
+
+	owned := rows(owner)
+	if len(owned) != 1 || owned["acme"]["role"] != "owner" || owned["acme"]["can_manage"] != true {
+		t.Errorf("an owner should be listed their organisation as its owner: %v", owned)
+	}
+
+	all := rows(admin)
+	if len(all) != 2 {
+		t.Errorf("the administrator should be listed every organisation: %v", all)
+	}
+	// Created by the administrator, so owned by them: the role they were given
+	// there comes before the flag that lets them in everywhere.
+	if all["other"]["role"] != "owner" {
+		t.Errorf("the administrator's role where they are an owner: %v", all["other"]["role"])
+	}
+	// And where they hold nothing, what lets them in.
+	if got := status(t, admin.do(http.MethodPost, "/api/orgs/other/team",
+		map[string]string{"username": "owner", "repository": "", "role": ""})); got != http.StatusOK {
+		t.Fatalf("taking the administrator's own role back: %d", got)
+	}
+	if got := rows(admin)["other"]["role"]; got != "administrator" {
+		t.Errorf("the administrator's role where they hold none: %v", got)
+	}
+}

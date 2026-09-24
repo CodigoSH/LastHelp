@@ -134,6 +134,83 @@ func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, body)
 }
 
+// handleOrganizationsPanel is the panel's list of organisations: the ones the
+// reader may open, each with how many of its boards they work on, what is
+// waiting in those, its forge and whether it is connected, and what the reader
+// is there.
+//
+// The public list is every organisation by name, which is right for a visitor
+// and wrong here: a collaborator was shown organisations whose page refuses
+// them, and nobody was shown where the work was waiting until they opened
+// each one.
+func (s *Server) handleOrganizationsPanel(w http.ResponseWriter, r *http.Request) {
+	actor, _ := middleware.ActorFrom(r)
+	list, err := s.orgs().ListOrganizations()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
+	out := make([]map[string]any, 0, len(list))
+	for _, o := range list {
+		manage := actor.Can(authz.ManageOrganization, authz.Organization(o.ID))
+		repos, err := s.orgs().ListRepositories(o.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		ids := make([]int64, 0, len(repos))
+		for _, repo := range repos {
+			if actor.Can(authz.Triage, authz.Repository(repo.ID, o.ID)) {
+				ids = append(ids, repo.ID)
+			}
+		}
+		if !manage && len(ids) == 0 {
+			continue
+		}
+		pending := 0
+		if len(ids) > 0 {
+			counts, err := s.items().Counts(ids, "moderation_state")
+			if err != nil {
+				slog.Error("counting an organisation's queue", "error", err)
+				writeError(w, http.StatusInternalServerError, "error.internal")
+				return
+			}
+			pending = counts[string(item.Pending)]
+		}
+
+		row := map[string]any{
+			"slug":         o.Slug,
+			"name":         o.Name,
+			"forge":        string(o.Forge),
+			"repositories": len(ids),
+			"pending":      pending,
+			"role":         actor.StandingIn(o.ID),
+			"can_manage":   manage,
+		}
+		// Whether it is connected, to whoever connects it — never with what.
+		if manage && o.Forge != org.ForgeNone {
+			_, _, err := s.orgs().Credentials(o.ID)
+			switch {
+			case errors.Is(err, org.ErrNoCredentials):
+				row["connected"] = false
+			case err != nil:
+				writeError(w, http.StatusInternalServerError, "error.internal")
+				return
+			default:
+				row["connected"] = true
+			}
+		}
+		out = append(out, row)
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"organizations": out,
+		"can_add":       actor.Can(authz.ManageServer, authz.Scope{}),
+		"can_delete":    actor.Can(authz.ManageServer, authz.Scope{}),
+	})
+}
+
 // channelKind reads which channel a stored configuration is, and nothing else.
 // Through the notifier's own reader: a second parser of the same JSON is the
 // kind of copy that reads a key the other spells differently.

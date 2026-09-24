@@ -3276,15 +3276,19 @@ function keyboardFor(on: {
 /** The organisations, as cards, with the way to add one. */
 async function showOrganizationsPanel(): Promise<void> {
   if (!(await requirePanel())) return;
-  const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
+  // The panel's list, not the public one: the organisations this person may
+  // open, with what they are there and what is waiting in them.
+  const list = await api.get<{ organizations: views.OrganizationRow[]; can_add: boolean; can_delete: boolean }>(
+    "/api/panel/organizations",
+  );
 
   await showInShell(
-    views.organizationsScreen(
-      organizations ?? [],
-      { canAdd: isAdministrator(), canManage: ownsOrganization, canDelete: isAdministrator() },
-      text,
-    ) +
-      views.modal(
+    views.organizationsScreen(list.organizations ?? [], { canAdd: list.can_add, canDelete: list.can_delete }, text) +
+      // Each dialog only for whoever can open it: a form nobody may send is
+      // one the server would refuse.
+      (!list.can_add
+        ? ""
+        : views.modal(
         {
           id: "org-modal",
           title: text.t("panel.newOrganization"),
@@ -3294,8 +3298,10 @@ async function showOrganizationsPanel(): Promise<void> {
           formClass: "org-form",
         },
         text,
-      ) +
-      views.modal(
+      )) +
+      (!(list.organizations ?? []).some((o) => o.can_manage)
+        ? ""
+        : views.modal(
         {
           id: "org-rename",
           title: text.t("organizations.rename"),
@@ -3304,7 +3310,7 @@ async function showOrganizationsPanel(): Promise<void> {
           formClass: "org-rename-form",
         },
         text,
-      ),
+      )),
     "/panel/organizations",
   );
 

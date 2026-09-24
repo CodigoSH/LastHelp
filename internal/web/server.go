@@ -257,6 +257,7 @@ func (s *Server) routes() {
 	// A repository's page in the panel, and the team of an organisation: who
 	// works where, changed by whoever runs it.
 	private("GET /api/orgs/{org}/repos/{repo}/panel", s.handleRepositoryPanel)
+	private("GET /api/panel/organizations", s.handleOrganizationsPanel)
 	private("GET /api/orgs/{org}/panel", s.handleOrganizationPanel)
 	private("GET /api/orgs/{org}/team", s.handleTeam)
 	private("POST /api/orgs/{org}/team", s.handleTeamChange)

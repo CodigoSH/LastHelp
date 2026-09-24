@@ -251,6 +251,7 @@
   "org.noForgeLead": "No forge connected. Reports are kept in this installation only.",
   "org.notConnected": "Not connected",
   "org.notConnectedHelp": "No token stored yet, so no issue can be opened here. Paste one below.",
+  "org.repoCount": "Repositories: {count}",
   "org.stepForge": "Forge",
   "org.stepIdentity": "Details",
   "org.teamLead": "Owners run {organization} and its forge connection. Collaborators work on one repository, and are added on its page.",
