@@ -125,7 +125,7 @@ invents one the binary does not read. The ones worth knowing about:
 | `LASTHELP_PORT` | `8080` | Listening port. `LASTHELP_ADDR` takes a full address instead |
 | `LASTHELP_DB_FILE` | `lasthelp.db` | The database |
 | `LASTHELP_KEY_FILE` | beside the database | Only for upgrading: where a pre-Beta.04 install kept its encryption key |
-| `LASTHELP_PUBLIC_URL` | empty | Where this instance is reachable, for the links in notifications and feeds |
+| `LASTHELP_PUBLIC_URL` | empty | Where this instance is reachable, for the links in notifications and feeds, and for the share image in link previews |
 | `LASTHELP_TRUST_PROXY` | `false` | Turn on **only** when a reverse proxy really is in front |
 | `LASTHELP_TRUST_PROXY_HOPS` | `1` | How many proxies |
 | `LASTHELP_OFFLINE` | `false` | Stops every outbound connection |

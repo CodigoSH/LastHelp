@@ -167,6 +167,10 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	if composer {
 		body["boards"] = describeBoards(boards)
 		body["has_draft"] = draft != ""
+		// A share picture is announced only at an absolute address, so the
+		// editor says so when none is configured rather than letting the
+		// operator choose one nobody will ever see.
+		body["share_ready"] = s.cfg.PublicURL != ""
 	}
 	writeJSON(w, http.StatusOK, body)
 }

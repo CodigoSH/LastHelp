@@ -1562,6 +1562,32 @@ async function main() {
     JSON.stringify({ sinEtiqueta, conEtiqueta }),
   );
 
+  // The page's own settings: the title and description a shared link shows,
+  // and a link at the foot of the page.
+  await evaluate(`document.querySelector('[data-bar="settings"]').click()`);
+  await waitFor('.lpe-panel [data-bind="page.title"]');
+  await evaluate(`
+    const set = (bind, v) => { const i = document.querySelector('.lpe-panel [data-bind="' + bind + '"]');
+      i.value = v; i.dispatchEvent(new Event("input", { bubbles: true })); };
+    set("page.title", "Our help desk");
+    set("page.description", "Where we listen.");
+    document.querySelector('.lpe-panel [data-act="add-link"]').click();
+  `);
+  await sleep(200);
+  await evaluate(`const to = document.querySelector('.lpe-panel [data-link-field="to"]'); to.value = "url"; to.dispatchEvent(new Event("change", { bubbles: true }))`);
+  await sleep(200);
+  await evaluate(`
+    const l = document.querySelector('.lpe-panel [data-link-field="label"]'); l.value = "Status"; l.dispatchEvent(new Event("input", { bubbles: true }));
+    const u = document.querySelector('.lpe-panel [data-link-field="url"]'); u.value = "https://status.example.com"; u.dispatchEvent(new Event("input", { bubbles: true }));
+  `);
+  await sleep(1200);
+  const pie = await evaluate(`return [...document.querySelectorAll(".lpe-canvas .lp-footer-links a")].map(a => a.textContent.trim() + " " + a.getAttribute("href"))`);
+  check(
+    "a footer link shows on the page as it is written",
+    pie.some((l: string) => l === "Status https://status.example.com"),
+    JSON.stringify(pie),
+  );
+
   // The phone preview is the phone layout, not a narrowed desktop one.
   await evaluate(`document.querySelector('[data-bar="phone"]').click()`);
   await sleep(300);
@@ -1588,6 +1614,43 @@ async function main() {
       publicado.controles === 0 && publicado.borrador === false,
     JSON.stringify(publicado),
   );
+
+  // The title and description are in the HTML the server sends — a link
+  // preview is made by a program that never runs the page's script.
+  const cabecera = String(await evaluate(`return fetch("/", { cache: "no-store" }).then(r => r.text())`));
+  check(
+    "the published title and description are in the page the server sends",
+    cabecera.includes("<title>Our help desk</title>") && cabecera.includes('<meta name="description" content="Where we listen." />'),
+    cabecera.slice(0, 300),
+  );
+
+  // Restoring the default is a change like any other: it goes to the draft,
+  // and Ctrl+Z takes it back.
+  await evaluate(`document.querySelector("body > nav [data-edit-page]")?.click()`);
+  await waitFor(".lpe .lp-editing");
+  await evaluate(`document.querySelector('[data-bar="settings"]').click()`);
+  await waitFor('.lpe-panel [data-act="restore"]');
+  await evaluate(`window.confirm = () => true; document.querySelector('.lpe-panel [data-act="restore"]').click()`);
+  await sleep(1500);
+  const restaurado = await evaluate(`
+    const d = await (async () => { ${leerBorrador} })();
+    const p = await (async () => { ${leerPublicada} })();
+    return { titulo: d.settings?.title ?? "", secciones: d.bands.map(b => b.id).join(), publicada: p.settings?.title ?? "" };
+  `);
+  await evaluate(`document.activeElement?.blur()`);
+  await tecla("z", ", ctrlKey: true");
+  await sleep(1300);
+  const devuelto = await evaluate(`const d = await (async () => { ${leerBorrador} })(); return d.settings?.title ?? ""`);
+  check(
+    "restoring the default goes to the draft, and Ctrl+Z takes it back",
+    restaurado.titulo === "" && restaurado.secciones === "top,where,activity,how" &&
+      restaurado.publicada === "Our help desk" && devuelto === "Our help desk",
+    JSON.stringify({ ...restaurado, devuelto }),
+  );
+  await evaluate(`window.confirm = () => true; document.querySelector('[data-bar="discard"]').click()`);
+  await sleep(1300);
+  await evaluate(`document.querySelector("body > nav [data-edit-done]")?.click()`);
+  await waitFor(".lp:not(.lp-editing)");
 
   // Discard: a change made and thrown away leaves the published page as it was.
   await evaluate(`document.querySelector("body > nav [data-edit-page]")?.click()`);

@@ -16,6 +16,7 @@ import {
   type LandingKind,
   type LandingLink,
   type LandingModule,
+  type LandingSettings,
 } from "./landing";
 import type { Text } from "./templates";
 
@@ -30,6 +31,8 @@ export interface EditBarState {
   saving: "idle" | "saving" | "failed";
   /** Why the draft cannot be saved as it is, in words for the operator. */
   problem?: string;
+  /** Whether the page settings are what the panel shows. */
+  pageOpen?: boolean;
 }
 
 /**
@@ -66,7 +69,7 @@ export function editBar(s: EditBarState, text: Text): string {
     </div>
     ${state}
     <div class="lpe-bar-group end">
-      ${barTool("settings", text.t("landing.pageSettings"), icons.palette(16))}
+      ${barTool("settings", text.t("landing.pageSettings"), icons.palette(16), true, s.pageOpen === true)}
       <button type="button" class="button ghost small" data-bar="discard" ${s.unpublished ? "" : "disabled"}>${escapeHTML(
         text.t("landing.discard"),
       )}</button>
@@ -92,6 +95,8 @@ export interface PanelContext {
   tab: "content" | "appearance";
   /** The default name a band of the default page wears, or "". */
   defaultName: (band: LandingBand) => string;
+  /** Whether a public address is configured, which a share picture needs. */
+  shareReady: boolean;
 }
 
 /**
@@ -102,7 +107,7 @@ export interface PanelContext {
  * button would make it a question whether what is on it is real.
  */
 export function panel(
-  chosen: { band: LandingBand } | { module: LandingModule } | null,
+  chosen: { band: LandingBand } | { module: LandingModule } | { page: LandingSettings } | null,
   ctx: PanelContext,
   text: Text,
 ): string {
@@ -112,6 +117,7 @@ export function panel(
       <p>${escapeHTML(text.t("landing.chooseSomething"))}</p>
     </div>`;
   }
+  if ("page" in chosen) return pagePanel(chosen.page, ctx, text);
   if ("band" in chosen) return bandPanel(chosen.band, ctx, text);
   return modulePanel(chosen.module, ctx, text);
 }
@@ -190,6 +196,55 @@ export function scopeOptions(boards: LandingBoard[], current: string, text: Text
   }
   if (current && !out.some(([v]) => v === current)) out.push([current, text.t("landing.scopeGone", { scope: current })]);
   return out;
+}
+
+/**
+ * The page as a whole: what a browser tab and a shared link call it, the
+ * picture a shared link shows, the links at its foot, and the way back to the
+ * page every installation starts with.
+ */
+function pagePanel(set: LandingSettings, ctx: PanelContext, text: Text): string {
+  return `${panelHead(icons.palette(16), text.t("landing.pageSettings"), text)}
+    <div class="lpe-panel-body">
+      ${input("page.title", text.t("landing.pageTitle"), set.title ?? "", {
+        placeholder: ctx.instance.name || text.t("app.name"),
+        hint: text.t("landing.pageTitleHint"),
+        max: 120,
+      })}
+      ${input("page.description", text.t("landing.pageDescription"), set.description ?? "", {
+        hint: text.t("landing.pageDescriptionHint"),
+        max: 200,
+      })}
+      <div class="field">
+        <span class="label">${escapeHTML(text.t("landing.shareImage"))}</span>
+        <div class="lpe-image">
+          ${
+            set.share_image
+              ? `<img src="${escapeAttr(set.share_image)}" alt="" />`
+              : `<div class="lpe-image-none">${icons.image(28)}</div>`
+          }
+          <div class="lpe-image-actions">
+            <button type="button" class="button ghost small" data-act="pick-share">${icons.upload(14)}<span>${escapeHTML(
+              text.t(set.share_image ? "landing.replaceImage" : "landing.uploadImage"),
+            )}</span></button>
+            ${
+              set.share_image
+                ? `<button type="button" class="button ghost small danger" data-act="drop-share">${escapeHTML(text.t("action.remove"))}</button>`
+                : ""
+            }
+          </div>
+        </div>
+        <p class="hint">${escapeHTML(text.t(ctx.shareReady ? "landing.shareImageHint" : "landing.shareImageNoURL"))}</p>
+      </div>
+      <div class="field">
+        <span class="label">${escapeHTML(text.t("landing.footerLinks"))}</span>
+        ${linksFields(set.footer ?? [], ctx, text)}
+      </div>
+      <div class="lpe-restore">
+        <p class="hint">${escapeHTML(text.t("landing.restoreHint"))}</p>
+        <button type="button" class="button ghost small danger" data-act="restore">${escapeHTML(text.t("landing.restore"))}</button>
+      </div>
+    </div>`;
 }
 
 function bandPanel(b: LandingBand, ctx: PanelContext, text: Text): string {

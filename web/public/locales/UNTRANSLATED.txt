@@ -30,12 +30,14 @@ landing.bgSoft
 landing.caption
 landing.chooseSomething
 landing.confirmDiscard
+landing.confirmRestore
 landing.discard
 landing.display
 landing.displayCards
 landing.displayList
 landing.drag
 landing.duplicate
+landing.footerLinks
 landing.groupContent
 landing.groupLayouts
 landing.groupPortal
@@ -78,8 +80,11 @@ landing.noImage
 landing.noLinks
 landing.noName
 landing.notSaved
+landing.pageDescription
+landing.pageDescriptionHint
 landing.pageSettings
-landing.pageSettingsSoon
+landing.pageTitle
+landing.pageTitleHint
 landing.point1Title
 landing.point2Title
 landing.point3Title
@@ -104,6 +109,8 @@ landing.readyAbout.text
 landing.readyAbout.where
 landing.replaceImage
 landing.reportIn
+landing.restore
+landing.restoreHint
 landing.sampleTitle
 landing.saving
 landing.scopeGone
@@ -111,6 +118,9 @@ landing.scopeOrg
 landing.searchNone
 landing.searchPlaceholder
 landing.section
+landing.shareImage
+landing.shareImageHint
+landing.shareImageNoURL
 landing.show
 landing.showLogo
 landing.showPlanned

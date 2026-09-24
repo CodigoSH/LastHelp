@@ -2415,14 +2415,20 @@ body > main:has(> .lpe) {
 .lpe-seg { margin-block-start: 0; }
 .lpe-seg .segment { padding: 6px; }
 
-.lpe-check {
+/* Weighted past `.field label`, which makes a label a block of bold text: a
+   checkbox inside a field lost its words to a line of its own. */
+.lpe-panel-body .lpe-check {
   display: flex;
+  font-weight: 400;
   align-items: center;
   gap: 0.5rem;
   margin-block-end: 0.75rem;
   font-size: 0.9rem;
   cursor: pointer;
 }
+
+/* A box, not a field: inside a field every input is as wide as the column. */
+.lpe-panel-body .lpe-check input { inline-size: auto; flex: none; margin: 0; }
 
 .lpe-layouts {
   display: grid;
@@ -2492,6 +2498,17 @@ body > main:has(> .lpe) {
 }
 
 .lpe-image-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+/* Restoring the default is the one change here that replaces everything, so
+   it stands apart at the foot of the page settings. */
+.lpe-restore {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  margin-block-start: 1.5rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid var(--border);
+}
 
 /* ---- the pickers ---- */
 

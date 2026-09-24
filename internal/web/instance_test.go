@@ -1,6 +1,7 @@
 package web
 
 import (
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -329,5 +330,54 @@ func TestTheFrontPageSearchFindsWhatIsPublished(t *testing.T) {
 	short := decode(t, i.anonymous().do(http.MethodGet, "/api/search?q=d", nil))
 	if items, _ := short["items"].([]any); len(items) != 0 {
 		t.Errorf("one character searched: %v", items)
+	}
+}
+
+// TestThePageHeadCarriesThePageSettings.
+//
+// A link preview is built by a program that never runs the page's script, so
+// the title and description have to be in the HTML the server sends — and the
+// operator's words go into attributes, so a quote must not end one.
+func TestThePageHeadCarriesThePageSettings(t *testing.T) {
+	i := newInstance(t)
+	i.claim()
+
+	shell := func() string {
+		t.Helper()
+		resp := i.anonymous().do(http.MethodGet, "/", nil)
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return string(body)
+	}
+
+	// Nothing chosen: the installation's own name.
+	if got := shell(); !strings.Contains(got, "<title>LastHelp</title>") || strings.Contains(got, `name="description"`) {
+		t.Fatalf("an untouched installation's head:\n%s", got)
+	}
+
+	page := frontPage(t, i, "")
+	page["settings"] = map[string]any{"title": `Acme "support"`, "description": "Bugs & ideas <here>"}
+	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", page)); got != http.StatusOK {
+		t.Fatalf("saving the draft: %d", got)
+	}
+	// A draft is not what a link shows.
+	if got := shell(); strings.Contains(got, "Acme") {
+		t.Fatalf("the draft's title reached the head before publishing")
+	}
+	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
+		t.Fatalf("publishing: %d", got)
+	}
+	got := shell()
+	for _, want := range []string{
+		"<title>Acme &#34;support&#34;</title>",
+		`<meta property="og:title" content="Acme &#34;support&#34;" />`,
+		`<meta name="description" content="Bugs &amp; ideas &lt;here&gt;" />`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the head lacks %s:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "og:image") {
+		t.Errorf("a picture was announced with no picture and no public address")
 	}
 }

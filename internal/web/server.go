@@ -123,6 +123,12 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 		return nil, fmt.Errorf("the embedded frontend has no index.html: %w", err)
 	}
 	s.shell = string(shell)
+	// The head is written into the title's place. A build whose index lost
+	// that line would serve every page untitled and unpreviewable without a
+	// word, so it is refused here instead.
+	if !strings.Contains(s.shell, shellTitle) {
+		return nil, fmt.Errorf("the embedded index.html has no %s to write the page head into", shellTitle)
+	}
 
 	// Secrets are stored as they are given, and the one thing left that knows
 	// how to open a sealed value is the migration that empties the old columns.
@@ -338,6 +344,7 @@ func (s *Server) serveShell(w http.ResponseWriter, r *http.Request) {
 	shell := strings.NewReplacer(
 		`lang="en"`, `lang="`+lang+`"`,
 		`dir="ltr"`, `dir="`+direction(lang)+`"`,
+		shellTitle, s.head(),
 	).Replace(s.shell)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

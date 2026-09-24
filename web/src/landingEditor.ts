@@ -50,7 +50,11 @@ interface Composed extends LandingPage {
   content?: LandingContent;
   boards?: LandingBoard[];
   has_draft?: boolean;
+  share_ready?: boolean;
 }
+
+/** What the panel shows when the page as a whole is chosen: no band or module has this id. */
+const PAGE = " page";
 
 /** A fresh id nobody on the page has, for a band or a module. */
 function freshID(kind: string): string {
@@ -77,6 +81,7 @@ export class LandingEditor {
   private content: LandingContent = {};
   private boards: LandingBoard[] = [];
   private unpublished = false;
+  private shareReady = false;
 
   private past: string[] = [];
   private future: string[] = [];
@@ -122,6 +127,7 @@ export class LandingEditor {
     this.content = composed.content ?? {};
     this.boards = composed.boards ?? [];
     this.unpublished = composed.has_draft === true;
+    this.shareReady = composed.share_ready === true;
     this.filledFor = dataSignature(this.page);
   }
 
@@ -337,6 +343,7 @@ export class LandingEditor {
         unpublished: this.unpublished,
         saving: this.saving,
         problem: this.problem() || undefined,
+        pageOpen: this.selected === PAGE,
       },
       this.text,
     );
@@ -374,13 +381,21 @@ export class LandingEditor {
     const aside = this.el(".lpe-panel");
     if (!aside) return;
     const found = this.selected ? this.find(this.selected) : null;
-    const chosen = !found ? null : found.module ? { module: found.module } : { band: found.band };
+    const chosen =
+      this.selected === PAGE
+        ? { page: this.page.settings }
+        : !found
+          ? null
+          : found.module
+            ? { module: found.module }
+            : { band: found.band };
     aside.innerHTML = editorViews.panel(
       chosen,
       {
         boards: this.boards,
         instance: this.host.instance(),
         tab: this.tab,
+        shareReady: this.shareReady,
         defaultName: (b) => (b.id === "where" ? this.text.t("landing.bandWhere") : b.id === "how" ? this.text.t("landing.bandHow") : ""),
       },
       this.text,
@@ -395,6 +410,7 @@ export class LandingEditor {
     this.host.root.querySelectorAll(".lpe-canvas .is-selected").forEach((n) => n.classList.remove("is-selected"));
     if (id) this.host.root.querySelector(`.lpe-canvas [data-module="${CSS.escape(id)}"], .lpe-canvas [data-band="${CSS.escape(id)}"]`)?.classList.add("is-selected");
     this.drawPanel();
+    this.drawBar();
   }
 
   private focusSelected(): void {
@@ -548,7 +564,6 @@ export class LandingEditor {
 
   private async click(e: MouseEvent): Promise<void> {
     const target = e.target as HTMLElement;
-    const t = this.text.t;
 
     const bar = target.closest<HTMLElement>("[data-bar]");
     if (bar) {
@@ -569,7 +584,7 @@ export class LandingEditor {
         case "deselect":
           return this.choose("");
         case "settings":
-          return this.host.toast(t("landing.pageSettingsSoon"));
+          return this.choose(this.selected === PAGE ? "" : PAGE);
       }
       return;
     }
@@ -807,6 +822,18 @@ export class LandingEditor {
    * checks field by field.
    */
   private setField(bind: string, raw: string | boolean, redraw: "all" | "page"): void {
+    if (bind.startsWith("page.")) {
+      const key = bind.slice(5) as "title" | "description";
+      const settings = this.page.settings;
+      return this.change(
+        () => {
+          const value = String(raw);
+          if (value.trim() === "") delete settings[key];
+          else settings[key] = value;
+        },
+        { key: `${bind}`, redraw: "none" },
+      );
+    }
     const found = this.selected ? this.find(this.selected) : null;
     if (!found) return;
     const onBand = bind.startsWith("band.");
@@ -883,10 +910,21 @@ export class LandingEditor {
     return found && found.module ? found.module : null;
   }
 
-  private setLink(i: number, field: string, value: string | boolean, redrawPanel: boolean): void {
+  /** The list of links the panel is editing: a links module's, or the page's foot. */
+  private chosenLinks(create = false): LandingLink[] | null {
+    if (this.selected === PAGE) {
+      if (create && !this.page.settings.footer) this.page.settings.footer = [];
+      return this.page.settings.footer ?? [];
+    }
     const m = this.chosenModule();
-    const link = m?.links?.[i];
-    if (!m || !link) return;
+    if (!m || m.kind !== "links") return null;
+    if (create && !m.links) m.links = [];
+    return m.links ?? [];
+  }
+
+  private setLink(i: number, field: string, value: string | boolean, redrawPanel: boolean): void {
+    const link = this.chosenLinks()?.[i];
+    if (!link) return;
     this.change(
       () => {
         if (field === "label") link.label = String(value);
@@ -901,16 +939,22 @@ export class LandingEditor {
           else delete link.url;
         }
       },
-      { key: `link:${m.id}:${i}:${field}`, redraw: redrawPanel ? "all" : "page" },
+      { key: `link:${this.selected}:${i}:${field}`, redraw: redrawPanel ? "all" : "page" },
     );
   }
 
   private async panelAct(button: HTMLElement): Promise<void> {
-    const m = this.chosenModule();
-    if (!m) return;
+    switch (button.dataset.act) {
+      case "pick-share":
+        return this.upload((path) => (this.page.settings.share_image = path));
+      case "drop-share":
+        return this.change(() => delete this.page.settings.share_image);
+      case "restore":
+        return this.restore();
+    }
     if (button.dataset.linkAct) {
       const i = Number(button.dataset.link);
-      const links = m.links ?? [];
+      const links = this.chosenLinks() ?? [];
       if (button.dataset.linkAct === "remove") this.change(() => links.splice(i, 1));
       else if (button.dataset.linkAct === "up" && i > 0) this.change(() => links.splice(i - 1, 0, ...links.splice(i, 1)));
       return;
@@ -918,36 +962,65 @@ export class LandingEditor {
     switch (button.dataset.act) {
       case "add-link": {
         const first = this.boards[0];
-        this.change(() => {
-          m.links = [
-            ...(m.links ?? []),
+        this.change(() =>
+          this.chosenLinks(true)?.push(
             first ? { label: "", to: "form", scope: `${first.org}/${first.slug}` } : { label: "", to: "url", url: "" },
-          ];
-        });
+          ),
+        );
         // Straight to the label, which is what a new link is missing.
         const labels = this.host.root.querySelectorAll<HTMLInputElement>('.lpe-panel [data-link-field="label"]');
         labels[labels.length - 1]?.focus();
         return;
       }
-      case "pick-image": {
-        const file = await pickImageFile();
-        if (!file) return;
-        try {
-          const path = await putImage(file);
-          this.change(() => (m.image = path));
-          this.host.root.querySelector<HTMLInputElement>('.lpe-panel [data-bind="alt"]')?.focus();
-        } catch (err) {
-          if (err instanceof NoWebP) this.host.toastError(this.text.t("error.no_webp"));
-          else this.host.report(err);
-        }
+    }
+    const m = this.chosenModule();
+    if (!m) return;
+    switch (button.dataset.act) {
+      case "pick-image":
+        await this.upload((path) => (m.image = path));
+        // A picture is not saved without its description, so that is next.
+        this.host.root.querySelector<HTMLInputElement>('.lpe-panel [data-bind="alt"]')?.focus();
         return;
-      }
       case "drop-image":
         return this.change(() => {
           delete m.image;
           delete m.alt;
           delete m.caption;
         });
+    }
+  }
+
+  /** Asks for a picture, stores it, and hands its address to `put` as one change. */
+  private async upload(put: (path: string) => void): Promise<void> {
+    const file = await pickImageFile();
+    if (!file) return;
+    try {
+      const path = await putImage(file);
+      this.change(() => put(path));
+    } catch (err) {
+      if (err instanceof NoWebP) this.host.toastError(this.text.t("error.no_webp"));
+      else this.host.report(err);
+    }
+  }
+
+  /**
+   * Back to the page every installation starts with — as a change like any
+   * other: it goes to the draft, visitors see nothing until Publish, and
+   * Ctrl+Z takes it back.
+   */
+  private async restore(): Promise<void> {
+    if (!confirm(this.text.t("landing.confirmRestore"))) return;
+    try {
+      await this.flush();
+      const fresh = await api.post<LandingPage>("/api/landing/restore");
+      this.change(() => {
+        this.page.bands = fresh.bands;
+        this.page.settings = fresh.settings ?? {};
+      });
+      this.selected = PAGE;
+      this.drawPanel();
+    } catch (err) {
+      this.host.report(err);
     }
   }
 
