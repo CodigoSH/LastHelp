@@ -8,3 +8,16 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+landing.bandHow
+landing.bandWhere
+landing.madeWith
+landing.moduleLinks
+landing.noImage
+landing.noLinks
+landing.point1Title
+landing.point2Title
+landing.point3Title
+landing.reportIn
+landing.searchNone
+landing.searchPlaceholder
+landing.showPlanned

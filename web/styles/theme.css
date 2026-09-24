@@ -358,11 +358,9 @@ html:has(> body:not(.admin-view))::-webkit-scrollbar { display: none; }
    reduced-motion rule of its own and a timer that must keep running. */
 @media (prefers-reduced-motion: reduce) {
   .page > *,
-  .hero > *,
-  .cards > li,
-  .items > li,
-  .points > li,
-  .roadmap .column {
+.cards > li,
+.items > li,
+.roadmap .column {
     animation: none !important;
   }
 }
@@ -428,20 +426,6 @@ body > main {
   max-inline-size: var(--page);
   margin-inline: auto;
   padding: clamp(1.5rem, 4vw, 2.5rem) 1.25rem 5rem;
-}
-
-/*
- * The front page is not a column.
- *
- * Every other public screen asks for one thing — report this, read that, sign
- * in — and a measure keeps those readable. The front page shows things, and the
- * dashboard this grid comes from runs its tiles to within a margin of the
- * window. Kept as one rule about the page that holds a grid rather than a class
- * the view has to remember to pass.
- */
-body > main:has(.landing-grid) {
-  max-inline-size: none;
-  padding-inline: clamp(1rem, 2.5vw, 2rem);
 }
 
 /*
@@ -1475,33 +1459,10 @@ summary:focus-visible,
 
 .exports { font-size: 0.875rem; margin-block: 0.5rem 0; }
 
-/* ---------------------------------------------------------------- landing
- *
- * A fresh instance used to open on one grey sentence: "nothing is set up yet".
- * Nothing said what this is, who it is for, or what to do next, and the
- * operator who asked for this read it — correctly — as an unfinished product.
- * The first screen has to introduce the thing before it admits it is empty.
- *
- * What it says now is the name of the installation, under its own mark: this
- * page is the front door of somebody's project, not an advertisement for the
- * software running it. The software's name is in the footer of the About
- * screen, where an operator looks for it.
- */
-.hero {
-  display: grid;
-  justify-items: center;
-  gap: 0.75rem;
-  padding-block: clamp(2rem, 7vw, 4rem) 0;
-  text-align: center;
-}
+/* ------------------------------------------------------------ shared marks */
 
-.hero > * { animation: rise 0.5s var(--ease) both; }
-.hero > *:nth-child(2) { animation-delay: 0.07s; }
-.hero > *:nth-child(3) { animation-delay: 0.14s; }
-.hero > *:nth-child(4) { animation-delay: 0.21s; }
-
-/* The mark, lit from behind. It is the only ornament on the page and it earns
-   its place by being the thing the installation is recognised by. */
+/* A large mark in a lit tile, for a screen that has one thing to say — a page
+   that could not be shown. */
 .hero-mark {
   display: grid;
   place-items: center;
@@ -1512,60 +1473,6 @@ summary:focus-visible,
   border: 1px solid var(--border);
   box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
 }
-
-.hero h1 {
-  font-size: clamp(2.1rem, 1.2rem + 3.4vw, 3.5rem);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.hero .lead {
-  font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.25rem);
-  max-inline-size: 34rem;
-  margin: 0;
-  color: var(--text-dim);
-  text-wrap: balance;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin-block-start: 0.5rem;
-}
-
-/* Three short lines under the hero. Not a feature grid: the whole product is
-   one journey, and a wall of cards would promise a suite it is not. Each one
-   carries the mark of what it talks about, which is what stops three
-   paragraphs of grey text reading as small print. */
-.points {
-  display: grid;
-  /* Three, or one. Two columns leave an orphan on the second row, which
-     reads as a layout that ran out rather than as three points. */
-  grid-template-columns: 1fr;
-  gap: 0.75rem;
-  margin-block: 0;
-  text-align: start;
-}
-
-.points > li {
-  display: flex;
-  align-items: start;
-  gap: 0.75rem;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel) 65%, transparent);
-  color: var(--text-dim);
-  font-size: 0.925rem;
-  animation: rise 0.45s var(--ease) both;
-}
-
-.points > li:nth-child(2) { animation-delay: 0.08s; }
-.points > li:nth-child(3) { animation-delay: 0.16s; }
 
 .point-icon {
   display: grid;
@@ -1578,15 +1485,575 @@ summary:focus-visible,
   color: var(--accent-alt);
 }
 
-/*
- * Three across, for the one place that still draws three of them at once: the
- * wizard's summary. A point on the front page is a module of its own now, so in
- * there it fills the module it was given and how many go side by side is the
- * operator's decision, made by dragging — not this rule's.
+/* ------------------------------------------------------------ the front page
+ *
+ * A stack of bands. Each band is a stretch of the window with its own
+ * background and one row of columns inside it; each column holds modules, one
+ * under the other. That is the whole model — the one every website builder
+ * settles on, and the reason this one needs no coordinates: a band says what
+ * goes beside what, and reading order says the rest, including on a phone.
+ *
+ * The page is not a column. Every other public screen asks for one thing and a
+ * measure keeps it readable; this one shows several, so the bands run to the
+ * window's edges and their contents keep the page's measure inside them.
  */
-@media (min-width: 52rem) {
-  .points:not(.landing-cell .points) { grid-template-columns: repeat(3, 1fr); }
+body > main:has(> .lp) {
+  max-inline-size: none;
+  padding: 0;
 }
+
+/* A column, so a short page still ends with its foot at the bottom. */
+.lp {
+  display: flex;
+  flex-direction: column;
+  min-block-size: calc(100vh - 3.5rem);
+}
+
+.lp-band { position: relative; }
+
+/* The band with the search open sits above the rest: every module animates in,
+   and an animated transform makes a stacking context of its own, so without
+   this the results would open underneath the next band's cards. */
+.lp-band:has(.lp-results:not([hidden])) { z-index: 5; }
+
+.lp-band.bg-soft {
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+  border-block: 1px solid var(--border);
+}
+
+.lp-band.bg-accent {
+  background: var(--accent-wash);
+  border-block: 1px solid rgba(var(--accent-rgb), 0.18);
+}
+
+/* Two coloured bands in a row share one line between them, not two. */
+.lp-band:is(.bg-soft, .bg-accent) + .lp-band:is(.bg-soft, .bg-accent) { border-block-start: 0; }
+
+.lp-inner {
+  max-inline-size: var(--page);
+  margin-inline: auto;
+  padding-inline: 1.25rem;
+}
+
+.lp-band.full > .lp-inner {
+  max-inline-size: none;
+  padding-inline: clamp(1rem, 2.5vw, 2rem);
+}
+
+.lp-band.space-compact > .lp-inner { padding-block: 1.25rem; }
+.lp-band.space-normal > .lp-inner { padding-block: clamp(1.75rem, 4vw, 2.75rem); }
+.lp-band.space-airy > .lp-inner { padding-block: clamp(2.75rem, 8vw, 5rem); }
+
+/* A band's name, in the house pill: the same letters, border and chip as the
+   pill a section wears, set in the flow above the band rather than on a border
+   the band does not have. */
+.lp-pill {
+  display: flex;
+  inline-size: fit-content;
+  margin: 0 0 1.1rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.lp-cols {
+  display: grid;
+  gap: 1.25rem;
+  /* Every column as tall as the tallest: two lists side by side end on one
+     line rather than one short and one long. */
+  align-items: stretch;
+}
+
+.lp-cols.cols-1 { grid-template-columns: minmax(0, 1fr); }
+.lp-cols.cols-1-1 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lp-cols.cols-1-1-1 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lp-cols.cols-2-1 { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.lp-cols.cols-1-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.lp-cols.cols-1-1-1-1 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.lp-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-inline-size: 0;
+}
+
+/* The last module of a column takes what is left, which is what lines the
+   bottoms up across the band. */
+.lp-col > .lp-mod:last-child { flex: 1 0 auto; }
+
+/* Four across is four narrow columns: two by two until there is room. */
+@media (max-width: 64rem) {
+  .lp-cols.cols-1-1-1-1 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* On a phone every band is one column, in reading order. */
+@media (max-width: 45rem) {
+  .lp-cols[class*="cols-"] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- a module ---- */
+
+.lp-mod {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  animation: rise 0.45s var(--ease) both;
+}
+
+.lp-col > .lp-mod:nth-child(2) { animation-delay: 0.06s; }
+.lp-col:nth-child(2) > .lp-mod { animation-delay: 0.08s; }
+.lp-col:nth-child(3) > .lp-mod { animation-delay: 0.16s; }
+.lp-col:nth-child(4) > .lp-mod { animation-delay: 0.24s; }
+
+/* The three dresses. A card is the house's card; soft is the same box with no
+   border to hold it, for a band that already has a background; plain is the
+   content alone. */
+.lp-mod.style-card {
+  padding: 1.1rem 1.2rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+  box-shadow: var(--card-shadow);
+}
+
+.lp-mod.style-soft {
+  padding: 1.1rem 1.2rem;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-dim) 60%, transparent);
+}
+
+.lp-mod.style-plain { padding: 0; }
+
+/* A module's name: its mark and its name above what it shows, with a line
+   under them — the recipe a widget's header uses. */
+.lp-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-block-end: 0.65rem;
+  margin-block-end: 0.75rem;
+  border-block-end: 1px solid var(--border);
+}
+
+.lp-head-icon { display: flex; color: var(--accent); }
+
+.lp-head h3 {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lp-mod .empty { flex: 1; align-content: center; }
+
+/* ---- the heading ---- */
+
+.lp-heading {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.lp-heading.align-start {
+  justify-items: start;
+  text-align: start;
+}
+
+.lp-heading > * { animation: rise 0.5s var(--ease) both; }
+.lp-heading > :nth-child(2) { animation-delay: 0.07s; }
+.lp-heading > :nth-child(3) { animation-delay: 0.14s; }
+.lp-heading > :nth-child(4) { animation-delay: 0.21s; }
+
+/* The mark, lit from behind: the one ornament on the page, and it earns its
+   place by being what the installation is recognised by. */
+.lp-logo {
+  display: grid;
+  place-items: center;
+  inline-size: 4.5rem;
+  block-size: 4.5rem;
+  margin-block-end: 0.25rem;
+  border-radius: var(--radius-xl);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
+}
+
+.lp-heading h1 {
+  margin: 0;
+  font-size: clamp(2.1rem, 1.2rem + 3.4vw, 3.4rem);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+  overflow-wrap: anywhere;
+}
+
+.lp-subtitle {
+  margin: 0;
+  max-inline-size: 40rem;
+  font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.25rem);
+  color: var(--text-dim);
+  text-wrap: balance;
+}
+
+.lp-heading .lp-search {
+  margin-block-start: 0.75rem;
+  inline-size: min(100%, 36rem);
+}
+
+/* ---- the search ---- */
+
+.lp-search {
+  position: relative;
+  inline-size: 100%;
+  text-align: start;
+}
+
+.lp-search-icon {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0.95rem;
+  block-size: 3rem;
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.lp-search input {
+  inline-size: 100%;
+  block-size: 3rem;
+  padding-inline: 2.75rem 1rem;
+  border-radius: var(--radius-lg);
+  font-size: 1rem;
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+}
+
+.lp-results {
+  position: absolute;
+  z-index: 20;
+  inset-inline: 0;
+  inset-block-start: calc(100% + 0.4rem);
+  display: grid;
+  padding: 0.35rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--shadow-lg);
+  animation: rise 0.18s var(--ease) both;
+}
+
+.lp-results[hidden] { display: none; }
+
+.lp-hit {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+}
+
+.lp-hit:hover,
+.lp-hit:focus-visible { background: var(--surface-hover); }
+
+.lp-hit-title {
+  flex: 1;
+  min-inline-size: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The way to write a new one, set apart from what was found. */
+.lp-hit-new { color: var(--accent-alt); }
+.lp-hit + .lp-hit-new:not(.lp-hit-new + .lp-hit-new),
+.lp-hit-none + .lp-hit-new {
+  margin-block-start: 0.3rem;
+  border-block-start: 1px solid var(--border);
+  border-start-start-radius: 0;
+  border-start-end-radius: 0;
+  padding-block-start: 0.7rem;
+}
+
+.lp-hit-plus {
+  display: grid;
+  place-items: center;
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent-wash);
+}
+
+.lp-hit-none {
+  margin: 0;
+  padding: 0.55rem 0.6rem;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+/* ---- words ---- */
+
+.lp-mod .words { block-size: auto; padding: 0; flex: 1; }
+
+.words.tone-note .words-box,
+.words.tone-notice .words-box {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius);
+  border-inline-start: 3px solid var(--hue-open);
+  background: rgba(var(--info-rgb), 0.07);
+}
+
+.words.tone-notice .words-box {
+  border-inline-start-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+/* A point of the default page: its mark, a short title, one line. */
+.point {
+  display: flex;
+  align-items: start;
+  gap: 0.8rem;
+}
+
+/* The title is as tall as the mark beside it, so the two sit on one line.
+   Scoped to the words box because its own h3 and p rules come later in this
+   sheet and would otherwise win with the same weight. */
+.words-box .point h3 { margin: 0 0 0.2rem; font-size: 1rem; line-height: 2.1rem; }
+.words-box .point p { margin: 0; color: var(--text-dim); font-size: 0.925rem; }
+
+/* ---- boards ---- */
+
+.lp-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.85rem;
+}
+
+.lp-card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  block-size: 100%;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s var(--ease), transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.lp-card:hover {
+  border-color: var(--accent-line);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.lp-card-body {
+  display: grid;
+  gap: 0.3rem;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.lp-card-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lp-card-go {
+  display: flex;
+  color: var(--text-dim);
+  transform: scaleX(var(--rtl-flip));
+  transition: color 0.15s var(--ease);
+}
+
+.lp-card:hover .lp-card-go { color: var(--accent); }
+
+.lp-board-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  inline-size: 2.4rem;
+  block-size: 2.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent-alt);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.lp-rows .lp-board-mark {
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+}
+
+.lp-accepts { display: flex; gap: 0.35rem; }
+
+.lp-org + .lp-org { margin-block-start: 1.1rem; }
+
+.lp-org-name {
+  margin: 0 0 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- lists of reports ---- */
+
+/* minmax(0, 1fr), not the default: a grid item is as wide as its content by
+   default, and a long title would push the row — and on a phone the page —
+   past the edge instead of ending in an ellipsis. */
+.lp-rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+.lp-rows .brief { padding-inline: 0.4rem; }
+.lp-rows .when,
+.lp-rows .card-sub { flex: none; font-size: 0.8rem; color: var(--text-dim); }
+
+.lp-roadmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 1rem;
+}
+
+.lp-roadmap-col .column-name {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- statistics ---- */
+
+.lp-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr));
+  gap: 1rem;
+  flex: 1;
+  align-content: center;
+}
+
+.lp-stat { display: grid; gap: 0.15rem; }
+
+.lp-stat-number {
+  font-size: clamp(1.6rem, 1.2rem + 1.2vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp-stat-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* ---- links ---- */
+
+.lp-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.lp-buttons + .lp-links { margin-block-start: 0.8rem; }
+
+.lp-links { display: grid; gap: 0.35rem; }
+
+.lp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--accent-alt);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.lp-link:hover { text-decoration: underline; }
+.lp-out { display: flex; opacity: 0.7; }
+
+/* ---- a picture ---- */
+
+.lp-figure { margin: 0; display: grid; gap: 0.5rem; }
+
+.lp-figure img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+  border-radius: var(--radius);
+}
+
+.lp-figure figcaption {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* ---- the foot ---- */
+
+.lp-footer {
+  margin-block-start: auto;
+  border-block-start: 1px solid var(--border);
+}
+
+.lp-footer > .lp-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  padding-block: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--text-dim);
+}
+
+.lp-footer-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.lp-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.lp-footer-links .lp-link { color: var(--text-dim); font-weight: 400; }
+.lp-footer-links .lp-link:hover { color: var(--text-main); }
+.lp-made { margin-inline-start: auto; font-size: 0.8rem; }
+
 /* ---------------------------------------------------------------- wizard */
 
 /*
@@ -4398,255 +4865,10 @@ a.stat:hover .stat-go {
    not replay, and removing this class after a reflow is what restarts it. */
 .toast-bar.no-drain { animation: none !important; }
 
-/*
- * The front page, composed.
- *
- * A grid rather than a stack, because the whole point of letting the operator
- * arrange it is that two things can sit side by side. Two columns at a width
- * where that reads, one below it — a half-width module on a phone is a column
- * of four words.
- *
- * The cells carry no decoration of their own: what goes in them already knows
- * how it looks, and a box around a box is how a page starts looking like a
- * form.
- */
-.landing-grid {
-  display: grid;
-  /* Twelve, the dashboard's. A number in the stylesheet rather than a
-     custom property set from the page: it never changes at runtime, and a
-     value that never changes does not need a channel that can be blocked. */
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: var(--row-height, 100px);
-  /*
-   * 16px, because that is the number the drag arithmetic uses. It is not a
-   * taste: the code that works out which cell the pointer is over divides by
-   * the column width plus this gap, so a stylesheet that says 24 and a
-   * calculation that says 16 disagree by a growing amount across the row, and
-   * the ghost lands one cell off at the far end. That is exactly how it first
-   * behaved — a module dropped on another one was reported as free.
-   */
-  gap: 16px;
-  /*
-   * No align-items. It was `start` in the version of this that stacked blocks,
-   * and it survived into the grid where it meant every module sized to its
-   * content instead of filling the cells it was given — which also made the
-   * drag ghost, whose whole job is to be an empty rectangle, four pixels tall.
-   */
-}
-
-/* Placed the way the dashboard places a tile: the numbers the domain stores
-   are the numbers the grid lines use, so nothing converts on the way in. */
-.landing-cell {
-  grid-column: var(--x, 1) / span var(--w, 12);
-  grid-row: var(--y, 1) / span var(--h, 1);
-  min-inline-size: 0;
-  position: relative;
-  /*
-   * Clipped, never scrolled. This is the dashboard's own rule for a tile, and
-   * copying it rather than inventing one is what fixes two symptoms at once:
-   * the corner handle is positioned against these edges, and while the cell
-   * scrolled, the handle pushed its scrollable area out — a scrollbar appeared,
-   * the content narrowed, the handle moved, and the whole thing flickered with
-   * nothing being dragged. A box that cannot scroll has no bar to show.
-   *
-   * What needs to scroll scrolls inside itself, which is what a widget does
-   * over there and what .landing-scroll does here.
-   */
-  overflow: hidden;
-}
-
-/*
- * How a module names itself, copied from the dashboard's widget header.
- *
- * NOT the section pill. Over there that pill is drawn by one thing only — a
- * section, which is a container you drag items into — so wearing it made every
- * module here read as a container with modules missing from inside it. A module
- * is the dashboard's widget, not its section: same grid, same drag, its own
- * content. So it names itself the way a widget does, and the pill stays
- * reserved for what it means.
- *
- * Sticky, like the original: the module scrolls, and a name that scrolls away
- * leaves a list of rows belonging to nothing.
- */
-.module-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 14px 10px;
-  flex-shrink: 0;
-  border-block-end: 1px solid var(--border);
-  background: var(--surface);
-  position: sticky;
-  inset-block-start: 0;
-  z-index: 2;
-}
-
-.module-header .module-icon {
-  inline-size: 16px;
-  block-size: 16px;
-  flex-shrink: 0;
-  color: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.module-header .module-icon svg {
-  inline-size: 16px;
-  block-size: 16px;
-}
-
-.module-header h2 {
-  flex: 1;
-  min-inline-size: 0;
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-main);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* The count, kept as the chip the rest of the product uses. */
-.module-header .count-chip {
-  flex-shrink: 0;
-}
-
-/*
- * A module that draws content is a card, the same recipe a section box uses,
- * put on the module itself rather than on something inside it.
- *
- * It used to be an inner `.section`, which brought the pill with it — and the
- * pill means "container you drag items into" in the dashboard this grid comes
- * from. The box was never the problem; the name on it was.
- */
-.landing-scroll {
-  block-size: 100%;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
-  box-shadow: var(--card-shadow);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-/*
- * The name at the foot instead of the head.
- *
- * The whole box is reversed rather than the header moved, so the separator ends
- * up on the correct side of it without a second rule, and the header sticks to
- * the bottom edge for the same reason it sticks to the top: a scrolled module
- * still has to say what it is.
- */
-.landing-scroll.label-bottom {
-  flex-direction: column-reverse;
-}
-
-.landing-scroll.label-bottom .module-header {
-  border-block-end: 0;
-  border-block-start: 1px solid var(--border);
-  padding: 10px 14px 14px;
-  inset-block-start: auto;
-  inset-block-end: 0;
-}
-
-/*
- * A section: its own grid, as many columns and rows as the section is wide and
- * tall. A child at 3,2 of a six-by-two section lands in that section's third
- * column and second row, which is what lets the section be dragged elsewhere
- * without touching anything inside it.
- *
- * Same gap as the page's grid, because the drag arithmetic in here divides by
- * it exactly as it does out there.
- */
-.landing-group {
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel) 45%, transparent);
-  padding: 12px;
-}
-
-.landing-section {
-  display: grid;
-  grid-template-columns: repeat(var(--w, 1), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--h, 1), minmax(0, 1fr));
-  gap: 16px;
-  block-size: 100%;
-}
-
 /* While the page is being arranged, the control that says so wears the accent,
    the way the dashboard's own edit toggle does. */
 .icon-button.composing {
   color: var(--accent);
-}
-
-/*
- * The hero, inside a module, is a banner — not the sign-in screen without its
- * card.
- *
- * On the sign-in and the wizard the centred mark, the display-sized name and
- * the air around them are right: those screens ask for one thing and the empty
- * space IS the design. The front page is the other register — it shows things —
- * and wearing the first one made it read as a login with the form missing.
- *
- * Same pieces, same mark, laid along the top of its module instead of down the
- * middle of the window. Scoped to the grid so the screens that ask for one
- * thing keep what suits them.
- */
-.landing-cell .hero {
-  grid-template-columns: auto 1fr;
-  align-content: center;
-  justify-items: start;
-  text-align: start;
-  column-gap: 1rem;
-  row-gap: 0.1rem;
-  padding-block: 0;
-  block-size: 100%;
-}
-
-.landing-cell .hero-mark {
-  grid-row: 1 / span 2;
-  inline-size: 3rem;
-  block-size: 3rem;
-}
-
-.landing-cell .hero h1 {
-  font-size: clamp(1.35rem, 1rem + 1.1vw, 1.9rem);
-  line-height: 1.15;
-}
-
-.landing-cell .hero .lead {
-  font-size: 0.95rem;
-}
-
-.landing-cell .hero-actions {
-  grid-column: 2;
-  margin-block-start: 0.5rem;
-}
-
-/*
- * The three sentences fill the module they were given, rather than sitting at
- * the top of it with the rest of the box empty.
- *
- * Measured: at a 75px row the cards drew 80 and the module was 167, so 87
- * pixels of nothing sat between them and whatever came next — which is what
- * made the page read as a stack of bands with air between them rather than as
- * an arrangement. Integer rows are not the problem and cannot be argued with;
- * content that ignores its box is.
- */
-.landing-cell .points {
-  block-size: 100%;
-  align-content: stretch;
-  grid-template-columns: 1fr;
-}
-
-.landing-cell .points > li {
-  align-items: center;
 }
 
 /*
@@ -5215,29 +5437,11 @@ a.stat:hover .stat-go {
   .rev-detail { transition: none; }
 }
 
-/* A block of words, and the box it lives in.
- *
- * The box used to be sized by its contents and pushed down by a top margin, so
- * it floated somewhere inside its module with a band of nothing above it. It
- * fills the module now and keeps five pixels off the border all round, which is
- * what separates the two edges without reading as a second frame. */
-/* The module stops adding its own inset for this one kind of content: the box
-   provides the whole gap, so the five pixels asked for are the five pixels
-   measured rather than five plus whatever the tile was already adding.
- *
- * Written at the arranging level too, and that is not belt and braces: while
- * the page is being arranged the tile takes half a rem of its own, which
- * out-specifies the plain selector and was the whole of the difference — the
- * gap measured fourteen instead of six, and reading the file said five. */
-.landing-cell:has(> .words),
-.landing-grid.editing .landing-cell:has(> .words) {
-  padding: 0;
-}
+/* A block of words. The frame is the module's, so the words carry none of
+   their own: a second border inside the first reads as a box in a box. */
 
 .words {
-  block-size: 100%;
   inline-size: 100%;
-  padding: 5px;
   box-sizing: border-box;
   /* The writing bar is placed inside this, so this is what it is placed
      against. */
@@ -5245,19 +5449,9 @@ a.stat:hover .stat-go {
 }
 
 .words-box {
-  block-size: 100%;
   box-sizing: border-box;
-  padding: 0.95rem 1.05rem;
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
-  box-shadow: var(--card-shadow);
   color: var(--text-main);
   line-height: 1.6;
-  /* Whatever is written can be longer than the module is tall, and the tile
-     itself never scrolls — that is the dashboard's rule and the reason the
-     resize handle stays put. So it scrolls in here. */
-  overflow: auto;
 }
 
 /* The things somebody can write, dressed once. Margins collapse to nothing at
@@ -5285,7 +5479,6 @@ a.stat:hover .stat-go {
 }
 .words-box a { color: var(--accent-alt); }
 .words-box .lead { color: var(--text-dim); font-size: 1.05rem; }
-.words-box .hero-mark-line { margin-block-end: 0.4rem; }
 
 /* Alignment and colour, as classes rather than as inline styles.
  *
@@ -6005,19 +6198,6 @@ a.stat:hover .stat-go {
   .admin.leaving { animation: none; }
 }
 
-/* What is being dragged is going in here. Same green the ghost uses, on the
-   box rather than in it, so the answer is readable before letting go. */
-.landing-group.drop-target {
-  border-color: #00ff00;
-  background: rgba(0, 255, 0, 0.06);
-}
-
-/* An empty section still has to look like a place things go into. */
-.landing-grid.editing .landing-section:empty {
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-}
-
 /*
  * Room for a name asked to sit on the border.
  *
@@ -6025,144 +6205,6 @@ a.stat:hover .stat-go {
  * module down by a name most of them do not wear. Measured — the pill renders
  * 25px, so it hangs 12.5px over the edge and needs at least that much.
  */
-/*
- * The one exception, and the dashboard makes the same one: a name that sits on
- * the border has to be allowed over the edge.
- *
- * The pill straddles the top border and nothing else moves. It used to be
- * pushed down by the same amount the content was, which put it inside the box
- * instead of on its edge — the padding is there to keep the CONTENT clear of a
- * name on the border, not to move the name.
- */
-.landing-cell.has-pill {
-  overflow: visible;
-}
-
-.landing-cell.has-pill > .section-legend {
-  inset-block-start: 0;
-  /* Theirs to the pixel: half of itself above the line, and one more so it
-     covers the border rather than sitting a hair below it. */
-  transform: translateY(calc(-50% - 1px));
-}
-
-/* The room the name needs is given to what is under it. */
-.landing-cell.has-pill > .landing-scroll,
-.landing-cell.has-pill > .landing-one,
-.landing-cell.has-pill > .hero,
-.landing-cell.has-pill > .points {
-  margin-block-start: 0.6rem;
-}
-
-/*
- * A module that shows one thing IS that thing: the card fills the module rather
- * than sitting inside a box with a heading over it. Same recipe as the card in
- * a list, because it is the same card — what changes is that nothing surrounds
- * it.
- */
-.landing-one {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  block-size: 100%;
-  padding: 0.9rem;
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
-  box-shadow: var(--card-shadow);
-  text-decoration: none;
-  color: inherit;
-}
-
-.landing-one:hover {
-  border-color: rgba(var(--accent-rgb), 0.35);
-}
-
-.landing-one .card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  min-inline-size: 0;
-  flex: 1;
-}
-
-/*
- * The roadmap's three columns, stacked rather than side by side: a module is a
- * box on a page, and three columns inside one are three columns of two words
- * each. The column names carry the weight instead.
- */
-.landing-columns {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.landing-column .column-name {
-  margin: 0 0 0.3rem;
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  font-family: var(--font-mono, monospace);
-}
-
-/* Three numbers, side by side while there is room for them. */
-.landing-figures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.landing-figure {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-inline-size: 4.5rem;
-}
-
-.landing-figure .figure-number {
-  font-size: 1.6rem;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--text-main);
-}
-
-.landing-figure .figure-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-
-/* The rows sit inside the padding the header already establishes. */
-.landing-scroll > :not(.module-header) {
-  padding: 0.9rem;
-  margin: 0;
-}
-
-.landing-text p {
-  margin: 0;
-  color: var(--text-main);
-  line-height: 1.6;
-  white-space: normal;
-}
-
-/*
- * A twelve column grid on a phone is twelve columns of four characters. Below
- * the width where a half-width module still reads, every module takes the row
- * and they stack in the order they were placed.
- */
-@media (max-width: 720px) {
-  .landing-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-auto-rows: auto;
-  }
-  .landing-cell {
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
-}
 
 /*
  * The front page editor: one row per module, in the order they are drawn.
@@ -6173,103 +6215,6 @@ a.stat:hover .stat-go {
  */
 .turn-up { display: inline-flex; transform: rotate(-90deg); }
 .turn-down { display: inline-flex; transform: rotate(90deg); }
-
-.landing-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.6rem;
-}
-
-.landing-row {
-  border: 1px solid var(--card-border);
-  border-radius: 10px;
-  background: var(--panel);
-  padding: 0.6rem 0.7rem;
-  display: grid;
-  gap: 0.5rem;
-}
-
-.landing-row-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-/* The controls to the far end of the row, whichever end that is. */
-.landing-row-actions {
-  margin-inline-start: auto;
-  display: flex;
-  gap: 0.35rem;
-}
-
-.landing-row textarea {
-  inline-size: 100%;
-  resize: vertical;
-}
-
-.landing-editor-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-block-start: 0.8rem;
-}
-
-/*
- * Arranging the front page, on the front page.
- *
- * The dashed outline and the tools on each module are what tell somebody they
- * are in a mode: the page is the same page, so if nothing about it changes the
- * mode is invisible and the first click is a guess.
- */
-.landing-bar {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.landing-grid.editing .landing-cell {
-  position: relative;
-  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: var(--radius-lg);
-  padding: 0.5rem;
-  min-block-size: 3.5rem;
-}
-
-/*
- * A module's actions, behind one button. The recipe is the dashboard's, copied
- * rather than approximated: 28 square at the inline end, its own surface so it
- * reads over whatever the module draws, and the accent on hover.
- */
-.kebab-btn {
-  position: absolute;
-  inset-block-start: 4px;
-  inset-inline-end: 4px;
-  z-index: 4;
-  inline-size: 28px;
-  block-size: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  background: var(--panel);
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
-  color: var(--text-dim);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: color 0.15s, border-color 0.15s, transform 0.15s;
-}
-
-.kebab-btn:hover {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  transform: scale(1.1);
-}
 
 /* The add menu is the dashboard's, not the kebab's.
  *
@@ -6332,79 +6277,6 @@ a.stat:hover .stat-go {
 
 .add-menu-item:hover .icon { opacity: 1; }
 
-.kebab-menu {
-  position: absolute;
-  inset-block-start: 36px;
-  inset-inline-end: 4px;
-  z-index: 5;
-  min-inline-size: 170px;
-  padding: 6px;
-  background: var(--panel);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.kebab-menu[hidden] { display: none; }
-
-.kebab-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  inline-size: 100%;
-  box-sizing: border-box;
-  padding: 9px 10px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  color: var(--text-main);
-  font: inherit;
-  font-size: 0.875rem;
-  text-align: start;
-  cursor: pointer;
-}
-
-.kebab-item:hover { background: rgba(128, 128, 128, 0.15); }
-.kebab-item.menu-delete:hover { color: var(--danger-color); }
-
-/*
- * Where a module would land, shown before the hand lets go.
- *
- * The dashboard's colours, taken as they are: green when it fits, red when it
- * would sit on something. Flat #00ff00 and #ff0000 rather than the theme's
- * tokens, and deliberately — this is not part of the page's palette, it is a
- * yes or a no, and it has to read as one against every accent an operator might
- * have chosen.
- */
-.landing-ghost {
-  grid-column: var(--x, 1) / span var(--w, 1);
-  grid-row: var(--y, 1) / span var(--h, 1);
-  background: rgba(0, 255, 0, 0.1);
-  border: 2px dashed #00ff00;
-  border-radius: var(--radius-lg);
-  /* Lastboard states these, and they are not decoration: a grid item with no
-     content of its own has no height to inherit, and the ghost is empty by
-     definition. Without them it draws as a line and every check that reads its
-     colour still passes. */
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 100;
-  will-change: grid-column, grid-row;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-}
-
-.landing-ghost.invalid {
-  background: rgba(255, 0, 0, 0.1);
-  border-color: #ff0000;
-}
-
-.landing-ghost[hidden] { display: none; }
-
 /*
  * A data module scrolls inside the box it was given rather than spilling out of
  * it or having what does not fit cut off without a word.
@@ -6420,68 +6292,6 @@ a.stat:hover .stat-go {
  * The button module: the one thing this page exists to make happen, so it is
  * centred in whatever box it was given rather than hugging a corner of it.
  */
-/* A box stretched to its module must not also be pushed down.
- *
- * .section carries a top margin from the page flow it was written for, and
- * inside a cell it is also given the module's full height. Those two together
- * are taller than the module by exactly that margin, and the tile clips rather
- * than scrolls — so the bottom padding was cut off, with the words sitting on
- * the cut. Measured on the button module: nine pixels over, nine pixels gone.
- *
- * Every module whose content is one of these boxes had it; fixing it where the
- * margin is applied fixes the lot rather than one at a time. */
-.landing-cell > .section {
-  margin-block-start: 0;
-}
-
-.landing-action {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  block-size: 100%;
-}
-
-/* The board a voted idea belongs to, under its title rather than beside it:
-   beside it, a long title pushes it off the row it was meant to label. */
-.landing-scroll .brief { flex-wrap: wrap; }
-.landing-scroll .brief .card-sub { flex-basis: 100%; }
-
-/* What is being carried, so the ghost is what you read and not this. */
-.landing-cell.carrying { opacity: 0.4; }
-.landing-grid.editing .landing-cell { cursor: grab; }
-.landing-grid.editing .landing-cell:active { cursor: grabbing; }
-
-/*
- * The corner you pull. A solid triangle drawn with borders, the dashboard's
- * shape and its accent.
- *
- * bottom and right, not the logical pair, and that is the decision rather than
- * an oversight: the drag arithmetic is in physical pixels, and turning only the
- * corner in a right-to-left page leaves the cursor pointing one way and the
- * triangle the other. It is written down in the house notes because it was
- * found the hard way.
- */
-.resize-handle {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  cursor: nwse-resize;
-  z-index: 20;
-  border-style: solid;
-  border-width: 0 0 12px 12px;
-  border-color: transparent transparent var(--accent) transparent;
-  opacity: 0.8;
-  transition: opacity 0.2s, transform 0.2s;
-}
-
-.resize-handle:hover {
-  opacity: 1;
-  transform: scale(1.1);
-}
 
 /*
  * Lastboard's settings panel, ported whole into this one.

@@ -392,6 +392,56 @@ func (s *Server) reportsIn(boards []org.Board, ask item.Filter) []map[string]any
 	return out
 }
 
+// handleSearch is the search on the front page: reports that already exist,
+// across every board, so a visitor finds theirs before writing it again.
+//
+// Published only — the item store's own default — and a handful at most: this
+// is a list somebody reads while typing, not the board. Two characters before
+// anything is asked, because one matches half the titles on any board and says
+// nothing. The boards come back as well, so the last line can always be the
+// way to write a new report.
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if runes := []rune(q); len(runes) < 2 || len(runes) > 100 {
+		writeJSON(w, http.StatusOK, map[string]any{"items": []any{}, "boards": []any{}})
+		return
+	}
+	boards, err := s.orgs().ListBoards()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	hits := []map[string]any{}
+	if len(boards) > 0 {
+		byID := make(map[int64]org.Board, len(boards))
+		ids := make([]int64, 0, len(boards))
+		for _, b := range boards {
+			ids = append(ids, b.ID)
+			byID[b.ID] = b
+		}
+		items, err := s.items().List(item.Filter{RepoIDs: ids, Search: q, AsTyped: true, SortByVote: true, Limit: searchHits})
+		if err != nil {
+			slog.Error("searching the front page", "error", err)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		for _, it := range items {
+			hits = append(hits, map[string]any{
+				"public_id": it.PublicID,
+				"title":     it.Title,
+				"kind":      string(it.Kind),
+				"status":    string(it.Status),
+				"votes":     it.VoteCount,
+				"board":     byID[it.RepoID].Name,
+			})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": hits, "boards": describeBoards(boards)})
+}
+
+// searchHits is how many reports one search answers with.
+const searchHits = 6
+
 // handleSaveLandingDraft keeps the page being edited, without showing it.
 //
 // Validated by the domain, which refuses a page it cannot draw entirely rather

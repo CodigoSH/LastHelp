@@ -124,7 +124,12 @@ type Filter struct {
 	// "everything".
 	AnyModeration bool
 	Search        string // empty for everything
-	SortByVote    bool
+	// AsTyped reads Search as something still being written: its last word
+	// matches any word it begins, so "dar" already finds "dark". A search box
+	// that answers while somebody types needs it; one that answers a finished
+	// question does not.
+	AsTyped    bool
+	SortByVote bool
 	// SortByClosed is newest finished first, and takes only what has actually
 	// finished: an item with no closing time has not, whatever its status says,
 	// and sorting those by a null would put them somewhere arbitrary.
@@ -188,7 +193,7 @@ func (s Store) List(f Filter) ([]Item, error) {
 	query := `SELECT ` + itemColumns + ` FROM item`
 	if q := strings.TrimSpace(f.Search); q != "" {
 		where = append(where, "id IN (SELECT rowid FROM item_fts WHERE item_fts MATCH ?)")
-		args = append(args, ftsQuery(q))
+		args = append(args, ftsQuery(q, f.AsTyped))
 	}
 	query += ` WHERE ` + strings.Join(where, " AND ")
 
@@ -249,7 +254,11 @@ func (s Store) Similar(repoID int64, title string, limit int) ([]Item, error) {
 // a syntax error rather than a search. This is the same class of bug as an
 // unescaped quote in SQL, and it is not solved by parameters: the parameter is
 // the query language.
-func ftsQuery(input string) string {
+//
+// asTyped marks the last token as a prefix. The asterisk goes outside the
+// quotes, where FTS5 reads it as the prefix operator on a quoted string rather
+// than as part of what is searched for.
+func ftsQuery(input string, asTyped bool) string {
 	fields := strings.Fields(input)
 	quoted := make([]string, 0, len(fields))
 	for _, f := range fields {
@@ -261,6 +270,9 @@ func ftsQuery(input string) string {
 	}
 	if len(quoted) == 0 {
 		return `""`
+	}
+	if asTyped {
+		quoted[len(quoted)-1] += "*"
 	}
 	return strings.Join(quoted, " OR ")
 }

@@ -183,6 +183,9 @@ func (s *Server) routes() {
 	// reason the name and the mark are: it IS the page a visitor is looking at.
 	// Changing it is the administrator's, and that half is wrapped below.
 	s.mux.HandleFunc("GET /api/landing", s.handleGetLanding)
+	// The search on the front page, public for the same reason: it is how a
+	// visitor finds a report before writing it again.
+	s.mux.HandleFunc("GET /api/search", s.handleSearch)
 	// Public for the same reason the page is: a picture on the front page that
 	// asked for a session would be a broken box for everybody who is not the
 	// operator.

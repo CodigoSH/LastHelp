@@ -23,13 +23,12 @@ import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/t
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { shrink, TooLarge } from "./services/image";
-import { wireWords } from "./services/words";
-import { NoWebP, putImage } from "./services/landingImage";
 import { attachChartHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
 import { watchSelects } from "./services/select";
 import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
+import * as landingViews from "./views/landing";
 import { icons } from "./views/icons";
 
 const text: views.Text = {
@@ -248,1084 +247,93 @@ function renderNav(): void {
 }
 
 /**
- * The front page while it is being arranged.
+ * The front page, and whether it is being arranged.
  *
  * Kept in module scope because editing is a mode the page is in, not a thing
- * one render knows about: a module saved from the modal has to redraw the page
- * it is on, and the page has to come back in the same mode.
+ * one render knows about: what the editor changes has to survive a redraw.
  */
-let landingModules: views.LandingModule[] = [];
-let landingContent: views.LandingContent = {};
-let landingBoards: views.LandingBoard[] = [];
+let landing: landingViews.LandingPage = { bands: [], settings: {} };
+let landingContent: landingViews.LandingContent = {};
 let landingEditing = false;
 
 /**
- * Where each module sits, as a rule rather than an attribute.
+ * What this installation's front page is, and what goes in it.
  *
- * The dashboard writes these four numbers into a style attribute. Here that
- * would be dropped on the floor: the content policy this product serves has no
- * unsafe-inline, so every module would fall back to cell one and stack. Same
- * numbers, same custom properties, delivered the way the policy allows.
- */
-/**
- * The cells are square, which is what lets one divisor serve both axes when
- * something is dragged: a row is as tall as a column is wide, so the same
- * arithmetic reads a sideways drag and a downwards one. The stylesheet cannot
- * know the width, so the row height is synced from here — through the sheet
- * rather than the element, because this product's content policy drops style
- * attributes. It runs on every draw and on resize, not only while arranging:
- * a visitor who never edits anything still has to see square cells.
- */
-function squareLandingCells(): void {
-  const grid = root?.querySelector<HTMLElement>(".landing-grid");
-  if (!grid) return;
-  const width = (grid.getBoundingClientRect().width - (views.LANDING_COLUMNS - 1) * 16) /
-    views.LANDING_COLUMNS;
-  if (width > 0) setRule("landing-rows", `.landing-grid{--row-height:${width}px}`);
-}
-
-window.addEventListener("resize", squareLandingCells);
-
-function placeLandingModules(modules: views.LandingModule[]): void {
-  // A border somebody chose, through the sheet like everything else here: this
-  // product's content policy drops a style attribute.
-  setRule(
-    "landing-borders",
-    modules
-      .filter((m) => m.border_color || m.border_width || m.bare || m.clear)
-      .map(
-        (m) =>
-          `.landing-cell[data-module="${cssEscape(m.id)}"] > :not(.kebab-btn):not(.kebab-menu):not(.resize-handle):not(.section-legend){` +
-          `${m.border_color ? `border-color:${m.border_color};` : ""}` +
-          `${m.bare ? "border-width:0;" : m.border_width ? `border-width:${m.border_width}px;` : ""}` +
-          // Nothing behind it and nothing under it: a surface that keeps its
-          // shadow while losing its fill reads as a pane of glass rather than
-          // as part of the page.
-          `${m.clear ? "background:transparent;box-shadow:none;" : ""}}` +
-          // The box a block of words lives in is one level further in, so it
-          // has to be told as well or the fill stays where it always was.
-          `${
-            m.clear
-              ? `.landing-cell[data-module="${cssEscape(m.id)}"] .words-box{background:transparent;box-shadow:none;${m.bare ? "border-width:0;" : ""}}`
-              : ""
-          }`,
-      )
-      .join("\n"),
-  );
-  setRule(
-    "landing-modules",
-    modules
-      .map(
-        (m) =>
-          `.landing-cell[data-module="${cssEscape(m.id)}"]{--x:${m.x};--y:${m.y};--w:${m.w};--h:${m.h}}`,
-      )
-      .join("\n"),
-  );
-}
-
-/** An id is ours, but it reaches a selector, so it is escaped like one. */
-function cssEscape(value: string): string {
-  return value.replace(/["\\]/g, "\\$&");
-}
-
-/**
- * What this installation decided the page is made of, and what goes in it.
- *
- * Failing softly: an unreachable layout leaves the page as the default rather
- * than as an error, because this is the one screen a stranger sees first.
+ * The published page for everybody; the draft, when there is one, for whoever
+ * is arranging it. Failing softly: an unreachable page leaves the default
+ * rather than an error, because this is the one screen a stranger sees first.
  */
 async function fetchLanding(): Promise<void> {
-  type Composed = {
-    modules: views.LandingModule[];
-    content?: views.LandingContent;
-    boards?: views.LandingBoard[];
+  type Composed = landingViews.LandingPage & {
+    content?: landingViews.LandingContent;
+    boards?: landingViews.LandingBoard[];
   };
   const composed = await api
-    .get<Composed>("/api/landing")
-    .catch((): Composed => ({ modules: [] }));
-
-  landingModules = composed.modules ?? [];
+    .get<Composed>(landingEditing ? "/api/landing?draft=1" : "/api/landing")
+    .catch((): Composed => ({ bands: [], settings: {} }));
+  landing = { bands: composed.bands ?? [], settings: composed.settings ?? {} };
   landingContent = composed.content ?? {};
-  landingBoards = composed.boards ?? [];
 }
 
-function drawLanding(orgs: OrganizationSummary[]): void {
-  placeLandingModules(landingModules);
+function drawLanding(): void {
   show(
-    views.landing(
-      orgs,
-      me?.admin === true,
+    landingViews.landingPage(
+      landing,
+      { instance: { name: instanceName, logo: instanceLogo }, content: landingContent, editing: landingEditing },
       text,
-      { name: instanceName, logo: instanceLogo },
-      landingModules,
-      landingEditing,
-      landingContent,
-      landingBoards,
     ),
   );
-  // After the markup is on the page, never before: the row height is measured
-  // from the grid, and a grid that has not been written yet measures nothing.
-  // Placed before, this silently left the public page on the fallback height
-  // and only the second draw ever looked right.
-  squareLandingCells();
-  // The bar above the page carries the control that turns arranging on and off,
-  // so it has to be redrawn when that changes: the pencil becomes a tick.
+  // The bar carries the control that turns arranging on and off, so it is
+  // redrawn when that changes.
   renderNav();
-  wireLanding(orgs);
+  wireLandingSearch();
 }
 
 /**
- * Arranging the page, on the page.
+ * The search on the front page: reports that already exist, as somebody types,
+ * and always a last line to write a new one — so finding nothing is a step
+ * forward rather than a dead end.
  *
- * Every change is saved as it is made rather than collected behind a button.
- * The page under it is the thing being changed, so it is already showing what
- * would be saved, and a separate save turns that into a question about whether
- * what you are looking at is real.
+ * Waits a moment after the last key rather than asking on every one, and drops
+ * an answer that arrives after a newer question: typing fast must not end with
+ * the results of three letters ago.
  */
-function wireLanding(orgs: OrganizationSummary[]): void {
-  /**
-   * Save, and read the page back when what it is made of changed.
-   *
-   * Moving and resizing needs no reread: the modules are the same ones and
-   * their content has not moved with them. Adding one, removing one or pointing
-   * one at a different board does — a module that has just appeared has nothing
-   * to draw until the server says what goes in it.
-   */
-  /**
-   * Writing a block of words, on the page, where it is read.
-   *
-   * Saved as it is typed like everything else here, but not on every keystroke:
-   * a PUT per character would be a request per character. The wait is short
-   * enough that leaving the page straight after typing still lands, and
-   * finishing the arrangement saves whatever is outstanding anyway.
-   */
-  let penWaiting: ReturnType<typeof setTimeout> | undefined;
-  wireWords({
-    root: document,
-    bar: document.querySelector<HTMLElement>(".words-bar"),
-    image: {
-      pick: pickImageFile,
-      upload: putImage,
-      // A browser with no WebP encoder gets told that; everything else goes
-      // through the one place that turns a refusal into words.
-      failed: (err) => (err instanceof NoWebP ? toastError(i18n.t("error.no_webp")) : report(err)),
-    },
-    onChange: (id, html) => {
-      const target = landingModules.find((m) => m.id === id);
-      if (!target) return;
-      target.body = html;
-      clearTimeout(penWaiting);
-      penWaiting = setTimeout(() => void save(), 700);
-    },
-  });
+function wireLandingSearch(): void {
+  root?.querySelectorAll<HTMLFormElement>("[data-landing-search]").forEach((form) => {
+    const input = form.querySelector<HTMLInputElement>("input[name=q]");
+    const results = form.querySelector<HTMLElement>(".lp-results");
+    if (!input || !results) return;
+    let waiting: ReturnType<typeof setTimeout> | undefined;
+    let asked = 0;
 
-  const save = async (refresh = false) => {
-    try {
-      clearTimeout(penWaiting);
-      await api.put("/api/landing", {
-        modules: landingModules.map((m) => ({
-          id: m.id,
-          kind: m.kind,
-          x: m.x,
-          y: m.y,
-          w: m.w,
-          h: m.h,
-          ...(m.kind === "text" ||
-          m.kind === "hero" ||
-          m.kind === "call_to_action" ||
-          m.kind === "section"
-            ? { body: m.body ?? "" }
-            : {}),
-          ...(m.scope ? { scope: m.scope } : {}),
-          ...(m.label ? { label: m.label } : {}),
-          ...(m.name ? { name: m.name } : {}),
-          ...(m.border_color ? { border_color: m.border_color } : {}),
-          ...(m.border_width ? { border_width: m.border_width } : {}),
-          ...(m.bare ? { bare: true } : {}),
-          ...(m.clear ? { clear: true } : {}),
-          ...(m.rows ? { rows: m.rows } : {}),
-          ...(m.parent ? { parent: m.parent } : {}),
-        })),
-      });
-      if (refresh) await fetchLanding();
-    } catch (err) {
-      report(err);
-    }
-  };
-
-  // Looked up in the document, not in the page: the control lives in the bar
-  // above it now, which is outside what this view draws.
-  document.querySelector<HTMLButtonElement>("[data-edit-page]")?.addEventListener("click", () => {
-    landingEditing = true;
-    drawLanding(orgs);
-  });
-  document.querySelector<HTMLButtonElement>("[data-edit-done]")?.addEventListener("click", () => {
-    landingEditing = false;
-    drawLanding(orgs);
-  });
-
-  /**
-   * Put a new module on the page.
-   *
-   * Called from the picker, which is a grid of cards saying what each one
-   * draws, and from the menu beside it for a group. Both end here: a module is
-   * a module whichever door it came through.
-   */
-  const add = async (kind: views.LandingModule["kind"]) => {
-    // Under everything: the one place a new module is certainly not on top of
-    // another one, whatever the page already looks like.
-    const bottom = landingModules.reduce((low, m) => Math.max(low, m.y + m.h), 1);
-    const added: views.LandingModule = {
-      id: `${kind}-${Date.now().toString(36)}`,
-      kind,
-      x: 1,
-      y: bottom,
-      // Sized from what each one draws, not from the width of the page.
-      //
-      // Everything used to arrive twelve columns wide, so a page of modules was
-      // a stack of bands and the only way to get anything else was to drag every
-      // corner. Now each kind arrives at a size that suits it, and the corner is
-      // for changing your mind — which is the way round the dashboard has it.
-      ...sizeFor(kind),
-      body: "",
+    const close = () => {
+      results.hidden = true;
+      results.innerHTML = "";
     };
-    landingModules = [...landingModules, added];
-    await save(true);
-    drawLanding(orgs);
-    // Opened straight away, the way the dashboard does it: a module you just
-    // added with nothing in it is a module you were about to configure.
-    openModuleConfig(added.id, orgs);
-  };
-
-  root?.querySelectorAll<HTMLButtonElement>("[data-pick]").forEach((card) =>
-    card.addEventListener("click", async () => {
-      card.closest("dialog")?.close();
-      await add((card.dataset.pick ?? "text") as views.LandingModule["kind"]);
-    }),
-  );
-
-  // A group comes straight from the menu: there is only one of it, so there is
-  // nothing to pick.
-  document.querySelector<HTMLButtonElement>("[data-add-section]")?.addEventListener("click", async () => {
-    closeMenus();
-    await add("section");
-  });
-
-  // The plus, and its short menu.
-  const adder = document.querySelector<HTMLButtonElement>("[data-add-menu]");
-  adder?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const menu = adder.parentElement?.querySelector<HTMLElement>(".add-menu");
-    const wasOpen = menu ? !menu.hidden : false;
-    closeMenus();
-    if (menu && !wasOpen) {
-      menu.hidden = false;
-      adder.setAttribute("aria-expanded", "true");
-    }
-  });
-
-  // The menu opens one at a time, and anything else closes it: a second menu
-  // left open behind the first is two sets of actions on screen for two
-  // different modules.
-  // Across the document, not just the page: the menu that adds things lives in
-  // the bar above it, and a menu left open up there while another opens down
-  // here is two sets of actions on screen for two different things.
-  const closeMenus = () =>
-    document.querySelectorAll<HTMLElement>(".kebab-menu").forEach((menu) => {
-      menu.hidden = true;
-      document
-        .querySelectorAll<HTMLButtonElement>("[data-module-menu], [data-add-menu]")
-        .forEach((button) => button.setAttribute("aria-expanded", "false"));
+    form.addEventListener("submit", (e) => e.preventDefault());
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close();
     });
-
-  root?.querySelectorAll<HTMLButtonElement>("[data-module-menu]").forEach((button) =>
-    button.addEventListener("click", (event) => {
-      event.stopPropagation();
-      const id = button.dataset.moduleMenu ?? "";
-      const menu = root?.querySelector<HTMLElement>(`.kebab-menu[data-menu-for="${id}"]`);
-      const wasOpen = menu ? !menu.hidden : false;
-      closeMenus();
-      if (menu && !wasOpen) {
-        menu.hidden = false;
-        button.setAttribute("aria-expanded", "true");
-      }
-    }),
-  );
-  document.addEventListener("click", closeMenus, { once: true });
-
-  root?.querySelectorAll<HTMLButtonElement>("[data-edit-module]").forEach((button) =>
-    button.addEventListener("click", () => openModuleConfig(button.dataset.editModule ?? "", orgs)),
-  );
-
-  // Removing asks first, the way it does over there. A module somebody spent a
-  // minute pointing at the right board should not go on one stray click.
-  let pending = "";
-  const confirmRemove = async () => {
-    const gone = pending;
-    pending = "";
-      // What was inside a removed section comes out onto the page rather than
-      // being removed with it: those are modules somebody composed, and a
-      // container disappearing is not a decision to throw away its contents.
-      // Left pointing at a section that is not there, the layout would be
-      // refused outright and the whole page would fail to save.
-    landingModules = landingModules.filter((m) => m.id !== gone);
-    spillOnto(landingModules.filter((m) => m.parent === gone));
-    await save(true);
-    drawLanding(orgs);
-  };
-
-  root?.querySelectorAll<HTMLButtonElement>("[data-remove-module]").forEach((button) =>
-    button.addEventListener("click", () => {
-      pending = button.dataset.removeModule ?? "";
-      const target = landingModules.find((m) => m.id === pending);
-      const section = target?.kind === "section";
-      const dialog = root?.querySelector<HTMLDialogElement>("#confirm-remove");
-      const title = dialog?.querySelector<HTMLElement>("[data-confirm-title]");
-      const message = dialog?.querySelector<HTMLElement>("[data-confirm-message]");
-      if (title) title.textContent = i18n.t(section ? "landing.removeSection" : "landing.removeModule");
-      // A section says what happens to what is inside it: those modules come
-      // back onto the page rather than going with it, and somebody about to
-      // click should know that before they do.
-      if (message) {
-        message.textContent = i18n.t(section ? "landing.removeSectionSays" : "landing.removeModuleSays");
-      }
-      closeMenus();
-      openModal("confirm-remove");
-    }),
-  );
-
-  root?.querySelector<HTMLButtonElement>("[data-confirm]")?.addEventListener("click", async () => {
-    root?.querySelector<HTMLDialogElement>("#confirm-remove")?.close();
-    await confirmRemove();
-  });
-
-  if (landingEditing) wireLandingGrid(orgs, () => save());
-
-  // One dialog, filled for whichever module opened it.
-  const dialog = root?.querySelector<HTMLFormElement>("form.module-config");
-  dialog?.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((tab) =>
-    tab.addEventListener("click", () => showTab(dialog, tab.dataset.tab ?? "general")),
-  );
-
-  // The three rows of buttons that stand in for a field: each writes its value
-  // into the hidden input beside it, which is what the form submits.
-  const rows: Array<[string, string, string]> = [
-    ["[data-at]", "at", "labelAt"],
-    ["[data-colour]", "colour", "borderColour"],
-    ["[data-width]", "width", "borderWidth"],
-  ];
-  for (const [selector, key, field] of rows) {
-    dialog?.querySelectorAll<HTMLButtonElement>(selector).forEach((button) =>
-      button.addEventListener("click", () => {
-        const value = button.dataset[key] ?? "";
-        const input = dialog.querySelector<HTMLInputElement>(`[name=${field}]`);
-        if (input) input.value = value;
-        pickOne(dialog, selector, key, value);
-        if (key === "at") {
-          showMark(dialog, value);
-          dialog.querySelector<HTMLElement>("[data-marks]")!.hidden = true;
-          dialog.querySelector("[data-open-marks]")?.setAttribute("aria-expanded", "false");
-        }
-      }),
-    );
-  }
-
-  // The button that opens that menu, and anything else that closes it.
-  const marksButton = dialog?.querySelector<HTMLButtonElement>("[data-open-marks]");
-  marksButton?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const menu = dialog?.querySelector<HTMLElement>("[data-marks]");
-    if (!menu) return;
-    menu.hidden = !menu.hidden;
-    marksButton.setAttribute("aria-expanded", String(!menu.hidden));
-  });
-  dialog?.addEventListener("click", (event) => {
-    if ((event.target as HTMLElement | null)?.closest("[data-open-marks], [data-marks]")) return;
-    const menu = dialog.querySelector<HTMLElement>("[data-marks]");
-    if (menu) menu.hidden = true;
-  });
-  dialog?.addEventListener("submit", async () => {
-    const data = new FormData(dialog);
-    const id = String(data.get("id") ?? "");
-    const target = landingModules.find((m) => m.id === id);
-    if (!target) return;
-    // A block of words is written where it is seen, so the dialog does not ask
-    // for it: reading an empty field here would wipe what somebody just typed.
-    if (target.kind === "call_to_action") {
-      target.body = String(data.get("label") ?? "").trim();
-    }
-    if (lists(target.kind)) target.rows = Number(data.get("rows") ?? 0) || 0;
-    if (usesHeader(target.kind)) target.name = String(data.get("name") ?? "").trim();
-    // A section's name is its body: it is the pill on its border and nothing
-    // else, so there is no second name to keep.
-    if (target.kind === "section") target.body = String(data.get("name") ?? "").trim();
-    target.border_color = String(data.get("borderColour") ?? "");
-    // Nought is a choice here and nowhere else: the four segments are none,
-    // thin, regular and thick, and "none" is the one that has to be told apart
-    // from nobody having touched the control. An untouched control leaves the
-    // field empty; a chosen "none" leaves a nought in it.
-    const chosenWidth = String(data.get("borderWidth") ?? "");
-    target.bare = chosenWidth === "0";
-    target.border_width = Number(chosenWidth) || 0;
-    target.clear = data.get("clear") !== null;
-    if (takesScope(target.kind)) target.scope = String(data.get("scope") ?? "");
-    if (usesHeader(target.kind)) {
-      target.label = String(data.get("labelAt") ?? "top") as views.LandingModule["label"];
-    }
-    // Reread: pointing a module at a different board changes what goes in it,
-    // and the words of a text module are the only thing this dialog can change
-    // that the page already knows.
-    await save(takesScope(target.kind));
-    drawLanding(orgs);
-  });
-}
-
-/**
- * Dragging and resizing, ported from the dashboard rather than re-derived.
- *
- * The arithmetic is theirs: the cell under the TOP-LEFT corner of what is being
- * carried, not under the pointer, because dragging a wide module by its middle
- * and having it land where the pointer is puts it somewhere nobody aimed. The
- * snap is strict — floor to a cell, clamp inside the grid — and the ghost shows
- * where it would land before the mouse is let go.
- *
- * Green means it fits. Red means it overlaps something, and the drop is
- * refused: the grid has no opinion about two modules in one cell, so this is
- * the only thing between an operator and a page with a module hidden under
- * another one.
- */
-function wireLandingGrid(orgs: OrganizationSummary[], save: () => Promise<void>): void {
-  const grid = root?.querySelector<HTMLElement>(".landing-grid.editing");
-  const ghost = root?.querySelector<HTMLElement>(".landing-ghost");
-  if (!grid || !ghost) return;
-
-  const GAP = 16;
-  const cols = views.LANDING_COLUMNS;
-  const cell = () => {
-    const box = grid.getBoundingClientRect();
-    return { box, width: (box.width - (cols - 1) * GAP) / cols };
-  };
-
-  /**
-   * Does this fit, in whichever grid it is being dropped into?
-   *
-   * Two grids, two sets of bounds: the page is twelve columns, a section is as
-   * many as it is wide. And a module is only measured against what shares its
-   * grid — a child at 1,1 of a section and a module at 1,1 of the page are not
-   * on top of each other, and asking whether they are is asking a question with
-   * no meaning.
-   */
-  const fits = (
-    id: string,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    parent = "",
-  ): boolean => {
-    if (x < 1 || y < 1) return false;
-    if (parent === "") {
-      if (x + w - 1 > cols) return false;
-    } else {
-      const holder = landingModules.find((m) => m.id === parent);
-      if (!holder || holder.kind !== "section") return false;
-      if (x + w - 1 > holder.w || y + h - 1 > holder.h) return false;
-    }
-    return !landingModules.some(
-      (m) =>
-        m.id !== id &&
-        (m.parent ?? "") === parent &&
-        x < m.x + m.w &&
-        m.x < x + w &&
-        y < m.y + m.h &&
-        m.y < y + h,
-    );
-  };
-
-  // Lastboard damps the ghost to about 60fps rather than answering every move
-  // event: each update rewrites a rule in the sheet, and a pointer produces far
-  // more events than a screen has frames.
-  let damped: ReturnType<typeof setTimeout> | null = null;
-  const damp = (run: () => void) => {
-    if (damped) return;
-    damped = setTimeout(() => {
-      damped = null;
-      run();
-    }, 16);
-  };
-
-  const showGhost = (x: number, y: number, w: number, h: number, ok: boolean, parent = "") => {
-    // The ghost is moved into whichever grid it is describing. Its rule places
-    // it from --x and --y, and those mean the page's columns out here and the
-    // section's columns in there, so the same element says the right thing in
-    // both once it is in the right parent.
-    const host = parent
-      ? grid.querySelector<HTMLElement>(`.landing-section[data-section="${cssEscape(parent)}"]`)
-      : grid;
-    if (host && ghost.parentElement !== host) host.appendChild(ghost);
-    grid.querySelectorAll(".landing-group").forEach((el) =>
-      el.classList.toggle("drop-target", parent !== "" && el.getAttribute("data-module") === parent),
-    );
-    ghost.hidden = false;
-    // Through the sheet, like the modules: setProperty on the element writes
-    // the style attribute, which this product's content policy drops.
-    // Under the grid in the selector, so it outscores the stylesheet's own
-    // `.landing-ghost` rather than tying with it and depending on sheet order.
-    setRule(
-      "landing-ghost",
-      `.landing-grid .landing-ghost{--x:${x};--y:${y};--w:${w};--h:${h}}`,
-    );
-    ghost.classList.toggle("invalid", !ok);
-  };
-  const hideGhost = () => {
-    if (ghost.parentElement !== grid) grid.appendChild(ghost);
-    grid.querySelectorAll(".landing-group.drop-target").forEach((el) =>
-      el.classList.remove("drop-target"),
-    );
-    ghost.hidden = true;
-    ghost.classList.remove("invalid");
-    setRule("landing-ghost");
-  };
-
-  let carrying: views.LandingModule | null = null;
-  let grabX = 0;
-  let grabY = 0;
-
-  grid.querySelectorAll<HTMLElement>(".landing-cell").forEach((cellEl) => {
-    cellEl.addEventListener("dragstart", (event) => {
-      // The innermost module wins. A child sits inside its section's own cell,
-      // and both are draggable, so without this the event reaches the section
-      // afterwards and the section decides it is the thing being carried —
-      // picking up a module out of a group would pick up the group.
-      event.stopPropagation();
-      const id = cellEl.dataset.module ?? "";
-      carrying = landingModules.find((m) => m.id === id) ?? null;
-      if (!carrying) return;
-      const box = cellEl.getBoundingClientRect();
-      // Where inside the module it was picked up, so it lands under the hand
-      // rather than jumping so its corner is at the pointer.
-      grabX = (event as DragEvent).clientX - box.left;
-      grabY = (event as DragEvent).clientY - box.top;
-      cellEl.classList.add("carrying");
-      (event as DragEvent).dataTransfer?.setData("text/plain", id);
+    input.addEventListener("input", () => {
+      clearTimeout(waiting);
+      const q = input.value.trim();
+      if (q.length < 2) return close();
+      waiting = setTimeout(async () => {
+        const mine = ++asked;
+        const found = await api
+          .get<{ items: landingViews.LandingSearchHit[]; boards: landingViews.LandingBoard[] }>(
+            `/api/search?q=${encodeURIComponent(q)}`,
+          )
+          .catch(() => ({ items: [], boards: [] }));
+        if (mine !== asked) return;
+        results.innerHTML = landingViews.searchResults(found.items ?? [], found.boards ?? [], q, text);
+        results.hidden = false;
+      }, 250);
     });
-    cellEl.addEventListener("dragend", (event) => {
-      event.stopPropagation();
-      cellEl.classList.remove("carrying");
-      carrying = null;
-      hideGhost();
+    document.addEventListener("click", (e) => {
+      if (!form.contains(e.target as Node)) close();
     });
   });
-
-  /**
-   * Which section, if any, the carried module's top-left corner is over.
-   *
-   * A section is never dropped into a section, so one is never looking for a
-   * home. The corner rather than the pointer, for the same reason every other
-   * measurement here uses it: what lands somewhere is the module, not the hand.
-   */
-  const sectionUnder = (cornerX: number, cornerY: number): HTMLElement | null => {
-    if (!carrying || carrying.kind === "section") return null;
-    for (const el of grid.querySelectorAll<HTMLElement>(".landing-section")) {
-      const box = el.getBoundingClientRect();
-      if (cornerX >= box.left && cornerX <= box.right && cornerY >= box.top && cornerY <= box.bottom) {
-        return el;
-      }
-    }
-    return null;
-  };
-
-  /**
-   * The cell the carried module would land in, and the grid it would land in.
-   *
-   * Two grids. The page's cells are measured from the page's grid, a section's
-   * from that section's own box — measured, not derived by subtracting the
-   * section's position from a page coordinate. The dashboard this comes from
-   * derives it, and that is only right while a section has no padding: its own
-   * has twelve pixels of it, so its inner cells are narrower than the page's
-   * and the two drift apart across the section.
-   */
-  const targetCell = (event: DragEvent) => {
-    const cornerX = event.clientX - grabX;
-    const cornerY = event.clientY - grabY;
-    const w = carrying?.w ?? 1;
-    const h = carrying?.h ?? 1;
-
-    const host = sectionUnder(cornerX, cornerY);
-    if (host) {
-      const parent = host.dataset.section ?? "";
-      const holder = landingModules.find((m) => m.id === parent);
-      const box = host.getBoundingClientRect();
-      if (holder) {
-        const colWidth = (box.width - (holder.w - 1) * GAP) / holder.w;
-        const rowHeight = (box.height - (holder.h - 1) * GAP) / holder.h;
-        const x = Math.max(1, Math.min(holder.w - w + 1,
-          Math.floor((cornerX - box.left) / (colWidth + GAP)) + 1));
-        const y = Math.max(1, Math.min(holder.h - h + 1,
-          Math.floor((cornerY - box.top) / (rowHeight + GAP)) + 1));
-        return { x, y, parent };
-      }
-    }
-
-    const { box, width } = cell();
-    const x = Math.max(1, Math.min(cols - w + 1,
-      Math.floor((cornerX - box.left) / (width + GAP)) + 1));
-    const y = Math.max(1, Math.floor((cornerY - box.top) / (width + GAP)) + 1);
-    return { x, y, parent: "" };
-  };
-
-  grid.addEventListener("dragover", (event) => {
-    if (!carrying) return;
-    event.preventDefault();
-    const moved = event as DragEvent;
-    damp(() => {
-      if (!carrying) return;
-      const { x, y, parent } = targetCell(moved);
-      showGhost(x, y, carrying.w, carrying.h,
-        fits(carrying.id, x, y, carrying.w, carrying.h, parent), parent);
-    });
-  });
-
-  grid.addEventListener("drop", async (event) => {
-    if (!carrying) return;
-    event.preventDefault();
-    const { x, y, parent } = targetCell(event as DragEvent);
-    const moving = carrying;
-    hideGhost();
-
-    const leaving = (moving.parent ?? "") !== "" && parent === "";
-    if (!fits(moving.id, x, y, moving.w, moving.h, parent)) {
-      // Refusing a drop that collides is right everywhere except here: a module
-      // being taken OUT of a section has nowhere else to go, and on a page with
-      // no free cell — which is most pages — refusing left it trapped inside
-      // for good. Leaving always works; where it lands is below everything if
-      // there was no room under the hand.
-      if (!leaving) return;
-      spillOnto([moving]);
-      await save();
-      await fetchLanding();
-      drawLanding(orgs);
-      return;
-    }
-    moving.x = x;
-    moving.y = y;
-    // Into a section, out of one, or from one to another. The coordinates are
-    // already in the grid it is landing in, so the move is the same three
-    // numbers either way.
-    const changedGrid = (moving.parent ?? "") !== parent;
-    if (parent === "") delete moving.parent;
-    else moving.parent = parent;
-    await save();
-    if (changedGrid) await fetchLanding();
-    drawLanding(orgs);
-  });
-
-  // Resizing, from the corner. The pointer arithmetic is in physical pixels and
-  // the handle is drawn with borders, so this corner stays the bottom-right one
-  // in every reading direction: turning only the triangle would leave the
-  // cursor and the shape disagreeing.
-  grid.querySelectorAll<HTMLElement>("[data-resize]").forEach((handle) => {
-    handle.addEventListener("pointerdown", (event) => {
-      const id = handle.dataset.resize ?? "";
-      const target = landingModules.find((m) => m.id === id);
-      if (!target) return;
-      event.preventDefault();
-      event.stopPropagation();
-
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const fromW = target.w;
-      const fromH = target.h;
-      let w = fromW;
-      let h = fromH;
-      // Lastboard draws the ghost on the way down, before anything has moved, so
-      // taking the corner already says what is being resized.
-      showGhost(target.x, target.y, fromW, fromH, true);
-
-      const move = (moved: PointerEvent) => damp(() => {
-        const { width } = cell();
-        const parent = target.parent ?? "";
-        const holder = parent ? landingModules.find((m) => m.id === parent) : null;
-        const most = holder ? holder.w : cols;
-        // One column everywhere, in a section and on the page alike.
-        const least = 1;
-        w = Math.max(least, Math.min(most - target.x + 1,
-          fromW + Math.round((moved.clientX - startX) / (width + GAP))));
-        h = Math.max(1, fromH + Math.round((moved.clientY - startY) / (width + GAP)));
-        if (holder) h = Math.min(h, holder.h - target.y + 1);
-        showGhost(target.x, target.y, w, h,
-          fits(target.id, target.x, target.y, w, h, parent), parent);
-      });
-      const done = async () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", done);
-        hideGhost();
-        const parent = target.parent ?? "";
-        if (!fits(target.id, target.x, target.y, w, h, parent)) return;
-        target.w = w;
-        target.h = h;
-        // A section that shrank may no longer hold everything it did. What no
-        // longer fits comes out onto the page rather than being drawn past the
-        // edge of the box that is supposed to contain it.
-        const ejected = target.kind === "section" ? evict(target) : 0;
-        await save();
-        if (ejected > 0) await fetchLanding();
-        drawLanding(orgs);
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", done);
-    });
-  });
-}
-
-function openModuleConfig(id: string, orgs: OrganizationSummary[]): void {
-  const target = landingModules.find((m) => m.id === id);
-  const form = root?.querySelector<HTMLFormElement>("form.module-config");
-  if (!target || !form) return;
-
-  form.querySelector<HTMLInputElement>("[name=id]")!.value = target.id;
-
-  // A block of words has no field here at all: it is written on the page, in
-  // the place it will be read, with the bar that follows the cursor. A textarea
-  // in a dialog was asking somebody to compose their front page through a
-  // letterbox.
-
-  // And only a module that draws something out of the database is asked which
-  // board to draw it from, for the same reason.
-  const where = form.querySelector<HTMLElement>("[data-for-scope]");
-  const scope = form.querySelector<HTMLSelectElement>("[name=scope]");
-  if (where && scope) {
-    where.hidden = !takesScope(target.kind);
-    // Which levels this module can use. A button goes to one report form, so
-    // "everything" and "an organisation" are not answers it can act on; the
-    // organisations module has no use for a board. Offering a level a module
-    // cannot use is offering a choice that quietly does nothing.
-    const allowed =
-      target.kind === "call_to_action"
-        ? ["board"]
-        : target.kind === "organisations"
-          ? ["all", "org"]
-          : ["all", "org", "board"];
-    scope.querySelectorAll<HTMLOptionElement>("option").forEach((option) => {
-      option.hidden = !allowed.includes(option.dataset.level ?? "");
-    });
-    scope.value = target.scope ?? "";
-    // A module whose stored level is no longer on offer falls back to the first
-    // one that is, rather than showing a blank control.
-    if (scope.selectedIndex < 0 || scope.options[scope.selectedIndex]?.hidden) {
-      const first = [...scope.options].find((option) => !option.hidden);
-      if (first) scope.value = first.value;
-    }
-  }
-
-  // And only a module that draws a name is asked where to keep it — as the four
-  // little diagrams, not four words.
-  // Where the name goes, on the name: the dropdown lives inside the same box as
-  // the name it places, which is where theirs is.
-  const at = form.querySelector<HTMLInputElement>("[name=labelAt]");
-  const placing = form.querySelector<HTMLElement>(".icon-dropdown");
-  if (placing) placing.hidden = !usesHeader(target.kind) && target.kind !== "section";
-  if (at) {
-    const section = target.kind === "section";
-    at.value = section ? "pill" : (target.label ?? "top");
-    pickOne(form, "[data-at]", "at", at.value);
-    showMark(form, at.value);
-    // A section wears its name on its border or wears none, which is what it
-    // does over there. The other two are shown and cannot be taken: a control
-    // that quietly ignores half of itself is worse than one that says which
-    // half it will not do.
-    form.querySelectorAll<HTMLButtonElement>("[data-at]").forEach((mark) => {
-      const allowed = !section || mark.dataset.at === "pill" || mark.dataset.at === "off";
-      mark.disabled = !allowed;
-      mark.classList.toggle("cannot", !allowed);
-    });
-  }
-
-  // How its own box looks, which every module has.
-  const colour = form.querySelector<HTMLInputElement>("[name=borderColour]");
-  if (colour) {
-    colour.value = target.border_color ?? "";
-    pickOne(form, "[data-colour]", "colour", colour.value);
-  }
-  const width = form.querySelector<HTMLInputElement>("[name=borderWidth]");
-  if (width) {
-    width.value = target.bare ? "0" : target.border_width ? String(target.border_width) : "";
-    pickOne(form, "[data-width]", "width", width.value);
-  }
-  const clear = form.querySelector<HTMLInputElement>("[name=clear]");
-  if (clear) clear.checked = target.clear === true;
-
-  // How many things a module that lists them shows.
-  const counting = form.querySelector<HTMLElement>("[data-for-rows]");
-  const rows = form.querySelector<HTMLInputElement>("[name=rows]");
-  if (counting && rows) {
-    counting.hidden = !lists(target.kind);
-    rows.value = String(target.rows ?? 0);
-    stepRows(counting, rows);
-  }
-
-
-  // The button's words, a section's name, and a point's sentence. All three are
-  // one short line the operator writes, so they are one field.
-  const naming = form.querySelector<HTMLElement>("[data-for-label]");
-  const label = form.querySelector<HTMLInputElement>("[name=label]");
-  if (naming && label) {
-    const named = target.kind === "call_to_action";
-    naming.hidden = !named;
-    label.value = named ? (target.body ?? "") : "";
-    const labelText = form.querySelector<HTMLElement>("[data-for-label] label");
-    if (labelText) labelText.textContent = i18n.t("landing.label");
-  }
-
-  // What the operator calls it, for the modules that draw a name at all.
-  const naming2 = form.querySelector<HTMLElement>("[data-for-name]");
-  const name = form.querySelector<HTMLInputElement>("[name=name]");
-  if (naming2 && name) {
-    naming2.hidden = !usesHeader(target.kind);
-    name.value = target.name ?? "";
-    name.placeholder = defaultNameFor(target.kind);
-  }
-
-  // A section is named in the same field as everything else and placed with the
-  // same marks. Over there a section's name IS the pill on its border, so the
-  // only position it can take is that one — and saying so with the same control
-  // greyed down to one choice is clearer than a different control.
-  if (target.kind === "section" && naming2 && name) {
-    naming2.hidden = false;
-    name.value = target.body ?? "";
-    name.placeholder = "";
-  }
-
-  // A tab with nothing in it says so rather than opening empty.
-  const look = form.querySelector<HTMLElement>("[data-look-empty]");
-  if (look) look.hidden = usesHeader(target.kind);
-
-  // Always opened on the first tab: which one was left showing is a fact about
-  // the last module somebody configured, not about this one.
-  showTab(form, "general");
-  void orgs;
-  openModal("module-config");
-}
-
-/** The name of what a module draws, which is what it is called until it is not. */
-function defaultNameFor(kind: views.LandingModule["kind"]): string {
-  switch (kind) {
-    case "organisations":
-      return i18n.t("shell.organizations");
-    case "boards":
-      return i18n.t("portal.boards");
-    case "most_voted":
-      return i18n.t("landing.moduleVoted");
-    case "recently_done":
-      return i18n.t("landing.moduleDone");
-    case "recent_activity":
-      return i18n.t("landing.moduleActivity");
-    case "roadmap":
-      return i18n.t("landing.moduleRoadmap");
-    case "statistics":
-      return i18n.t("landing.moduleStats");
-    default:
-      return "";
-  }
-}
-
-/**
- * Mark one of a row of buttons as the chosen one.
- *
- * Three rows work this way — the colour, the width, the place a name goes — and
- * three copies of the same four lines is three places for them to drift apart.
- */
-function pickOne(form: HTMLFormElement, selector: string, key: string, value: string): void {
-  form.querySelectorAll<HTMLButtonElement>(selector).forEach((button) => {
-    button.classList.toggle("on", (button.dataset[key] ?? "") === value);
-  });
-}
-
-/** Put the chosen diagram on the button that opens the menu of them. */
-function showMark(form: HTMLFormElement, at: string): void {
-  const chosen = form.querySelector<HTMLElement>(`[data-at="${at}"]`);
-  const shown = form.querySelector<HTMLElement>("[data-current-mark]");
-  if (chosen && shown) shown.innerHTML = chosen.innerHTML;
-}
-
-/** Show one tab of the settings dialog and mark it as the one showing. */
-/**
- * Wires the minus and plus either side of a count, and keeps them honest: at
- * nought there is nothing to take away and at the ceiling nothing to add, and
- * a button that still looks pressable at the end of its range is a button that
- * lies. Typing into the field still works — the steps are a second way in, not
- * the only one.
- */
-/**
- * Asks for a picture.
- *
- * The input is made, used and dropped rather than sitting in the markup: a file
- * input left on the page is a control a visitor can see the shadow of, and one
- * more thing for a redraw to lose the listener of.
- */
-function pickImageFile(): Promise<File | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.addEventListener("change", () => resolve(input.files?.[0] ?? null), { once: true });
-    // A picker closed with Escape fires nothing at all in some browsers, so
-    // this also listens for the window coming back and settles at nothing.
-    window.addEventListener(
-      "focus",
-      () => setTimeout(() => resolve(input.files?.[0] ?? null), 400),
-      { once: true },
-    );
-    input.click();
-  });
-}
-
-function stepRows(group: HTMLElement, field: HTMLInputElement): void {
-  const low = Number(field.min || 0);
-  const high = Number(field.max || 20);
-  const steps = [...group.querySelectorAll<HTMLButtonElement>("[data-step]")];
-
-  const settle = (): void => {
-    const now = Number(field.value || 0);
-    for (const step of steps) {
-      const by = Number(step.dataset.step ?? 0);
-      step.disabled = by < 0 ? now <= low : now >= high;
-    }
-  };
-
-  for (const step of steps) {
-    if (step.dataset.wired === "1") continue;
-    step.dataset.wired = "1";
-    step.addEventListener("click", () => {
-      const by = Number(step.dataset.step ?? 0);
-      field.value = String(Math.min(high, Math.max(low, Number(field.value || 0) + by)));
-      field.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-  }
-  if (field.dataset.wired !== "1") {
-    field.dataset.wired = "1";
-    field.addEventListener("input", settle);
-  }
-  settle();
-}
-
-function showTab(form: HTMLFormElement, which: string): void {
-  form.querySelectorAll<HTMLElement>("[data-panel]").forEach((panel) => {
-    panel.hidden = panel.dataset.panel !== which;
-  });
-  form.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((tab) => {
-    const on = tab.dataset.tab === which;
-    tab.classList.toggle("on", on);
-    tab.setAttribute("aria-selected", String(on));
-  });
-}
-
-/**
- * What a shrunken section can no longer hold comes out onto the page.
- *
- * Which children, decided by WHERE they are and not by how many there are: the
- * dashboard this comes from compares the number of children against the number
- * of cells, so a section with two children shrunk under the second one ejects
- * nothing and draws that child outside the box meant to contain it. A child
- * that no longer fits is one whose far edge is past the section's new one.
- *
- * Each one goes under everything on the page, one below the next, which is the
- * one place a module is certainly not on top of something else.
- */
-function evict(section: views.LandingModule): number {
-  const out = landingModules.filter(
-    (m) => m.parent === section.id && (m.x + m.w - 1 > section.w || m.y + m.h - 1 > section.h),
-  );
-  spillOnto(out);
-  return out.length;
-}
-
-/**
- * Put these modules on the page, one under the other, below everything.
- *
- * Under everything is the one place a module is certainly not on top of another
- * one. The width is widened to the page's minimum: a module one column wide is
- * fine inside a section and is not a module out here.
- */
-function spillOnto(modules: views.LandingModule[]): void {
-  let row = landingModules.reduce((low, m) => (m.parent ? low : Math.max(low, m.y + m.h)), 1);
-  for (const child of modules) {
-    delete child.parent;
-    child.x = 1;
-    child.y = row;
-    child.w = Math.max(2, Math.min(views.LANDING_COLUMNS, child.w));
-    row += child.h;
-  }
-}
-
-/** The kinds that draw a name of their own, and so can be told where to put it. */
-function usesHeader(kind: views.LandingModule["kind"]): boolean {
-  return (
-    kind === "organisations" ||
-    kind === "boards" ||
-    kind === "most_voted" ||
-    kind === "recently_done" ||
-    kind === "recent_activity" ||
-    kind === "roadmap" ||
-    kind === "statistics"
-  );
-}
-
-/**
- * How big a module arrives.
- *
- * A first size, not a rule: every one of these can be dragged to anything from
- * a single cell upwards. What it is for is that a module lands looking like the
- * thing it is — a button is a button, a list is a column, a banner is a banner —
- * instead of as one more band across the page.
- */
-function sizeFor(kind: views.LandingModule["kind"]): { w: number; h: number } {
-  // Three by two, all of them. It was a size per kind, worked out from what
-  // each one draws, which sounds right and is not: what a module should be is
-  // the operator's decision and the corner is how they make it. One arrival
-  // size means a page of new modules is a row of equal tiles to arrange rather
-  // than a stack of things that already decided for themselves.
-  //
-  // A section is the exception, and only just: at three by two it holds one
-  // module, which is a container nothing fits into.
-  void kind;
-  return kind === "section" ? { w: 6, h: 3 } : { w: 3, h: 2 };
-}
-
-/** The kinds that draw a list, and so can be told how long it is. */
-function lists(kind: views.LandingModule["kind"]): boolean {
-  return (
-    kind === "organisations" ||
-    kind === "boards" ||
-    kind === "most_voted" ||
-    kind === "recently_done" ||
-    kind === "recent_activity" ||
-    kind === "roadmap"
-  );
-}
-
-/**
- * The kinds that can be pointed at one place.
- *
- * Wider than usesData: where a module's content comes from and whether it can
- * be narrowed are two different questions. The organisations module draws the
- * list the page already carries, and is still something you can aim at one.
- */
-function takesScope(kind: views.LandingModule["kind"]): boolean {
-  return kind === "organisations" || usesData(kind);
-}
-
-/** The kinds that draw out of the database, and so have a board to be told. */
-function usesData(kind: views.LandingModule["kind"]): boolean {
-  return (
-    kind === "boards" ||
-    kind === "most_voted" ||
-    kind === "recently_done" ||
-    kind === "call_to_action" ||
-    kind === "recent_activity" ||
-    kind === "roadmap" ||
-    kind === "statistics"
-  );
 }
 
 function show(html: string): void {
@@ -2119,14 +1127,11 @@ async function showOrganizations(): Promise<void> {
   const status = await api.get<Status>("/api/status").catch(() => null);
   if (status?.needs_setup) return go("/setup");
 
-  const { organizations } = await api.get<{ organizations: OrganizationSummary[] }>("/api/orgs");
-  // Who is looking decides what an empty instance says. An administrator gets
-  // the way out of it; a visitor gets told plainly, rather than being sent to a
-  // form that would refuse them.
+  // Who is looking decides whether the page can be arranged.
   if (!me) me = await api.get<Me>("/api/me").catch(() => null);
 
   await fetchLanding();
-  drawLanding(organizations ?? []);
+  drawLanding();
 }
 
 async function showRepositories(orgSlug: string): Promise<void> {

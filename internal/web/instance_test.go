@@ -296,3 +296,38 @@ func TestAPictureOnlyTheDraftUsesIsKept(t *testing.T) {
 		t.Error("a picture no page uses was kept")
 	}
 }
+
+// TestTheFrontPageSearchFindsWhatIsPublished.
+//
+// A visitor finds a report before writing it again — and only a published one:
+// the front page must never be where something unreviewed appears.
+func TestTheFrontPageSearchFindsWhatIsPublished(t *testing.T) {
+	i := newInstance(t)
+	i.claim()
+	i.createOrg("acme")
+	i.createRepo("acme", "atlas")
+	shown, _ := i.submit("acme", "atlas", "idea", "dark mode for the dashboard")
+	_, _ = i.submit("acme", "atlas", "idea", "dark mode for the editor, still waiting")
+	if got := status(t, i.do(http.MethodPost, "/api/items/"+shown+"/moderation", map[string]string{"state": "published"})); got != http.StatusOK {
+		t.Fatalf("publishing: %d", got)
+	}
+
+	body := decode(t, i.anonymous().do(http.MethodGet, "/api/search?q=dar", nil))
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("the search found %d reports, want the one published: %v", len(items), items)
+	}
+	if hit, _ := items[0].(map[string]any); hit["public_id"] != shown || hit["board"] != "atlas" {
+		t.Errorf("the search found %v", hit)
+	}
+	if boards, _ := body["boards"].([]any); len(boards) != 1 {
+		t.Errorf("the search did not say where a new report goes: %v", body["boards"])
+	}
+
+	// One character asks nothing — and "d" would match: the last word is read
+	// as the start of one, so this answers only because of the minimum.
+	short := decode(t, i.anonymous().do(http.MethodGet, "/api/search?q=d", nil))
+	if items, _ := short["items"].([]any); len(items) != 0 {
+		t.Errorf("one character searched: %v", items)
+	}
+}
