@@ -59,6 +59,14 @@ const InstanceAccent = "instance_accent"
 // it is a table somebody has to remember exists.
 const LandingLayout = "landing_layout"
 
+// LandingDraft is the front page being edited and not yet published.
+//
+// Visitors are shown LandingLayout and nothing else, so an operator can move a
+// band, change their mind and move it back without anybody seeing the page half
+// arranged. Empty means there is no draft: the editor opens on what is
+// published.
+const LandingDraft = "landing_draft"
+
 const UpdateChannel = "update_channel"
 
 type Store struct {

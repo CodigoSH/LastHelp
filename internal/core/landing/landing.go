@@ -1,16 +1,23 @@
 // Package landing is what the public front page is made of.
 //
-// The page used to be a fixed composition: a mark, a tagline, three sentences
-// and the list of organisations, in that order, for everybody. It read like the
-// sign-in screen because it was built like one — a screen that asks for one
-// thing, wearing all that space on purpose — while what it actually has to do
-// is show a visitor where to go.
+// A front page here is a website, not a dashboard. It was a dashboard's grid
+// for a while — twelve columns of square cells, each module placed at a cell
+// and sized in them — and that is the right tool for a private board somebody
+// arranges for themselves and the wrong one for a page a stranger reads top to
+// bottom on whatever screen they have: heights tied to widths cut the words
+// off, a phone got the modules in whatever order they happened to stack, and
+// nothing stopped two boxes ending three pixels apart.
 //
-// So it is a list of modules now, and the operator decides which and in what
-// order. This package owns what a module may be, and refuses anything else:
-// the layout arrives over HTTP from an administrator and is rendered on the one
-// page strangers see, so "we did not recognise that, we left it out" is not an
-// acceptable answer. A layout is either understood entirely or refused entirely.
+// So a page is a stack of bands. Each band chooses its columns from a handful
+// of layouts, each column holds modules one under another, and every module is
+// as tall as what it says. There are no coordinates to get wrong, a phone reads
+// the columns in order, and the choices an operator makes are the ones a
+// website needs — what goes where, and in which band — rather than the ones a
+// page-building product would offer.
+//
+// This package owns what a page may be and refuses anything else. The page
+// arrives over HTTP from an administrator and is drawn on the one screen
+// strangers see, so it is understood entirely or refused entirely.
 package landing
 
 import (
@@ -18,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -26,382 +34,332 @@ import (
 type Kind string
 
 const (
-	// Hero is the block that opens the page.
-	//
-	// It drew a fixed mark, a fixed name and a fixed line, and the operator
-	// could change none of them. It is now the same block of words as Text,
-	// seeded with the installation's identity so that a new page opens saying
-	// something rather than nothing, and free from there.
-	Hero Kind = "hero"
-
-	// Intro was one thing worth saying about reporting here. It said the same
-	// as Text in a narrower way, so it is gone and anything stored as one is
-	// read back as Text — see foldOldKinds. The constant stays because that is
-	// the value sitting in saved layouts, and something has to name it.
-	Intro Kind = "intro"
-
-	// Organisations is the list of places somebody can report to.
-	Organisations Kind = "organisations"
+	// Heading opens a page: a title, a line under it, the installation's mark,
+	// and — on the default page — the search that stops a report being
+	// written twice. Its words are plain, because a heading is one sentence
+	// and markup in it would only be a way to make it something else.
+	Heading Kind = "heading"
 
 	// Text is whatever the operator wants to say, written where it is seen.
-	//
-	// It used to be plain text, on the grounds that markup on a public page is
-	// a way to put script on it. That reasoning was right about the danger and
-	// wrong about the answer: the words are written by the operator, who is the
-	// one person this page belongs to, and refusing them a heading or a link
-	// made the module useless for the thing it exists for. So it carries
-	// markup, through a list of tags and classes narrow enough to state in one
-	// place — see Clean — and it is cleaned again on the way in rather than
-	// trusted because the browser cleaned it once.
+	// It carries markup through the policy in Clean, and a tone: plain, a
+	// note, or a notice somebody should not miss.
 	Text Kind = "text"
 
-	// Boards is the list of boards themselves, without going through the
-	// organisation that holds them. The usual installation is one person with
-	// one organisation and a handful of projects, and there the organisation
-	// level is a door with nothing behind it: a visitor who wants to report
-	// something has to open it to find the list they were looking for.
+	// Search finds a report that already exists before somebody writes a new
+	// one. The same search the heading can carry, as a module of its own for
+	// operators who want it somewhere else.
+	Search Kind = "search"
+
+	// Boards is where to report: the boards, as cards or as a list, grouped
+	// by organisation when there is more than one.
 	Boards Kind = "boards"
 
-	// MostVoted is the ideas people asked for most.
-	//
-	// The front page already promises this — "ideas collect votes, which shows
-	// what is most requested" — and until now there was nowhere on it that
-	// showed one. A promise a page makes and does not keep reads as broken.
-	MostVoted Kind = "most_voted"
+	// Reports is a list of reports, and which list is its Show: the most
+	// voted ideas, what was put right lately, the newest, or what is planned.
+	// One module with a question rather than four that differ in one query.
+	Reports Kind = "reports"
 
-	// RecentActivity is what has arrived lately.
-	//
-	// Useful only where there is a flow of it: on a quiet portal a list of the
-	// same three reports for a month says less than nothing. It is offered and
-	// not placed by default for exactly that reason.
-	RecentActivity Kind = "recent_activity"
-
-	// Roadmap is what is coming, being worked on, and done.
-	//
-	// The same three columns the board's own roadmap uses, because a visitor
-	// who reads one and then the other should not have to learn a second
-	// vocabulary.
+	// Roadmap is what is planned, in progress and done, in the three columns
+	// a board's own roadmap uses.
 	Roadmap Kind = "roadmap"
 
-	// Statistics is how much has come in and how much is finished.
-	//
-	// The most dangerous of these on a fresh installation: three zeroes say
-	// "nothing happens here" to the first person who ever looks. It draws
-	// nothing at all until there is something to count.
+	// Statistics is how much came in and where it got to. It draws nothing
+	// until there is something to count: three zeroes tell the first visitor
+	// that nothing happens here.
 	Statistics Kind = "statistics"
 
-	// Section is a box that holds other modules.
-	//
-	// The dashboard's own, and the reason it exists there is the reason it
-	// exists here: once a module shows one thing — this board, this
-	// organisation — a page with eight of them is eight loose boxes, and the
-	// only thing that makes them read as a group is a box around them.
-	//
-	// A section has its own grid inside it, as wide and as tall as the section
-	// is, and its children are placed in THAT grid. A section never holds
-	// another section: two levels is a layout somebody arranged, three is a
-	// layout nobody can drag.
-	Section Kind = "section"
+	// Links is a short list of places — a board's report form, its roadmap,
+	// or an address outside — each drawn as a button or as a link.
+	Links Kind = "links"
 
-	// RecentlyDone is what was put right lately.
-	//
-	// The strongest thing this page can say to somebody deciding whether it is
-	// worth typing anything: reports here get read and acted on. It takes both
-	// vocabularies that mean finished — an idea is done, a bug is closed — and
-	// leaves out the two that mean refused.
-	RecentlyDone Kind = "recently_done"
-
-	// CallToAction is a button that goes straight to a board's report form.
-	//
-	// The one thing this page exists to make happen, and until now the only
-	// route to it was the list: pick an organisation, pick a board, find the
-	// button. An operator with one project should be able to put that button on
-	// the front page and be done.
-	CallToAction Kind = "call_to_action"
+	// Picture is one image, with the words for somebody who cannot see it.
+	Picture Kind = "image"
 )
 
-// usesData is the modules whose content has to be read out of the database and
-// sent with the page: the boards, the reports, and the button's destination.
-//
-// Deliberately NOT the organisations module. It draws the same list the page
-// already carries for its own navigation, so a front page of a mark, some words
-// and the organisations still reads neither the board table nor the item table.
-// Putting it here cost exactly that, and a test said so.
+// usesData is the modules drawn from the database, whose content travels with
+// the page. A page of headings, words, links and pictures reads neither the
+// board table nor the item table when a stranger opens it.
 func (k Kind) usesData() bool {
 	switch k {
-	case Boards, MostVoted, RecentlyDone, CallToAction, RecentActivity, Roadmap, Statistics:
+	case Boards, Reports, Roadmap, Statistics:
 		return true
 	}
 	return false
 }
 
-// takesScope is the modules that can be pointed at one place. A wider set than
-// usesData: where a module's content comes from and whether it can be narrowed
-// are two different questions, and answering them with one predicate is how the
-// default page started reading tables it has no use for.
-func (k Kind) takesScope() bool { return k == Organisations || k.usesData() }
+// takesScope is the modules that can be narrowed to an organisation or a board.
+func (k Kind) takesScope() bool { return k.usesData() }
 
-// lists is the modules that draw a list of things, and so can be told how many
-// of them to draw.
-func (k Kind) lists() bool {
+// lists is the modules that can be told how many rows to show.
+func (k Kind) lists() bool { return k == Boards || k == Reports }
+
+// named is the modules that draw a header with their name. A heading is its own
+// name, a paragraph and a picture have none, and a search box is a field.
+func (k Kind) named() bool {
 	switch k {
-	case Boards, MostVoted, RecentlyDone, RecentActivity, Roadmap, Organisations:
+	case Boards, Reports, Roadmap, Statistics, Links:
 		return true
 	}
 	return false
 }
 
-// usesWords is the modules that carry words of their own: the operator's own
-// paragraph, and the label on the button.
-// usesMarkup is the modules whose words are written where they are seen, and
-// so arrive as markup. A narrower set than usesWords: a button's label and a
-// section's name are one line of plain text and would be nothing but a way in
-// if they accepted tags.
-func (k Kind) usesMarkup() bool { return k == Text || k == Hero }
+// Columns is how a band is divided, as the relative widths of its columns.
+type Columns string
 
-func (k Kind) usesWords() bool {
-	return k == Text || k == CallToAction || k == Section || k == Intro || k == Hero
-}
-
-// usesHeader is the modules that draw a name of their own, and so are the ones
-// a label position means anything to. A hero is its own name and a paragraph
-// has none, so neither is asked where to put one.
-func (k Kind) usesHeader() bool {
-	switch k {
-	case Organisations, Boards, MostVoted, RecentlyDone, RecentActivity, Roadmap, Statistics:
-		return true
-	}
-	return false
-}
-
-// isNamed is the modules that carry a name of their own.
-//
-// A block of words is not one of them, and that includes the block that opens
-// the page. It says what it is in its own words, at whatever size the operator
-// chose; a header drawn above that would be the same thing said twice in two
-// type sizes, and the dialog would be offering a field with nowhere to show.
-func (k Kind) isNamed() bool { return k.usesHeader() }
-
-// LabelAt is where a module's name sits.
-//
-// The four the dashboard offers on its own items, so an operator who has
-// arranged one board already knows this control. What each one looks like is
-// not identical across the two products and that is deliberate: a bookmark
-// there is a square with an icon, so its name sits straight against it, while a
-// module here is a box holding a list and its name needs a line under it or it
-// reads as the first row.
-type LabelAt string
-
+// The layouts a band may take. Six, because those are the arrangements a web
+// page actually uses; a seventh would be a choice nobody can tell apart from
+// one of these.
 const (
-	// LabelTop is the default, and what every module drew before there was a
-	// choice. The zero value means this, so a layout written earlier keeps the
-	// look it had.
-	LabelTop LabelAt = "top"
-
-	// LabelBottom is the same header at the foot of the module.
-	LabelBottom LabelAt = "bottom"
-
-	// LabelPill is the name on the module's top border, the same pill a section
-	// wears. Chosen by the operator, never given out by the product: handing it
-	// to every module automatically is what made this page read as a row of
-	// containers with their contents missing.
-	LabelPill LabelAt = "pill"
-
-	// LabelOff draws no name at all.
-	LabelOff LabelAt = "off"
+	One        Columns = "1"
+	Halves     Columns = "1-1"
+	Thirds     Columns = "1-1-1"
+	WideNarrow Columns = "2-1"
+	NarrowWide Columns = "1-2"
+	Quarters   Columns = "1-1-1-1"
 )
 
-func (l LabelAt) valid() bool {
-	switch l {
-	case "", LabelTop, LabelBottom, LabelPill, LabelOff:
-		return true
+// count is how many columns a layout has, and zero for a layout that is not
+// one of them.
+func (c Columns) count() int {
+	switch c {
+	case One:
+		return 1
+	case Halves, WideNarrow, NarrowWide:
+		return 2
+	case Thirds:
+		return 3
+	case Quarters:
+		return 4
 	}
-	return false
+	return 0
 }
 
-// The grid, ported from the dashboard this house already runs.
-//
-// Twelve columns and rows of a fixed height, each module placed at a cell and
-// spanning a number of them. Not a first guess: it is the same geometry the
-// dashboard uses, and the point of taking it whole rather than inventing a
-// smaller one is that the arithmetic, the collision rules and the look are
-// already worked out and already carry the house's mark.
+// The rest of a band's choices, each a short closed list. The empty value is
+// the ordinary one, so a band nobody has touched says nothing about any of them.
 const (
-	maxModules  = 24
-	maxTextBody = 4_000
+	BackgroundSoft   = "soft"
+	BackgroundAccent = "accent"
 
-	// maxLabel is a button's words, in runes rather than bytes: the bound is
-	// about what fits on a button, and a byte count would cut a Japanese label
-	// at a third of the length of an English one.
-	maxLabel = 80
+	WidthFull = "full"
 
-	// maxPoint is one thing worth saying, in runes. Longer than a label because
-	// it is a sentence and shorter than a paragraph because it sits beside a
-	// mark on one line.
-	maxPoint = 160
-
-	// maxRows is the most a module that lists things will show. The same bound
-	// the server already uses when it reads them, written once so the dialog
-	// cannot offer a number the reader would quietly cut.
-	maxRows = 20
-
-	Columns = 12
-
-	// The narrowest a module may be, in columns.
-	//
-	// One, like the dashboard's own items. It was two, on the grounds that
-	// eighty pixels is not a module — which was true while every module was a
-	// band of content across the page. It stopped being true when a module
-	// became able to show one board, one organisation or one button: those are
-	// cards, and a card in a single column is exactly what the dashboard puts
-	// in one. How small is useful is the operator's judgement, not a number
-	// decided here.
-	MinSpan = 1
+	SpacingCompact = "compact"
+	SpacingAiry    = "airy"
 )
 
-// Module is one block on the page, and where it sits.
+// A module's frame. Card is the empty value: a box with a border, which is
+// what a module looks like until somebody chooses otherwise.
+const (
+	StyleSoft  = "soft"
+	StylePlain = "plain"
+)
+
+// A text module's tone.
+const (
+	ToneNote   = "note"
+	ToneNotice = "notice"
+)
+
+// What a reports module shows. The empty value is the most voted ideas.
+const (
+	ShowMostVoted    = "most_voted"
+	ShowRecentlyDone = "recently_done"
+	ShowLatest       = "latest"
+	ShowPlanned      = "planned"
+)
+
+// DisplayList draws a boards module as rows rather than cards.
+const DisplayList = "list"
+
+// AlignStart puts a heading against the start edge rather than in the middle.
+const AlignStart = "start"
+
+// Where a link goes.
+const (
+	// ToForm is a board's report form. Its Scope is "org/board".
+	ToForm = "form"
+	// ToBoard is a board's public page.
+	ToBoard = "board"
+	// ToRoadmap is a board's roadmap.
+	ToRoadmap = "roadmap"
+	// ToURL is an address outside this installation.
+	ToURL = "url"
+)
+
+// Link is one place a links module, or the page's footer, points at.
+type Link struct {
+	Label  string `json:"label"`
+	To     string `json:"to"`
+	Scope  string `json:"scope,omitempty"`
+	URL    string `json:"url,omitempty"`
+	Button bool   `json:"button,omitempty"`
+}
+
+// Module is one block of a column.
 //
-// X and Y are one-based, the way CSS grid lines are, so the numbers stored here
-// are the numbers the stylesheet uses and nothing has to add one on the way
-// through. W and H are spans.
+// One shape for every kind, with the fields each kind reads. The alternative —
+// a type per kind behind an interface — makes the JSON the browser sends
+// ambiguous to decode and every change twice the work, and the validation below
+// already says which fields belong to which kind.
 type Module struct {
 	ID   string `json:"id"`
 	Kind Kind   `json:"kind"`
 
-	X int `json:"x"`
-	Y int `json:"y"`
-	W int `json:"w"`
-	H int `json:"h"`
+	// Name is the header a named module draws, and empty means the name of
+	// what it shows. HideName draws no header at all.
+	Name     string `json:"name,omitempty"`
+	HideName bool   `json:"hide_name,omitempty"`
 
-	// Body is the words of a Text module, and empty for every other kind.
+	// Style is the frame: card (empty), soft or plain.
+	Style string `json:"style,omitempty"`
+
+	// Body and Tone are a text module's.
 	Body string `json:"body,omitempty"`
+	Tone string `json:"tone,omitempty"`
 
-	// Parent is the id of the section holding this module, and empty for a
-	// module sitting straight on the page.
-	//
-	// A child's X, Y, W and H are in ITS SECTION's grid, not the page's: a
-	// child at 1,1 is the top-left cell of its section wherever that section
-	// happens to be. Keeping them relative is what lets a section be dragged
-	// somewhere else without rewriting everything inside it.
-	Parent string `json:"parent,omitempty"`
+	// Title, Subtitle, HideLogo, Align and WithSearch are a heading's. An
+	// empty title and subtitle are the installation's name and tagline, so
+	// the default page says who it belongs to without storing it twice.
+	Title      string `json:"title,omitempty"`
+	Subtitle   string `json:"subtitle,omitempty"`
+	HideLogo   bool   `json:"hide_logo,omitempty"`
+	Align      string `json:"align,omitempty"`
+	WithSearch bool   `json:"with_search,omitempty"`
 
-	// Name is what this module calls itself, and empty means the name of what it
-	// draws — "Repositories", "Most wanted ideas".
-	//
-	// An operator with three boards modules pointed at three boards needs to
-	// tell them apart, and "Repositories" three times tells nobody anything.
+	// Scope narrows a data module to an organisation ("org") or a board
+	// ("org/board"), and empty is everything. Rows is how many a list shows,
+	// and zero is its own default. Show is which reports; Display is how the
+	// boards are drawn.
+	Scope   string `json:"scope,omitempty"`
+	Rows    int    `json:"rows,omitempty"`
+	Show    string `json:"show,omitempty"`
+	Display string `json:"display,omitempty"`
+
+	// Links is a links module's.
+	Links []Link `json:"links,omitempty"`
+
+	// Image, Alt and Caption are an image module's. Image is the address of a
+	// picture this installation stores, as its upload answered.
+	Image   string `json:"image,omitempty"`
+	Alt     string `json:"alt,omitempty"`
+	Caption string `json:"caption,omitempty"`
+}
+
+// Band is one horizontal stretch of the page.
+type Band struct {
+	ID string `json:"id"`
+
+	// Columns is the layout, and Cells holds one list of modules per column,
+	// in order, top to bottom.
+	Columns Columns    `json:"columns"`
+	Cells   [][]Module `json:"cells"`
+
+	// Name is drawn as a pill on the band, and empty draws none.
 	Name string `json:"name,omitempty"`
 
-	// Rows is how many a module that lists things shows, and zero means as many
-	// as it would anyway. An operator who gives a module two rows of height does
-	// not want eight of them in it.
-	Rows int `json:"rows,omitempty"`
-
-	// BorderColor and BorderWidth are how the module's own box looks, and they
-	// are the dashboard's controls with the dashboard's values: ten colours and
-	// three widths. Empty and zero mean the theme decides, which is what every
-	// module looks like until somebody says otherwise.
-	BorderColor string `json:"border_color,omitempty"`
-	BorderWidth int    `json:"border_width,omitempty"`
-
-	// Bare draws the module with no border at all.
-	//
-	// A field of its own rather than a width of nought, because nought already
-	// means something else and means it everywhere: "whatever the theme draws",
-	// which is what every module looks like until somebody chooses. Somebody
-	// who wants no line has chosen; somebody who has not touched it has not.
-	Bare bool `json:"bare,omitempty"`
-
-	// Clear draws the module with nothing behind it, so the page shows through.
-	//
-	// It is what makes a block of words readable as part of the page rather
-	// than as a card sitting on it — a heading across the top of a front page
-	// wants no box around it, and until now every module had one.
-	Clear bool `json:"clear,omitempty"`
-
-	// Label is where this module's name sits. Empty means the top, which is
-	// what every module drew before there was anywhere else to put it.
-	Label LabelAt `json:"label,omitempty"`
-
-	// Scope is which board a data module draws from, as "org/board", and empty
-	// for all of them. It is stored as slugs rather than as row ids because a
-	// layout is written by hand often enough — and because an id would make a
-	// page silently point at whatever took that row's place.
-	Scope string `json:"scope,omitempty"`
-
-	// legacyWidth is the coarse width the first version of this stored. Read,
-	// never written: it exists so a layout saved then can be placed on the grid
-	// once, and it disappears the next time that layout is saved.
-	legacyWidth string
+	Background string `json:"background,omitempty"`
+	Width      string `json:"width,omitempty"`
+	Spacing    string `json:"spacing,omitempty"`
 }
 
-// UnmarshalJSON keeps the old width long enough to place the module.
-func (m *Module) UnmarshalJSON(data []byte) error {
-	type plain Module
-	var in struct {
-		plain
-		Width string `json:"width"`
-	}
-	if err := json.Unmarshal(data, &in); err != nil {
-		return err
-	}
-	*m = Module(in.plain)
-	m.legacyWidth = in.Width
-	return nil
+// Settings is what belongs to the page rather than to a band: how it reads
+// when somebody shares its address, and the links in its footer.
+type Settings struct {
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	ShareImage  string `json:"share_image,omitempty"`
+	Footer      []Link `json:"footer,omitempty"`
 }
 
-// Overlaps says whether two modules would sit on top of each other.
-//
-// The question the drag answers before it lets go: the grid has no opinion
-// about two things in one cell, so this is the only thing between an operator
-// and a page where a module is hidden under another one.
-func (m Module) Overlaps(other Module) bool {
-	return m.X < other.X+other.W && other.X < m.X+m.W &&
-		m.Y < other.Y+other.H && other.Y < m.Y+m.H
+// Page is the whole front page.
+type Page struct {
+	Bands    []Band   `json:"bands"`
+	Settings Settings `json:"settings"`
 }
 
-// Layout is the whole page, in order.
-type Layout struct {
-	Modules []Module `json:"modules"`
-}
+const (
+	maxBands    = 12
+	maxModules  = 24
+	maxLinks    = 8
+	maxTextBody = 4_000
+
+	// The bounds on one-line words are in runes, not bytes: they are about
+	// what fits on the screen, and a byte count would cut a Japanese title at
+	// a third of the length of an English one.
+	maxLabel    = 80
+	maxTitle    = 120
+	maxSubtitle = 240
+	maxAlt      = 200
+	maxDesc     = 200
+	maxURL      = 500
+
+	// maxRows is the most a list will show, the same bound the server uses
+	// when it reads them.
+	maxRows = 20
+)
+
+// ErrUnknownKind means a module nothing here can draw.
+var ErrUnknownKind = errors.New("unknown module")
 
 // Default is the front page of an installation that never composes one.
 //
-// The spans are what each module draws, not round numbers: a row is as tall as
-// a column is wide, so a span too generous shows as a band of nothing between
-// the modules and a span too mean lets the words out of their box.
+// It is not stored. An installation that has not touched its page gets this,
+// read fresh every time, so a better default in a later release reaches every
+// operator who never changed theirs.
 //
-// The blocks of words are three rows and two rows, not one.
+// Its words are not here either. The heading is the installation's own name and
+// tagline, and the band names and the three points are looked up by their ids
+// in the catalogue the browser holds, in the visitor's language. A sentence in
+// English stored in this function would be every page's language decided once.
 //
-// One row was right while they drew a single line of text laid along the top
-// of the module. They are written-in blocks now, inside a box with a border and
-// padding of its own, and a block of that shape in one row shows a scrollbar on
-// a fresh installation — which is the page every operator sees first.
-//
-// The blocks of words arrive empty on purpose. What they say by default is
-// written in the catalogue the browser holds, in the visitor's language; a
-// sentence in English stored here would be the page's language decided once,
-// by whoever installed it, for everybody who ever reads it. The moment the
-// operator writes their own, theirs is what is stored.
-func Default() Layout {
-	return Layout{Modules: []Module{
-		{ID: "hero", Kind: Hero, X: 1, Y: 1, W: 12, H: 2},
-		// Three things worth saying, one module each: an operator who can move,
-		// resize, rewrite or remove any one of them.
-		{ID: "point-1", Kind: Text, X: 1, Y: 3, W: 4, H: 2},
-		{ID: "point-2", Kind: Text, X: 5, Y: 3, W: 4, H: 2},
-		{ID: "point-3", Kind: Text, X: 9, Y: 3, W: 4, H: 2},
-		{ID: "organisations", Kind: Organisations, X: 1, Y: 5, W: 12, H: 2},
+// The order is the one a visitor needs: find what exists before writing it
+// again, see where to report, see that people here are listened to, and only
+// then — for the one arriving for the first time — how it works.
+func Default() Page {
+	return Page{Bands: []Band{
+		{
+			ID: "top", Columns: One, Background: BackgroundSoft, Spacing: SpacingAiry,
+			Cells: [][]Module{{{ID: "heading", Kind: Heading, WithSearch: true, Style: StylePlain}}},
+		},
+		{
+			ID: "where", Columns: One,
+			Cells: [][]Module{{{ID: "where-list", Kind: Boards, HideName: true, Style: StylePlain}}},
+		},
+		{
+			ID: "activity", Columns: Halves,
+			Cells: [][]Module{
+				{{ID: "most-voted", Kind: Reports, Show: ShowMostVoted, Rows: 5}},
+				{{ID: "recently-done", Kind: Reports, Show: ShowRecentlyDone, Rows: 5}},
+			},
+		},
+		{
+			ID: "how", Columns: Thirds,
+			Cells: [][]Module{
+				{{ID: "point-1", Kind: Text}},
+				{{ID: "point-2", Kind: Text}},
+				{{ID: "point-3", Kind: Text}},
+			},
+		},
 	}}
 }
 
-// NeedsData says whether drawing this page means reading the database.
-//
-// It lives here rather than in the handler because it is a fact about what the
-// modules are, and because the handler is where somebody would be tempted to
-// answer it by looking at the response.
-func (l Layout) NeedsData() bool {
-	for _, m := range l.Modules {
+// Modules is every module on the page, in reading order: band by band, column
+// by column, top to bottom.
+func (p Page) Modules() []Module {
+	var out []Module
+	for _, b := range p.Bands {
+		for _, cell := range b.Cells {
+			out = append(out, cell...)
+		}
+	}
+	return out
+}
+
+// NeedsData says whether drawing this page means reading the database. It
+// lives here because it is a fact about what the modules are, and it cannot be
+// tested from the response: the response is the same whether the query ran or
+// not.
+func (p Page) NeedsData() bool {
+	for _, m := range p.Modules() {
 		if m.Kind.usesData() {
 			return true
 		}
@@ -409,76 +367,262 @@ func (l Layout) NeedsData() bool {
 	return false
 }
 
-// validatePlacement checks where a module sits, in whichever grid it sits in.
+// ShowsOne says whether a module was pointed at a single board, which decides
+// how it draws: one board is that board, a set of them is a list. It follows
+// what was asked for, not what came back, so a list does not turn into a card
+// the day an installation happens to have one board.
+func (m Module) ShowsOne() bool {
+	_, _, deeper := strings.Cut(m.Scope, "/")
+	return deeper
+}
+
+// Parse reads a stored page.
 //
-// Two grids, two sets of bounds. A module on the page is measured against the
-// twelve columns of the page; a module in a section is measured against that
-// section, because its coordinates are that section's. Mixing the two is how a
-// child ends up drawn outside the box that is supposed to contain it — the
-// dashboard this comes from checks only how MANY children there are, and lets a
-// child sit past the edge of a section that shrank under it.
-func (l Layout) validatePlacement(m Module) error {
-	if m.X < 1 || m.Y < 1 {
-		return fmt.Errorf("module %q starts at %d,%d", m.ID, m.X, m.Y)
+// Empty is the default page, which is every installation's until its operator
+// changes something. A page stored in the grid format this replaced is the
+// default page too: that format lived only in pre-release builds, and refusing
+// to start over it, or converting it, would be work for installations that do
+// not exist.
+func Parse(stored string) (Page, error) {
+	if strings.TrimSpace(stored) == "" {
+		return Default(), nil
 	}
-	if m.H < 1 {
-		return fmt.Errorf("module %q is %d rows tall", m.ID, m.H)
+	var page Page
+	if err := json.Unmarshal([]byte(stored), &page); err != nil {
+		return Page{}, fmt.Errorf("reading the page: %w", err)
+	}
+	if len(page.Bands) == 0 {
+		return Default(), nil
+	}
+	page.cleanWords()
+	if err := page.validate(); err != nil {
+		return Page{}, err
+	}
+	return page, nil
+}
+
+// Submitted reads a page an administrator has just composed. It cleans the
+// markup and validates exactly as Parse does, so there is one way in.
+func Submitted(r io.Reader) (Page, error) {
+	var page Page
+	if err := json.NewDecoder(r).Decode(&page); err != nil {
+		return Page{}, fmt.Errorf("reading the page: %w", err)
+	}
+	page.cleanWords()
+	if err := page.validate(); err != nil {
+		return Page{}, err
+	}
+	return page, nil
+}
+
+// Encode is the other direction, and validates for the same reason: the only
+// way a bad page reaches the database is through here.
+func (p Page) Encode() (string, error) {
+	if err := p.validate(); err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(p)
+	if err != nil {
+		return "", fmt.Errorf("writing the page: %w", err)
+	}
+	return string(out), nil
+}
+
+// cleanWords runs the markup policy over every text module, on the way in and
+// on the way out of the database: neither what a browser sent nor what an
+// earlier version stored is a reason to put unchecked markup on a public page.
+func (p *Page) cleanWords() {
+	for bi := range p.Bands {
+		for ci := range p.Bands[bi].Cells {
+			for mi := range p.Bands[bi].Cells[ci] {
+				m := &p.Bands[bi].Cells[ci][mi]
+				if m.Kind != Text || m.Body == "" {
+					continue
+				}
+				cleaned, err := Clean(m.Body)
+				if err != nil {
+					// Markup that cannot be parsed keeps nothing: the
+					// alternative is putting whatever it was on the page.
+					m.Body = ""
+					continue
+				}
+				m.Body = cleaned
+			}
+		}
+	}
+}
+
+func (p Page) validate() error {
+	if len(p.Bands) == 0 {
+		return errors.New("a page needs at least one band")
+	}
+	if len(p.Bands) > maxBands {
+		return fmt.Errorf("a page may have at most %d bands", maxBands)
 	}
 
-	if m.Parent == "" {
-		if m.W < MinSpan {
-			return fmt.Errorf("module %q is %d columns wide, and the narrowest a module may be is %d",
-				m.ID, m.W, MinSpan)
+	seen := map[string]bool{}
+	claim := func(id, what string) error {
+		if strings.TrimSpace(id) == "" {
+			return fmt.Errorf("a %s has no id", what)
 		}
-		if m.X+m.W-1 > Columns {
-			// Off the right-hand edge is not a layout the grid can draw: the
-			// module would be cut, and cut silently.
-			return fmt.Errorf("module %q runs past column %d", m.ID, Columns)
+		if len(id) > 64 {
+			return fmt.Errorf("the %s id %q is too long", what, id)
 		}
+		// One id space for bands and modules: the editor finds either by id,
+		// and two things answering to one name is a page where moving one
+		// moves the other.
+		if seen[id] {
+			return fmt.Errorf("two things share the id %q", id)
+		}
+		seen[id] = true
 		return nil
 	}
 
-	if m.Kind == Section {
-		// Two levels is a layout somebody arranged. Three is a layout nobody
-		// can drag, and every rule here would need a third set of coordinates.
-		return fmt.Errorf("section %q is inside another section", m.ID)
+	modules := 0
+	for _, b := range p.Bands {
+		if err := claim(b.ID, "band"); err != nil {
+			return err
+		}
+		if err := b.validate(); err != nil {
+			return err
+		}
+		for _, cell := range b.Cells {
+			for _, m := range cell {
+				modules++
+				if err := claim(m.ID, "module"); err != nil {
+					return err
+				}
+				if err := m.validate(); err != nil {
+					return err
+				}
+			}
+		}
 	}
-	// A single column of a section is already narrow, so the page's minimum
-	// does not apply in here: it is a bound about the page's twelve columns.
-	if m.W < 1 {
-		return fmt.Errorf("module %q is %d columns wide", m.ID, m.W)
+	if modules > maxModules {
+		return fmt.Errorf("a page may have at most %d modules", maxModules)
 	}
+	return p.Settings.validate()
+}
 
-	parent, ok := l.find(m.Parent)
-	if !ok {
-		return fmt.Errorf("module %q is inside %q, which is not on this page", m.ID, m.Parent)
+func (b Band) validate() error {
+	n := b.Columns.count()
+	if n == 0 {
+		return fmt.Errorf("band %q has the layout %q, which is not one of the six", b.ID, b.Columns)
 	}
-	if parent.Kind != Section {
-		return fmt.Errorf("module %q is inside %q, which is not a section", m.ID, m.Parent)
+	// A cell for every column and no more. A column with nothing in it is
+	// allowed — it is where the editor offers to add one — but a module in a
+	// column the layout does not have is a module nobody would ever see.
+	if len(b.Cells) != n {
+		return fmt.Errorf("band %q has %d columns and %d cells", b.ID, n, len(b.Cells))
 	}
-	if m.X+m.W-1 > parent.W || m.Y+m.H-1 > parent.H {
-		return fmt.Errorf("module %q sticks out of the section %q holding it", m.ID, m.Parent)
+	if !oneOf(b.Background, "", BackgroundSoft, BackgroundAccent) {
+		return fmt.Errorf("band %q has the background %q", b.ID, b.Background)
+	}
+	if !oneOf(b.Width, "", WidthFull) {
+		return fmt.Errorf("band %q has the width %q", b.ID, b.Width)
+	}
+	if !oneOf(b.Spacing, "", SpacingCompact, SpacingAiry) {
+		return fmt.Errorf("band %q has the spacing %q", b.ID, b.Spacing)
+	}
+	if runes(b.Name) > maxLabel {
+		return fmt.Errorf("band %q has a name longer than %d characters", b.ID, maxLabel)
 	}
 	return nil
 }
 
-// find is the module with this id, if the page has one.
-func (l Layout) find(id string) (Module, bool) {
-	for _, m := range l.Modules {
-		if m.ID == id {
-			return m, true
+func (m Module) validate() error {
+	switch m.Kind {
+	case Heading, Text, Search, Boards, Reports, Roadmap, Statistics, Links, Picture:
+	default:
+		return fmt.Errorf("%w: %q", ErrUnknownKind, m.Kind)
+	}
+
+	if !oneOf(m.Style, "", StyleSoft, StylePlain) {
+		return fmt.Errorf("module %q has the style %q", m.ID, m.Style)
+	}
+	if (m.Name != "" || m.HideName) && !m.Kind.named() {
+		return fmt.Errorf("module %q is given a name it does not draw", m.ID)
+	}
+	if runes(m.Name) > maxLabel {
+		return fmt.Errorf("module %q has a name longer than %d characters", m.ID, maxLabel)
+	}
+
+	// Each field belongs to the kinds that read it. A field on a kind that
+	// ignores it is somebody expecting a page they are not going to get.
+	if (m.Body != "" || m.Tone != "") && m.Kind != Text {
+		return fmt.Errorf("module %q carries words it has nowhere to put", m.ID)
+	}
+	if len(m.Body) > maxTextBody {
+		return fmt.Errorf("module %q is longer than %d characters", m.ID, maxTextBody)
+	}
+	if !oneOf(m.Tone, "", ToneNote, ToneNotice) {
+		return fmt.Errorf("module %q has the tone %q", m.ID, m.Tone)
+	}
+
+	heading := m.Title != "" || m.Subtitle != "" || m.HideLogo || m.Align != "" || m.WithSearch
+	if heading && m.Kind != Heading {
+		return fmt.Errorf("module %q carries a heading's settings and is not a heading", m.ID)
+	}
+	if runes(m.Title) > maxTitle || runes(m.Subtitle) > maxSubtitle {
+		return fmt.Errorf("module %q has a title or a subtitle that is too long", m.ID)
+	}
+	if !oneOf(m.Align, "", AlignStart) {
+		return fmt.Errorf("module %q is aligned %q", m.ID, m.Align)
+	}
+
+	if err := m.validateScope(); err != nil {
+		return err
+	}
+	if m.Rows < 0 || m.Rows > maxRows {
+		return fmt.Errorf("module %q asks for %d rows", m.ID, m.Rows)
+	}
+	if m.Rows != 0 && !m.Kind.lists() {
+		return fmt.Errorf("module %q asks for rows and does not list anything", m.ID)
+	}
+	if m.Show != "" && m.Kind != Reports {
+		return fmt.Errorf("module %q chooses which reports and does not show reports", m.ID)
+	}
+	if !oneOf(m.Show, "", ShowMostVoted, ShowRecentlyDone, ShowLatest, ShowPlanned) {
+		return fmt.Errorf("module %q shows %q", m.ID, m.Show)
+	}
+	if m.Display != "" && m.Kind != Boards {
+		return fmt.Errorf("module %q chooses a display and is not a list of boards", m.ID)
+	}
+	if !oneOf(m.Display, "", DisplayList) {
+		return fmt.Errorf("module %q is displayed as %q", m.ID, m.Display)
+	}
+
+	if len(m.Links) > 0 && m.Kind != Links {
+		return fmt.Errorf("module %q carries links and is not a links module", m.ID)
+	}
+	if err := validateLinks(m.ID, m.Links); err != nil {
+		return err
+	}
+
+	picture := m.Image != "" || m.Alt != "" || m.Caption != ""
+	if picture && m.Kind != Picture {
+		return fmt.Errorf("module %q carries a picture and is not an image", m.ID)
+	}
+	if m.Kind == Picture {
+		// A picture needs its words. The module can be placed empty — that
+		// is where the editor asks for one — but a picture without a
+		// description is a hole in the page for whoever cannot see it.
+		if m.Image != "" && strings.TrimSpace(m.Alt) == "" {
+			return fmt.Errorf("image %q has no description", m.ID)
+		}
+		if m.Image != "" && !imageName.MatchString(m.Image) {
+			return fmt.Errorf("image %q names %q, which is not a stored picture", m.ID, m.Image)
 		}
 	}
-	return Module{}, false
+	if runes(m.Alt) > maxAlt || runes(m.Caption) > maxAlt {
+		return fmt.Errorf("module %q has a description or a caption that is too long", m.ID)
+	}
+	return nil
 }
 
-// validateScope checks what a data module was pointed at.
-//
-// Refused rather than ignored: a scope on a module that cannot use one is
-// somebody expecting a narrower page than they are going to get, and an
-// unreadable one is a module that would quietly draw everything instead of the
-// board it names. Whether that board still exists is not decided here — it can
-// be deleted long after the page was composed, and the page has to survive it.
+// validateScope checks what a data module was pointed at. The shape only:
+// whether that board still exists is not decided here, because it can be
+// deleted long after the page was composed, and the page has to survive it.
 func (m Module) validateScope() error {
 	if m.Scope == "" {
 		return nil
@@ -486,45 +630,75 @@ func (m Module) validateScope() error {
 	if !m.Kind.takesScope() {
 		return fmt.Errorf("module %q names a place and is not a module that shows one", m.ID)
 	}
-	org, board, deeper := strings.Cut(m.Scope, "/")
-	if !isSlug(org) || (deeper && !isSlug(board)) {
+	if !isScope(m.Scope, false) {
 		return fmt.Errorf("module %q names %q, which is not an organisation or a board", m.ID, m.Scope)
-	}
-	// A button goes to one report form, so "somewhere in this organisation" is
-	// not an answer it can act on. Every other module narrows to a set, and one
-	// organisation is a perfectly good set.
-	if m.Kind == CallToAction && !deeper {
-		return fmt.Errorf("module %q is a button and %q is not one board", m.ID, m.Scope)
 	}
 	return nil
 }
 
-// ShowsOne says whether this module was pointed at a single thing, which is
-// what decides how it draws: a module showing one board is that board, a module
-// showing a set of them is a list of them.
-//
-// The presentation follows what was ASKED FOR, not what came back. An
-// installation that happens to have one organisation should not find its list
-// silently turned into a tile the day it has two.
-func (m Module) ShowsOne() bool {
-	if m.Scope == "" {
-		return false
+func validateLinks(owner string, links []Link) error {
+	if len(links) > maxLinks {
+		return fmt.Errorf("%q has more than %d links", owner, maxLinks)
 	}
-	_, _, deeper := strings.Cut(m.Scope, "/")
-	if m.Kind == Organisations {
-		return !deeper
+	for i, l := range links {
+		if strings.TrimSpace(l.Label) == "" || runes(l.Label) > maxLabel {
+			return fmt.Errorf("link %d of %q needs a label of at most %d characters", i+1, owner, maxLabel)
+		}
+		switch l.To {
+		case ToForm, ToBoard, ToRoadmap:
+			// A form, a board and a roadmap are one board each: an
+			// organisation is not a place any of them can open.
+			if !isScope(l.Scope, true) || l.URL != "" {
+				return fmt.Errorf("link %d of %q must name one board", i+1, owner)
+			}
+		case ToURL:
+			if l.Scope != "" || !isWebAddress(l.URL) {
+				return fmt.Errorf("link %d of %q needs an http or https address", i+1, owner)
+			}
+		default:
+			return fmt.Errorf("link %d of %q goes to %q", i+1, owner, l.To)
+		}
 	}
-	return deeper
+	return nil
 }
 
-// colourPattern is six hex digits and nothing else. This value reaches a
-// stylesheet rule, so anything that is not exactly a colour is refused rather
-// than escaped and hoped about — the same rule the instance accent already has.
-var colourPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+func (s Settings) validate() error {
+	if runes(s.Title) > maxTitle {
+		return fmt.Errorf("the page title is longer than %d characters", maxTitle)
+	}
+	if runes(s.Description) > maxDesc {
+		return fmt.Errorf("the page description is longer than %d characters", maxDesc)
+	}
+	if s.ShareImage != "" && !imageName.MatchString(s.ShareImage) {
+		return fmt.Errorf("the share image %q is not a stored picture", s.ShareImage)
+	}
+	return validateLinks("footer", s.Footer)
+}
 
-// isSlug is the shape of the slugs the rest of the product hands out. Kept
-// deliberately narrow: this value is read back and compared, never interpolated
-// into anything, and a narrow shape is one fewer thing to reason about.
+// isWebAddress accepts an absolute http or https address and nothing else.
+// Anything that reaches an href on a public page is refused unless it is
+// exactly this: javascript:, data: and friends are how a link becomes a script.
+func isWebAddress(v string) bool {
+	if v == "" || len(v) > maxURL {
+		return false
+	}
+	u, err := url.Parse(v)
+	if err != nil {
+		return false
+	}
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
+}
+
+// isScope is "org" or "org/board", and "org/board" alone when a board is needed.
+func isScope(v string, boardOnly bool) bool {
+	org, board, deeper := strings.Cut(v, "/")
+	if boardOnly && !deeper {
+		return false
+	}
+	return isSlug(org) && (!deeper || isSlug(board))
+}
+
+// isSlug is the shape of the slugs the rest of the product hands out.
 func isSlug(v string) bool {
 	if v == "" || len(v) > 64 {
 		return false
@@ -539,254 +713,19 @@ func isSlug(v string) bool {
 	return true
 }
 
-// Colours is the palette a module's border may take: the dashboard's ten,
-// copied rather than chosen again, so a border set over there and a border set
-// here are the same colour and not two that nearly match.
-var Colours = []string{
-	"#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-	"#ec4899", "#64748b", "#f8fafc", "#1e293b", "#333333",
+// imageName is the address a stored picture is served at — what an upload
+// answers with, and what a page keeps. Built from the one constant the server
+// serves under, so the two cannot drift: a copy of that path here is a picture
+// that uploads and then disappears the first time the page is read back.
+var imageName = regexp.MustCompile(`^` + regexp.QuoteMeta(ImagePrefix) + `[0-9a-f]{32}\.webp$`)
+
+func oneOf(v string, allowed ...string) bool {
+	for _, a := range allowed {
+		if v == a {
+			return true
+		}
+	}
+	return false
 }
 
-// ErrUnknownKind means a module nothing here can draw.
-var ErrUnknownKind = errors.New("unknown module")
-
-// Parse reads a stored or submitted layout.
-//
-// An empty value is the default rather than an empty page: that is the state
-// every installation starts in, and a front page with nothing on it is not a
-// choice anybody made.
-func Parse(stored string) (Layout, error) {
-	if strings.TrimSpace(stored) == "" {
-		return Default(), nil
-	}
-
-	var layout Layout
-	if err := json.Unmarshal([]byte(stored), &layout); err != nil {
-		return Layout{}, fmt.Errorf("reading the layout: %w", err)
-	}
-	layout.foldOldKinds()
-	layout.cleanWords()
-	layout.placeTheUnplaced()
-	if err := layout.validate(); err != nil {
-		return Layout{}, err
-	}
-	return layout, nil
-}
-
-// placeTheUnplaced gives coordinates to a layout written before there were any.
-//
-// The first version of this stored a coarse width — a module was the whole row
-// or half of it — and nothing else. Those layouts are real: they are saved in
-// installations that composed a page between one release and the next, and
-// refusing to read one would mean an operator's front page coming back as an
-// error rather than as their page.
-//
-// So a module with no size is given one: full becomes the twelve columns it
-// meant, half becomes six, and they are stacked in the order they were written.
-// Once read and saved again they carry coordinates like everything else, and
-// this never fires for them a second time.
-// foldOldKinds turns the kinds that no longer exist into the ones that replaced
-// them.
-//
-// Intro was a paragraph with a mark beside it and Text was a paragraph; they
-// did the same thing in two shapes, so there is one now. A saved page is full
-// of the old value, and so is the body of a request from a browser that has
-// not reloaded since the last release — which is the reader this step is really
-// for, because the page comes back either way but a save would be refused.
-//
-// It runs on everything that arrives, not only on what is read from the
-// database, for the reason written on Submitted: a tolerance step that one
-// caller can skip is a tolerance step that gets skipped.
-// cleanWords runs the markup policy over every module that carries any.
-//
-// On both ways in, for the reason the policy exists at all: what is stored was
-// written by some version of this product and what arrives was written by some
-// version of a browser, and neither is a reason to put unchecked markup on a
-// public page. Cleaning what is read also means an installation that saved
-// something under a looser policy stops serving it the moment it updates,
-// without anybody having to go and fix their page.
-func (l *Layout) cleanWords() {
-	for i := range l.Modules {
-		m := &l.Modules[i]
-		if !m.Kind.usesMarkup() || m.Body == "" {
-			continue
-		}
-		// A body that cannot be parsed at all is not markup, so it keeps
-		// nothing: the alternative is putting whatever it was on the page.
-		cleaned, err := Clean(m.Body)
-		if err != nil {
-			m.Body = ""
-			continue
-		}
-		m.Body = cleaned
-	}
-}
-
-func (l *Layout) foldOldKinds() {
-	for i := range l.Modules {
-		if l.Modules[i].Kind == Intro {
-			l.Modules[i].Kind = Text
-		}
-	}
-}
-
-func (l *Layout) placeTheUnplaced() {
-	row := 1
-	for i := range l.Modules {
-		m := &l.Modules[i]
-		if m.W != 0 && m.H != 0 && m.X != 0 && m.Y != 0 {
-			continue
-		}
-		if m.W == 0 {
-			// Half is the only other width the old format had. Anything else
-			// was already refused when it was written.
-			m.W = Columns
-			if strings.EqualFold(m.legacyWidth, "half") {
-				m.W = Columns / 2
-			}
-		}
-		if m.H == 0 {
-			m.H = defaultHeight(m.Kind)
-		}
-		if m.X == 0 {
-			m.X = 1
-		}
-		if m.Y == 0 {
-			m.Y = row
-		}
-		row = m.Y + m.H
-
-		// Used, so forgotten. Keeping it would mean a module that came from an
-		// old layout never comparing equal to the same module written today.
-		m.legacyWidth = ""
-	}
-}
-
-// defaultHeight is how tall a module is when nobody has said.
-//
-// The same measured spans Default uses, so a layout written before there were
-// coordinates comes back sized like one written today rather than carrying the
-// taller guess the first version made.
-func defaultHeight(kind Kind) int {
-	switch kind {
-	case Hero:
-		return 3
-	default:
-		return 2
-	}
-}
-
-// Submitted reads a layout an administrator has just composed.
-//
-// It exists so the forgiving step cannot be skipped. Parse does it for a layout
-// coming out of the database and the handler decoded straight into the type,
-// which meant a browser still running the previous bundle — one that sends a
-// coarse width and no coordinates — was answered with a refusal for sending
-// exactly what the release before this one taught it to send.
-func Submitted(r io.Reader) (Layout, error) {
-	var layout Layout
-	if err := json.NewDecoder(r).Decode(&layout); err != nil {
-		return Layout{}, fmt.Errorf("reading the layout: %w", err)
-	}
-	layout.foldOldKinds()
-	layout.cleanWords()
-	layout.placeTheUnplaced()
-	if err := layout.validate(); err != nil {
-		return Layout{}, err
-	}
-	return layout, nil
-}
-
-// Encode is the other direction, and validates for the same reason: the only
-// way a bad layout reaches the database is through here.
-func (l Layout) Encode() (string, error) {
-	if err := l.validate(); err != nil {
-		return "", err
-	}
-	out, err := json.Marshal(l)
-	if err != nil {
-		return "", fmt.Errorf("writing the layout: %w", err)
-	}
-	return string(out), nil
-}
-
-func (l Layout) validate() error {
-	if len(l.Modules) == 0 {
-		return errors.New("a page needs at least one module")
-	}
-	if len(l.Modules) > maxModules {
-		return fmt.Errorf("a page may have at most %d modules", maxModules)
-	}
-
-	seen := map[string]bool{}
-	for i, m := range l.Modules {
-		if strings.TrimSpace(m.ID) == "" {
-			return fmt.Errorf("module %d has no id", i+1)
-		}
-		if seen[m.ID] {
-			// Two modules with one id is a page where moving one moves the
-			// other, and the editor would look broken rather than the data.
-			return fmt.Errorf("two modules share the id %q", m.ID)
-		}
-		seen[m.ID] = true
-
-		switch m.Kind {
-		case Hero, Intro, Organisations, Text, Boards, MostVoted, RecentlyDone, CallToAction,
-			RecentActivity, Roadmap, Statistics, Section:
-		default:
-			return fmt.Errorf("%w: %q", ErrUnknownKind, m.Kind)
-		}
-		if err := l.validatePlacement(m); err != nil {
-			return err
-		}
-		for _, other := range l.Modules[i+1:] {
-			// Only against what shares its grid. A child and a module on the
-			// page are measured in different coordinates, so asking whether
-			// they overlap is asking a question with no meaning — and answering
-			// it would refuse layouts that are perfectly drawable.
-			if m.Parent == other.Parent && m.Overlaps(other) {
-				return fmt.Errorf("modules %q and %q sit on top of each other", m.ID, other.ID)
-			}
-		}
-		if !m.Kind.usesWords() && m.Body != "" {
-			return fmt.Errorf("module %q carries words and has nowhere to put them", m.ID)
-		}
-		// A button's label is a label. Bounded separately from a paragraph
-		// because four thousand characters on a button is not a long label, it
-		// is a layout nobody can use and a page nobody can read past.
-		if (m.Kind == CallToAction || m.Kind == Section) && len([]rune(m.Body)) > maxLabel {
-			return fmt.Errorf("module %q has a label longer than %d characters", m.ID, maxLabel)
-		}
-		if len(m.Body) > maxTextBody {
-			return fmt.Errorf("module %q is longer than %d characters", m.ID, maxTextBody)
-		}
-		if err := m.validateScope(); err != nil {
-			return err
-		}
-		if !m.Label.valid() {
-			return fmt.Errorf("module %q puts its name at %q, which is nowhere", m.ID, m.Label)
-		}
-		if m.Label != "" && !m.Kind.usesHeader() {
-			return fmt.Errorf("module %q says where to put a name it does not draw", m.ID)
-		}
-		if m.Name != "" && !m.Kind.isNamed() {
-			return fmt.Errorf("module %q carries a name it does not draw", m.ID)
-		}
-		if m.Rows < 0 || m.Rows > maxRows {
-			return fmt.Errorf("module %q asks for %d rows", m.ID, m.Rows)
-		}
-		if m.Rows != 0 && !m.Kind.lists() {
-			return fmt.Errorf("module %q asks for rows and does not list anything", m.ID)
-		}
-		if m.BorderColor != "" && !colourPattern.MatchString(m.BorderColor) {
-			return fmt.Errorf("module %q has a border colour of %q", m.ID, m.BorderColor)
-		}
-		if m.BorderWidth < 0 || m.BorderWidth > 3 {
-			return fmt.Errorf("module %q has a border %d wide", m.ID, m.BorderWidth)
-		}
-		if len([]rune(m.Name)) > maxLabel {
-			return fmt.Errorf("module %q has a name longer than %d characters", m.ID, maxLabel)
-		}
-	}
-	return nil
-}
+func runes(v string) int { return len([]rune(v)) }

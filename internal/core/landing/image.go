@@ -117,20 +117,20 @@ func looksLikeImageID(id string) bool {
 	return true
 }
 
-// ForgetUnusedImages removes the pictures the layout no longer refers to.
+// ForgetUnusedImages removes the pictures no page refers to any more.
 //
 // Uploading happens while somebody is writing, so a picture dropped in and then
-// deleted again before the page was saved would sit in the database forever.
-// Sweeping on save rather than on delete means it does not matter how a picture
+// deleted again would sit in the database forever. Sweeping against the pages
+// that are stored rather than on delete means it does not matter how a picture
 // stopped being used — undone, overwritten, or the whole module removed.
 //
-// It is deliberately driven by the layout that was just stored rather than by
-// what the browser said it removed: the stored layout is the truth about what
-// the page draws, and a browser that crashed mid-edit never says anything.
-func ForgetUnusedImages(db database.Execer, layout Layout) error {
+// It takes every page that can still be shown: the published one and the draft
+// being edited. A picture only the draft uses is a picture the operator is about
+// to publish, and one only the published page uses is still on the screen.
+func ForgetUnusedImages(db database.Execer, pages ...Page) error {
 	used := map[string]bool{}
-	for _, m := range layout.Modules {
-		for _, id := range imageIDsIn(m.Body) {
+	for _, page := range pages {
+		for _, id := range page.imageIDs() {
 			used[id] = true
 		}
 	}
@@ -183,4 +183,16 @@ func imageIDsIn(body string) []string {
 		}
 		rest = rest[end:]
 	}
+}
+
+// imageIDs is every stored picture a page refers to: in the words of its text
+// modules, as its image modules, and as the picture it is shared with.
+func (p Page) imageIDs() []string {
+	var ids []string
+	for _, m := range p.Modules() {
+		ids = append(ids, imageIDsIn(m.Body)...)
+		ids = append(ids, imageIDsIn(m.Image)...)
+	}
+	ids = append(ids, imageIDsIn(p.Settings.ShareImage)...)
+	return ids
 }

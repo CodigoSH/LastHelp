@@ -2,79 +2,120 @@ package web
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/landing"
 )
+
+// frontPage is the page as whoever is asking sees it.
+func frontPage(t *testing.T, who *instance, query string) map[string]any {
+	t.Helper()
+	return decode(t, who.do(http.MethodGet, "/api/landing"+query, nil))
+}
+
+func bandIDs(body map[string]any) []string {
+	var ids []string
+	bands, _ := body["bands"].([]any)
+	for _, b := range bands {
+		m, _ := b.(map[string]any)
+		ids = append(ids, m["id"].(string))
+	}
+	return ids
+}
+
+// words is a one-band page with one paragraph.
+func words(body string) map[string]any {
+	return map[string]any{"bands": []map[string]any{{
+		"id": "b", "columns": "1",
+		"cells": [][]map[string]any{{{"id": "t", "kind": "text", "body": body}}},
+	}}}
+}
 
 // TestComposingTheFrontPage.
 //
-// The front page is the one screen a stranger sees, so the two halves of this
-// are checked together: that anybody may read what it is made of, and that only
-// an administrator may change it.
+// The front page is the one screen a stranger sees, so the halves are checked
+// together: that anybody may read it, that what is being edited is never what
+// a visitor is shown, and that only an administrator may change it.
 func TestComposingTheFrontPage(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
+	visitor := i.anonymous()
 
-	// Before anybody composes anything, it is the page that was always there.
-	body := decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
-	modules, _ := body["modules"].([]any)
-	// Five: the mark and name, three points, and the organisations. The points
-	// used to be one module drawing three sentences.
-	if len(modules) != 5 {
-		t.Fatalf("an untouched installation offered %d modules, want 5", len(modules))
+	// Before anybody composes anything, it is the default page, band by band.
+	if got := strings.Join(bandIDs(frontPage(t, visitor, "")), " "); got != "top where activity how" {
+		t.Fatalf("an untouched installation offered %q", got)
 	}
 
-	// The administrator composes it.
-	resp := i.do(http.MethodPut, "/api/landing", map[string]any{
-		"modules": []map[string]any{
-			{"id": "words", "kind": "text", "width": "full", "body": "We read everything."},
-			{"id": "orgs", "kind": "organisations", "width": "full"},
-		},
-	})
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("the administrator could not compose the page: %d", resp.StatusCode)
+	// A draft is kept and not shown.
+	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>We read everything.</p>"))); got != http.StatusOK {
+		t.Fatalf("the administrator could not keep a draft: %d", got)
+	}
+	if got := strings.Join(bandIDs(frontPage(t, visitor, "")), " "); got != "top where activity how" {
+		t.Errorf("a visitor was shown the draft: %q", got)
+	}
+	if got := strings.Join(bandIDs(frontPage(t, visitor, "?draft=1")), " "); got != "top where activity how" {
+		t.Errorf("a visitor asking for the draft was shown it: %q", got)
+	}
+	// Nor is the administrator, outside the editor: looking at their own
+	// page, they see what everybody else sees.
+	if got := strings.Join(bandIDs(frontPage(t, i, "")), " "); got != "top where activity how" {
+		t.Errorf("the administrator was shown the draft outside the editor: %q", got)
+	}
+	editing := frontPage(t, i, "?draft=1")
+	if got := strings.Join(bandIDs(editing), " "); got != "b" || editing["has_draft"] != true {
+		t.Errorf("the administrator was not given the draft: %q %v", got, editing["has_draft"])
 	}
 
-	// And a stranger sees what was composed.
-	body = decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
-	modules, _ = body["modules"].([]any)
-	if len(modules) != 2 {
-		t.Fatalf("a visitor was shown %d modules, want 2", len(modules))
+	// A page nothing can draw is refused, and the draft is left as it was.
+	bad := map[string]any{"bands": []map[string]any{{"id": "b", "columns": "1",
+		"cells": [][]map[string]any{{{"id": "x", "kind": "iframe"}}}}}}
+	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", bad)); got != http.StatusBadRequest {
+		t.Errorf("a module nothing can draw was accepted: %d", got)
 	}
-	first, _ := modules[0].(map[string]any)
-	if first["body"] != "We read everything." {
-		t.Errorf("the operator's words came back as %v", first["body"])
-	}
-
-	// A module nothing can draw is refused, and the page is left as it was.
-	resp = i.do(http.MethodPut, "/api/landing", map[string]any{
-		"modules": []map[string]any{{"id": "x", "kind": "iframe", "width": "full"}},
-	})
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("a module nothing can draw was accepted: %d", resp.StatusCode)
-	}
-	body = decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
-	if modules, _ := body["modules"].([]any); len(modules) != 2 {
-		t.Errorf("a refused layout changed the page: %d modules", len(modules))
+	if got := strings.Join(bandIDs(frontPage(t, i, "?draft=1")), " "); got != "b" {
+		t.Errorf("a refused page changed the draft: %q", got)
 	}
 
-	// A stranger cannot compose it. This one is stopped at the door, before any
-	// handler runs.
-	resp = i.anonymous().do(http.MethodPut, "/api/landing", map[string]any{
-		"modules": []map[string]any{{"id": "a", "kind": "hero", "width": "full"}},
-	})
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusUnauthorized && resp.StatusCode != http.StatusForbidden {
-		t.Errorf("a stranger composed the front page: %d", resp.StatusCode)
+	// Published, it is what everybody sees, and there is no draft any more.
+	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
+		t.Fatalf("publishing: %d", got)
+	}
+	shown := frontPage(t, visitor, "")
+	if got := strings.Join(bandIDs(shown), " "); got != "b" {
+		t.Errorf("a visitor was not shown the published page: %q", got)
+	}
+	if frontPage(t, i, "")["has_draft"] != false {
+		t.Error("a draft was left behind after publishing")
 	}
 
-	// And neither can somebody who IS signed in and is not an administrator —
-	// which is the half the door does not answer. A collaborator triages a
-	// board; the front page belongs to whoever runs the server.
+	// Discarding a draft puts nothing back, because nothing was touched.
+	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>Second thoughts.</p>")))
+	if got := status(t, i.do(http.MethodDelete, "/api/landing/draft", nil)); got != http.StatusOK {
+		t.Fatalf("discarding: %d", got)
+	}
+	if frontPage(t, i, "")["has_draft"] != false {
+		t.Error("a discarded draft is still there")
+	}
+	if got := strings.Join(bandIDs(frontPage(t, visitor, "")), " "); got != "b" {
+		t.Errorf("discarding a draft changed the published page: %q", got)
+	}
+
+	// A stranger cannot touch any of it; this one is stopped at the door.
+	for _, call := range [][2]string{
+		{http.MethodPut, "/api/landing/draft"}, {http.MethodPost, "/api/landing/publish"},
+		{http.MethodDelete, "/api/landing/draft"}, {http.MethodPost, "/api/landing/restore"},
+	} {
+		got := status(t, visitor.do(call[0], call[1], words("<p>x</p>")))
+		if got != http.StatusUnauthorized && got != http.StatusForbidden {
+			t.Errorf("a stranger reached %s %s: %d", call[0], call[1], got)
+		}
+	}
+
+	// And neither can somebody who IS signed in and is not an administrator:
+	// the front page belongs to whoever runs the server.
 	accounts := account.Store{DB: i.db()}
 	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, i.now())
 	if err != nil {
@@ -90,88 +131,168 @@ func TestComposingTheFrontPage(t *testing.T) {
 		t.Fatal(err)
 	}
 	helperClient := i.anonymous()
-	resp = helperClient.do(http.MethodPost, "/api/session", map[string]string{
+	_ = status(t, helperClient.do(http.MethodPost, "/api/session", map[string]string{
 		"username": "helper", "password": "a good long passphrase",
-	})
-	_ = resp.Body.Close()
-
-	resp = helperClient.do(http.MethodPut, "/api/landing", map[string]any{
-		"modules": []map[string]any{{"id": "a", "kind": "hero", "width": "full"}},
-	})
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("a collaborator composed the front page: %d", resp.StatusCode)
+	}))
+	for _, call := range [][2]string{
+		{http.MethodPut, "/api/landing/draft"}, {http.MethodPost, "/api/landing/publish"},
+	} {
+		if got := status(t, helperClient.do(call[0], call[1], words("<p>x</p>"))); got != http.StatusForbidden {
+			t.Errorf("a collaborator reached %s %s: %d", call[0], call[1], got)
+		}
+	}
+	if _, told := frontPage(t, helperClient, "")["has_draft"]; told {
+		t.Error("a collaborator was told whether there is a draft")
 	}
 }
 
-// TestMostVotedShowsIdeasAndOnlyIdeas.
+// TestRestoringTheDefaultStoresNoPage.
 //
-// Only an idea can be voted for, so a "most voted" that included bugs would be
-// ranking a list of things that all have nought and putting whichever is newest
-// at the top. The front page promises this module by name — "ideas collect
-// votes, which shows what is most requested" — so what it shows has to be that.
+// The default page is read fresh, never stored, so a better one in a later
+// release reaches everybody who never changed theirs. An operator who restores
+// it and publishes is one of them again.
+func TestRestoringTheDefaultStoresNoPage(t *testing.T) {
+	i := newInstance(t)
+	i.claim()
+	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>Mine.</p>")))
+	_ = status(t, i.do(http.MethodPost, "/api/landing/publish", nil))
+
+	if got := status(t, i.do(http.MethodPost, "/api/landing/restore", nil)); got != http.StatusOK {
+		t.Fatalf("restoring the default: %d", got)
+	}
+	if got := strings.Join(bandIDs(frontPage(t, i.anonymous(), "")), " "); got != "b" {
+		t.Errorf("restoring changed the published page before it was published: %q", got)
+	}
+	_ = status(t, i.do(http.MethodPost, "/api/landing/publish", nil))
+
+	var stored string
+	if err := i.db().QueryRow(`SELECT value FROM settings WHERE key = 'landing_layout'`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != "" {
+		t.Errorf("the default page was stored as a page: %.60s", stored)
+	}
+	if got := strings.Join(bandIDs(frontPage(t, i.anonymous(), "")), " "); got != "top where activity how" {
+		t.Errorf("after restoring, a visitor sees %q", got)
+	}
+}
+
+// TestAReportsModuleShowsWhatItIsAskedFor.
 //
-// Proved here rather than in the browser pass: that journey has one published
-// idea and no published bug when it reaches the front page, so the module looks
-// identical with the filter and without it.
-func TestMostVotedShowsIdeasAndOnlyIdeas(t *testing.T) {
+// Proved here rather than in the browser pass: that journey reaches the front
+// page with one published idea and no published bug, so a list looks identical
+// whether it filters or not.
+func TestAReportsModuleShowsWhatItIsAskedFor(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
 	i.createOrg("acme")
 	i.createRepo("acme", "atlas")
 
 	idea, _ := i.submit("acme", "atlas", "idea", "dark mode for the dashboard")
+	planned, _ := i.submit("acme", "atlas", "idea", "export to csv")
 	bug, _ := i.submit("acme", "atlas", "bug", "the sidebar forgets its width")
-	for _, id := range []string{idea, bug} {
-		resp := i.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
-		_ = resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("publishing %s: %d", id, resp.StatusCode)
+	for _, id := range []string{idea, planned, bug} {
+		if got := status(t, i.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})); got != http.StatusOK {
+			t.Fatalf("publishing %s: %d", id, got)
 		}
 	}
-
-	resp := i.do(http.MethodPut, "/api/landing", map[string]any{
-		"modules": []map[string]any{
-			{"id": "wanted", "kind": "most_voted", "x": 1, "y": 1, "w": 12, "h": 3},
-		},
-	})
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("composing a page with a most voted module: %d", resp.StatusCode)
+	if got := status(t, i.do(http.MethodPost, "/api/items/"+planned+"/status", map[string]string{"status": "planned"})); got != http.StatusOK {
+		t.Fatalf("planning: %d", got)
+	}
+	if got := status(t, i.do(http.MethodPost, "/api/items/"+bug+"/status", map[string]string{"status": "closed"})); got != http.StatusOK {
+		t.Fatalf("closing: %d", got)
 	}
 
-	body := decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
-	content, _ := body["content"].(map[string]any)
-	rows, _ := content["wanted"].([]any)
-	if len(rows) != 1 {
-		t.Fatalf("the module carried %d reports, want only the idea", len(rows))
+	list := func(id, show string) map[string]any {
+		return map[string]any{"id": id, "kind": "reports", "show": show}
 	}
-	only, _ := rows[0].(map[string]any)
-	if only["kind"] != "idea" || only["title"] != "dark mode for the dashboard" {
-		t.Errorf("the module carried %v, which is not the idea", only)
+	composed := map[string]any{"bands": []map[string]any{{"id": "b", "columns": "1-1-1-1",
+		"cells": [][]map[string]any{
+			{list("voted", "most_voted")}, {list("done", "recently_done")},
+			{list("latest", "latest")}, {list("planned", "planned")},
+		}}}}
+	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", composed))
+	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
+		t.Fatalf("publishing the page: %d", got)
+	}
+
+	content, _ := frontPage(t, i.anonymous(), "")["content"].(map[string]any)
+	titles := func(id string) string {
+		rows, _ := content[id].([]any)
+		var out []string
+		for _, r := range rows {
+			m, _ := r.(map[string]any)
+			out = append(out, m["title"].(string))
+		}
+		return strings.Join(out, ", ")
+	}
+	if got := titles("voted"); strings.Contains(got, "sidebar") || got == "" {
+		t.Errorf("most voted carried %q: ideas only", got)
+	}
+	if got := titles("done"); got != "the sidebar forgets its width" {
+		t.Errorf("recently resolved carried %q", got)
+	}
+	if got := titles("planned"); got != "export to csv" {
+		t.Errorf("planned carried %q", got)
+	}
+	if got := titles("latest"); strings.Count(got, ",") != 2 {
+		t.Errorf("latest carried %q, want all three", got)
 	}
 }
 
 // TestAStrangerIsHandedThePageAndNothingElse.
 //
-// The board list travels with the layout for whoever is going to compose it,
-// and for nobody else: it is the picker in the module dialog, not something a
-// visitor has any use for.
-//
-// This deliberately does NOT claim the default page skips the board query —
-// that is what layoutUsesData decides, and it has its own test. Asserting it
-// here would be asserting it from the response shape, which looks identical
-// whether the query ran or not: the first version of this was named for the
-// query and passed with the skip mutated away.
+// The board list travels with the page for whoever is going to compose it, and
+// for nobody else: it is the picker in the editor, not something a visitor has
+// any use for. Nor is whether a draft exists.
 func TestAStrangerIsHandedThePageAndNothingElse(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
-
-	body := decode(t, i.anonymous().do(http.MethodGet, "/api/landing", nil))
-	if _, carried := body["content"]; carried {
-		t.Errorf("a default page came back carrying content: %v", body["content"])
-	}
+	body := frontPage(t, i.anonymous(), "")
 	if _, carried := body["boards"]; carried {
 		t.Errorf("a stranger was handed the board list: %v", body["boards"])
+	}
+	if _, carried := body["has_draft"]; carried {
+		t.Errorf("a stranger was told whether there is a draft")
+	}
+}
+
+// TestAPictureOnlyTheDraftUsesIsKept.
+//
+// A picture dropped into the draft is about to be published, and one only the
+// published page uses is still on the screen. Neither may be swept; one nothing
+// uses any more is.
+func TestAPictureOnlyTheDraftUsesIsKept(t *testing.T) {
+	i := newInstance(t)
+	i.claim()
+	webp := append([]byte("RIFF\x00\x00\x00\x00WEBPVP8 "), make([]byte, 32)...)
+	name, err := landing.StoreImage(i.db(), webp, i.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	withPicture := map[string]any{"bands": []map[string]any{{"id": "b", "columns": "1",
+		"cells": [][]map[string]any{{{"id": "p", "kind": "image", "image": name, "alt": "The dashboard"}}}}}}
+	stored := func() int {
+		var n int
+		_ = i.db().QueryRow(`SELECT count(*) FROM landing_image`).Scan(&n)
+		return n
+	}
+
+	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", withPicture)); got != http.StatusOK {
+		t.Fatalf("keeping a draft with a picture %q: %d", name, got)
+	}
+	if stored() != 1 {
+		t.Fatal("a picture the draft uses was swept")
+	}
+	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
+		t.Fatalf("publishing the picture: %d", got)
+	}
+	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>No picture.</p>")))
+	if stored() != 1 {
+		t.Fatal("a picture the published page shows was swept")
+	}
+	_ = status(t, i.do(http.MethodPost, "/api/landing/publish", nil))
+	if stored() != 0 {
+		t.Error("a picture no page uses was kept")
 	}
 }

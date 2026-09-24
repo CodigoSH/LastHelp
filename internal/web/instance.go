@@ -123,42 +123,50 @@ func (s *Server) handleSetInstance(w http.ResponseWriter, r *http.Request) {
 
 // handleGetLanding answers what the front page is made of.
 //
-// Open, like the name and the mark: this is the page itself, and a visitor who
-// could not read it would be shown nothing. An unset layout comes back as the
-// default rather than as empty — an installation that never opened the editor
-// has a front page, it just never chose one.
+// Open, like the name and the mark: this is the page itself. A visitor is given
+// the published page and nothing else. Whoever may compose it can ask for the
+// draft with ?draft=1, and is given the board list the editor's pickers need
+// and whether there is a draft at all.
 func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
-	stored, err := s.settings().Get(settings.LandingLayout)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-
-	layout, err := landing.Parse(stored)
-	if err != nil {
-		// Something unreadable is in the settings row. The front page is not
-		// the place to find that out, so it falls back to the page everybody
-		// had before and says so where somebody will see it.
-		slog.Error("the stored front page layout could not be read", "error", err)
-		layout = landing.Default()
-	}
-	// The board list travels with the page for whoever is going to compose it:
-	// the dialog's board picker cannot be built out of what the page happens to
-	// be showing, or adding a most-voted module to a page with no boards module
-	// would offer an empty list.
 	composer := false
 	if actor, ok := middleware.ActorFrom(r); ok {
 		composer = actor.Can(authz.ManageServer, authz.Scope{})
 	}
 
-	body := map[string]any{"modules": layout.Modules}
-	boards, needed := s.boardsForLanding(layout, composer)
+	published, err := s.settings().Get(settings.LandingLayout)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	stored := published
+	draft := ""
+	if composer {
+		if draft, err = s.settings().Get(settings.LandingDraft); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		if r.URL.Query().Get("draft") == "1" && draft != "" {
+			stored = draft
+		}
+	}
+
+	page, err := landing.Parse(stored)
+	if err != nil {
+		// Something unreadable is in the settings row. The front page is not
+		// the place to find that out, so it falls back to the default and says
+		// so where somebody will see it.
+		slog.Error("the stored front page could not be read", "error", err)
+		page = landing.Default()
+	}
+
+	body := map[string]any{"bands": page.Bands, "settings": page.Settings}
+	boards, needed := s.boardsForLanding(page, composer)
 	if needed {
-		body["content"] = landingContentFrom(layout, boards,
-			s.mostVotedIn, s.recentlyDoneIn, s.latelyIn, s.comingIn, s.countedIn)
+		body["content"] = landingContentFrom(page, boards, s.reportsFor, s.comingIn, s.countedIn)
 	}
 	if composer {
 		body["boards"] = describeBoards(boards)
+		body["has_draft"] = draft != ""
 	}
 	writeJSON(w, http.StatusOK, body)
 }
@@ -166,8 +174,8 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 // boardsForLanding reads the boards only when somebody on this request needs
 // them: a page of words and pictures shown to a stranger touches neither the
 // board table nor the item table.
-func (s *Server) boardsForLanding(layout landing.Layout, composer bool) ([]org.Board, bool) {
-	if !layout.NeedsData() && !composer {
+func (s *Server) boardsForLanding(page landing.Page, composer bool) ([]org.Board, bool) {
+	if !page.NeedsData() && !composer {
 		return nil, false
 	}
 	boards, err := s.orgs().ListBoards()
@@ -175,33 +183,25 @@ func (s *Server) boardsForLanding(layout landing.Layout, composer bool) ([]org.B
 		slog.Error("listing boards for the front page", "error", err)
 		return nil, false
 	}
-	return boards, layout.NeedsData()
+	return boards, page.NeedsData()
 }
 
-// landingContentFrom is what the data modules of a layout have to show.
-//
-// Keyed by module id rather than by kind, because two modules of the same kind
-// on one page are the point: most voted for this board beside most voted for
-// that one. Nothing in here fails the request — a front page that answers with
-// an error because one module could not be filled is a front page that goes
-// down when a board is deleted.
-func landingContentFrom(layout landing.Layout, boards []org.Board,
-	voted, done, lately func([]org.Board) []map[string]any,
+// landingContentFrom is what the data modules of a page have to show, keyed by
+// module id: two modules of one kind side by side — most voted for this board,
+// most voted for that one — are the point. Nothing in here fails the request; a
+// front page that errors because one module could not be filled is a front page
+// that goes down when a board is deleted.
+func landingContentFrom(page landing.Page, boards []org.Board,
+	reports func([]org.Board, string) []map[string]any,
 	coming func([]org.Board) map[string]any,
 	counted func([]org.Board) map[string]any) map[string]any {
 	content := map[string]any{}
-	for _, m := range layout.Modules {
+	for _, m := range page.Modules() {
 		switch m.Kind {
 		case landing.Boards:
 			content[m.ID] = cut(describeBoards(inScope(boards, m.Scope)), m.Rows)
-		case landing.MostVoted:
-			content[m.ID] = cut(voted(inScope(boards, m.Scope)), m.Rows)
-		case landing.RecentlyDone:
-			content[m.ID] = cut(done(inScope(boards, m.Scope)), m.Rows)
-		case landing.CallToAction:
-			content[m.ID] = whereItGoes(inScope(boards, m.Scope))
-		case landing.RecentActivity:
-			content[m.ID] = cut(lately(inScope(boards, m.Scope)), m.Rows)
+		case landing.Reports:
+			content[m.ID] = cut(reports(inScope(boards, m.Scope), m.Show), m.Rows)
 		case landing.Roadmap:
 			content[m.ID] = coming(inScope(boards, m.Scope))
 		case landing.Statistics:
@@ -212,8 +212,8 @@ func landingContentFrom(layout landing.Layout, boards []org.Board,
 }
 
 // cut is how many of them the operator asked for, and all of them when they
-// never said. Done here rather than in the browser so a module that shows three
-// does not carry eight across the wire to throw five away.
+// never said. Done here so a module that shows three does not carry eight
+// across the wire to throw five away.
 func cut(rows []map[string]any, howMany int) []map[string]any {
 	if howMany <= 0 || howMany >= len(rows) {
 		return rows
@@ -221,11 +221,10 @@ func cut(rows []map[string]any, howMany int) []map[string]any {
 	return rows[:howMany]
 }
 
-// inScope narrows a list of boards to what a module was pointed at.
-//
-// A scope naming a board that no longer exists comes back empty rather than as
-// everything: an operator who asked for one board and had it deleted should see
-// an empty module, not the whole installation silently taking its place.
+// inScope narrows the boards to what a module was pointed at. A scope naming a
+// board that no longer exists comes back empty rather than as everything: the
+// operator asked for one board, and the whole installation silently taking its
+// place is a page answering a question nobody asked.
 func inScope(boards []org.Board, scope string) []org.Board {
 	if scope == "" {
 		return boards
@@ -236,9 +235,6 @@ func inScope(boards []org.Board, scope string) []org.Board {
 		if b.OrgSlug != orgSlug {
 			continue
 		}
-		// A scope naming only an organisation is every board in it, which is
-		// what somebody who runs one organisation and four projects actually
-		// wants to put on a page.
 		if !deeper || b.Slug == boardSlug {
 			out = append(out, b)
 		}
@@ -261,67 +257,39 @@ func describeBoards(boards []org.Board) []map[string]any {
 	return out
 }
 
-// reportsOnTheFrontPage is how many reports one such module carries.
-//
-// Enough to fill a tall module and be worth scrolling, small enough that the
-// query stays cheap on the one page strangers load. The module scrolls rather
-// than clipping, so a short module shows fewer without the rest disappearing.
+// reportsOnTheFrontPage is how many reports one module carries at most: enough
+// to fill a tall column, few enough that the one page strangers load stays
+// cheap.
 const reportsOnTheFrontPage = 8
 
-// whereItGoes is the board a button points at.
+// reportsFor answers a reports module, by which list it shows.
 //
-// An unscoped button goes to the first board, which is what makes it useful the
-// moment it is added rather than after a trip to its dialog: the installation
-// this module is for has one board, and on that one there is no other answer.
-// With no boards at all it points nowhere and the module draws nothing, because
-// a button to a report form that does not exist is worse than no button.
-func whereItGoes(boards []org.Board) map[string]any {
-	if len(boards) == 0 {
-		return nil
+//   - most voted: ideas only, because only an idea can be voted for;
+//   - recently resolved: both vocabularies that mean finished — an idea done, a
+//     bug closed — and neither that means refused, newest first;
+//   - latest: what was published most recently;
+//   - planned: what the team has said it will do.
+//
+// Published only in every case, the default the item store keeps: the front
+// page must never be where something unreviewed appears.
+func (s *Server) reportsFor(boards []org.Board, show string) []map[string]any {
+	switch show {
+	case landing.ShowRecentlyDone:
+		return s.reportsIn(boards, item.Filter{
+			Statuses:     []item.Status{item.StatusDone, item.StatusClosed},
+			SortByClosed: true,
+		})
+	case landing.ShowLatest:
+		return s.reportsIn(boards, item.Filter{})
+	case landing.ShowPlanned:
+		return s.reportsIn(boards, item.Filter{Statuses: []item.Status{item.StatusPlanned}})
+	default:
+		return s.reportsIn(boards, item.Filter{Kind: item.Idea, SortByVote: true})
 	}
-	b := boards[0]
-	return map[string]any{
-		"org":  b.OrgSlug,
-		"slug": b.Slug,
-		"name": b.Name,
-		"href": "/" + b.OrgSlug + "/" + b.Slug + "/new",
-	}
 }
 
-// recentlyDoneIn is what was put right lately, newest first.
-//
-// Both vocabularies that mean finished and neither that means refused: showing
-// "declined" under a heading about what was done would be the page saying the
-// opposite of what happened.
-func (s *Server) recentlyDoneIn(boards []org.Board) []map[string]any {
-	return s.reportsIn(boards, item.Filter{
-		Statuses:     []item.Status{item.StatusDone, item.StatusClosed},
-		SortByClosed: true,
-	})
-}
-
-// mostVotedIn is the ideas people asked for most.
-//
-// Ideas only, because only an idea can be voted for. A "most voted" that
-// silently included bugs would be ranking things that all have nought.
-func (s *Server) mostVotedIn(boards []org.Board) []map[string]any {
-	return s.reportsIn(boards, item.Filter{Kind: item.Idea, SortByVote: true})
-}
-
-// latelyIn is what has arrived recently, newest first.
-//
-// Published only, like everything else here: the front page must never be where
-// something unreviewed appears, and the default the item store keeps is exactly
-// that.
-func (s *Server) latelyIn(boards []org.Board) []map[string]any {
-	return s.reportsIn(boards, item.Filter{})
-}
-
-// comingIn is the roadmap: what is planned, in progress, and done.
-//
-// The same three columns a board's own roadmap uses. A visitor who reads one
-// and then the other should not have to learn a second vocabulary for the same
-// three states.
+// comingIn is the roadmap: what is planned, in progress, and done, in the
+// columns a board's own roadmap uses.
 func (s *Server) comingIn(boards []org.Board) map[string]any {
 	out := map[string]any{}
 	for _, column := range item.Columns {
@@ -359,16 +327,13 @@ func (s *Server) comingIn(boards []org.Board) map[string]any {
 	return out
 }
 
-// roadmapOnTheFrontPage is how many of each column one module carries. Short,
-// because three columns of eight is a page of its own and this is a box on a
-// front page.
+// roadmapOnTheFrontPage is how many of each column one module carries.
 const roadmapOnTheFrontPage = 4
 
-// countedIn is how much came in and where it got to.
-//
-// Nothing at all when nothing has been published: three zeroes on a fresh
-// installation tell the first person who ever looks that nothing happens here,
-// which is both untrue and the worst thing this page could say.
+// countedIn is how much came in and where it got to, and nothing at all when
+// nothing has been published: three zeroes tell the first person who ever looks
+// that nothing happens here, which is both untrue and the worst thing this page
+// could say.
 func (s *Server) countedIn(boards []org.Board) map[string]any {
 	ids := make([]int64, 0, len(boards))
 	for _, b := range boards {
@@ -389,12 +354,8 @@ func (s *Server) countedIn(boards []org.Board) map[string]any {
 	}
 }
 
-// reportsIn answers one of the report modules.
-//
-// The boards and the bound are the same for all of them and the question is
-// not, so the filter arrives already asked. Published only, which is the
-// default the item store deliberately keeps: the front page must not be the
-// place something unreviewed appears.
+// reportsIn lists published reports on these boards, with the filter already
+// asked.
 func (s *Server) reportsIn(boards []org.Board, ask item.Filter) []map[string]any {
 	if len(boards) == 0 {
 		return []map[string]any{}
@@ -424,9 +385,6 @@ func (s *Server) reportsIn(boards []org.Board, ask item.Filter) []map[string]any
 			"board":     byID[it.RepoID].Name,
 		}
 		if !it.ClosedAt.IsZero() {
-			// Seconds, like every other time this API sends: the browser side
-			// formats them in the language of the application, and a second
-			// shape would mean a second formatter to keep in step.
 			row["closed_at"] = it.ClosedAt.Unix()
 		}
 		out = append(out, row)
@@ -434,48 +392,142 @@ func (s *Server) reportsIn(boards []org.Board, ask item.Filter) []map[string]any
 	return out
 }
 
-// handleSetLanding replaces it.
+// handleSaveLandingDraft keeps the page being edited, without showing it.
 //
-// Validated by the domain, which refuses a layout it cannot draw entirely
-// rather than saving the parts it recognised. Saving half of what somebody
-// composed and showing them the rest missing is how an editor teaches people
-// not to trust it.
-func (s *Server) handleSetLanding(w http.ResponseWriter, r *http.Request) {
+// Validated by the domain, which refuses a page it cannot draw entirely rather
+// than keeping the parts it recognised: saving half of what somebody composed
+// and showing them the rest missing is how an editor teaches people not to
+// trust it.
+func (s *Server) handleSaveLandingDraft(w http.ResponseWriter, r *http.Request) {
 	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
 		return
 	}
-
 	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
-	in, err := landing.Submitted(r.Body)
+	page, err := landing.Submitted(r.Body)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "error.bad_layout")
 		return
 	}
-
-	encoded, err := in.Encode()
+	encoded, err := page.Encode()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "error.bad_layout")
 		return
 	}
-	if err := s.settings().Set(settings.LandingLayout, encoded); err != nil {
-		slog.Error("storing the front page layout", "error", err)
+	if err := s.settings().Set(settings.LandingDraft, encoded); err != nil {
+		slog.Error("storing the front page draft", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
-	// A picture is uploaded while somebody is writing, which means one dropped
-	// in and then undone is a picture nothing refers to. Sweeping here, against
-	// the layout that was just stored, covers every way that happens — undone,
-	// overwritten, or the whole module removed — and needs the browser to say
-	// nothing at all.
-	//
-	// After the layout is stored, never before: a sweep that ran first and then
-	// failed to store would delete the pictures the page still shows.
-	if err := landing.ForgetUnusedImages(s.db, in); err != nil {
-		// Not worth failing the save. The operator's page is stored; what is
-		// left behind is some bytes nobody can see.
+	s.sweepLandingImages()
+	writeJSON(w, http.StatusOK, map[string]any{"bands": page.Bands, "settings": page.Settings})
+}
+
+// handlePublishLanding puts the draft in front of visitors.
+//
+// A draft that is exactly the default page is published as no page at all: the
+// default is read fresh rather than stored, so an operator who restored it gets
+// the better one a later release brings, like everybody who never changed it.
+func (s *Server) handlePublishLanding(w http.ResponseWriter, r *http.Request) {
+	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+		return
+	}
+	draft, err := s.settings().Get(settings.LandingDraft)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if draft == "" {
+		// Nothing to publish is not an error: the page is already what the
+		// editor shows.
+		writeJSON(w, http.StatusOK, map[string]any{"published": false})
+		return
+	}
+	page, err := landing.Parse(draft)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_layout")
+		return
+	}
+	published := draft
+	if isDefaultPage(page) {
+		published = ""
+	}
+	if err := s.settings().Set(settings.LandingLayout, published); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if err := s.settings().Set(settings.LandingDraft, ""); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	s.sweepLandingImages()
+	writeJSON(w, http.StatusOK, map[string]any{"published": true})
+}
+
+// handleDiscardLandingDraft throws the draft away. The page visitors see was
+// never touched, so there is nothing to put back.
+func (s *Server) handleDiscardLandingDraft(w http.ResponseWriter, r *http.Request) {
+	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+		return
+	}
+	if err := s.settings().Set(settings.LandingDraft, ""); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	s.sweepLandingImages()
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleRestoreLandingDefault makes the draft the default page, for the
+// operator to look at and publish or discard like any other change.
+func (s *Server) handleRestoreLandingDefault(w http.ResponseWriter, r *http.Request) {
+	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+		return
+	}
+	page := landing.Default()
+	encoded, err := page.Encode()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	if err := s.settings().Set(settings.LandingDraft, encoded); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"bands": page.Bands, "settings": page.Settings})
+}
+
+// isDefaultPage says whether a page is the default one, compared as it would
+// be stored.
+func isDefaultPage(page landing.Page) bool {
+	a, errA := page.Encode()
+	b, errB := landing.Default().Encode()
+	return errA == nil && errB == nil && a == b
+}
+
+// sweepLandingImages forgets the pictures neither the published page nor the
+// draft refers to. After the pages are stored, never before: a sweep that ran
+// first and then failed to store would delete pictures a page still shows. Not
+// worth failing the request over — what is left behind is bytes nobody sees.
+func (s *Server) sweepLandingImages() {
+	var pages []landing.Page
+	for _, key := range []string{settings.LandingLayout, settings.LandingDraft} {
+		stored, err := s.settings().Get(key)
+		if err != nil {
+			slog.Warn("reading a front page to sweep its pictures", "error", err)
+			return
+		}
+		page, err := landing.Parse(stored)
+		if err != nil {
+			// A page that cannot be read cannot say which pictures it uses,
+			// so nothing is swept rather than everything.
+			slog.Warn("reading a front page to sweep its pictures", "error", err)
+			return
+		}
+		pages = append(pages, page)
+	}
+	if err := landing.ForgetUnusedImages(s.db, pages...); err != nil {
 		slog.Warn("clearing unused front page pictures", "error", err)
 	}
-	writeJSON(w, http.StatusOK, in)
 }
 
 // handleAddLandingImage takes one picture for the front page.

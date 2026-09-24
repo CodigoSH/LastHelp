@@ -1,659 +1,354 @@
 package landing
 
 import (
-	"encoding/json"
-	"errors"
 	"strings"
 	"testing"
 )
 
-// TestAnUnsetLayoutIsStillAFrontPage.
-//
-// An installation that never opens the editor has a front page: it just never
-// chose one. The alternative — an empty grid until somebody composes something
-// — would mean a fresh instance greeting its first visitor with nothing.
-//
-// This used to promise that the default was pixel for pixel the page that came
-// before the grid. It is not any more, deliberately: the front page was rebuilt
-// on the dashboard's grid, and a promise to keep looking like the thing being
-// replaced is not a promise worth keeping.
-func TestAnUnsetLayoutIsStillAFrontPage(t *testing.T) {
-	for _, stored := range []string{"", "   ", "\n"} {
-		got, err := Parse(stored)
-		if err != nil {
-			t.Fatalf("%q: %v", stored, err)
-		}
-		if len(got.Modules) != 5 {
-			t.Fatalf("%q gave %d modules, want 5", stored, len(got.Modules))
-		}
-		// Three things worth saying, one module each: the page says what it
-		// always did, and every one of them can be moved, rewritten or removed.
-		for i, want := range []Kind{Hero, Text, Text, Text, Organisations} {
-			if got.Modules[i].Kind != want {
-				t.Errorf("%q: module %d is %q, want %q", stored, i+1, got.Modules[i].Kind, want)
-			}
-		}
+// page is a valid one-band page holding these modules in one column, for the
+// tests that are about a module rather than about bands.
+func page(modules ...Module) Page {
+	return Page{Bands: []Band{{ID: "b", Columns: One, Cells: [][]Module{modules}}}}
+}
+
+func mustRefuse(t *testing.T, why string, p Page) {
+	t.Helper()
+	if _, err := p.Encode(); err == nil {
+		t.Errorf("accepted a page that %s", why)
 	}
 }
 
-// TestAModuleNobodyCanDrawIsRefused, rather than quietly dropped.
+func mustAccept(t *testing.T, why string, p Page) {
+	t.Helper()
+	if _, err := p.Encode(); err != nil {
+		t.Errorf("refused a page that %s: %v", why, err)
+	}
+}
+
+// TestAnUnsetPageIsTheDefaultPage.
 //
-// This arrives over HTTP and renders on the page strangers see. Silently
-// leaving out what was not understood would mean an operator saving a page,
-// seeing part of it, and having no way to tell whether the rest failed to save
-// or failed to draw.
-func TestAModuleNobodyCanDrawIsRefused(t *testing.T) {
-	_, err := Parse(`{"modules":[{"id":"a","kind":"iframe","x":1,"y":1,"w":12,"h":2}]}`)
-	if !errors.Is(err, ErrUnknownKind) {
-		t.Errorf("an unknown module came back as %v, want ErrUnknownKind", err)
-	}
-
-	// And one bad module refuses the whole layout, not just itself.
-	mixed, err := Parse(`{"modules":[
-		{"id":"a","kind":"hero","x":1,"y":1,"w":12,"h":4},
-		{"id":"b","kind":"iframe","x":1,"y":5,"w":12,"h":2}]}`)
-	if err == nil {
-		t.Errorf("a layout with one bad module was accepted as %d modules", len(mixed.Modules))
-	}
-}
-
-func TestTheThingsAPageCannotBe(t *testing.T) {
-	for _, tc := range []struct{ name, layout string }{
-		{"no modules at all", `{"modules":[]}`},
-		{"a module with no id", `{"modules":[{"id":"","kind":"hero","x":1,"y":1,"w":12,"h":4}]}`},
-		{"two modules sharing an id", `{"modules":[
-			{"id":"a","kind":"hero","x":1,"y":1,"w":12,"h":4},
-			{"id":"a","kind":"intro","x":1,"y":5,"w":12,"h":2}]}`},
-		{"a module off the right-hand edge", `{"modules":[{"id":"a","kind":"hero","x":9,"y":1,"w":8,"h":2}]}`},
-		// A negative width, not a zero one: one column is the narrowest a module
-		// may be now, and a zero is not refusable at all — it is how a layout
-		// written before there were coordinates says "no width given", and it
-		// gets filled in rather than thrown out.
-		{"a module of negative width", `{"modules":[{"id":"a","kind":"hero","x":1,"y":1,"w":-1,"h":2}]}`},
-		{"two modules in the same cells", `{"modules":[
-			{"id":"a","kind":"hero","x":1,"y":1,"w":6,"h":2},
-			{"id":"b","kind":"intro","x":4,"y":1,"w":6,"h":2}]}`},
-		{"words on a module that has none", `{"modules":[{"id":"a","kind":"organisations","x":1,"y":1,"w":12,"h":4,"body":"hello"}]}`},
-		{"not json at all", `hello`},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := Parse(tc.layout); err == nil {
-				t.Error("accepted")
-			}
-		})
-	}
-}
-
-// TestALayoutSurvivesTheRoundTrip: what was saved is what comes back, in order.
-func TestALayoutSurvivesTheRoundTrip(t *testing.T) {
-	original := Layout{Modules: []Module{
-		{ID: "words", Kind: Text, X: 1, Y: 1, W: 6, H: 2, Body: "We read everything."},
-		{ID: "orgs", Kind: Organisations, X: 7, Y: 1, W: 6, H: 2},
-		{ID: "top", Kind: Hero, X: 1, Y: 3, W: 12, H: 4},
-	}}
-
-	stored, err := original.Encode()
+// Every installation starts here, and a front page with nothing on it is not a
+// choice anybody made. The default is read, never stored, so a better one in a
+// later release reaches everybody who never changed theirs.
+func TestAnUnsetPageIsTheDefaultPage(t *testing.T) {
+	got, err := Parse("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	back, err := Parse(stored)
-	if err != nil {
-		t.Fatal(err)
+	if len(got.Bands) != len(Default().Bands) {
+		t.Fatalf("an unset page came back with %d bands", len(got.Bands))
 	}
-	if len(back.Modules) != len(original.Modules) {
-		t.Fatalf("%d modules came back, want %d", len(back.Modules), len(original.Modules))
+	if _, err := Default().Encode(); err != nil {
+		t.Fatalf("the default page is not a page this package accepts: %v", err)
 	}
-	for i := range original.Modules {
-		if back.Modules[i] != original.Modules[i] {
-			t.Errorf("module %d came back as %+v, want %+v", i+1, back.Modules[i], original.Modules[i])
+}
+
+// TestTheDefaultPageOpensWithTheSearch.
+//
+// The order is the one a visitor needs: find what exists before writing it
+// again, then where to report, then that people here are listened to, and the
+// explanation last. The first thing on the page is a heading that searches.
+func TestTheDefaultPageOpensWithTheSearch(t *testing.T) {
+	d := Default()
+	first := d.Bands[0].Cells[0][0]
+	if first.Kind != Heading || !first.WithSearch {
+		t.Fatalf("the default page opens with %q (search %v)", first.Kind, first.WithSearch)
+	}
+	var kinds []string
+	for _, m := range d.Modules() {
+		kinds = append(kinds, string(m.Kind))
+	}
+	want := "heading boards reports reports text text text"
+	if got := strings.Join(kinds, " "); got != want {
+		t.Errorf("the default page reads %q, want %q", got, want)
+	}
+	// Its words are the installation's and the catalogue's, not stored here.
+	for _, m := range d.Modules() {
+		if m.Body != "" || m.Title != "" || m.Subtitle != "" || m.Name != "" {
+			t.Errorf("the default module %q carries words of its own", m.ID)
 		}
 	}
 }
 
-// TestEncodeRefusesWhatParseWouldRefuse. The two are one rule, not two: a
-// layout that can be written and not read is a page that breaks on the next
-// visit rather than when it was saved.
-func TestEncodeRefusesWhatParseWouldRefuse(t *testing.T) {
-	bad := Layout{Modules: []Module{{ID: "a", Kind: "carousel", X: 1, Y: 1, W: 12, H: 2}}}
-	if _, err := bad.Encode(); err == nil {
-		t.Fatal("an unknown module was written")
-	}
-
-	tooLong := Layout{Modules: []Module{{ID: "a", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: strings.Repeat("x", maxTextBody+1)}}}
-	if _, err := tooLong.Encode(); err == nil {
-		t.Error("a text module longer than the limit was written")
-	}
-}
-
-// TestTextCarriesMarkupAndIsNeverTrustedWithIt.
+// TestAPageInTheGridFormatComesBackAsTheDefault.
 //
-// This test used to say the opposite, and left a note saying that the day
-// somebody made this module accept markup it was the test to argue with. The
-// argument, for whoever reads this next: plain text made the module useless
-// for the one thing it exists for — the operator could not write a heading, a
-// list or a link on their own front page — and the safety it bought is bought
-// better by a policy that is written down, exported and asserted exactly
-// (clean.go), because "we escape everything" is only true until one caller
-// forgets.
-//
-// So markup goes in, and what comes back is what the policy allows and nothing
-// else. The body is still stored as data in a field, not as a fragment of a
-// page.
-func TestTextCarriesMarkupAndIsNeverTrustedWithIt(t *testing.T) {
-	const sneaky = `<h2>Ours</h2><script>alert(1)</script><p onclick="alert(2)">Hello</p>`
-	stored, err := Layout{Modules: []Module{
-		{ID: "a", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: sneaky},
-	}}.Encode()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var raw map[string]any
-	if err := json.Unmarshal([]byte(stored), &raw); err != nil {
-		t.Fatal(err)
-	}
-	back, err := Parse(stored)
-	if err != nil {
-		t.Fatal(err)
-	}
-	body := back.Modules[0].Body
-	if !strings.Contains(body, "<h2>Ours</h2>") {
-		t.Errorf("a heading the operator wrote did not survive: %q", body)
-	}
-	if strings.Contains(body, "script") || strings.Contains(body, "onclick") {
-		t.Errorf("the ways in survived the round trip: %q", body)
-	}
-}
-
-// TestAPageComposedBeforeThereWasAGridStillComesBack.
-//
-// The first version of this stored a coarse width and no position. Those
-// layouts exist in installations that arranged a page between one release and
-// the next, and the grid arriving must not turn somebody's front page into an
-// error. Full becomes the twelve columns it meant, half becomes six, and they
-// keep the order they were written in.
-func TestAPageComposedBeforeThereWasAGridStillComesBack(t *testing.T) {
-	old := `{"modules":[
-		{"id":"words","kind":"text","width":"half","body":"We read everything."},
-		{"id":"orgs","kind":"organisations","width":"full"}]}`
-
+// The grid lived only in pre-release builds. A page stored in it is not
+// converted and not refused: it is the default page, and the server starts.
+func TestAPageInTheGridFormatComesBackAsTheDefault(t *testing.T) {
+	old := `{"modules":[{"id":"hero","kind":"hero","x":1,"y":1,"w":12,"h":2}]}`
 	got, err := Parse(old)
 	if err != nil {
-		t.Fatalf("a page composed before the grid came back as an error: %v", err)
+		t.Fatalf("a page in the old format refused to open: %v", err)
 	}
-	if len(got.Modules) != 2 {
-		t.Fatalf("%d modules came back, want 2", len(got.Modules))
+	if len(got.Bands) != len(Default().Bands) || got.Bands[0].ID != "top" {
+		t.Errorf("a page in the old format did not come back as the default: %+v", got.Bands)
 	}
+}
 
-	words, orgs := got.Modules[0], got.Modules[1]
-	if words.W != Columns/2 {
-		t.Errorf("half became %d columns, want %d", words.W, Columns/2)
+// TestAPageSurvivesTheRoundTrip.
+func TestAPageSurvivesTheRoundTrip(t *testing.T) {
+	in := Page{
+		Bands: []Band{
+			{ID: "a", Columns: WideNarrow, Name: "News", Background: BackgroundAccent, Width: WidthFull, Spacing: SpacingCompact,
+				Cells: [][]Module{
+					{{ID: "t", Kind: Text, Body: "<p>Hello</p>", Tone: ToneNotice}},
+					{{ID: "l", Kind: Links, Name: "Elsewhere", Links: []Link{
+						{Label: "Docs", To: ToURL, URL: "https://docs.example.com"},
+						{Label: "Report", To: ToForm, Scope: "acme/atlas", Button: true},
+					}}},
+				}},
+		},
+		Settings: Settings{Title: "Acme", Description: "Where Acme listens.",
+			Footer: []Link{{Label: "Code", To: ToURL, URL: "https://git.example.com/acme"}}},
 	}
-	if orgs.W != Columns {
-		t.Errorf("full became %d columns, want %d", orgs.W, Columns)
-	}
-	if words.Body != "We read everything." {
-		t.Errorf("the words were lost on the way: %q", words.Body)
-	}
-	if !(words.Y < orgs.Y) {
-		t.Errorf("the order changed: words at row %d, organisations at row %d", words.Y, orgs.Y)
-	}
-	if words.Overlaps(orgs) {
-		t.Error("the two ended up on top of each other")
-	}
-
-	// And once saved again it is an ordinary layout: the old width is gone and
-	// nothing has to guess a second time.
-	again, err := got.Encode()
+	encoded, err := in.Encode()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(again, `"width"`) {
-		t.Errorf("the old width was written back out: %s", again)
-	}
-	reread, err := Parse(again)
+	out, err := Parse(encoded)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reread.Modules[0] != got.Modules[0] {
-		t.Errorf("a second read moved it: %+v then %+v", got.Modules[0], reread.Modules[0])
+	again, _ := out.Encode()
+	if again != encoded {
+		t.Errorf("the page changed on the way through:\n%s\n%s", encoded, again)
 	}
 }
 
-// TestAModuleThatShowsBoardsCanBeToldWhichOnes.
-//
-// The scope is what makes these worth having on an installation with more than
-// one organisation: without it, every "most voted" on the page shows the same
-// thing. The shape is checked, the existence is not — a board can be deleted
-// long after somebody composed a page that names it, and the page has to
-// survive that rather than refuse to load.
-func TestAModuleThatShowsBoardsCanBeToldWhichOnes(t *testing.T) {
-	for _, scope := range []string{"", "acme/atlas", "a-b_c/d0"} {
-		in := `{"modules":[{"id":"v","kind":"most_voted","x":1,"y":1,"w":12,"h":3,"scope":"` + scope + `"}]}`
-		got, err := Parse(in)
-		if err != nil {
-			t.Fatalf("scope %q was refused: %v", scope, err)
-		}
-		if got.Modules[0].Scope != scope {
-			t.Errorf("scope %q came back as %q", scope, got.Modules[0].Scope)
-		}
+// TestAModuleNobodyCanDrawIsRefused, and so are the kinds of the grid.
+func TestAModuleNobodyCanDrawIsRefused(t *testing.T) {
+	for _, kind := range []Kind{"carousel", "hero", "section", "most_voted", "call_to_action", ""} {
+		mustRefuse(t, "holds a "+string(kind), page(Module{ID: "m", Kind: kind}))
 	}
 }
 
-// TestAScopeThatNamesNothingUsableIsRefused.
-//
-// Both halves matter. A scope the reader cannot take apart would leave the
-// module drawing every board instead of the one it names, and a scope on a
-// module that cannot use one is somebody expecting a narrower page than they
-// are going to get. Neither is something to discover by looking at the page.
-func TestAScopeThatNamesNothingUsableIsRefused(t *testing.T) {
-	cases := map[string]string{
-		// A button goes to one report form, so an organisation is not an answer
-		// it can act on. Every other module narrows to a set, and one
-		// organisation is a set — so "acme" on a boards module is fine now, and
-		// this case used to be that, refused.
-		"an organisation where one board is needed": `{"modules":[{"id":"v","kind":"call_to_action",` +
-			`"x":1,"y":1,"w":4,"h":2,"scope":"acme"}]}`,
-		"empty half":          `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"acme/"}]}`,
-		"not a slug":          `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"Acme/At las"}]}`,
-		"a path, not a board": `{"modules":[{"id":"v","kind":"boards","x":1,"y":1,"w":12,"h":3,"scope":"../../etc"}]}`,
-		"on a module with no use for one": `{"modules":[{"id":"t","kind":"text","x":1,"y":1,"w":12,"h":2,` +
-			`"body":"hello","scope":"acme/atlas"}]}`,
+// TestABandIsOneOfTheSixLayoutsWithACellPerColumn.
+func TestABandIsOneOfTheSixLayoutsWithACellPerColumn(t *testing.T) {
+	for _, c := range []Columns{One, Halves, Thirds, WideNarrow, NarrowWide, Quarters} {
+		cells := make([][]Module, c.count())
+		mustAccept(t, "is laid out "+string(c), Page{Bands: []Band{{ID: "b", Columns: c, Cells: cells}}})
 	}
-	for name, in := range cases {
-		if _, err := Parse(in); err == nil {
-			t.Errorf("%s: accepted", name)
-		}
-	}
+	mustRefuse(t, "has a seventh layout", Page{Bands: []Band{{ID: "b", Columns: "3-1", Cells: make([][]Module, 2)}}})
+	// A module in a column the layout does not have is one nobody would see.
+	mustRefuse(t, "has more cells than columns", Page{Bands: []Band{{ID: "b", Columns: Halves, Cells: make([][]Module, 3)}}})
+	mustRefuse(t, "has fewer cells than columns", Page{Bands: []Band{{ID: "b", Columns: Thirds, Cells: make([][]Module, 2)}}})
+	// An empty column is allowed: it is where the editor offers to add one.
+	mustAccept(t, "has an empty column", Page{Bands: []Band{{ID: "b", Columns: Halves,
+		Cells: [][]Module{{{ID: "t", Kind: Text}}, {}}}}})
 }
 
-// TestAPageOfWordsSaysItNeedsNothingFromTheDatabase.
-//
-// The front page is the one screen every stranger loads, and most installations
-// will never put a data module on it. This predicate is what keeps a page of a
-// mark, some words and a list of organisations from costing a board query and
-// an item query on every visit, so it is the thing to guard: the response looks
-// the same either way, which is exactly why reading the answer off the response
-// proves nothing.
-func TestAPageOfWordsSaysItNeedsNothingFromTheDatabase(t *testing.T) {
-	if Default().NeedsData() {
-		t.Error("the default page asked the database for something")
+// TestABandsChoicesAreShortClosedLists.
+func TestABandsChoicesAreShortClosedLists(t *testing.T) {
+	band := func(edit func(*Band)) Page {
+		b := Band{ID: "b", Columns: One, Cells: make([][]Module, 1)}
+		edit(&b)
+		return Page{Bands: []Band{b}}
 	}
-	words := Layout{Modules: []Module{
-		{ID: "t", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: "hello"},
-		{ID: "h", Kind: Hero, X: 1, Y: 3, W: 12, H: 3},
-	}}
-	if words.NeedsData() {
-		t.Error("a page of words asked the database for something")
-	}
-	for _, kind := range []Kind{Boards, MostVoted} {
-		page := Layout{Modules: []Module{{ID: "d", Kind: kind, X: 1, Y: 1, W: 12, H: 3}}}
-		if !page.NeedsData() {
-			t.Errorf("a page holding %q said it needed nothing", kind)
-		}
-	}
+	mustRefuse(t, "has a background of its own invention", band(func(b *Band) { b.Background = "#ff0000" }))
+	mustRefuse(t, "has a width of its own invention", band(func(b *Band) { b.Width = "900px" }))
+	mustRefuse(t, "has a spacing of its own invention", band(func(b *Band) { b.Spacing = "huge" }))
+	mustRefuse(t, "names a band past the bound", band(func(b *Band) { b.Name = strings.Repeat("ぜ", maxLabel+1) }))
+	// Counted in characters: a name that fits in Japanese is not refused for
+	// its bytes.
+	mustAccept(t, "names a band at the bound in Japanese", band(func(b *Band) { b.Name = strings.Repeat("ぜ", maxLabel) }))
 }
 
-// TestAButtonsLabelIsBoundedAsALabel.
-//
-// The words of a paragraph and the words on a button are not the same bound.
-// Four thousand characters is a reasonable paragraph and an unusable button, so
-// the button has its own — counted in runes, because a bound about what fits on
-// a button that counted bytes would cut a Japanese label at a third of the
-// length of an English one.
-func TestAButtonsLabelIsBoundedAsALabel(t *testing.T) {
-	page := func(label string) string {
-		out, _ := json.Marshal(Layout{Modules: []Module{
-			{ID: "go", Kind: CallToAction, X: 1, Y: 1, W: 4, H: 1,
-				Scope: "acme/atlas", Body: label},
-		}})
-		return string(out)
-	}
+// TestAPageHasBounds.
+func TestAPageHasBounds(t *testing.T) {
+	mustRefuse(t, "has no bands", Page{})
 
-	if _, err := Parse(page(strings.Repeat("ぜ", maxLabel))); err != nil {
-		t.Errorf("a label of %d characters was refused: %v", maxLabel, err)
+	var bands []Band
+	for i := 0; i <= maxBands; i++ {
+		bands = append(bands, Band{ID: "b" + string(rune('a'+i)), Columns: One, Cells: make([][]Module, 1)})
 	}
-	if _, err := Parse(page(strings.Repeat("ぜ", maxLabel+1))); err == nil {
-		t.Error("a label past the bound was accepted")
-	}
-	// The same label in bytes is three times over a byte bound, and has to be
-	// accepted: this is the case a byte count gets wrong.
-	if _, err := Parse(page(strings.Repeat("ぜ", maxLabel))); err != nil {
-		t.Errorf("a label of %d runes was measured in bytes: %v", maxLabel, err)
-	}
-}
+	mustRefuse(t, "has more bands than the bound", Page{Bands: bands})
 
-// TestOnlyWhatHasSomewhereToPutWordsMayCarryThem.
-//
-// A module carrying words it cannot draw is somebody's writing that vanished,
-// with nothing on the page to say where it went. Two kinds have somewhere to
-// put them — the operator's own paragraph and the label on the button — and the
-// rest are refused rather than quietly dropped.
-func TestOnlyWhatHasSomewhereToPutWordsMayCarryThem(t *testing.T) {
-	page := func(m Module) string {
-		out, _ := json.Marshal(Layout{Modules: []Module{m}})
-		return string(out)
+	var many []Module
+	for i := 0; i <= maxModules; i++ {
+		many = append(many, Module{ID: "m" + string(rune('a'+i)), Kind: Search})
 	}
+	mustRefuse(t, "has more modules than the bound", page(many...))
 
-	for _, kind := range []Kind{Organisations, Boards, MostVoted, RecentlyDone} {
-		m := Module{ID: "m", Kind: kind, X: 1, Y: 1, W: 12, H: 2, Body: "hello"}
-		if _, err := Parse(page(m)); err == nil {
-			t.Errorf("%q was allowed to carry words it cannot draw", kind)
-		}
-	}
-
-	// The intro carries words now: it used to draw three fixed sentences and
-	// draws one of the operator's instead.
-	if _, err := Parse(page(Module{ID: "p", Kind: Intro, X: 1, Y: 1, W: 4, H: 1,
-		Body: "Reporting requires no account."})); err != nil {
-		t.Errorf("a point could not carry its own words: %v", err)
-	}
-
-	if _, err := Parse(page(Module{ID: "t", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: "hello"})); err != nil {
-		t.Errorf("a text module could not carry its own words: %v", err)
-	}
-	if _, err := Parse(page(Module{ID: "go", Kind: CallToAction, X: 1, Y: 1, W: 4, H: 1,
-		Scope: "acme/atlas", Body: "Report something"})); err != nil {
-		t.Errorf("a button could not carry its own label: %v", err)
-	}
-
-	// The hero carries its own tagline now: it drew a fixed one, and the
-	// operator writes theirs instead.
-	if _, err := Parse(page(Module{ID: "h", Kind: Hero, X: 1, Y: 1, W: 3, H: 2,
-		Body: "Tell us what broke."})); err != nil {
-		t.Errorf("the hero could not carry its own tagline: %v", err)
-	}
-}
-
-// TestWhereAModuleKeepsItsName.
-//
-// Four places, and the empty value is the top — so a page composed before there
-// was a choice keeps the look it had rather than losing its headings to a zero
-// value nobody wrote.
-func TestWhereAModuleKeepsItsName(t *testing.T) {
-	page := func(m Module) string {
-		out, _ := json.Marshal(Layout{Modules: []Module{m}})
-		return string(out)
-	}
-
-	for _, at := range []LabelAt{"", LabelTop, LabelBottom, LabelPill, LabelOff} {
-		m := Module{ID: "b", Kind: Boards, X: 1, Y: 1, W: 12, H: 3, Label: at}
-		got, err := Parse(page(m))
-		if err != nil {
-			t.Fatalf("%q was refused: %v", at, err)
-		}
-		if got.Modules[0].Label != at {
-			t.Errorf("%q came back as %q", at, got.Modules[0].Label)
-		}
-	}
-
-	// Somewhere that is not one of the four.
-	bad := Module{ID: "b", Kind: Boards, X: 1, Y: 1, W: 12, H: 3, Label: "middle"}
-	if _, err := Parse(page(bad)); err == nil {
-		t.Error("a module was allowed to put its name nowhere")
-	}
-
-	// And a module that draws no name is not asked where to put one: a hero is
-	// its own name, a paragraph has none. Accepting it would store a setting
-	// whose dialog never shows it and nothing ever reads.
-	// Not the hero: it draws a name of its own now, so it is asked where to put
-	// it like everything else that does.
-	for _, kind := range []Kind{Intro, Text, CallToAction} {
-		m := Module{ID: "m", Kind: kind, X: 1, Y: 1, W: 12, H: 2, Label: LabelPill}
-		if kind == Text || kind == CallToAction {
-			m.Body = "hello"
-		}
-		if kind == CallToAction {
-			m.Scope = "acme/atlas"
-		}
-		if _, err := Parse(page(m)); err == nil {
-			t.Errorf("%q was asked where to put a name it does not draw", kind)
-		}
-	}
-}
-
-// TestASectionHoldsModulesInItsOwnGrid.
-//
-// A child's coordinates belong to its section, not to the page. That is what
-// lets a section be dragged somewhere else without rewriting everything inside
-// it, and it is also the thing most likely to be got wrong later: the two kinds
-// of coordinate look identical in the stored layout.
-func TestASectionHoldsModulesInItsOwnGrid(t *testing.T) {
-	page := func(ms ...Module) string {
-		out, _ := json.Marshal(Layout{Modules: ms})
-		return string(out)
-	}
-	section := Module{ID: "group", Kind: Section, X: 1, Y: 1, W: 6, H: 2, Body: "My projects"}
-
-	// A child at the section's own top-left, which in the page's coordinates is
-	// where the section itself begins. Both are 1,1 and both are correct.
-	inside := Module{ID: "a", Kind: Boards, X: 1, Y: 1, W: 3, H: 1, Parent: "group"}
-	if _, err := Parse(page(section, inside)); err != nil {
-		t.Fatalf("a child at its section's first cell was refused: %v", err)
-	}
-
-	// Two children side by side inside a six-wide section. On the page they
-	// would be nowhere near the section's own column six.
-	second := Module{ID: "b", Kind: MostVoted, X: 4, Y: 1, W: 3, H: 1, Parent: "group"}
-	if _, err := Parse(page(section, inside, second)); err != nil {
-		t.Fatalf("two children sharing a section were refused: %v", err)
-	}
-
-	// And a child that would stick out of it.
-	past := Module{ID: "c", Kind: Boards, X: 5, Y: 1, W: 3, H: 1, Parent: "group"}
-	if _, err := Parse(page(section, past)); err == nil {
-		t.Error("a child was allowed to stick out of its section")
-	}
-
-	// Children of one section may not sit on each other.
-	clash := Module{ID: "d", Kind: Boards, X: 2, Y: 1, W: 3, H: 1, Parent: "group"}
-	if _, err := Parse(page(section, inside, clash)); err == nil {
-		t.Error("two children were allowed to share a cell")
-	}
-}
-
-// TestAChildAndAPageModuleAreNotMeasuredAgainstEachOther.
-//
-// The one that would be easy to get wrong in the other direction: a child at
-// 1,1 of its section and a module at 1,1 of the page are not on top of each
-// other, and refusing that pair would refuse almost every page with a section
-// on it.
-func TestAChildAndAPageModuleAreNotMeasuredAgainstEachOther(t *testing.T) {
-	out, _ := json.Marshal(Layout{Modules: []Module{
-		{ID: "top", Kind: Hero, X: 1, Y: 1, W: 12, H: 3},
-		{ID: "group", Kind: Section, X: 1, Y: 4, W: 6, H: 2},
-		{ID: "a", Kind: Boards, X: 1, Y: 1, W: 3, H: 1, Parent: "group"},
+	mustRefuse(t, "gives a band and a module the same id", Page{Bands: []Band{
+		{ID: "x", Columns: One, Cells: [][]Module{{{ID: "x", Kind: Search}}}},
 	}})
-	if _, err := Parse(string(out)); err != nil {
-		t.Errorf("a child was measured against the page: %v", err)
+	mustRefuse(t, "gives two modules in different bands one id", Page{Bands: []Band{
+		{ID: "a", Columns: One, Cells: [][]Module{{{ID: "m", Kind: Search}}}},
+		{ID: "b", Columns: One, Cells: [][]Module{{{ID: "m", Kind: Text}}}},
+	}})
+}
+
+// TestEachFieldBelongsToTheKindsThatReadIt.
+//
+// A field on a kind that ignores it is somebody expecting a page they are not
+// going to get, so it is refused rather than dropped.
+func TestEachFieldBelongsToTheKindsThatReadIt(t *testing.T) {
+	cases := map[string]Module{
+		"words on a search":               {ID: "m", Kind: Search, Body: "<p>x</p>"},
+		"a tone on a heading":             {ID: "m", Kind: Heading, Tone: ToneNote},
+		"a title on a text":               {ID: "m", Kind: Text, Title: "x"},
+		"a search on a text":              {ID: "m", Kind: Text, WithSearch: true},
+		"rows on a roadmap":               {ID: "m", Kind: Roadmap, Rows: 3},
+		"a choice of reports on a boards": {ID: "m", Kind: Boards, Show: ShowLatest},
+		"a display on reports":            {ID: "m", Kind: Reports, Display: DisplayList},
+		"links on a text":                 {ID: "m", Kind: Text, Links: []Link{{Label: "x", To: ToURL, URL: "https://x.dev"}}},
+		"a picture on a text":             {ID: "m", Kind: Text, Image: ImagePrefix + strings.Repeat("a", 32) + ".webp", Alt: "x"},
+		"a name on a text":                {ID: "m", Kind: Text, Name: "x"},
+		"a name on a heading":             {ID: "m", Kind: Heading, HideName: true},
+		"a scope on a text":               {ID: "m", Kind: Text, Scope: "acme"},
+	}
+	for why, m := range cases {
+		mustRefuse(t, "puts "+why, page(m))
 	}
 }
 
-// TestASectionDoesNotGoInsideASection.
-//
-// Two levels is a layout somebody arranged; three is a layout nobody can drag,
-// and every rule about coordinates would need a third set.
-func TestASectionDoesNotGoInsideASection(t *testing.T) {
-	out, _ := json.Marshal(Layout{Modules: []Module{
-		{ID: "outer", Kind: Section, X: 1, Y: 1, W: 8, H: 4},
-		{ID: "inner", Kind: Section, X: 1, Y: 1, W: 2, H: 1, Parent: "outer"},
-	}})
-	if _, err := Parse(string(out)); err == nil {
-		t.Error("a section was nested inside another")
+// TestTheClosedChoicesOfAModule.
+func TestTheClosedChoicesOfAModule(t *testing.T) {
+	mustRefuse(t, "frames a module with a style of its own", page(Module{ID: "m", Kind: Text, Style: "glass"}))
+	mustRefuse(t, "gives a text a tone of its own", page(Module{ID: "m", Kind: Text, Tone: "shout"}))
+	mustRefuse(t, "shows a list of its own invention", page(Module{ID: "m", Kind: Reports, Show: "trending"}))
+	mustRefuse(t, "draws boards as a grid of its own", page(Module{ID: "m", Kind: Boards, Display: "masonry"}))
+	mustRefuse(t, "aligns a heading right", page(Module{ID: "m", Kind: Heading, Align: "right"}))
+	mustRefuse(t, "asks for more rows than the bound", page(Module{ID: "m", Kind: Reports, Rows: maxRows + 1}))
+	for _, show := range []string{"", ShowMostVoted, ShowRecentlyDone, ShowLatest, ShowPlanned} {
+		mustAccept(t, "shows "+show, page(Module{ID: "m", Kind: Reports, Show: show}))
 	}
 }
 
-// TestAModuleInsideSomethingThatIsNotThere.
-//
-// A parent that was deleted, or a section that never existed. Refused rather
-// than drawn on the page at coordinates belonging to a grid that is not there.
-func TestAModuleInsideSomethingThatIsNotThere(t *testing.T) {
-	gone, _ := json.Marshal(Layout{Modules: []Module{
-		{ID: "a", Kind: Boards, X: 1, Y: 1, W: 2, H: 1, Parent: "group"},
-	}})
-	_, err := Parse(string(gone))
-	if err == nil {
-		t.Fatal("a module was allowed inside a section that is not on the page")
+// TestAScopeIsAnOrganisationOrABoard.
+func TestAScopeIsAnOrganisationOrABoard(t *testing.T) {
+	mustAccept(t, "points at an organisation", page(Module{ID: "m", Kind: Boards, Scope: "acme"}))
+	mustAccept(t, "points at a board", page(Module{ID: "m", Kind: Reports, Scope: "acme/atlas"}))
+	for _, bad := range []string{"Acme", "acme/", "/atlas", "acme/atlas/x", "acme atlas", "../x"} {
+		mustRefuse(t, "points at "+bad, page(Module{ID: "m", Kind: Boards, Scope: bad}))
 	}
-	// And it has to SAY that, which is the whole of this guard: a missing
-	// parent measures nothing by nothing, so the bounds check refuses it too —
-	// with "sticks out of the section holding it", about a section that is not
-	// there. Removing the guard leaves the layout refused and the operator
-	// looking for a box that does not exist.
-	if !strings.Contains(err.Error(), "not on this page") {
-		t.Errorf("a missing section was reported as %q", err)
-	}
-
-	notASection, _ := json.Marshal(Layout{Modules: []Module{
-		{ID: "words", Kind: Text, X: 1, Y: 1, W: 12, H: 2, Body: "hello"},
-		{ID: "a", Kind: Boards, X: 1, Y: 1, W: 2, H: 1, Parent: "words"},
-	}})
-	if _, err := Parse(string(notASection)); err == nil {
-		t.Error("a module was allowed inside something that is not a section")
+	if !(Module{Scope: "acme/atlas"}).ShowsOne() || (Module{Scope: "acme"}).ShowsOne() {
+		t.Error("ShowsOne does not tell one board from a set")
 	}
 }
 
-// TestAModuleMayBeOneColumnWide.
+// TestALinkGoesSomewhereItCanGo.
 //
-// The dashboard's own items go down to a single cell, and a module here can be
-// one board, one organisation or one button — all of which are cards, and a
-// card is what a single column holds. How small is useful is the operator's
-// judgement; this only says the grid will draw it.
-func TestAModuleMayBeOneColumnWide(t *testing.T) {
-	out, _ := json.Marshal(Layout{Modules: []Module{
-		{ID: "one", Kind: Boards, X: 1, Y: 1, W: 1, H: 1, Scope: "acme/atlas"},
-		{ID: "two", Kind: Boards, X: 2, Y: 1, W: 1, H: 1, Scope: "acme/web"},
-	}})
-	if _, err := Parse(string(out)); err != nil {
-		t.Errorf("two single-column modules side by side were refused: %v", err)
+// Anything that reaches an href on a public page is refused unless it is an
+// absolute http or https address or one board of this installation: a
+// javascript: or data: link is how a link becomes a script.
+func TestALinkGoesSomewhereItCanGo(t *testing.T) {
+	link := func(l Link) Page { return page(Module{ID: "m", Kind: Links, Links: []Link{l}}) }
+
+	mustAccept(t, "links to an https address", link(Link{Label: "x", To: ToURL, URL: "https://example.com/a?b=c"}))
+	mustAccept(t, "links to an http address", link(Link{Label: "x", To: ToURL, URL: "http://intranet.local"}))
+	mustAccept(t, "links to a board's form", link(Link{Label: "x", To: ToForm, Scope: "acme/atlas", Button: true}))
+	mustAccept(t, "links to a board's roadmap", link(Link{Label: "x", To: ToRoadmap, Scope: "acme/atlas"}))
+
+	for _, bad := range []string{
+		"javascript:alert(1)", "JavaScript:alert(1)", "data:text/html,<script>", "/relative",
+		"//example.com", "example.com", "ftp://example.com", "https://", "",
+	} {
+		mustRefuse(t, "links to "+bad, link(Link{Label: "x", To: ToURL, URL: bad}))
 	}
+	mustRefuse(t, "links a form to an organisation", link(Link{Label: "x", To: ToForm, Scope: "acme"}))
+	mustRefuse(t, "links a board and an address at once", link(Link{Label: "x", To: ToBoard, Scope: "acme/atlas", URL: "https://x.dev"}))
+	mustRefuse(t, "links somewhere of its own invention", link(Link{Label: "x", To: "mailto", URL: "mailto:a@b.c"}))
+	mustRefuse(t, "has a link with no label", link(Link{Label: " ", To: ToURL, URL: "https://x.dev"}))
+
+	var many []Link
+	for i := 0; i <= maxLinks; i++ {
+		many = append(many, Link{Label: "x", To: ToURL, URL: "https://x.dev"})
+	}
+	mustRefuse(t, "has more links than the bound", page(Module{ID: "m", Kind: Links, Links: many}))
+	// The footer is held to the same rules.
+	mustRefuse(t, "puts a script in the footer", Page{Bands: page().Bands,
+		Settings: Settings{Footer: []Link{{Label: "x", To: ToURL, URL: "javascript:alert(1)"}}}})
 }
 
-// TestAPageWrittenWithPointsStillOpens.
+// TestAPictureNeedsItsWords.
 //
-// Intro was a paragraph with a mark beside it and Text was a paragraph. They
-// said the same thing in two shapes, so there is one now — and every page
-// composed before that is full of the value that no longer exists, including
-// the page every installation starts with.
-//
-// A saved layout is somebody's front page. Reading one back as an error, or as
-// a module that draws nothing, is the version of this change that loses
-// people's work.
-func TestAPageWrittenWithPointsStillOpens(t *testing.T) {
-	out, _ := json.Marshal(Layout{Modules: []Module{
-		{ID: "p", Kind: Intro, X: 1, Y: 1, W: 4, H: 1, Body: "Reporting needs no account."},
-	}})
-	layout, err := Parse(string(out))
-	if err != nil {
-		t.Fatalf("a page written with points was refused: %v", err)
-	}
-	if got := layout.Modules[0].Kind; got != Text {
-		t.Errorf("a point came back as %q rather than as the block that replaced it", got)
-	}
-	if !strings.Contains(layout.Modules[0].Body, "Reporting needs no account.") {
-		t.Errorf("the words written into it were lost: %q", layout.Modules[0].Body)
-	}
+// An image module may be placed empty — that is where the editor asks for one —
+// but a picture without a description is a hole in the page for somebody who
+// cannot see it.
+func TestAPictureNeedsItsWords(t *testing.T) {
+	name := ImagePrefix + strings.Repeat("a1", 16) + ".webp"
+	mustAccept(t, "places an empty image", page(Module{ID: "m", Kind: Picture}))
+	mustAccept(t, "has a described picture", page(Module{ID: "m", Kind: Picture, Image: name, Alt: "The dashboard"}))
+	mustRefuse(t, "has a picture with no description", page(Module{ID: "m", Kind: Picture, Image: name}))
+	mustRefuse(t, "names a picture that is not a stored one", page(Module{ID: "m", Kind: Picture, Image: "../../etc/passwd", Alt: "x"}))
+	mustRefuse(t, "shares the page with a picture that is not a stored one",
+		Page{Bands: page().Bands, Settings: Settings{ShareImage: "https://elsewhere/x.png"}})
+}
+
+// TestThePagesOwnWordsAreBounded, in characters.
+func TestThePagesOwnWordsAreBounded(t *testing.T) {
+	mustRefuse(t, "has a title past the bound", Page{Bands: page().Bands, Settings: Settings{Title: strings.Repeat("ぜ", maxTitle+1)}})
+	mustAccept(t, "has a title at the bound in Japanese", Page{Bands: page().Bands, Settings: Settings{Title: strings.Repeat("ぜ", maxTitle)}})
+	mustRefuse(t, "has a description past the bound", Page{Bands: page().Bands, Settings: Settings{Description: strings.Repeat("x", maxDesc+1)}})
+	mustRefuse(t, "has a heading title past the bound", page(Module{ID: "m", Kind: Heading, Title: strings.Repeat("x", maxTitle+1)}))
 }
 
 // TestTheWordsOnThePageAreCleanedComingAndGoing.
 //
-// The policy is tested on its own in clean_test.go. This is the other half of
-// it, and the half that has been got wrong before in this repository: a step
-// that one caller can skip is a step that gets skipped. Both doors — what a
-// browser submits and what the database already holds — have to run it, so a
-// page saved under a looser policy stops serving that markup the moment the
-// installation updates.
+// Both ways in, because neither what a browser sent nor what an earlier
+// version stored is a reason to put unchecked markup on a public page.
 func TestTheWordsOnThePageAreCleanedComingAndGoing(t *testing.T) {
-	dirty, _ := json.Marshal(Layout{Modules: []Module{
-		{ID: "w", Kind: Text, X: 1, Y: 1, W: 4, H: 2,
-			Body: `<p onclick="alert(1)">Hello</p><script>alert(2)</script>`},
-	}})
+	dirty := `{"bands":[{"id":"b","columns":"1","cells":[[{"id":"t","kind":"text","body":"<p>hi</p><script>alert(1)</script>"}]]}]}`
 
-	fromStore, err := Parse(string(dirty))
+	submitted, err := Submitted(strings.NewReader(dirty))
 	if err != nil {
 		t.Fatal(err)
 	}
-	fromBrowser, err := Submitted(strings.NewReader(string(dirty)))
+	if body := submitted.Modules()[0].Body; strings.Contains(body, "script") {
+		t.Errorf("a submitted page kept a script: %q", body)
+	}
+	parsed, err := Parse(dirty)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	for door, layout := range map[string]Layout{"read back": fromStore, "submitted": fromBrowser} {
-		body := layout.Modules[0].Body
-		if strings.Contains(body, "onclick") || strings.Contains(body, "script") {
-			t.Errorf("%s: the markup reached the page uncleaned: %s", door, body)
-		}
-		if !strings.Contains(body, "Hello") {
-			t.Errorf("%s: cleaning took the words with it: %s", door, body)
-		}
+	if body := parsed.Modules()[0].Body; strings.Contains(body, "script") || !strings.Contains(body, "hi") {
+		t.Errorf("a stored page kept a script or lost its words: %q", body)
 	}
 }
 
-// TestABorderIsAColourAndAWidthOrNothing.
+// TestAPageOfWordsNeedsNothingFromTheDatabase.
 //
-// The value reaches a stylesheet rule, so anything that is not exactly a colour
-// is refused rather than escaped and hoped about — the same rule the accent
-// already has. Empty and zero are the theme deciding, which is what every
-// module looks like until somebody says otherwise.
-func TestABorderIsAColourAndAWidthOrNothing(t *testing.T) {
-	page := func(colour string, width int) string {
-		out, _ := json.Marshal(Layout{Modules: []Module{
-			{ID: "b", Kind: Boards, X: 1, Y: 1, W: 6, H: 3,
-				BorderColor: colour, BorderWidth: width},
-		}})
-		return string(out)
+// A page of headings, words, links and pictures shown to a stranger reads
+// neither the board table nor the item table.
+func TestAPageOfWordsNeedsNothingFromTheDatabase(t *testing.T) {
+	words := page(
+		Module{ID: "h", Kind: Heading, WithSearch: true},
+		Module{ID: "t", Kind: Text},
+		Module{ID: "l", Kind: Links},
+		Module{ID: "i", Kind: Picture},
+		Module{ID: "s", Kind: Search},
+	)
+	if words.NeedsData() {
+		t.Error("a page of words says it needs the database")
 	}
-
-	if _, err := Parse(page("", 0)); err != nil {
-		t.Errorf("a module with no border of its own was refused: %v", err)
-	}
-	for _, colour := range Colours {
-		if _, err := Parse(page(colour, 2)); err != nil {
-			t.Errorf("%s was refused: %v", colour, err)
+	for _, k := range []Kind{Boards, Reports, Roadmap, Statistics} {
+		if !page(Module{ID: "m", Kind: k}).NeedsData() {
+			t.Errorf("a page with %s says it needs nothing", k)
 		}
 	}
-	for name, bad := range map[string]string{
-		"a name":        "red",
-		"half a colour": "#abc",
-		"a rule":        "#000000; content: url(x)",
-	} {
-		if _, err := Parse(page(bad, 1)); err == nil {
-			t.Errorf("%s was accepted as a border colour", name)
-		}
-	}
-	for _, width := range []int{-1, 4} {
-		if _, err := Parse(page("#3b82f6", width)); err == nil {
-			t.Errorf("a border %d wide was accepted", width)
-		}
+	if !Default().NeedsData() {
+		t.Error("the default page shows boards and reports and says it needs nothing")
 	}
 }
 
-// TestHowManyRowsAModuleShows.
-//
-// An operator who gives a module two rows of height does not want eight things
-// in it. Bounded to what the reader will actually return, written once here so
-// the dialog cannot offer a number that would quietly be cut.
-func TestHowManyRowsAModuleShows(t *testing.T) {
-	page := func(kind Kind, rows int) string {
-		out, _ := json.Marshal(Layout{Modules: []Module{
-			{ID: "m", Kind: kind, X: 1, Y: 1, W: 3, H: 2, Rows: rows},
-		}})
-		return string(out)
+// TestEveryPictureAPageUsesIsFound, which is what keeps the sweep from
+// deleting one that is still on the screen.
+func TestEveryPictureAPageUsesIsFound(t *testing.T) {
+	inWords := strings.Repeat("1", 32)
+	asModule := strings.Repeat("2", 32)
+	shared := strings.Repeat("3", 32)
+	p := Page{
+		Bands: []Band{{ID: "b", Columns: Halves, Cells: [][]Module{
+			{{ID: "t", Kind: Text, Body: `<p><img src="/api/landing/images/` + inWords + `" alt=""></p>`}},
+			{{ID: "i", Kind: Picture, Image: ImagePrefix + asModule + ".webp", Alt: "x"}},
+		}}},
+		Settings: Settings{ShareImage: ImagePrefix + shared + ".webp"},
 	}
-
-	if _, err := Parse(page(MostVoted, 0)); err != nil {
-		t.Errorf("a module that never said was refused: %v", err)
-	}
-	if _, err := Parse(page(MostVoted, maxRows)); err != nil {
-		t.Errorf("%d rows was refused: %v", maxRows, err)
-	}
-	for _, rows := range []int{-1, maxRows + 1} {
-		if _, err := Parse(page(MostVoted, rows)); err == nil {
-			t.Errorf("%d rows was accepted", rows)
+	found := strings.Join(p.imageIDs(), " ")
+	for _, id := range []string{inWords, asModule, shared} {
+		if !strings.Contains(found, id) {
+			t.Errorf("the picture %s is on the page and was not found: %s", id[:4], found)
 		}
-	}
-	// And a module that lists nothing is not asked how many to list.
-	if _, err := Parse(page(Hero, 4)); err == nil {
-		t.Error("a module that lists nothing was given a number of rows")
 	}
 }
