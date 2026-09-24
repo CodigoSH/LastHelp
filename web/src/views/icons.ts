@@ -41,6 +41,9 @@ function doneIcon(size = 18): string {
 
 export const icons = {
   dots: dotsIcon,
+  /** Six dots in two columns: the handle something is dragged by. */
+  grip: (size = 16) =>
+    `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true" focusable="false"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>`,
   done: doneIcon,
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
   minus: (s?: number) => stroke(`<path d="M5 12h14"/>`, s),

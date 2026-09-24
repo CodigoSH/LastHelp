@@ -29,6 +29,7 @@ import { watchSelects } from "./services/select";
 import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
 import * as landingViews from "./views/landing";
+import { LandingEditor } from "./landingEditor";
 import { icons } from "./views/icons";
 
 const text: views.Text = {
@@ -75,6 +76,9 @@ function go(path: string): void {
 }
 
 document.addEventListener("click", (event) => {
+  // A link something else already answered — the front page editor keeps the
+  // links on the page it is editing from going anywhere.
+  if (event.defaultPrevented) return;
   const link = (event.target as HTMLElement | null)?.closest?.("a");
   if (!link) return;
   const href = link.getAttribute("href");
@@ -139,9 +143,9 @@ function renderNav(): void {
                      aria-label="${escapeAttr(i18n.t("landing.add"))}"
                      aria-haspopup="menu" aria-expanded="false">${icons.add(16)}</button>
              <div class="add-menu" role="menu" hidden>
-               <button type="button" class="add-menu-item" role="menuitem" data-open-modal="module-picker">
+               <button type="button" class="add-menu-item" role="menuitem" data-editor-add="module">
                  ${icons.module(14)}<span>${escapeHTML(i18n.t("landing.addModule"))}</span></button>
-               <button type="button" class="add-menu-item" role="menuitem" data-add-section>
+               <button type="button" class="add-menu-item" role="menuitem" data-editor-add="section">
                  ${icons.section(14)}<span>${escapeHTML(i18n.t("landing.addSection"))}</span></button>
              </div>
            </div>
@@ -239,6 +243,33 @@ function renderNav(): void {
       <div class="nav-right">${account}</div>
     </div>`;
 
+  nav.querySelector<HTMLButtonElement>("[data-edit-page]")?.addEventListener("click", () => void startEditing());
+  nav.querySelector<HTMLButtonElement>("[data-edit-done]")?.addEventListener("click", () => void stopEditing());
+  const adder = nav.querySelector<HTMLButtonElement>("[data-add-menu]");
+  const menu = nav.querySelector<HTMLElement>(".add-menu");
+  adder?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!menu) return;
+    menu.hidden = !menu.hidden;
+    adder.setAttribute("aria-expanded", String(!menu.hidden));
+    if (!menu.hidden) {
+      document.addEventListener(
+        "click",
+        () => {
+          menu.hidden = true;
+          adder.setAttribute("aria-expanded", "false");
+        },
+        { once: true },
+      );
+    }
+  });
+  nav.querySelectorAll<HTMLButtonElement>("[data-editor-add]").forEach((item) =>
+    item.addEventListener("click", () => {
+      if (menu) menu.hidden = true;
+      editor?.addFromBar(item.dataset.editorAdd === "section" ? "section" : "module");
+    }),
+  );
+
   nav.querySelector<HTMLButtonElement>("[data-signout]")?.addEventListener("click", async () => {
     await api.del("/api/session").catch(() => undefined);
     me = null;
@@ -255,6 +286,47 @@ function renderNav(): void {
 let landing: landingViews.LandingPage = { bands: [], settings: {} };
 let landingContent: landingViews.LandingContent = {};
 let landingEditing = false;
+let editor: LandingEditor | null = null;
+
+/** Opens the editor on the front page, over the draft if there is one. */
+async function startEditing(): Promise<void> {
+  if (editor || !root) return;
+  landingEditing = true;
+  document.body.classList.remove("admin-view");
+  editor = new LandingEditor({
+    root,
+    text,
+    instance: () => ({ name: instanceName, logo: instanceLogo }),
+    report,
+    toast: (message) => toast(message),
+    toastError,
+    renderNav,
+  });
+  try {
+    await editor.start();
+  } catch (err) {
+    editor = null;
+    landingEditing = false;
+    report(err);
+    await fetchLanding();
+    drawLanding();
+  }
+}
+
+/**
+ * Leaves the editor. What was typed last is saved first; the page shown is the
+ * published one, because that is what leaving the editor means — the draft is
+ * still there next time, and the bar said so.
+ */
+async function stopEditing(redraw = true): Promise<void> {
+  const leaving = editor;
+  editor = null;
+  landingEditing = false;
+  await leaving?.stop();
+  if (!redraw) return;
+  await fetchLanding();
+  drawLanding();
+}
 
 /**
  * What this installation's front page is, and what goes in it.
@@ -1033,6 +1105,12 @@ async function render(): Promise<void> {
   await loadInstance();
 
   const path = location.pathname.replace(/\/+$/, "") || "/";
+  // The editor is a mode of the front page: staying there keeps it, going
+  // anywhere else saves and leaves it.
+  if (editor) {
+    if (path === "/") return;
+    await stopEditing(false);
+  }
   // Where the review screen was opened from, which is where leaving it goes:
   // the bar's icon, the close button and Escape all take you back rather than
   // to a fixed page, the way closing Lastboard's status page leaves you on the

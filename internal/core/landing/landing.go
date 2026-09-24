@@ -253,8 +253,12 @@ type Band struct {
 	Columns Columns    `json:"columns"`
 	Cells   [][]Module `json:"cells"`
 
-	// Name is drawn as a pill on the band, and empty draws none.
-	Name string `json:"name,omitempty"`
+	// Name is drawn as a pill on the band, and empty draws none — except on
+	// the bands of the default page, whose names come from the visitor's
+	// language. HideName is how one of those loses its pill: an empty name
+	// there already means "the default one".
+	Name     string `json:"name,omitempty"`
+	HideName bool   `json:"hide_name,omitempty"`
 
 	Background string `json:"background,omitempty"`
 	Width      string `json:"width,omitempty"`

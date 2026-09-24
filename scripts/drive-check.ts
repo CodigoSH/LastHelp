@@ -1082,20 +1082,20 @@ async function main() {
   // is the installation — its name and its mark — rather than the name of the
   // software running it, which is on the About screen where an operator looks
   // for it.
-  await goTo("/", ".landing-grid");
+  await goTo("/", ".lp");
   const front = await evaluate(`
-    const hero = document.querySelector('[data-module^="hero"] .words-box');
-    const mark = hero?.querySelector("img");
+    const mark = document.querySelector(".lp-heading .lp-logo :is(img, svg)");
     return {
-      title: hero?.querySelector("h1")?.textContent?.trim() ?? "",
+      title: document.querySelector(".lp-heading h1")?.textContent?.trim() ?? "",
       mark: mark ? Math.round(mark.getBoundingClientRect().width) : 0,
-      points: document.querySelectorAll(".points > li").length,
-      boards: document.querySelectorAll(".cards .card").length,
+      points: document.querySelectorAll(".words.point").length,
+      boards: document.querySelectorAll(".lp-card").length,
+      search: !!document.querySelector(".lp-heading .lp-search input"),
     };
   `);
   check(
     "the front page announces the installation, not the software",
-    front.title === "CodigoSH" && front.mark > 30 && front.points === 3 && front.boards === 1,
+    front.title === "CodigoSH" && front.mark > 30 && front.points === 3 && front.boards === 1 && front.search === true,
     JSON.stringify(front),
   );
 
@@ -1374,609 +1374,364 @@ async function main() {
     JSON.stringify(rewritten),
   );
 
-  // The front page, composed. Two halves: the default is the page everybody
-  // already had — proved elsewhere by comparing the pixels — and composing it
-  // actually changes what a visitor sees. Without the second half this is a
-  // setting that saves and does nothing.
-  // The front page, arranged on the front page. Not by calling the API: the
-  // whole point of this is that somebody does it with the page in front of
+  // The front page, edited on the front page. Not by calling the API: the
+  // point of the editor is that somebody does it with the page in front of
   // them, and an editor tested through fetch is an editor nobody has used.
-  await goTo("/", ".landing-grid");
-  const composing = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 600));
-
-    const outlined = getComputedStyle(document.querySelector(".landing-cell")).borderStyle;
-    const kebabs = document.querySelectorAll(".kebab-btn").length;
-
-    // Add words, and the module opens its own dialog the moment it exists.
-    document.querySelector("[data-add-menu]").click();
-    await new Promise(r => setTimeout(r, 200));
-    document.querySelector('[data-open-modal="module-picker"]').click();
-    await new Promise(r => setTimeout(r, 400));
-    document.querySelector('[data-pick="text"]').click();
-    await new Promise(r => setTimeout(r, 900));
-    const opened = document.querySelector("#module-config")?.open === true;
-
-    document.querySelector("#module-config [data-close]")?.click();
-    await new Promise(r => setTimeout(r, 400));
-
-    // And the words go in on the page, which is the whole point of the change:
-    // the dialog has no field for them any more.
-    const caja = [...document.querySelectorAll("[data-words-body]")].at(-1);
-    caja.focus();
-    caja.innerHTML = "<p>We read everything that arrives.</p>";
-    caja.dispatchEvent(new Event("input", { bubbles: true }));
-    await new Promise(r => setTimeout(r, 1200));
-    const escrito = caja.textContent.trim();
-
-    document.querySelector("[data-edit-done]")?.click();
-    await new Promise(r => setTimeout(r, 600));
-    return { outlined, kebabs, opened, escrito };
-  `);
-  check(
-    "the front page is arranged on the front page",
-    composing.outlined === "dashed" && composing.kebabs >= 3 && composing.opened === true &&
-      composing.escrito === "We read everything that arrives.",
-    JSON.stringify(composing),
-  );
-
-  await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 600));
-  `);
-  // The ghost, which is the whole of the feedback while something is being
-  // carried: green where it would land, red where it would sit on top of
-  // another module. Driven with real drag events rather than by calling the
-  // handler, because what is being checked is that the page answers a gesture.
-  const carried = await evaluate(`
-    const grid = document.querySelector(".landing-grid.editing");
-    const first = grid.querySelector(".landing-cell");
-    const box = first.getBoundingClientRect();
-    const gridBox = grid.getBoundingClientRect();
-
-    const dt = new DataTransfer();
-    first.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt,
-      clientX: box.left + 10, clientY: box.top + 10 }));
-
-    // Somewhere empty, well below everything that is placed.
-    grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt,
-      clientX: gridBox.left + 10, clientY: gridBox.top + 1400 }));
-    await new Promise(r => setTimeout(r, 120));
-    const ghost = document.querySelector(".landing-ghost");
-    const ghostBox = ghost.getBoundingClientRect();
-    const free = { shown: !ghost.hidden, invalid: ghost.classList.contains("invalid"),
-                   border: getComputedStyle(ghost).borderTopColor,
-                   // The ghost stands for the module being carried, so it has to
-                   // be that module's size. Reading only its colour let it pass
-                   // while it drew as a four-pixel line: an empty grid item with
-                   // align-items:start above it sizes to the nothing it holds.
-                   alto: Math.round(ghostBox.height), ancho: Math.round(ghostBox.width) };
-    // Measured at the same instant as the ghost, not at the instant the drag
-    // started: a scrollbar arriving between the two made the two boxes differ
-    // by fifteen pixels and the check call it a fault.
-    const ahora = first.getBoundingClientRect();
-    const llevado = { alto: Math.round(ahora.height), ancho: Math.round(ahora.width) };
-
-    // And on top of another module, which is a no.
-    const other = grid.querySelectorAll(".landing-cell")[1];
-    const otherBox = other.getBoundingClientRect();
-    grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt,
-      clientX: otherBox.left + 12, clientY: otherBox.top + 12 }));
-    await new Promise(r => setTimeout(r, 120));
-    const taken = { invalid: ghost.classList.contains("invalid"),
-                    border: getComputedStyle(ghost).borderTopColor };
-
-    first.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
-    return { free, llevado, taken, hiddenAfter: ghost.hidden };
-  `);
-  check(
-    "what is being carried shows where it would land, and where it would not",
-    carried.free.shown === true && carried.free.invalid === false &&
-      carried.free.border === "rgb(0, 255, 0)" &&
-      carried.free.alto === carried.llevado.alto &&
-      carried.free.ancho === carried.llevado.ancho &&
-      carried.taken.invalid === true && carried.taken.border === "rgb(255, 0, 0)" &&
-      carried.hiddenAfter === true,
-    JSON.stringify(carried),
-  );
-
-  // And where it actually lands, down the page. Colour alone never saw this:
-  // the vertical arithmetic divided by the column width, so a module dropped
-  // one row lower landed several rows lower. Rows are 100px, columns are about
-  // 45, and the two axes needed their own divisor.
-  const dropped = await evaluate(`
-    const grid = document.querySelector(".landing-grid.editing");
-    const before = await fetch("/api/landing").then(r => r.json());
-    const was = before.modules.slice().sort((a, b) => (b.y + b.h) - (a.y + a.h))[0];
-    const cellEl = grid.querySelector('[data-module="' + was.id + '"]');
-    const box = cellEl.getBoundingClientRect();
-    const dt = new DataTransfer();
-
-    cellEl.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt,
-      clientX: box.left + 10, clientY: box.top + 10 }));
-    // Exactly one row further down: one row plus one gap. A row is as tall as a
-    // column is wide — the cells are square, which is what lets the drag use one
-    // divisor for both axes — so the step is measured, never written down.
-    const gridBox = grid.getBoundingClientRect();
-    const fila = (gridBox.width - 11 * 16) / 12;
-    // One row down and a third of a row into it. Landing on the exact boundary
-    // put the pointer at 8.0000 cells and let floating point pick the row: the
-    // same gesture read as row eight or row nine depending on the numbers. A
-    // hand never aims at the seam, and neither should this.
-    const lower = { clientX: box.left + 10, clientY: box.top + 10 + fila + 16 + fila / 3 };
-    grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt, ...lower }));
-    await new Promise(r => setTimeout(r, 60));
-    const fantasma = getComputedStyle(document.querySelector(".landing-ghost")).gridRow;
-    const arriba = Math.round(box.top - grid.getBoundingClientRect().top);
-    grid.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, ...lower }));
-    await new Promise(r => setTimeout(r, 500));
-    cellEl.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
-
-    const after = await fetch("/api/landing").then(r => r.json());
-    const now = after.modules.find(m => m.id === was.id);
-    return { id: was.id, antes: was.y, esperado: was.y + 1, ahora: now.y,
-             fantasma, ocupado: after.modules.map(m => m.id + "@" + m.y + "+" + m.h).join(" ") };
-  `);
-  check(
-    "a module dropped one row lower is one row lower",
-    dropped.ahora === dropped.esperado,
-    JSON.stringify(dropped),
-  );
-
-  // Dragging the bottom-right corner, the way Lastboard does it. This one goes
-  // all the way to the stored layout: a corner that only moves a ghost and
-  // forgets on reload would pass any check that stopped at the screen.
-  const corner = await evaluate(`
-    const grid = document.querySelector(".landing-grid.editing");
-    const before = await fetch("/api/landing").then(r => r.json());
-    // The bottom-most module, because growing downwards into an occupied cell is
-    // refused — correctly. Picking the top one measured the refusal, not the
-    // corner, and the layout came back unchanged for the right reason.
-    const was = before.modules.slice().sort((a, b) => (b.y + b.h) - (a.y + a.h))[0];
-    const id = was.id;
-    const cellEl = grid.querySelector('[data-module="' + id + '"]');
-
-    const handle = cellEl.querySelector("[data-resize]");
-    const box = cellEl.getBoundingClientRect();
-    const gridBox = grid.getBoundingClientRect();
-    const colWidth = (gridBox.width - 11 * 16) / 12;
-    const fila = colWidth;
-    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
-
-    handle.dispatchEvent(new PointerEvent("pointerdown", { ...opts,
-      clientX: box.right, clientY: box.bottom }));
-    // Exactly one cell shorter and one row taller: a module that spans the whole
-    // grid cannot grow sideways, so shrinking is the move that proves the axis.
-    window.dispatchEvent(new PointerEvent("pointermove", { ...opts,
-      clientX: box.right - (colWidth + 16), clientY: box.bottom + (fila + 16) }));
-    await new Promise(r => setTimeout(r, 120));
-    const ghost = document.querySelector(".landing-ghost");
-    const ghostBox = ghost.getBoundingClientRect();
-    const mientras = { alto: Math.round(ghostBox.height), visible: !ghost.hidden };
-    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
-      clientX: box.right - (colWidth + 16), clientY: box.bottom + (fila + 16) }));
-    await new Promise(r => setTimeout(r, 400));
-
-    const after = await fetch("/api/landing").then(r => r.json());
-    const now = after.modules.find(m => m.id === id);
-    return { id, antes: { w: was.w, h: was.h }, ahora: { w: now.w, h: now.h },
-             mientras, altoEsperado: Math.round((was.h + 1) * fila + was.h * 16) };
-  `);
-  check(
-    "a module is resized from its bottom-right corner, and stays resized",
-    corner.ahora.w === corner.antes.w - 1 && corner.ahora.h === corner.antes.h + 1 &&
-      corner.mientras.visible === true && corner.mientras.alto === corner.altoEsperado,
-    JSON.stringify(corner),
-  );
-
-  // The two modules that draw out of the database. Added the way an operator
-  // adds them — the picker and the button, not the API — because what is being
-  // checked is that somebody can compose this page, not that the server can
-  // store it.
-  const conDatos = await evaluate(`
-    // What the dialog offered, captured while it is open. Read afterwards it is
-    // always closed and always hidden: submitting redraws the page, and the
-    // dialog comes back in its initial state.
-    let opciones = [];
-    let ofrecido = false;
-    const add = async (kind) => {
-      document.querySelector("[data-add-menu]").click();
-      await new Promise(r => setTimeout(r, 200));
-      document.querySelector('[data-open-modal="module-picker"]').click();
-      await new Promise(r => setTimeout(r, 400));
-      document.querySelector('[data-pick="' + kind + '"]').click();
-      await new Promise(r => setTimeout(r, 1100));
-      opciones = [...document.querySelectorAll("#module-scope option")].map(o => o.value);
-      ofrecido = !document.querySelector("[data-for-scope]").hidden;
-      // Each one opens its own dialog. Closed without changing anything: the
-      // default is every board, which is what this checks first.
-      document.querySelector("#module-config")?.close();
-      await new Promise(r => setTimeout(r, 300));
-    };
-    await add("boards");
-    await add("most_voted");
-    await add("recently_done");
-
-    // The button, with a label typed into its dialog rather than left default:
-    // what is being checked is that the words reach the button, not that a
-    // fallback exists.
-    document.querySelector("[data-add-menu]").click();
-    await new Promise(r => setTimeout(r, 200));
-    document.querySelector('[data-open-modal="module-picker"]').click();
-    await new Promise(r => setTimeout(r, 400));
-    document.querySelector('[data-pick="call_to_action"]').click();
-    await new Promise(r => setTimeout(r, 1100));
-    const etiquetaOfrecida = !document.querySelector("[data-for-label]").hidden;
-    const form = document.querySelector("form.module-config");
-    form.querySelector("[name=label]").value = "Tell us what broke";
-    form.requestSubmit();
-    await new Promise(r => setTimeout(r, 1100));
-
-    document.querySelector("[data-edit-done]")?.click();
-    await new Promise(r => setTimeout(r, 800));
-
-    const tableros = [...document.querySelectorAll(".landing-cell .cards .card")]
-      .map(a => a.getAttribute("href"));
-    const votadas = [...document.querySelectorAll(".landing-cell .briefs .brief")]
-      .map(a => ({ titulo: a.querySelector(".brief-title")?.textContent?.trim() ?? "",
-                   href: a.getAttribute("href"),
-                   votos: a.querySelector(".count")?.textContent?.trim() ?? "" }));
-    const boton = document.querySelector(".landing-action a");
-    const hechas = document.querySelector('.landing-cell[data-module^="recently_done-"]');
-    return { opciones, ofrecido, tableros, votadas, etiquetaOfrecida,
-             boton: boton ? { href: boton.getAttribute("href"),
-                              palabras: boton.textContent.trim() } : null,
-             sinHechas: !!hechas?.querySelector(".empty"),
-             hechasRotas: hechas ? hechas.getBoundingClientRect().height < 10 : true };
-  `);
-  check(
-    "the front page can list the boards themselves, without the organisation in the way",
-    conDatos.tableros.includes("/codigosh/lastboard"),
-    JSON.stringify(conDatos.tableros),
-  );
-  // That the list holds ideas and only ideas is proved in Go, not here: this
-  // journey has one published idea and no published bug at this point, so the
-  // module shows the same single row whether it filters by kind or not. Trying
-  // it here meant seeding a bug, and that moved the row counts three later
-  // checks depend on.
-  check(
-    "and the ideas people asked for most, with their count",
-    conDatos.votadas.length === 1 && conDatos.votadas[0].votos === "1" &&
-      conDatos.votadas[0].href.startsWith("/i/"),
-    JSON.stringify(conDatos.votadas),
-  );
-  check(
-    "a data module is asked which board, and offered all of them first",
-    conDatos.ofrecido === true && conDatos.opciones[0] === "" &&
-      conDatos.opciones.includes("codigosh/lastboard"),
-    JSON.stringify(conDatos.opciones),
-  );
-
-  check(
-    "the page can carry the button that is the point of it, in the operator's words",
-    conDatos.etiquetaOfrecida === true && conDatos.boton !== null &&
-      conDatos.boton.href === "/codigosh/lastboard/new" &&
-      conDatos.boton.palabras.includes("Tell us what broke"),
-    JSON.stringify(conDatos.boton),
-  );
-  // Nothing has been finished at this point in the journey, which is the state
-  // every installation starts in and the one least likely to be looked at. The
-  // module has to say so and still occupy its box: a module that collapses to
-  // nothing reads as a page that failed to load.
-  check(
-    "a module with nothing to show yet says so, and still holds its place",
-    conDatos.sinHechas === true && conDatos.hechasRotas === false,
-    JSON.stringify({ vacio: conDatos.sinHechas, roto: conDatos.hechasRotas }),
-  );
-
-  // How a module names itself, which is a question about two products rather
-  // than about this page. The pill mounted on a border means "a container you
-  // drag items into" in the dashboard this grid comes from, so a module wearing
-  // one reads as a container with its contents missing — and reads that way
-  // hardest to the people most likely to recognise it. A module is that
-  // dashboard's widget, so it wears a widget's header: inside the box, at the
-  // top, and still there after the module is scrolled.
-  const nombre = await evaluate(`
-    const cell = document.querySelector('.landing-cell[data-module^="boards-"]');
-    const head = cell.querySelector(".module-header");
-    const cb = cell.getBoundingClientRect();
-    // Tolerant on purpose: a mutation that brings the container pill back
-    // leaves no header at all, and a probe that assumes one throws and takes
-    // the whole pass down instead of naming what changed.
-    if (!head) return { pildora: !!cell.querySelector(".section-legend"), cabecera: false };
-    const antes = Math.round(head.getBoundingClientRect().top - cb.top);
-    cell.querySelector(".landing-scroll")?.scrollTo(0, 400);
-    await new Promise(r => setTimeout(r, 120));
-    return {
-      cabecera: true,
-      pildora: !!cell.querySelector(".section-legend"),
-      dentro: antes >= 0,
-      texto: head.querySelector("h2")?.textContent?.trim() ?? "",
-      icono: !!head.querySelector(".module-icon svg"),
-      trasDesplazar: Math.round(head.getBoundingClientRect().top - cb.top),
-    };
-  `);
-  check(
-    "a module names itself the way a widget does, not the way a container does",
-    nombre.cabecera === true && nombre.pildora === false &&
-      nombre.dentro === true && nombre.icono === true &&
-      nombre.texto !== "" && nombre.trasDesplazar >= 0 && nombre.trasDesplazar < 8,
-    JSON.stringify(nombre),
-  );
-
-  // The front page is the register that SHOWS things, not the one that asks for
-  // one thing. The difference is not a matter of taste and it is measurable:
-  // the sign-in stacks the mark above a display-sized name down the middle of
-  // the window, and the front page used to do exactly that — it was the sign-in
-  // without its card. In a module the mark sits BESIDE the name, on one line.
-  const registro = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const escribir = (modules) => fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules }) });
-    const dibujar = async () => {
-      history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-      await new Promise(r => setTimeout(r, 1300));
-    };
-
-    // This block writes a page of its own, so it puts back the one it found.
-    // Leaving a rewritten layout behind took the checks after it down — for the
-    // third time in this file, which is why it is spelled out here.
-    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-
-    await escribir([
-      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 2 },
-      { id: "block", kind: "text", x: 1, y: 3, w: 12, h: 2 },
-    ]);
-    await dibujar();
-
-    const celda = document.querySelector('[data-module="hero"]');
-    const nombre = celda.querySelector("h1");
-    const bloque = document.querySelector('[data-module="block"]');
-    const caja = bloque.querySelector(".words-box").getBoundingClientRect();
-    const medido = {
-      // Where the mark goes is the operator's decision now, so it is not
-      // measured here. What is still the product's decision, and is what this
-      // check exists for, is the register: a heading sized for a card that asks
-      // for one thing, and modules whose content fills them rather than sitting
-      // in a band of air.
-      tamanoNombre: Math.round(parseFloat(getComputedStyle(nombre).fontSize)),
-      // The box fills its module but for the gap asked for on each side.
-      holgura: Math.round(bloque.getBoundingClientRect().height - caja.height),
-    };
-    await escribir(previa);
-    await dibujar();
-    return medido;
-  `);
-  check(
-    "the front page shows things rather than asking for one, as the dashboard does",
-    registro.tamanoNombre <= 34 && registro.holgura <= 14,
-    JSON.stringify(registro),
-  );
-
-  // Nothing a module holds is cut off by the module.
   //
-  // The tile clips rather than scrolls — that is the dashboard's rule and what
-  // stops the resize handle fighting a scrollbar — so anything taller than its
-  // tile loses its bottom silently. A box given the module's full height while
-  // also carrying the page-flow top margin is taller by exactly that margin,
-  // and the button module was losing its bottom padding to it.
-  const recortes = await evaluate(`
+  // Everything here happens in a draft, and the last step publishes it — which
+  // is the half that matters: without it this is a setting that saves and
+  // changes nothing a visitor sees.
+  await goTo("/", ".lp");
+  const leerBorrador = `return fetch("/api/landing?draft=1").then(r => r.json())`;
+  const leerPublicada = `return fetch("/api/landing").then(r => r.json())`;
+  const tecla = (key: string, extra = "") =>
+    evaluate(`(document.activeElement ?? document).dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(key)}, bubbles: true ${extra} }))`);
+
+  await evaluate(`document.querySelector("body > nav [data-edit-page]")?.click()`);
+  await waitFor(".lpe .lp-editing");
+  const entrando = await evaluate(`
+    return {
+      secciones: [...document.querySelectorAll(".lpe-canvas [data-band]")].map(b => b.dataset.band),
+      panelVacio: !!document.querySelector(".lpe-panel .lpe-panel-empty"),
+      publicado: !!document.querySelector(".lpe-state.live"),
+      // Publish and Discard with nothing to publish or discard, and looking it.
+      publicar: document.querySelector('[data-bar="publish"]')?.disabled === true &&
+        Number(getComputedStyle(document.querySelector('[data-bar="publish"]')).opacity) < 0.6,
+    };
+  `);
+  check(
+    "the editor opens on the page itself, with nothing chosen and nothing to publish",
+    entrando.secciones.join() === "top,where,activity,how" && entrando.panelVacio === true &&
+      entrando.publicado === true && entrando.publicar === true,
+    JSON.stringify(entrando),
+  );
+
+  // Choosing a module and changing what it lists. The draft changes; what a
+  // visitor is served does not.
+  await evaluate(`document.querySelector('[data-module="most-voted"] .lp-head').click()`);
+  await waitFor(".lpe-panel .lpe-panel-head");
+  await evaluate(`
+    const s = document.querySelector('.lpe-panel [data-bind="show"]');
+    s.value = "planned"; s.dispatchEvent(new Event("change", { bubbles: true }));
+  `);
+  await sleep(1300);
+  const tras = await evaluate(`
+    const borrador = await (async () => { ${leerBorrador} })();
+    const publicada = await (async () => { ${leerPublicada} })();
+    const en = (p) => p.bands.find(b => b.id === "activity").cells[0][0].show;
+    return { elegido: document.querySelector('[data-module="most-voted"]').classList.contains("is-selected"),
+             borrador: en(borrador), publicada: en(publicada), hayBorrador: borrador.has_draft,
+             aviso: !!document.querySelector(".lpe-state.draft") };
+  `);
+  check(
+    "a change goes to a draft, and visitors keep the published page",
+    tras.elegido === true && tras.borrador === "planned" && tras.publicada === "most_voted" &&
+      tras.hayBorrador === true && tras.aviso === true,
+    JSON.stringify(tras),
+  );
+
+  // Undo and redo, from the keyboard, as every editor answers them.
+  await evaluate(`document.querySelector('.lpe-panel [data-tab="appearance"]').click()`);
+  await evaluate(`document.querySelector('.lpe-panel [data-set="style"][data-value="soft"]').click()`);
+  const estilo = () => evaluate(`return [...document.querySelector('[data-module="most-voted"]').classList].find(c => c.startsWith("style-"))`);
+  const conEstilo = await estilo();
+  await evaluate(`document.activeElement?.blur()`);
+  await tecla("z", ", ctrlKey: true");
+  const deshecho = await estilo();
+  await tecla("z", ", ctrlKey: true, shiftKey: true");
+  const rehecho = await estilo();
+  check(
+    "Ctrl+Z undoes a change on the page and Ctrl+Shift+Z brings it back",
+    conEstilo === "style-soft" && deshecho === "style-card" && rehecho === "style-soft",
+    `${conEstilo} → ${deshecho} → ${rehecho}`,
+  );
+
+  // A ready-made section, where it was asked for, and a module in the column
+  // that asked for it.
+  await evaluate(`document.querySelector('[data-add-band="1"]').click()`);
+  await waitFor("#lpe-section-picker[open]");
+  await evaluate(`document.querySelector('[data-pick-section="ready:points"]').click()`);
+  await sleep(300);
+  await evaluate(`document.querySelector('[data-add-band="5"]').click()`);
+  await evaluate(`document.querySelector('[data-pick-section="layout:1-1"]').click()`);
+  await sleep(300);
+  const huecos = await evaluate(`return document.querySelectorAll(".lpe-add.empty").length`);
+  await evaluate(`document.querySelectorAll(".lpe-add.empty")[1].click()`);
+  await waitFor("#lpe-module-picker[open]");
+  const selector = await evaluate(`
+    return { tarjetas: document.querySelectorAll("#lpe-module-picker [data-pick]").length,
+             explicadas: [...document.querySelectorAll("#lpe-module-picker [data-pick] .picker-about")]
+               .every(a => a.textContent.trim() !== "") };
+  `);
+  await evaluate(`document.querySelector('#lpe-module-picker [data-pick="text"]').click()`);
+  await sleep(300);
+  const colocado = await evaluate(`
+    const m = document.querySelector(".lp-mod.is-selected");
+    return { secciones: [...document.querySelectorAll(".lpe-canvas [data-band]")].map(b => b.dataset.band),
+             id: m?.dataset.module ?? "", columna: m?.closest(".lp-col")?.dataset.column ?? "" };
+  `);
+  check(
+    "a section goes where it was asked for, and a module into the column that asked",
+    colocado.secciones.length === 6 && colocado.secciones[0] === "top" && colocado.secciones[2] === "where" &&
+      huecos === 2 && colocado.id.startsWith("text-") && colocado.columna === "1",
+    JSON.stringify({ ...colocado, huecos }),
+  );
+  check(
+    "the picker offers all nine modules, each saying what it shows",
+    selector.tarjetas === 9 && selector.explicadas === true,
+    JSON.stringify(selector),
+  );
+
+  // Words typed where they are read; and the prompt an empty block shows is
+  // not saved with them.
+  // The prompt is read off the page first, in whatever language it is in:
+  // the server strips its class, so only its words can say it was kept.
+  const aviso = await evaluate(`
+    const box = document.querySelector('.lp-mod.is-selected [data-words-body]');
+    const prompt = box.querySelector(".words-prompt")?.textContent.trim() ?? "";
+    box.focus();
+    document.execCommand("insertText", false, "Typed on the page");
+    return prompt;
+  `);
+  await evaluate(`
+    const h = document.querySelector('.lpe-canvas h1[data-field="title"]');
+    h.focus(); document.execCommand("selectAll"); document.execCommand("insertText", false, "Our feedback");
+    h.blur();
+  `);
+  await sleep(1300);
+  const escrito = await evaluate(`
+    const d = await (async () => { ${leerBorrador} })();
+    const todos = d.bands.flatMap(b => b.cells.flat());
+    return { cuerpo: todos.find(m => m.id === ${JSON.stringify(colocado.id)})?.body ?? "",
+             titulo: todos.find(m => m.kind === "heading")?.title ?? "" };
+  `);
+  check(
+    "words are written on the page, and only the words are kept",
+    aviso !== "" && escrito.cuerpo.includes("Typed on the page") && !escrito.cuerpo.includes(aviso) &&
+      escrito.titulo === "Our feedback",
+    JSON.stringify({ ...escrito, aviso }),
+  );
+
+  // Moving a module with the keyboard.
+  await evaluate(`const m = document.querySelector('[data-module="most-voted"]'); m.click(); m.focus()`);
+  const antesDeMover = await evaluate(`return document.querySelector('[data-module="most-voted"]').closest(".lp-col").dataset.column`);
+  await tecla("ArrowRight");
+  await sleep(200);
+  const movido = await evaluate(`return document.querySelector('[data-module="most-voted"]').closest(".lp-col").dataset.column`);
+  check(
+    "an arrow key moves the chosen module to the next column, in reading order",
+    antesDeMover === "0" && movido === "1",
+    `${antesDeMover} → ${movido}`,
+  );
+
+  // A section's own panel: its layout and its background show at once, and a
+  // default section can lose its name.
+  await evaluate(`document.querySelector('[data-band="where"] .lpe-tag').click()`);
+  await waitFor(".lpe-layouts");
+  await evaluate(`document.querySelector('.lpe-panel [data-set="band.columns"][data-value="1-1"]').click()`);
+  await evaluate(`document.querySelector('.lpe-panel [data-set="band.background"][data-value="accent"]').click()`);
+  await evaluate(`const c = document.querySelector('.lpe-panel [data-bind="band.hide_name"]'); c.checked = true; c.dispatchEvent(new Event("change", { bubbles: true }))`);
+  const seccion = await evaluate(`
+    const b = document.querySelector('[data-band="where"]');
+    const p = document.querySelector(".lpe-panel");
+    return { columnas: b.querySelectorAll(".lp-col").length, acento: b.classList.contains("bg-accent"),
+             pildora: !!b.querySelector(".lp-pill"), panelDeLado: p.scrollWidth - p.clientWidth };
+  `);
+  check(
+    "a section's layout, background and name change on the page as they are chosen",
+    seccion.columnas === 2 && seccion.acento === true && seccion.pildora === false && seccion.panelDeLado <= 0,
+    JSON.stringify(seccion),
+  );
+
+  // A link with no label cannot be saved, and the bar says why rather than
+  // failing in silence.
+  await evaluate(`document.querySelector('[data-add-module]').click()`);
+  await waitFor("#lpe-module-picker[open]");
+  await evaluate(`document.querySelector('#lpe-module-picker [data-pick="links"]').click()`);
+  await sleep(200);
+  await evaluate(`document.querySelector('.lpe-panel [data-act="add-link"]').click()`);
+  await sleep(200);
+  const sinEtiqueta = await evaluate(`return { aviso: !!document.querySelector(".lpe-state.problem"),
+    publicar: document.querySelector('[data-bar="publish"]').disabled }`);
+  await evaluate(`const i = document.querySelector('.lpe-panel [data-link-field="label"]'); i.value = "Report a bug"; i.dispatchEvent(new Event("input", { bubbles: true }))`);
+  await sleep(1200);
+  const conEtiqueta = await evaluate(`return !document.querySelector(".lpe-state.problem")`);
+  check(
+    "a link without a label stops the save and the bar says why",
+    sinEtiqueta.aviso === true && sinEtiqueta.publicar === true && conEtiqueta === true,
+    JSON.stringify({ sinEtiqueta, conEtiqueta }),
+  );
+
+  // The phone preview is the phone layout, not a narrowed desktop one.
+  await evaluate(`document.querySelector('[data-bar="phone"]').click()`);
+  await sleep(300);
+  const movil = await evaluate(`return getComputedStyle(document.querySelector('[data-band="activity"] .lp-cols')).gridTemplateColumns.split(" ").length`);
+  await evaluate(`document.querySelector('[data-bar="desktop"]').click()`);
+  check("the phone preview stacks the columns", movil === 1, String(movil));
+
+  // Publishing, and leaving: what was arranged is what a visitor is shown.
+  await evaluate(`document.querySelector('[data-bar="publish"]').click()`);
+  await sleep(1300);
+  await evaluate(`document.querySelector("body > nav [data-edit-done]")?.click()`);
+  await waitFor(".lp:not(.lp-editing)");
+  const publicado = await evaluate(`
+    const p = await (async () => { ${leerPublicada} })();
+    return { titulo: document.querySelector(".lp-heading h1")?.textContent.trim(),
+             palabras: document.body.textContent.includes("Typed on the page"),
+             boton: [...document.querySelectorAll(".mod-links a")].some(a => a.textContent.includes("Report a bug")),
+             controles: document.querySelectorAll(".lpe-tools, .lpe-add, .lpe-insert").length,
+             borrador: p.has_draft };
+  `);
+  check(
+    "publishing puts the draft in front of visitors, and leaving takes the controls away",
+    publicado.titulo === "Our feedback" && publicado.palabras === true && publicado.boton === true &&
+      publicado.controles === 0 && publicado.borrador === false,
+    JSON.stringify(publicado),
+  );
+
+  // Discard: a change made and thrown away leaves the published page as it was.
+  await evaluate(`document.querySelector("body > nav [data-edit-page]")?.click()`);
+  await waitFor(".lpe .lp-editing");
+  await evaluate(`document.querySelector('[data-band="how"] [data-act="remove"]').click()`);
+  await sleep(1000);
+  const quitada = await evaluate(`const d = await (async () => { ${leerBorrador} })(); return d.bands.some(b => b.id === "how")`);
+  await evaluate(`window.confirm = () => true; document.querySelector('[data-bar="discard"]').click()`);
+  await sleep(1300);
+  const descartado = await evaluate(`
+    const d = await (async () => { ${leerBorrador} })();
+    return { enLaPagina: !!document.querySelector('.lpe-canvas [data-band="how"]'), hayBorrador: d.has_draft };
+  `);
+  check(
+    "discarding throws the draft away and shows the published page again",
+    quitada === false && descartado.enLaPagina === true && descartado.hayBorrador === false,
+    JSON.stringify({ quitada, ...descartado }),
+  );
+  await evaluate(`document.querySelector("body > nav [data-edit-done]")?.click()`);
+  await waitFor(".lp:not(.lp-editing)");
+
+  // A picture in a block of words, from the file to the page and back out; and
+  // the writing bar, driven the way a hand drives it. Both on a text module put
+  // into the draft for the purpose, and the draft is thrown away at the end.
+  //
+  // The conversion to WebP is the point rather than a detail: what an operator
+  // picks is a photograph off a phone, and what a front page can afford is a
+  // fraction of it. It is done in the browser because encoding WebP on the
+  // server would mean a C library and a binary that is no longer one file.
+  //
+  // Colour and alignment are the two the bar cannot do the obvious way: this
+  // page is served with style-src 'self' and no unsafe-inline, so an inline
+  // style written by an editing command is dropped by the browser without a
+  // word. They write classes instead, and the check is that the class is there
+  // AFTER the round trip through the server, because the server has its own
+  // list and a class it does not know is a class it removes.
+  const retrato = await evaluate(`
     const csrf = () => document.cookie.split(";").map(c => c.trim())
       .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-    const kinds = ["hero", "text", "call_to_action", "organisations", "boards",
-      "most_voted", "recently_done", "recent_activity", "roadmap", "statistics"];
-    await fetch("/api/landing", { method: "PUT",
+    const borrador = await fetch("/api/landing?draft=1").then(r => r.json());
+    borrador.bands.push({ id: "shot-band", columns: "1", cells: [[{ id: "shot", kind: "text" }]] });
+    await fetch("/api/landing/draft", { method: "PUT",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: kinds.map((kind, i) => ({
-        id: kind, kind, x: 1 + (i % 4) * 3, y: 1 + Math.floor(i / 4) * 2, w: 3, h: 2,
-        ...(kind === "call_to_action" ? { scope: "codigosh/lastboard", body: "Tell us" } : {}),
-      })) }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1500));
-    const cortados = [...document.querySelectorAll(".landing-cell")]
-      .map(c => ({ que: c.dataset.module, seSale: c.scrollHeight - c.clientHeight }))
-      .filter(x => x.seSale > 0);
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: previa }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1300));
-    return { cortados, mirados: kinds.length };
-  `);
-  check(
-    "and no module has its content cut off by the tile it sits in",
-    recortes.mirados === 10 && recortes.cortados.length === 0,
-    JSON.stringify(recortes),
-  );
+      body: JSON.stringify({ bands: borrador.bands, settings: borrador.settings }) });
+    document.querySelector("body > nav [data-edit-page]")?.click();
+    for (let i = 0; i < 60 && !document.querySelector('[data-module="shot"] [data-words-body]'); i++)
+      await new Promise(r => setTimeout(r, 100));
+    const texto = () => fetch("/api/landing?draft=1").then(r => r.json())
+      .then(d => d.bands.flatMap(b => b.cells.flat()).find(m => m.id === "shot")?.body ?? "");
 
-  // Adding, the way the dashboard does it: a plus in the bar that opens a short
-  // menu — a module, or a group — and the module one opens a picker of cards
-  // saying what each kind draws. It was a dropdown and an Add button sitting on
-  // the page: two controls that said nothing about what you were about to get,
-  // in the middle of the thing every visitor sees.
-  const anadir = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 900));
-
-    const enLaPagina = !!document.querySelector("#app [data-add-kind], #app .landing-bar");
-    const mas = document.querySelector("body > nav [data-add-menu]");
-    mas.click();
-    await new Promise(r => setTimeout(r, 300));
-    // The menu is the dashboard's own, not the kebab's: monospaced items of
-    // 11px with a 14px mark each, which is how somebody recognises it without
-    // reading it. Measured, because "the same as theirs" is a number.
-    const items = [...document.querySelectorAll("body > nav .add-menu .add-menu-item")];
-    const menu = items.map(b => b.textContent.trim());
-    const primera = items[0] ? getComputedStyle(items[0]) : null;
-    const forma = {
-      fuente: primera?.fontSize ?? "",
-      mono: (primera?.fontFamily ?? "").includes("mono"),
-      radio: getComputedStyle(document.querySelector("body > nav .add-menu")).borderRadius,
-      marca: Math.round(items[0]?.querySelector("svg")?.getBoundingClientRect().width ?? 0),
-      nowrap: primera?.whiteSpace === "nowrap",
-    };
-    // One line each, whatever the language — and English is not a test of that:
-    // "Add Module" fits the starting width with or without the rule. The words
-    // are swapped for the longest pair any catalogue carries, measured, and put
-    // back, so this measures the menu rather than the language the journey runs
-    // in. A wrapped item is the same words in twice the box: 46 against 31.
-    const alto = (el) => Math.round(el.getBoundingClientRect().height);
-    const original = items.map(i => i.querySelector("span")?.textContent ?? "");
-    for (const i of items) {
-      const span = i.querySelector("span");
-      if (span) span.textContent = "Abschnitt hinzufügen";
+    // A picture with detail in it, so that the encoder has something to do and
+    // the two sizes are a real comparison.
+    const c = document.createElement("canvas");
+    c.width = 900; c.height = 600;
+    const x = c.getContext("2d");
+    for (let i = 0; i < 900; i += 3) {
+      x.fillStyle = "hsl(" + (i % 360) + ",70%," + (40 + (i % 30)) + "%)";
+      x.fillRect(i, 0, 3, 600);
     }
-    await new Promise(r => setTimeout(r, 60));
-    forma.unaLinea = items.every(i => alto(i) < 38);
-    forma.conPalabrasLargas = items.map(alto);
-    items.forEach((i, n) => {
-      const span = i.querySelector("span");
-      if (span) span.textContent = original[n];
-    });
+    const png = await new Promise(r => c.toBlob(r, "image/png"));
+    const webp = await new Promise(r => c.toBlob(r, "image/webp", 0.9));
+    const subir = (blob, type) => fetch("/api/landing/images", { method: "POST",
+      headers: { "X-CSRF-Token": csrf(), "Content-Type": type }, body: blob });
+    // What is not WebP is refused on the bytes, not on the header it declared.
+    const mentira = await subir(png, "image/webp").then(r => r.status);
+    const vacia = await subir(new Blob([], { type: "image/webp" }), "image/webp").then(r => r.status);
+    const hecha = await subir(webp, "image/webp");
+    const { url } = await hecha.json();
 
-    document.querySelector('[data-open-modal="module-picker"]').click();
-    await new Promise(r => setTimeout(r, 400));
-    const dlg = document.querySelector("#module-picker");
-    const tarjetas = [...dlg.querySelectorAll("[data-pick]")].map(c => c.dataset.pick);
-    // The title has height. The class named picker here is the image control
-    // elsewhere and carries a line-height of nought, which printed this title
-    // and the line under it on top of each other at no height at all.
-    const altoTitulo = Math.round(dlg.querySelector(".picker-head h2").getBoundingClientRect().height);
-    const altoLead = Math.round(dlg.querySelector(".picker-head p").getBoundingClientRect().height);
-    const conTexto = [...dlg.querySelectorAll(".picker-card")]
-      .every(c => c.querySelector(".picker-name")?.textContent.trim() &&
-                  c.querySelector(".picker-about")?.textContent.trim() &&
-                  c.querySelector(".picker-icon svg"));
-    const abierto = dlg.open === true;
-    dlg.querySelector("[data-close]").click();
-    await new Promise(r => setTimeout(r, 300));
+    const caja = document.querySelector('[data-module="shot"] [data-words-body]');
+    const barraAntes = document.querySelector(".words-bar")?.hidden !== false;
+    caja.focus();
+    await new Promise(r => setTimeout(r, 250));
+    const barra = document.querySelector(".words-bar");
+    const aparece = barra.hidden === false;
+    const sigue = caja.parentElement.contains(barra);
+    // Under the block, not over it: over it, it covered the words it formats.
+    const debajo = barra.getBoundingClientRect().top >= caja.getBoundingClientRect().bottom;
 
-    return { enLaPagina, menu, forma, tarjetas, conTexto, abierto, cerrado: dlg.open === false,
-             // And the way out of arranging is still one click in the same bar.
-             hecho: !!document.querySelector("body > nav [data-edit-done]") };
-  `);
-  check(
-    "adding is a menu in the bar and a picker of cards, not two controls on the page",
-    anadir.enLaPagina === false && anadir.menu.length === 2 &&
-      anadir.abierto === true && anadir.cerrado === true && anadir.hecho === true &&
-      // And it is shaped like theirs, not like the kebab it used to borrow.
-      anadir.forma.fuente === "11px" && anadir.forma.mono === true &&
-      anadir.forma.radio === "4px" && anadir.forma.marca === 14 &&
-      anadir.forma.unaLinea === true && anadir.forma.nowrap === true,
-    JSON.stringify({ enLaPagina: anadir.enLaPagina, menu: anadir.menu, forma: anadir.forma }),
-  );
-  check(
-    "and the picker offers every module, each saying what it draws",
-    // Ten, not eleven: the two that drew a paragraph did the same thing in two
-    // shapes and are one block of words now.
-    anadir.tarjetas.length === 10 && anadir.conTexto === true &&
-      anadir.tarjetas.includes("roadmap") && anadir.tarjetas.includes("hero") &&
-      // A group is not a module that draws something, so it is not in here.
-      !anadir.tarjetas.includes("section"),
-    JSON.stringify(anadir.tarjetas),
-  );
+    caja.innerHTML = '<p><img src="' + url + '" width="480" alt="A shot"></p>';
+    caja.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(r => setTimeout(r, 1500));
+    const guardado = await texto();
 
-  // Taking hold of a corner must not change the page around it. The handle is
-  // positioned against the cell's edges, and while the cell was the thing that
-  // scrolled, the handle pushed its scrollable area out: a scrollbar appeared,
-  // the content narrowed, the handle moved, and it flickered without anything
-  // being dragged.
-  const esquina = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 900));
+    // Asked of the server, never of the browser: these are served immutable
+    // for a year, so a plain fetch answers from the cache whatever the server
+    // still holds.
+    const preguntar = (at) => fetch(at, { cache: "no-store" });
+    const servida = await preguntar(url);
+    const cabeceras = { estado: servida.status, tipo: servida.headers.get("content-type"),
+                        cache: servida.headers.get("cache-control") };
 
-    const celda = document.querySelector(".landing-cell");
-    const cuerpo = celda;
-    const asa = celda.querySelector(":scope > [data-resize]");
-    const foto = () => ({
-      barras: cuerpo.scrollWidth > cuerpo.clientWidth || cuerpo.scrollHeight > cuerpo.clientHeight,
-      caja: Math.round(celda.getBoundingClientRect().width) + "x" +
-            Math.round(celda.getBoundingClientRect().height),
-      asa: Math.round(asa.getBoundingClientRect().left) + "," +
-           Math.round(asa.getBoundingClientRect().top),
-    });
-
-    const antes = foto();
-    const caja = celda.getBoundingClientRect();
-    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
-    asa.dispatchEvent(new PointerEvent("pointerdown", { ...opts,
-      clientX: caja.right, clientY: caja.bottom }));
-    await new Promise(r => setTimeout(r, 400));
-    const agarrada = foto();
-    await new Promise(r => setTimeout(r, 600));
-    const quieta = foto();
-    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
-      clientX: caja.right, clientY: caja.bottom }));
-    await new Promise(r => setTimeout(r, 600));
-    return { antes, agarrada, quieta };
-  `);
-  check(
-    "taking hold of a corner adds no scrollbars and moves nothing",
-    esquina.antes.barras === false && esquina.agarrada.barras === false &&
-      esquina.agarrada.caja === esquina.antes.caja &&
-      esquina.quieta.caja === esquina.agarrada.caja &&
-      esquina.quieta.asa === esquina.agarrada.asa,
-    JSON.stringify(esquina),
-  );
-
-  // Sizes. Every module used to arrive twelve columns wide and refuse to go
-  // below two, so a page was a stack of bands whatever the operator did. A
-  // module is a tile like any other in this house: it arrives at a size that
-  // suits it and can be dragged down to a single cell.
-  const tamanos = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    const anadir = async (kind) => {
-      document.querySelector("[data-add-menu]").click();
-      await new Promise(r => setTimeout(r, 200));
-      document.querySelector('[data-open-modal="module-picker"]').click();
-      await new Promise(r => setTimeout(r, 400));
-      document.querySelector('[data-pick="' + kind + '"]').click();
-      await new Promise(r => setTimeout(r, 1100));
-      document.querySelector("#module-config")?.close();
-      await new Promise(r => setTimeout(r, 300));
-      const capa = await fetch("/api/landing").then(r => r.json());
-      const puesto = capa.modules.filter(m => m.kind === kind).pop();
-      return { w: puesto.w, h: puesto.h, id: puesto.id };
+    // The bar: bold, a colour and an alignment on the same words.
+    caja.innerHTML = "<p>Ours</p>";
+    const elegir = () => {
+      const r = document.createRange();
+      r.selectNodeContents(caja.querySelector("p"));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
     };
+    elegir(); barra.querySelector('[data-do="bold"]').click();
+    await new Promise(r => setTimeout(r, 150));
+    elegir(); barra.querySelector('[data-do="ink:ink-accent"]').click();
+    await new Promise(r => setTimeout(r, 150));
+    elegir(); barra.querySelector('[data-do="align:align-center"]').click();
+    await new Promise(r => setTimeout(r, 1500));
+    const conEstilo = caja.querySelectorAll("[style]").length;
+    const conFormato = await texto();
 
-    const boton = await anadir("call_to_action");
-    const cifras = await anadir("statistics");
+    // A picture nothing refers to any more goes: it was uploaded while
+    // somebody was writing, so writing over it has to take it with it.
+    const trasQuitarla = await preguntar(url).then(r => r.status);
 
-    // And down to one column, from the corner.
-    const celda = document.querySelector('[data-module="' + cifras.id + '"]');
-    const caja = celda.getBoundingClientRect();
-    const grid = document.querySelector(".landing-grid.editing").getBoundingClientRect();
-    const col = (grid.width - 11 * 16) / 12;
-    const asa = celda.querySelector(":scope > [data-resize]");
-    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
-    asa.dispatchEvent(new PointerEvent("pointerdown", { ...opts, clientX: caja.right, clientY: caja.bottom }));
-    window.dispatchEvent(new PointerEvent("pointermove", { ...opts,
-      clientX: caja.right - 5 * (col + 16), clientY: caja.bottom - 2 * (col + 16) }));
-    await new Promise(r => setTimeout(r, 160));
-    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
-      clientX: caja.right - 5 * (col + 16), clientY: caja.bottom - 2 * (col + 16) }));
-    await new Promise(r => setTimeout(r, 1100));
-
-    const despues = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === cifras.id);
-    return { boton, cifras, encogido: { w: despues.w, h: despues.h } };
+    window.confirm = () => true;
+    document.querySelector('[data-bar="discard"]')?.click();
+    await new Promise(r => setTimeout(r, 1300));
+    document.querySelector("body > nav [data-edit-done]")?.click();
+    await new Promise(r => setTimeout(r, 900));
+    return { png: png.size, webp: webp.size, mentira, vacia, creada: hecha.status, guardado,
+             cabeceras, trasQuitarla, barraAntes, aparece, sigue, debajo, conEstilo, conFormato };
   `);
   check(
-    "every module arrives three by two, whatever it is",
-    tamanos.boton.w === 3 && tamanos.boton.h === 2 &&
-      tamanos.cifras.w === 3 && tamanos.cifras.h === 2,
-    JSON.stringify({ boton: tamanos.boton, cifras: tamanos.cifras }),
+    "a picture is stored as WebP, served for a year, and swept when nothing shows it",
+    retrato.webp < retrato.png &&
+      retrato.creada === 201 && retrato.mentira === 400 && retrato.vacia === 400 &&
+      retrato.guardado.includes('width="480"') && retrato.guardado.includes('alt="A shot"') &&
+      retrato.guardado.includes('loading="lazy"') &&
+      retrato.cabeceras.estado === 200 && retrato.cabeceras.tipo === "image/webp" &&
+      retrato.cabeceras.cache.includes("immutable") &&
+      retrato.trasQuitarla === 404,
+    JSON.stringify({ pesos: { png: retrato.png, webp: retrato.webp },
+                     subida: { creada: retrato.creada, noEsWebp: retrato.mentira, vacia: retrato.vacia },
+                     guardado: retrato.guardado, cabeceras: retrato.cabeceras,
+                     trasQuitarla: retrato.trasQuitarla }),
   );
   check(
-    "and can be dragged down to a single cell",
-    tamanos.encogido.w === 1 && tamanos.encogido.h === 1,
-    JSON.stringify(tamanos.encogido),
+    "the bar follows the cursor, sits under the words, and colour and alignment survive the policy",
+    retrato.barraAntes === true && retrato.aparece === true && retrato.sigue === true &&
+      retrato.debajo === true && retrato.conEstilo === 0 &&
+      retrato.conFormato.includes("align-center") && retrato.conFormato.includes("ink-accent") &&
+      // Bold arrives from the browser as <b> and is stored in one dialect.
+      retrato.conFormato.includes("<strong>"),
+    JSON.stringify({ barra: { antesOculta: retrato.barraAntes, aparece: retrato.aparece,
+                              dentro: retrato.sigue, debajo: retrato.debajo },
+                     estilosEnLinea: retrato.conEstilo, guardado: retrato.conFormato }),
   );
 
   // The bar carries icons and nothing but icons, and the panel arrives from the
@@ -2053,964 +1808,6 @@ async function main() {
         ? entrada.llegando?.giro === "-1"
         : entrada.llegando?.giro === "1"),
     JSON.stringify(entrada.llegando),
-  );
-
-  // The settings dialog, in the shape the dashboard uses for its own: the tabs
-  // ARE the header, General and Customization, the close beside them, and one
-  // action at the foot. Somebody who has configured a widget over there should
-  // not have to learn this one.
-  const ajustes = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-    const celda = document.querySelector('.landing-cell[data-module^="boards-"]');
-    celda.querySelector("[data-module-menu]").click();
-    await new Promise(r => setTimeout(r, 200));
-    celda.querySelector("[data-edit-module]").click();
-    await new Promise(r => setTimeout(r, 500));
-
-    const form = document.querySelector("form.module-config");
-    const pestanas = [...form.querySelectorAll(".modal-head.tabbed [data-tab]")]
-      .map(b => b.textContent.trim());
-    const enCabecera = !!form.querySelector(".modal-head.tabbed .modal-tabs [data-tab]");
-    const primeraActiva = form.querySelector("[data-tab=general]").classList.contains("on");
-    const generalVisible = !form.querySelector('[data-panel="general"]').hidden;
-    const lookOculto = form.querySelector('[data-panel="look"]').hidden;
-
-    // Its own name, and a placeholder saying what it is called without one.
-    const nombre = form.querySelector("[name=name]");
-    const pideNombre = !form.querySelector("[data-for-name]").hidden;
-    const sugerencia = nombre.placeholder;
-    nombre.value = "Our projects";
-
-    // The second tab holds how it looks, and nothing else does.
-    form.querySelector("[data-tab=look]").click();
-    await new Promise(r => setTimeout(r, 200));
-    const trasCambiar = {
-      general: form.querySelector('[data-panel="general"]').hidden,
-      look: !form.querySelector('[data-panel="look"]').hidden,
-      posicion: !form.querySelector("[data-for-label-at]").hidden,
-    };
-
-    // What is actually in that tab. It held one sentence saying there was
-    // nothing there; it holds the controls the dashboard's own does: ten
-    // colours and a default, and where the name goes drawn as four little
-    // diagrams rather than written as four words.
-    //
-    // Four widths, not three: none is a choice, and it has to be one that can
-    // be told apart from nobody having touched the control — which is what an
-    // empty field means everywhere else here.
-    const aspecto = {
-      colores: form.querySelectorAll("[data-colour]").length,
-      grosores: form.querySelectorAll("[data-width]").length,
-      sinBorde: !!form.querySelector('[data-width="0"]'),
-      // And whether the module has anything behind it at all.
-      relleno: !!form.querySelector("[name=clear]"),
-      posiciones: form.querySelectorAll("[data-marks] [data-at]").length,
-      marcas: [...form.querySelectorAll("[data-marks] [data-at]")].every(b => b.querySelector("svg")),
-      // And it sits on the name, joined to the box you type it in — not in the
-      // tab about how the box looks. Measured as boxes, not as markup: the
-      // first version of this asked whether the two were siblings, which stays
-      // true however they are laid out, so laying them one above the other left
-      // it green.
-      juntoAlNombre: (() => {
-        const boton = form.querySelector("[data-open-marks]")?.getBoundingClientRect();
-        const caja = form.querySelector("#module-name")?.getBoundingClientRect();
-        if (!boton || !caja) return false;
-        const mismaFila = Math.abs((boton.top + boton.bottom) / 2 - (caja.top + caja.bottom) / 2) < 4;
-        const pegados = Math.abs(boton.right - caja.left) < 3;
-        return mismaFila && pegados;
-      })(),
-      // Their close is an outline on the header, not a filled button sitting on
-      // it.
-      fondoDelCierre: getComputedStyle(form.querySelector(".modal-close")).backgroundColor,
-      // Its own name, not one this stylesheet already uses for something else.
-      // The class named tabs here is a pill-shaped segmented control elsewhere,
-      // and borrowing the name drew that pill around this header. Invisible to
-      // a test for duplicate rules; visible only by looking.
-      pildoraDeOtro: getComputedStyle(form.querySelector(".modal-tabs")).borderStyle !== "none",
-      // The chosen tab wears the accent and the other does not. Against the
-      // other tab rather than against a fixed colour: the accent is the
-      // operator's, so a literal here would be measuring this installation.
-      acento: getComputedStyle(form.querySelector("[data-tab=look]")).color,
-      apagada: getComputedStyle(form.querySelector("[data-tab=general]")).color,
-      subrayado: getComputedStyle(form.querySelector("[data-tab=look]"), "::after").content !== "none",
-    };
-
-    form.requestSubmit();
-    await new Promise(r => setTimeout(r, 1000));
-
-    const guardado = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === celda.dataset.module);
-    const enPantalla = document.querySelector(
-      '[data-module="' + celda.dataset.module + '"] .module-header h2')?.textContent.trim();
-
-    return { pestanas, enCabecera, primeraActiva, generalVisible, lookOculto,
-             pideNombre, sugerencia, trasCambiar, aspecto,
-             nombreGuardado: guardado.name ?? "", enPantalla,
-             acciones: form.querySelectorAll(".modal-foot button").length };
-  `);
-  check(
-    "a module's settings are two tabs in the header, the way the dashboard's are",
-    ajustes.pestanas.length === 2 && ajustes.enCabecera === true &&
-      ajustes.primeraActiva === true && ajustes.generalVisible === true &&
-      ajustes.lookOculto === true && ajustes.trasCambiar.general === true &&
-      ajustes.trasCambiar.look === true && ajustes.trasCambiar.posicion === true &&
-      ajustes.acciones === 1,
-    JSON.stringify({ pestanas: ajustes.pestanas, acciones: ajustes.acciones }),
-  );
-  check(
-    "the customization tab carries the dashboard's own controls",
-    ajustes.aspecto?.colores === 11 && ajustes.aspecto?.grosores === 4 &&
-      ajustes.aspecto?.sinBorde === true && ajustes.aspecto?.relleno === true &&
-      ajustes.aspecto?.posiciones === 4 && ajustes.aspecto?.marcas === true &&
-      ajustes.aspecto?.juntoAlNombre === true &&
-      (ajustes.aspecto?.fondoDelCierre ?? "").replace(/\s/g, "") === "rgba(0,0,0,0)" &&
-      ajustes.aspecto?.acento !== ajustes.aspecto?.apagada &&
-      ajustes.aspecto?.subrayado === true &&
-      ajustes.aspecto?.pildoraDeOtro === false,
-    JSON.stringify(ajustes.aspecto),
-  );
-  check(
-    "and a module is called what its operator calls it, not what it draws",
-    ajustes.pideNombre === true && ajustes.sugerencia !== "" &&
-      ajustes.nombreGuardado === "Our projects" && ajustes.enPantalla === "Our projects",
-    JSON.stringify({ sugerencia: ajustes.sugerencia, guardado: ajustes.nombreGuardado,
-                     enPantalla: ajustes.enPantalla }),
-  );
-
-  // Every module can be configured for what it is: the hero carries its own
-  // words and decides whether to draw the mark, and a module that lists things
-  // is told how many. It drew a fixed name, a fixed line and a fixed mark, and
-  // the lists always showed as many as they had.
-  const opciones = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: [
-        { id: "top", kind: "hero", x: 1, y: 1, w: 6, h: 2 },
-        { id: "list", kind: "boards", x: 7, y: 1, w: 6, h: 3 },
-      ] }) });
-    // Two more boards, so that "show one" is a different number from "show
-    // them all". With the single board the journey already has, a list that
-    // ignored the count entirely would read the same as one that obeyed it.
-    const extras = ["second-board", "third-board"];
-    for (const slug of extras) {
-      await fetch("/api/orgs/codigosh/repositories", { method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-        body: JSON.stringify({ slug, name: slug }) });
-    }
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1300));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    const abrir = async (id) => {
-      const celda = document.querySelector('[data-module="' + id + '"]');
-      celda.querySelector("[data-module-menu]").click();
-      await new Promise(r => setTimeout(r, 200));
-      celda.querySelector("[data-edit-module]").click();
-      await new Promise(r => setTimeout(r, 500));
-      return document.querySelector("form.module-config");
-    };
-
-    // The block that opens the page is written on the page, so the dialog does
-    // NOT ask for its words — a field there would be a second place to change
-    // the same thing, and the one that wins would be whichever was touched
-    // last. What the dialog still offers it is what it is: a name, a border.
-    const bloque = document.querySelector('[data-module="top"] [data-words-body]');
-    bloque.focus();
-    bloque.innerHTML = "<h1>Acme Support</h1><p>Tell us what broke.</p>";
-    bloque.dispatchEvent(new Event("input", { bubbles: true }));
-    await new Promise(r => setTimeout(r, 1200));
-
-    let form = await abrir("top");
-    const heroPide = {
-      nombre: !form.querySelector("[data-for-name]").hidden,
-      palabras: !!form.querySelector("[data-for-text], [name=body]"),
-      marca: !!form.querySelector("[data-for-mark]"),
-      filas: !form.querySelector("[data-for-rows]").hidden,
-    };
-    form.querySelector("[data-close]").click();
-    await new Promise(r => setTimeout(r, 400));
-
-    // And it survives the round trip through the server, which is where the
-    // markup policy runs.
-    const guardado = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === "top");
-    const heroEnPantalla = {
-      titulo: document.querySelector('[data-module="top"] .words-box h1')?.textContent?.trim() ?? "",
-      linea: document.querySelector('[data-module="top"] .words-box p')?.textContent?.trim() ?? "",
-      enElServidor: (guardado?.body ?? "").includes("Acme Support"),
-    };
-
-    // A list: told how many, and it shows that many.
-    form = await abrir("list");
-    const listaPide = {
-      filas: !form.querySelector("[data-for-rows]").hidden,
-      marca: !!form.querySelector("[data-for-mark]"),
-    };
-    // The count is asked for the way a phone asks: minus, the number, plus,
-    // and no browser spinners inside the field. At the ends the buttons say so
-    // rather than doing nothing.
-    const grupo = form.querySelector("[data-for-rows]");
-    const caja = grupo.querySelector("input[name=rows]");
-    const menos = grupo.querySelector('[data-step="-1"]');
-    const mas = grupo.querySelector('[data-step="1"]');
-    const izquierda = (el) => Math.round(el.getBoundingClientRect().x);
-    caja.value = "0";
-    caja.dispatchEvent(new Event("input", { bubbles: true }));
-    const contador = {
-      orden: izquierda(menos) < izquierda(caja) && izquierda(caja) < izquierda(mas),
-      sinFlechas: getComputedStyle(caja).appearance === "textfield",
-      suelo: menos.disabled === true,
-    };
-    mas.click(); mas.click();
-    contador.subeDe2 = caja.value === "2" && menos.disabled === false;
-    menos.click();
-    contador.baja = caja.value === "1";
-
-    const cuenta = () => document.querySelectorAll('[data-module="list"] .cards .card').length;
-    const sinLimite = cuenta();
-    if (listaPide.filas) form.querySelector("[name=rows]").value = "1";
-    form.requestSubmit();
-    await new Promise(r => setTimeout(r, 1000));
-    const filasEnPantalla = cuenta();
-
-    document.querySelector("[data-edit-done]")?.click();
-    for (const slug of extras) {
-      await fetch("/api/orgs/codigosh/repos/" + slug, { method: "DELETE",
-        headers: { "X-CSRF-Token": csrf() } });
-    }
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: previa }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-
-    return { heroPide, heroEnPantalla, listaPide, contador, sinLimite, filasEnPantalla };
-  `);
-  check(
-    "the block that opens the page is written on the page, not in a dialog",
-    opciones.heroPide.nombre === false && opciones.heroPide.palabras === false &&
-      opciones.heroPide.marca === false && opciones.heroPide.filas === false &&
-      opciones.heroEnPantalla.titulo === "Acme Support" &&
-      opciones.heroEnPantalla.linea === "Tell us what broke." &&
-      opciones.heroEnPantalla.enElServidor === true,
-    JSON.stringify({ pide: opciones.heroPide, enPantalla: opciones.heroEnPantalla }),
-  );
-  // No border and nothing behind it, which is what lets a block of words read
-  // as part of the page rather than as a card sitting on it. Counting the
-  // controls says they are there; this says they do something.
-  const desnudo = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: [{ id: "naked", kind: "text", x: 1, y: 1, w: 6, h: 3 }] }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1400));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 800));
-
-    const celda = document.querySelector('[data-module="naked"]');
-    const antes = getComputedStyle(celda.querySelector(".words-box"));
-    const vestido = { borde: antes.borderTopWidth, fondo: antes.backgroundColor };
-
-
-    celda.querySelector("[data-module-menu]").click();
-    await new Promise(r => setTimeout(r, 200));
-    celda.querySelector("[data-edit-module]").click();
-    await new Promise(r => setTimeout(r, 500));
-    const form = document.querySelector("form.module-config");
-    form.querySelector('[data-width="0"]').click();
-    form.querySelector("[name=clear]").checked = true;
-    form.requestSubmit();
-    await new Promise(r => setTimeout(r, 1300));
-
-    // Waited for, not slept at: the save redraws the page, and a box read
-    // before the redraw is a detached element whose computed style is a row of
-    // empty strings — which reads exactly like a border that was removed.
-    let caja = null;
-    for (let i = 0; i < 40 && !caja; i++) {
-      caja = document.querySelector('[data-module="naked"] .words-box');
-      if (caja && !caja.isConnected) caja = null;
-      if (!caja) await new Promise(r => setTimeout(r, 100));
-    }
-    // Read into plain strings HERE, not at the return. getComputedStyle hands
-    // back a LIVE declaration: held onto across the two redraws below, it
-    // belongs to an element that is no longer in the document by the time it is
-    // read, and every value comes back as an empty string — which reads exactly
-    // like a border that was successfully removed.
-    const ahora = caja
-      ? (() => {
-          const c = getComputedStyle(caja);
-          return { borde: c.borderTopWidth, fondo: c.backgroundColor, sombra: c.boxShadow };
-        })()
-      : { borde: "?", fondo: "?", sombra: "?" };
-    const guardado = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === "naked");
-
-    // And the dialog comes back saying what was chosen rather than empty: none
-    // is a choice, and a control that forgets it is a control that says
-    // nothing was chosen.
-    document.querySelector('[data-module="naked"] [data-module-menu]').click();
-    await new Promise(r => setTimeout(r, 200));
-    document.querySelector('[data-module="naked"] [data-edit-module]').click();
-    await new Promise(r => setTimeout(r, 500));
-    const reabierto = {
-      ancho: document.querySelector("form.module-config [name=borderWidth]").value,
-      relleno: document.querySelector("form.module-config [name=clear]").checked,
-    };
-    document.querySelector("#module-config [data-close]")?.click();
-    await new Promise(r => setTimeout(r, 300));
-
-    document.querySelector("[data-edit-done]")?.click();
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: previa }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1300));
-    return { vestido, desnudo: ahora,
-             servidor: { bare: guardado?.bare === true, clear: guardado?.clear === true },
-             reabierto };
-  `);
-  check(
-    "a module can be asked for no border and nothing behind it",
-    desnudo.vestido.borde !== "0px" &&
-      desnudo.desnudo.borde === "0px" &&
-      desnudo.desnudo.fondo === "rgba(0, 0, 0, 0)" && desnudo.desnudo.sombra === "none" &&
-      desnudo.servidor.bare === true && desnudo.servidor.clear === true &&
-      // Nought is a choice and comes back as one, not as an untouched control.
-      desnudo.reabierto.ancho === "0" && desnudo.reabierto.relleno === true,
-    JSON.stringify(desnudo),
-  );
-
-  // A picture in a block of words, from the file to the page and back out.
-  //
-  // The conversion is the point rather than a detail: what an operator picks is
-  // a photograph off a phone, and what a front page can afford is a fraction of
-  // it. It is done in the browser because encoding WebP on the server would
-  // mean a C library and a binary that is no longer one static file.
-  const retrato = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: [{ id: "shot", kind: "text", x: 1, y: 1, w: 8, h: 5 }] }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1400));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 800));
-
-    // A picture with detail in it, so that the encoder has something to do and
-    // the two sizes are a real comparison rather than two ways of writing a
-    // flat rectangle.
-    const c = document.createElement("canvas");
-    c.width = 900; c.height = 600;
-    const x = c.getContext("2d");
-    for (let i = 0; i < 900; i += 3) {
-      x.fillStyle = "hsl(" + (i % 360) + ",70%," + (40 + (i % 30)) + "%)";
-      x.fillRect(i, 0, 3, 600);
-    }
-    const png = await new Promise(r => c.toBlob(r, "image/png"));
-    const webp = await new Promise(r => c.toBlob(r, "image/webp", 0.9));
-
-    const subir = (blob, type) => fetch("/api/landing/images", { method: "POST",
-      headers: { "X-CSRF-Token": csrf(), "Content-Type": type }, body: blob });
-
-    // What is not WebP is refused on the bytes, not on the header it declared.
-    const mentira = await subir(png, "image/webp").then(r => r.status);
-    const vacia = await subir(new Blob([], { type: "image/webp" }), "image/webp").then(r => r.status);
-
-    const hecha = await subir(webp, "image/webp");
-    const { url } = await hecha.json();
-
-    const caja = document.querySelector('[data-module="shot"] [data-words-body]');
-    caja.focus();
-    caja.innerHTML = '<p><img src="' + url + '" width="480" alt="A shot"></p>';
-    caja.dispatchEvent(new Event("input", { bubbles: true }));
-    await new Promise(r => setTimeout(r, 1500));
-    const guardado = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === "shot")?.body ?? "";
-
-    // Asked of the server, never of the browser: these are served immutable for
-    // a year, so a plain fetch answers out of the cache whatever the server
-    // still holds. That is how this measurement first said the sweep did
-    // nothing while the table was already empty.
-    const preguntar = (at) => fetch(at, { cache: "no-store" });
-    const servida = await preguntar(url);
-    const cabeceras = { estado: servida.status, tipo: servida.headers.get("content-type"),
-                        cache: servida.headers.get("cache-control") };
-
-    // And a picture nothing refers to any more goes: it was uploaded while
-    // somebody was writing, so undoing has to take it with it.
-    caja.innerHTML = "<p>No picture now.</p>";
-    caja.dispatchEvent(new Event("input", { bubbles: true }));
-    await new Promise(r => setTimeout(r, 1600));
-    const trasQuitarla = await preguntar(url).then(r => r.status);
-
-    document.querySelector("[data-edit-done]")?.click();
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: previa }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1300));
-    return { png: png.size, webp: webp.size, mentira, vacia,
-             creada: hecha.status, guardado, cabeceras, trasQuitarla };
-  `);
-  check(
-    "a picture is stored as WebP, served for a year, and swept when nothing shows it",
-    // Lighter than what went in, which is the whole reason for the conversion.
-    retrato.webp < retrato.png &&
-      retrato.creada === 201 && retrato.mentira === 400 && retrato.vacia === 400 &&
-      retrato.guardado.includes('width="480"') && retrato.guardado.includes('alt="A shot"') &&
-      retrato.guardado.includes('loading="lazy"') &&
-      retrato.cabeceras.estado === 200 && retrato.cabeceras.tipo === "image/webp" &&
-      retrato.cabeceras.cache.includes("immutable") &&
-      retrato.trasQuitarla === 404,
-    JSON.stringify({ pesos: { png: retrato.png, webp: retrato.webp },
-                     subida: { creada: retrato.creada, noEsWebp: retrato.mentira, vacia: retrato.vacia },
-                     guardado: retrato.guardado, cabeceras: retrato.cabeceras,
-                     trasQuitarla: retrato.trasQuitarla }),
-  );
-
-  // The writing bar, driven the way a hand drives it.
-  //
-  // Colour and alignment are the two that cannot be copied from the dashboard:
-  // this page is served with style-src 'self' and no unsafe-inline, so an
-  // inline style written by an editing command is dropped by the browser
-  // without a word — the button would look like it worked and change nothing.
-  // They write classes instead, and the check is that the class is there AFTER
-  // the round trip through the server, because the server has its own list and
-  // a class it does not know is a class it removes.
-  const escribiendo = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: [{ id: "pen", kind: "text", x: 1, y: 1, w: 12, h: 3 }] }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1300));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    const caja = document.querySelector('[data-module="pen"] [data-words-body]');
-    const barraAntes = document.querySelector(".words-bar")?.hidden !== false;
-    caja.focus();
-    await new Promise(r => setTimeout(r, 250));
-    const barra = document.querySelector(".words-bar");
-    const aparece = barra.hidden === false;
-    const sigue = caja.parentElement.contains(barra);
-
-    caja.innerHTML = "<p>Ours</p>";
-    const elegir = () => {
-      const r = document.createRange();
-      r.selectNodeContents(caja.querySelector("p"));
-      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-    };
-    elegir(); barra.querySelector('[data-do="bold"]').click();
-    await new Promise(r => setTimeout(r, 150));
-    elegir(); barra.querySelector('[data-do="ink:ink-accent"]').click();
-    await new Promise(r => setTimeout(r, 150));
-    elegir(); barra.querySelector('[data-do="align:align-center"]').click();
-    await new Promise(r => setTimeout(r, 1400));
-
-    // Nothing was written as an inline style, which the policy would have
-    // thrown away: what the page holds is classes.
-    const enLaPagina = caja.innerHTML;
-    const conEstilo = caja.querySelectorAll("[style]").length;
-    const guardado = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === "pen")?.body ?? "";
-
-    document.querySelector("[data-edit-done]")?.click();
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: previa }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-    return { barraAntes, aparece, sigue, conEstilo, enLaPagina, guardado };
-  `);
-  check(
-    "the bar follows the cursor, and colour and alignment survive the policy",
-    escribiendo.barraAntes === true && escribiendo.aparece === true &&
-      escribiendo.sigue === true && escribiendo.conEstilo === 0 &&
-      escribiendo.guardado.includes("align-center") &&
-      escribiendo.guardado.includes("ink-accent") &&
-      // Bold arrives from the browser as <b> and is stored in one dialect.
-      escribiendo.guardado.includes("<strong>"),
-    JSON.stringify({ barra: { antesOculta: escribiendo.barraAntes, aparece: escribiendo.aparece,
-                              dentro: escribiendo.sigue },
-                     estilosEnLinea: escribiendo.conEstilo, guardado: escribiendo.guardado }),
-  );
-
-  // And every one of them, not just the two above. The browser kept its own
-  // idea of which modules carry a name and which can be pointed at a board,
-  // and it had fallen three behind the server's: recent activity, the roadmap
-  // and the figures were drawn from a board the operator was never offered a
-  // way to choose. Two predicates in two languages drift in silence, so the
-  // table is asserted whole rather than per module.
-  const todos = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const previa = (await fetch("/api/landing").then(r => r.json())).modules;
-    const kinds = ["hero", "text", "call_to_action", "organisations",
-      "boards", "most_voted", "recently_done", "recent_activity", "roadmap",
-      "statistics", "section"];
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: kinds.map((kind, i) => ({
-        id: kind, kind, x: 1 + (i % 4) * 3, y: 1 + Math.floor(i / 4) * 2, w: 3, h: 2,
-      })) }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1400));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    const ofrece = {};
-    for (const kind of kinds) {
-      const celda = document.querySelector('[data-module="' + kind + '"]');
-      celda.querySelector("[data-module-menu]").click();
-      await new Promise(r => setTimeout(r, 150));
-      celda.querySelector("[data-edit-module]").click();
-      await new Promise(r => setTimeout(r, 350));
-      const form = document.querySelector("form.module-config");
-      ofrece[kind] = ["name", "label", "scope", "rows"]
-        .filter(f => !form.querySelector("[data-for-" + f + "]").hidden).join(",");
-      form.querySelector("[data-close]").click();
-      await new Promise(r => setTimeout(r, 250));
-    }
-
-    document.querySelector("[data-edit-done]")?.click();
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: previa }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-    return ofrece;
-  `);
-  check(
-    "and it is asked the way a phone asks, with the ends saying so",
-    opciones.contador.orden === true && opciones.contador.sinFlechas === true &&
-      opciones.contador.suelo === true && opciones.contador.subeDe2 === true &&
-      opciones.contador.baja === true,
-    JSON.stringify(opciones.contador),
-  );
-
-  const esperado: Record<string, string> = {
-    // A block of words is asked nothing in the dialog but how its box looks.
-    // Not even a name: it says what it is in its own words, at whatever size
-    // the operator chose, and a header drawn above that would be the same
-    // thing said twice in two type sizes.
-    hero: "",
-    text: "",
-    call_to_action: "label,scope",
-    organisations: "name,scope,rows",
-    boards: "name,scope,rows",
-    most_voted: "name,scope,rows",
-    recently_done: "name,scope,rows",
-    recent_activity: "name,scope,rows",
-    roadmap: "name,scope,rows",
-    statistics: "name,scope",
-    section: "name",
-  };
-  const desviados = Object.keys(esperado)
-    .filter((kind) => todos[kind] !== esperado[kind])
-    .map((kind) => `${kind}: ${todos[kind]} (se esperaba ${esperado[kind]})`);
-  check(
-    "and every module is asked about what it is, the whole table at once",
-    desviados.length === 0 &&
-      // Every module that draws something out of the installation is asked
-      // about it. The two blocks of words are the exception and are named as
-      // one, rather than the rule being loosened until it says nothing: what
-      // they show is typed into them, so there is nothing left to ask.
-      Object.entries(todos).every(
-        ([kind, ofrecido]) => ofrecido !== "" || kind === "hero" || kind === "text",
-      ),
-    desviados.length === 0 ? JSON.stringify(todos) : desviados.join("; "),
-  );
-
-  check(
-    "and a module that lists things is asked how many, and shows that many",
-    opciones.listaPide.filas === true && opciones.listaPide.marca === false &&
-      opciones.sinLimite >= 2 && opciones.filasEnPantalla === 1,
-    JSON.stringify({
-      pide: opciones.listaPide,
-      sinLimite: opciones.sinLimite,
-      filas: opciones.filasEnPantalla,
-    }),
-  );
-
-  // Removing asks first. It used to go on the click, and a module somebody
-  // spent a minute pointing at the right board is not something to lose to a
-  // stray one.
-  const borrar = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-    const antes = (await fetch("/api/landing").then(r => r.json())).modules.length;
-    const celda = document.querySelector('.landing-cell[data-module^="statistics-"]')
-      || document.querySelector('.landing-cell[data-module^="call_to_action-"]');
-    const id = celda.dataset.module;
-
-    celda.querySelector("[data-module-menu]").click();
-    await new Promise(r => setTimeout(r, 200));
-    celda.querySelector("[data-remove-module]").click();
-    await new Promise(r => setTimeout(r, 500));
-
-    const dlg = document.querySelector("#confirm-remove");
-    const pregunta = {
-      abierto: dlg?.open === true,
-      titulo: dlg?.querySelector("[data-confirm-title]")?.textContent?.trim() ?? "",
-      mensaje: dlg?.querySelector("[data-confirm-message]")?.textContent?.trim() ?? "",
-      acciones: dlg ? dlg.querySelectorAll(".confirm-actions button").length : 0,
-      sigue: (await fetch("/api/landing").then(r => r.json())).modules.length,
-    };
-
-    // And it is composed the way theirs is, not the way the settings dialog is.
-    // It was wearing that one's furniture: no padding of its own, a header with
-    // no rule under it, a bigger bolder title, a bigger message, and the action
-    // stretched across the whole width. Five differences, one wrong
-    // composition.
-    const cabecera = dlg.querySelector(".confirm-head");
-    const titulo = dlg.querySelector(".confirm-title");
-    const mensaje = dlg.querySelector(".modal-message");
-    const accion = dlg.querySelector(".confirm-actions button");
-    const cs = (el) => getComputedStyle(el);
-    const forma = {
-      relleno: cs(dlg).padding,
-      cabeceraCentrada: cs(cabecera).alignItems === "center",
-      reglaBajoTitulo: cs(cabecera).borderBottomWidth,
-      titulo: cs(titulo).fontSize + "/" + cs(titulo).fontWeight,
-      mensaje: cs(mensaje).fontSize,
-      // Right-aligned and its own width, not stretched: the full-width outlined
-      // action belongs to the dialog whose verb is "save", not to this one.
-      alFinal: cs(dlg.querySelector(".confirm-actions")).justifyContent,
-      accionEstrecha:
-        accion.getBoundingClientRect().width < dlg.getBoundingClientRect().width / 2,
-    };
-
-    // Backing out changes nothing.
-    dlg.querySelector("[data-close]").click();
-    await new Promise(r => setTimeout(r, 500));
-    const trasCerrar = (await fetch("/api/landing").then(r => r.json())).modules.length;
-
-    // And confirming removes it.
-    celda.querySelector("[data-module-menu]").click();
-    await new Promise(r => setTimeout(r, 200));
-    celda.querySelector("[data-remove-module]").click();
-    await new Promise(r => setTimeout(r, 400));
-    document.querySelector("#confirm-remove [data-confirm]").click();
-    await new Promise(r => setTimeout(r, 1100));
-    const despues = (await fetch("/api/landing").then(r => r.json()));
-
-    return { antes, pregunta, forma, trasCerrar, despues: despues.modules.length,
-             sigueAhi: despues.modules.some(m => m.id === id) };
-  `);
-  check(
-    "removing asks first, and backing out changes nothing",
-    borrar.pregunta.abierto === true && borrar.pregunta.titulo !== "" &&
-      borrar.pregunta.mensaje !== "" && borrar.pregunta.acciones === 1 &&
-      borrar.pregunta.sigue === borrar.antes && borrar.trasCerrar === borrar.antes,
-    JSON.stringify(borrar.pregunta),
-  );
-  check(
-    "and it is composed the way theirs is, not the way the settings dialog is",
-    borrar.forma.relleno === "28px" && borrar.forma.cabeceraCentrada === true &&
-      borrar.forma.reglaBajoTitulo === "1px" && borrar.forma.titulo === "18px/600" &&
-      borrar.forma.mensaje === "14px" && borrar.forma.alFinal === "flex-end" &&
-      borrar.forma.accionEstrecha === true,
-    JSON.stringify(borrar.forma),
-  );
-  check(
-    "and confirming is what removes it",
-    borrar.despues === borrar.antes - 1 && borrar.sigueAhi === false,
-    JSON.stringify({ antes: borrar.antes, despues: borrar.despues }),
-  );
-
-  // A module's dialog, and its three ways out. The × and Cancel had no listener
-  // at all on this page: the wiring that gives every dialog in the product its
-  // close buttons ran on three panel screens and not on this one, so the only
-  // way out of a module's settings was the keyboard.
-  const salidas = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    const abrir = async () => {
-      document.querySelector('.landing-cell[data-module^="boards-"] [data-module-menu]').click();
-      await new Promise(r => setTimeout(r, 200));
-      document.querySelector('.landing-cell[data-module^="boards-"] [data-edit-module]').click();
-      await new Promise(r => setTimeout(r, 400));
-      return document.querySelector("#module-config");
-    };
-    const abierto = () => document.querySelector("#module-config")?.open === true;
-
-    const dlg = await abrir();
-    const seAbre = abierto();
-    dlg.querySelector(".modal-head [data-close]").click();
-    await new Promise(r => setTimeout(r, 300));
-    const trasLaEquis = abierto();
-
-    await abrir();
-    document.querySelector("#module-config [type=submit]").click();
-    await new Promise(r => setTimeout(r, 900));
-    const trasGuardar = abierto();
-
-    return { seAbre, trasLaEquis, trasGuardar,
-             // The dashboard's dialog has no cancel: the cross is the way out
-             // that changes nothing, and one action at the foot is the action.
-             cancelar: !!document.querySelector(".modal-foot [data-close]") };
-  `);
-  check(
-    "a module's dialog closes by the cross and by saving, and offers no third way",
-    salidas.seAbre === true && salidas.trasLaEquis === false &&
-      salidas.trasGuardar === false && salidas.cancelar === false,
-    JSON.stringify(salidas),
-  );
-
-  // The four places a name can go, driven through the dialog. The pill is the
-  // one that matters most: it is the mark the operator may CHOOSE, and the
-  // whole point is that the product never hands it out by itself.
-  const donde = await evaluate(`
-    // Back into edit mode: the block above left it, and the kebab that opens a
-    // module's dialog only exists while the page is being arranged.
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 600));
-
-    const leer = () => {
-      const cell = document.querySelector('.landing-cell[data-module^="boards-"]');
-      const head = cell.querySelector(".module-header");
-      const cb = cell.getBoundingClientRect();
-      return {
-        cabecera: !!head,
-        pildora: !!cell.querySelector(".section-legend"),
-        alPie: cell.querySelector(".landing-scroll")?.classList.contains("label-bottom") ?? false,
-        // Where the header actually sits inside the module, not which class it
-        // carries: a class says what was asked for, a box says what happened.
-        mitad: head ? (head.getBoundingClientRect().top - cb.top) > cb.height / 2 : null,
-        // And when the name IS the pill, whether it is whole.
-        //
-        // This is the most fragile piece of the system, because it lives half
-        // outside its own box: it has been cut in two twice, once by
-        // specificity and once by the tile clipping. A pill two pixels short
-        // looks exactly like one that is fine, so it is measured rather than
-        // looked at — the clearance to the module's edge, which has to be
-        // NEGATIVE because the whole point is that it sits on the line.
-        montada: (() => {
-          const pill = cell.querySelector(".section-legend");
-          if (!pill) return null;
-          const pb = pill.getBoundingClientRect();
-          return {
-            holgura: Math.round(pb.top - cb.top),
-            alto: Math.round(pb.height),
-            recorta: getComputedStyle(cell).overflow,
-          };
-        })(),
-      };
-    };
-
-    const poner = async (valor) => {
-      document.querySelector('.landing-cell[data-module^="boards-"] [data-module-menu]').click();
-      await new Promise(r => setTimeout(r, 200));
-      document.querySelector('.landing-cell[data-module^="boards-"] [data-edit-module]').click();
-      await new Promise(r => setTimeout(r, 400));
-      const form = document.querySelector("form.module-config");
-      const ofrecido = !document.querySelector("[data-for-label-at]").hidden;
-      form.querySelector("[data-open-marks]").click();
-      await new Promise(r => setTimeout(r, 200));
-      form.querySelector('[data-marks] [data-at="' + valor + '"]').click();
-      await new Promise(r => setTimeout(r, 150));
-      form.requestSubmit();
-      await new Promise(r => setTimeout(r, 900));
-      return { ofrecido, ...leer() };
-    };
-
-    return { arriba: leer(), abajo: await poner("bottom"),
-             enPildora: await poner("pill"), sinNombre: await poner("off") };
-  `);
-  check(
-    "and a name worn on the border is whole, not cut in half by its own module",
-    donde.enPildora.montada !== null &&
-      // Above the line by roughly half of itself, which is what "on the
-      // border" means. Cut off would read as nought or worse.
-      donde.enPildora.montada.holgura < 0 &&
-      donde.enPildora.montada.alto > 8 &&
-      // And the module lets it out, which is the one exception to a tile that
-      // clips everything.
-      donde.enPildora.montada.recorta === "visible",
-    JSON.stringify(donde.enPildora.montada),
-  );
-  check(
-    "a module's name goes where the operator puts it, in four places",
-    donde.arriba.cabecera === true && donde.arriba.pildora === false && donde.arriba.mitad === false &&
-      donde.abajo.ofrecido === true && donde.abajo.alPie === true && donde.abajo.mitad === true &&
-      donde.enPildora.pildora === true && donde.enPildora.cabecera === false &&
-      donde.sinNombre.pildora === false && donde.sinNombre.cabecera === false,
-    JSON.stringify(donde),
-  );
-
-
-  // Sections: a box that holds modules, ported from the dashboard. Four things
-  // have to be true for one to be worth having — something can be dropped in,
-  // what is in it is placed in ITS grid and not the page's, it can be taken
-  // back out, and shrinking one puts out what no longer fits.
-  //
-  // The page it runs on is written through the API first. That is setup, not
-  // the thing being checked: the default page is all full-width modules, so
-  // there is nowhere on it to drop anything, and a drag that has nowhere to
-  // land proves nothing about dragging.
-  const seccion = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const capa = () => fetch("/api/landing").then(r => r.json());
-    const escribir = (modules) => fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules }) }).then(r => r.status);
-
-    // The page as the checks after this one expect to find it. A journey is one
-    // story with accumulated state: writing a layout of my own here and leaving
-    // it took three later checks down with it.
-    window.__paginaAntes = (await capa()).modules;
-
-    const puesto = await escribir([
-      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 3 },
-      { id: "group", kind: "section", x: 1, y: 4, w: 6, h: 3, body: "My projects" },
-      { id: "loose", kind: "boards", x: 7, y: 4, w: 4, h: 2 },
-    ]);
-
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    const conPildora = !!document.querySelector(
-      '.landing-cell[data-module="group"] .section-legend');
-
-    // The point is worked out by the caller, in page coordinates. Aiming at a
-    // fraction of some element kept landing on top of another module, and a
-    // drop that collides is correctly refused — so the check was measuring the
-    // collision rule, not the drag.
-    const arrastrar = async (id, punto) => {
-      const celda = document.querySelector('[data-module="' + id + '"]');
-      const caja = celda.getBoundingClientRect();
-      const dt = new DataTransfer();
-      celda.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt,
-        clientX: caja.left + 8, clientY: caja.top + 8 }));
-      const grid = document.querySelector(".landing-grid.editing");
-      grid.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt, ...punto }));
-      await new Promise(r => setTimeout(r, 140));
-      const senales = {
-        resaltado: !!document.querySelector(".landing-group.drop-target"),
-        fantasmaDentro: !!document.querySelector(".landing-section .landing-ghost"),
-        valido: !document.querySelector(".landing-ghost")?.classList.contains("invalid"),
-        celda: (() => {
-          const g = document.querySelector(".landing-ghost");
-          const cs = getComputedStyle(g);
-          return cs.gridColumn + " / " + cs.gridRow;
-        })(),
-      };
-      grid.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt, ...punto }));
-      await new Promise(r => setTimeout(r, 900));
-      celda.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: dt }));
-      return senales;
-    };
-
-    // In, aimed at the section's own first cell.
-    const dentroDe = document.querySelector('.landing-section[data-section="group"]').getBoundingClientRect();
-    const senales = await arrastrar("loose",
-      { clientX: dentroDe.left + 10, clientY: dentroDe.top + 10 });
-    const hijo = (await capa()).modules.find(m => m.id === "loose");
-    const dibujadoDentro = !!document.querySelector(
-      '.landing-section[data-section="group"] [data-module="loose"]');
-
-    // Shrink the section under it, through the API rather than the corner: the
-    // corner is checked elsewhere, and what is being measured here is what the
-    // page does with a child that no longer fits.
-    await escribir([
-      { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 3 },
-      { id: "group", kind: "section", x: 1, y: 4, w: 6, h: 3, body: "My projects" },
-      { id: "loose", kind: "boards", x: 1, y: 1, w: 4, h: 2, parent: "group" },
-    ]);
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    // Out again — and aimed at a cell that is TAKEN, which is what a real page
-    // looks like. Refusing a colliding drop is right everywhere else, and here
-    // it left the module trapped in the section for good: there was nowhere
-    // free to aim at. Leaving always works.
-    const encima = document.querySelector('.landing-cell[data-module="hero"]').getBoundingClientRect();
-    const salida = await arrastrar("loose", { clientX: encima.left + 40, clientY: encima.top + 20 });
-    const fuera = (await capa()).modules.find(m => m.id === "loose");
-
-    document.querySelector("[data-edit-done]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-    return { puesto, conPildora, ...senales, dibujadoDentro,
-             dentro: { parent: hijo.parent ?? "", x: hijo.x, y: hijo.y },
-             fuera: { parent: fuera.parent ?? "", x: fuera.x, y: fuera.y, ...salida } };
-  `);
-  check(
-    "a module dropped into a section is placed in the section's own grid",
-    seccion.puesto === 200 && seccion.dentro.parent === "group" &&
-      seccion.dentro.x === 1 && seccion.dentro.y === 1 && seccion.dibujadoDentro === true,
-    JSON.stringify(seccion.dentro),
-  );
-  check(
-    "and the page says where it is going before it is let go",
-    seccion.resaltado === true && seccion.fantasmaDentro === true && seccion.valido === true,
-    JSON.stringify({ resaltado: seccion.resaltado, fantasma: seccion.fantasmaDentro }),
-  );
-  const seccionModal = await evaluate(`
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-    const celda = document.querySelector('.landing-cell[data-module="group"]');
-    celda.querySelector("[data-module-menu]").click();
-    await new Promise(r => setTimeout(r, 200));
-    celda.querySelector("[data-edit-module]").click();
-    await new Promise(r => setTimeout(r, 500));
-    const form = document.querySelector("form.module-config");
-    const nombre = form.querySelector("[name=name]");
-    const pideNombre = !form.querySelector("[data-for-name]").hidden;
-    const valor = nombre.value;
-    const marcas = [...form.querySelectorAll("[data-marks] [data-at]")].map(b => ({
-      at: b.dataset.at, puede: !b.disabled, elegida: b.classList.contains("on") }));
-    nombre.value = "Our work";
-    form.querySelector("[data-tab=general]").click();
-    form.requestSubmit();
-    await new Promise(r => setTimeout(r, 1000));
-    const guardada = (await fetch("/api/landing").then(r => r.json()))
-      .modules.find(m => m.id === "group");
-    document.querySelector("[data-edit-done]")?.click();
-    await new Promise(r => setTimeout(r, 600));
-    return { pideNombre, valor, marcas, nombreGuardado: guardada.body ?? "",
-             enLaPildora: document.querySelector(
-               '.landing-cell[data-module="group"] .section-legend')?.textContent.trim() ?? "" };
-  `);
-  check(
-    "a section is named in the same field and placed with the same marks",
-    seccionModal.pideNombre === true && seccionModal.valor === "My projects" &&
-      seccionModal.marcas.length === 4 &&
-      seccionModal.marcas.find((m: { at: string }) => m.at === "pill")?.puede === true &&
-      seccionModal.marcas.find((m: { at: string }) => m.at === "pill")?.elegida === true &&
-      seccionModal.marcas.find((m: { at: string }) => m.at === "top")?.puede === false &&
-      seccionModal.nombreGuardado === "Our work" &&
-      seccionModal.enLaPildora === "Our work",
-    JSON.stringify(seccionModal),
-  );
-
-  check(
-    "a section wears its name on its border, or wears none",
-    seccion.conPildora === true,
-    JSON.stringify({ pildora: seccion.conPildora }),
-  );
-  check(
-    "and a module can be taken back out of a section",
-    seccion.fuera.parent === "",
-    JSON.stringify(seccion.fuera),
   );
 
   // The bar above the page, which is the only thing a signed-in operator sees
@@ -3093,7 +1890,7 @@ async function main() {
   modos.panel = await evaluate(leerBarra);
   await goTo("/review", ".rev-list, .rev-empty");
   modos.revision = await evaluate(leerBarra);
-  await goTo("/", ".landing-grid");
+  await goTo("/", ".lp");
   const vivos = (m: any) =>
     ["lapiz", "panel", "revision"].filter((k) => m?.[k]?.vivo).join(",");
   const presentes = Object.values(modos).every((m: any) => m.lapiz && m.panel && m.revision);
@@ -3119,7 +1916,9 @@ async function main() {
   // the dashboard's.
   await page.send("Emulation.setDeviceMetricsOverride", { width: 2200, height: 900, deviceScaleFactor: 1, mobile: false });
   await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
-  await sleep(300);
+  // Measured at rest: the panel slides in from the side, and a column caught
+  // mid-slide is a few pixels past the edge it will settle on.
+  await waitFor(".admin:not(.arriving)");
   const ancho = await evaluate(`
     const col = document.querySelector(".admin-main").getBoundingClientRect();
     const first = document.querySelector(".admin-main > :not(h1):not(.visually-hidden)")?.getBoundingClientRect();
@@ -3131,260 +1930,7 @@ async function main() {
     ancho.hueco === 0 && ancho.contenido > 0 && ancho.contenido <= 1600,
     JSON.stringify(ancho),
   );
-  await goTo("/", ".landing-grid");
-
-  // One of three blocks that write their own page: the section checks capture
-  // what was here, this one and the next write over it, and the last one puts
-  // it back. They are a sequence, not three independent checks — moving one out
-  // of the middle leaves the page rewritten for everything after it, which is
-  // how three later checks went down the first time.
-  //
-  // A module pointed at one thing IS that thing, rather than a list of one row
-  // inside a box with a heading over it. This is what makes eight boards in a
-  // section read as eight boards, and it is the reason sections were worth
-  // building at all.
-  const singular = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: [
-        { id: "group", kind: "section", x: 1, y: 1, w: 8, h: 2, body: "My projects" },
-        { id: "one", kind: "boards", x: 1, y: 1, w: 4, h: 2, scope: "codigosh/lastboard", parent: "group" },
-        { id: "many", kind: "boards", x: 1, y: 3, w: 6, h: 3 },
-        { id: "org", kind: "organisations", x: 7, y: 3, w: 6, h: 2, scope: "codigosh" },
-      ] }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1300));
-
-    const uno = document.querySelector('[data-module="one"]');
-    const muchos = document.querySelector('[data-module="many"]');
-    const unaOrg = document.querySelector('[data-module="org"]');
-    return {
-      // One board: the card is the module, with no heading and no list around it.
-      unoEsTarjeta: !!uno.querySelector(".landing-one"),
-      unoSinCabecera: !uno.querySelector(".module-header"),
-      unoEnlaza: uno.querySelector(".landing-one")?.getAttribute("href") ?? "",
-      unoDentroDeSeccion: !!document.querySelector(
-        '.landing-section[data-section="group"] [data-module="one"]'),
-      // All of them: still the list it was, which is what an installation that
-      // never chose anything keeps showing.
-      muchosEsLista: !!muchos.querySelector(".cards") && !!muchos.querySelector(".module-header"),
-      orgEsTarjeta: !!unaOrg.querySelector(".landing-one"),
-      orgEnlaza: unaOrg.querySelector(".landing-one")?.getAttribute("href") ?? "",
-    };
-  `);
-  check(
-    "a module pointed at one board is that board, not a list holding it",
-    singular.unoEsTarjeta === true && singular.unoSinCabecera === true &&
-      singular.unoEnlaza === "/codigosh/lastboard" && singular.unoDentroDeSeccion === true,
-    JSON.stringify(singular),
-  );
-  check(
-    "and one pointed at everything is still the listing it was",
-    singular.muchosEsLista === true,
-    JSON.stringify({ lista: singular.muchosEsLista }),
-  );
-  check(
-    "the same for an organisation",
-    singular.orgEsTarjeta === true && singular.orgEnlaza === "/codigosh",
-    JSON.stringify({ tarjeta: singular.orgEsTarjeta, enlace: singular.orgEnlaza }),
-  );
-
-  // The three that only make sense on an installation with some history: what
-  // arrived lately, what is coming, and how it is going. The last of those is
-  // the one worth being careful with — three zeroes on a fresh installation
-  // tell the first visitor that nothing happens here.
-  const historia = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const escribir = (modules) => fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules }) }).then(r => r.status);
-    const dibujar = async () => {
-      history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-      await new Promise(r => setTimeout(r, 1300));
-    };
-
-    await escribir([
-      { id: "lately", kind: "recent_activity", x: 1, y: 1, w: 6, h: 3 },
-      { id: "soon", kind: "roadmap", x: 7, y: 1, w: 6, h: 3 },
-      { id: "figures", kind: "statistics", x: 1, y: 4, w: 6, h: 2 },
-    ]);
-    await dibujar();
-
-    const conDatos = {
-      recientes: document.querySelectorAll('[data-module="lately"] .brief').length,
-      columnas: [...document.querySelectorAll('[data-module="soon"] .column-name')]
-        .map(el => el.textContent.trim()),
-      cifras: [...document.querySelectorAll('[data-module="figures"] .figure-number')]
-        .map(el => el.textContent.trim()),
-      // The numbers have to agree with the reports the page itself lists, or
-      // they are three numbers from somewhere else.
-      recibidos: Number(document.querySelector('[data-module="figures"] .figure-number')?.textContent ?? "0"),
-    };
-
-    // Now the same three on an installation where nothing has been published.
-    // The scope names a board that is not there, which is the same thing to
-    // every one of them: no boards, so nothing counted.
-    await escribir([
-      { id: "lately", kind: "recent_activity", x: 1, y: 1, w: 6, h: 3, scope: "codigosh/gone" },
-      { id: "soon", kind: "roadmap", x: 7, y: 1, w: 6, h: 3, scope: "codigosh/gone" },
-      { id: "figures", kind: "statistics", x: 1, y: 4, w: 6, h: 2, scope: "codigosh/gone" },
-    ]);
-    await dibujar();
-
-    const enBlanco = {
-      recientesVacio: !!document.querySelector('[data-module="lately"] .empty'),
-      roadmapVacio: !!document.querySelector('[data-module="soon"] .empty'),
-      cifras: document.querySelectorAll('[data-module="figures"] .figure-number').length,
-      // And the statistics module keeps its place instead of collapsing.
-      cajaEstadisticas: Math.round(
-        document.querySelector('[data-module="figures"]').getBoundingClientRect().height),
-    };
-    return { conDatos, enBlanco };
-  `);
-  check(
-    "the front page can show what arrived lately and what is coming",
-    historia.conDatos.recientes >= 1 &&
-      historia.conDatos.columnas.length >= 1 &&
-      historia.conDatos.cifras.length === 3,
-    JSON.stringify(historia.conDatos),
-  );
-  check(
-    "and the numbers count what was actually published",
-    historia.conDatos.recibidos >= historia.conDatos.recientes,
-    JSON.stringify({ recibidos: historia.conDatos.recibidos, listados: historia.conDatos.recientes }),
-  );
-  check(
-    "with nothing to count, no numbers are shown at all",
-    historia.enBlanco.cifras === 0 &&
-      historia.enBlanco.recientesVacio === true && historia.enBlanco.roadmapVacio === true &&
-      historia.enBlanco.cajaEstadisticas > 10,
-    JSON.stringify(historia.enBlanco),
-  );
-
-  // Shrinking a section under what is inside it. The dashboard this comes from
-  // compares HOW MANY children there are against how many cells are left, so a
-  // section with one child shrunk under that child ejects nothing and draws it
-  // outside the box meant to contain it. Here the question is where each child
-  // is, so this is the case that separates the two.
-  const encoger = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: [
-        { id: "hero", kind: "hero", x: 1, y: 1, w: 12, h: 3 },
-        { id: "group", kind: "section", x: 1, y: 4, w: 6, h: 3, body: "My projects" },
-        { id: "loose", kind: "boards", x: 3, y: 1, w: 4, h: 2, parent: "group" },
-      ] }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-    document.querySelector("[data-edit-page]")?.click();
-    await new Promise(r => setTimeout(r, 700));
-
-    // One child, sitting at the section's third column and four wide, so it
-    // ends at the sixth. Take three columns away and it no longer fits — and
-    // counting children would say one child against nine cells and keep it.
-    const grid = document.querySelector(".landing-grid.editing");
-    const gridBox = grid.getBoundingClientRect();
-    const col = (gridBox.width - 11 * 16) / 12;
-    const celda = document.querySelector('.landing-cell[data-module="group"]');
-    const caja = celda.getBoundingClientRect();
-    // The section's OWN corner. Without :scope this finds the child's handle
-    // first — it is a descendant too — and the drag resized the child from four
-    // columns to one while the section stayed exactly as it was.
-    const asa = celda.querySelector(":scope > [data-resize]");
-    const opts = { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse" };
-
-    asa.dispatchEvent(new PointerEvent("pointerdown", { ...opts,
-      clientX: caja.right, clientY: caja.bottom }));
-    window.dispatchEvent(new PointerEvent("pointermove", { ...opts,
-      clientX: caja.right - 3 * (col + 16), clientY: caja.bottom }));
-    await new Promise(r => setTimeout(r, 140));
-    window.dispatchEvent(new PointerEvent("pointerup", { ...opts,
-      clientX: caja.right - 3 * (col + 16), clientY: caja.bottom }));
-    await new Promise(r => setTimeout(r, 1100));
-
-    const capa = await fetch("/api/landing").then(r => r.json());
-    const seccion = capa.modules.find(m => m.id === "group");
-    const hijo = capa.modules.find(m => m.id === "loose");
-    const dentroDelDibujo = !!document.querySelector(
-      '.landing-section[data-section="group"] [data-module="loose"]');
-
-    // And the page goes back to what it was, for whatever runs after this.
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules: window.__paginaAntes }) });
-    document.querySelector("[data-edit-done]")?.click();
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-
-    return { ancho: seccion.w, hijo: { parent: hijo.parent ?? "", x: hijo.x, y: hijo.y, w: hijo.w },
-             dentroDelDibujo,
-             devuelta: (await fetch("/api/landing").then(r => r.json())).modules.length };
-  `);
-  check(
-    "shrinking a section puts out what no longer fits in it",
-    encoger.ancho === 3 && encoger.hijo.parent === "" && encoger.dentroDelDibujo === false &&
-      encoger.devuelta > 3,
-    JSON.stringify(encoger),
-  );
-
-  // Pointed at a board that is not there any more — which is what an operator
-  // is left with after deleting one they had composed a page around. The module
-  // has to come back empty, not quietly show every board instead: showing
-  // everything would be the page answering a question nobody asked.
-  const huerfano = await evaluate(`
-    const csrf = () => document.cookie.split(";").map(c => c.trim())
-      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const layout = await fetch("/api/landing").then(r => r.json());
-    const modules = layout.modules.map(m =>
-      m.kind === "boards" ? { ...m, scope: "codigosh/gone" } : m);
-    await fetch("/api/landing", { method: "PUT",
-      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ modules }) });
-    history.pushState({}, "", "/"); dispatchEvent(new PopStateEvent("popstate"));
-    await new Promise(r => setTimeout(r, 1200));
-    // Inside the boards module and nowhere else. Counting every .card on the
-    // page counted the organisations module's two as well, so this passed and
-    // failed for reasons that had nothing to do with the scope.
-    const suyo = document.querySelector('.landing-cell[data-module^="boards-"]');
-    return { tarjetas: suyo.querySelectorAll(".cards .card").length,
-             vacio: !!suyo.querySelector(".empty") };
-  `);
-  check(
-    "a module pointed at a board that is gone shows nothing, not everything",
-    huerfano.tarjetas === 0 && huerfano.vacio === true,
-    JSON.stringify(huerfano),
-  );
-
-  await evaluate(`
-    document.querySelector("[data-edit-done]")?.click();
-    await new Promise(r => setTimeout(r, 500));
-  `);
-
-
-  // Against what is stored, not against a number written here. This counted a
-  // fixed eight and had to be edited every time another block added a module,
-  // which means it was measuring the journey rather than the page. What it is
-  // for is that everything arranged is drawn, and nothing else is.
-  const frontPage = await evaluate(`
-    const stored = await fetch("/api/landing").then(r => r.json());
-    return {
-      cells: document.querySelectorAll(".landing-cell").length,
-      arranged: stored.modules.length,
-      words: document.body.textContent.includes("We read everything that arrives."),
-      hero: !!document.querySelector('[data-module^="hero"] .words-box'),
-      orgs: !!document.querySelector(".landing-scroll"),
-    };
-  `);
-  check(
-    "and what was arranged is what a visitor is shown",
-    frontPage.cells === frontPage.arranged && frontPage.words === true && frontPage.hero === true && frontPage.orgs === true,
-    JSON.stringify(frontPage),
-  );
+  await goTo("/", ".lp");
 
 
   // 13. Right to left, which is where a stylesheet written in left and right

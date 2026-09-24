@@ -97,6 +97,7 @@ func TestAPageSurvivesTheRoundTrip(t *testing.T) {
 						{Label: "Report", To: ToForm, Scope: "acme/atlas", Button: true},
 					}}},
 				}},
+			{ID: "where", Columns: One, HideName: true, Cells: [][]Module{{}}},
 		},
 		Settings: Settings{Title: "Acme", Description: "Where Acme listens.",
 			Footer: []Link{{Label: "Code", To: ToURL, URL: "https://git.example.com/acme"}}},

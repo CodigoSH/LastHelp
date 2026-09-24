@@ -68,6 +68,7 @@ export interface LandingBand {
   columns: LandingColumns;
   cells: LandingModule[][];
   name?: string;
+  hide_name?: boolean;
   background?: "" | "soft" | "accent";
   width?: "" | "full";
   spacing?: "" | "compact" | "airy";
@@ -125,6 +126,8 @@ export interface LandingContext {
   content: LandingContent;
   /** Whether the editor is drawing it: empty modules then show what fills them. */
   editing?: boolean;
+  /** The band or module the editor has chosen, by id. */
+  selected?: string;
 }
 
 /**
@@ -152,9 +155,7 @@ const POINTS: Record<string, { icon: () => string; title: string; body: string }
 export function defaultWords(id: string, text: Text): string {
   const point = POINTS[id];
   if (!point) return "";
-  return `<div class="point"><span class="point-icon">${point.icon()}</span><div>
-    <h3>${escapeHTML(text.t(point.title))}</h3>
-    <p>${escapeHTML(text.t(point.body))}</p></div></div>`;
+  return `<h3>${escapeHTML(text.t(point.title))}</h3><p>${escapeHTML(text.t(point.body))}</p>`;
 }
 
 /** What a named module is called, by kind — and by list, for reports. */
@@ -211,8 +212,17 @@ function kindMark(kind: string): string {
 
 /** The whole page: its bands, then its footer. */
 export function landingPage(page: LandingPage, ctx: LandingContext, text: Text): string {
-  return `<div class="lp${ctx.editing ? " lp-editing" : ""}">
-    ${page.bands.map((b) => band(b, ctx, text)).join("")}
+  if (!ctx.editing) {
+    return `<div class="lp">
+      ${page.bands.map((b) => band(b, ctx, text)).join("")}
+      ${footer(page.settings, ctx, text)}
+    </div>`;
+  }
+  // While editing, a way to add a section sits before every band and after
+  // the last one: a new section goes exactly where it was asked for.
+  return `<div class="lp lp-editing">
+    ${insertBand(0, text)}
+    ${page.bands.map((b, i) => band(b, ctx, text) + insertBand(i + 1, text)).join("")}
     ${footer(page.settings, ctx, text)}
   </div>`;
 }
@@ -222,7 +232,7 @@ export function landingPage(page: LandingPage, ctx: LandingContext, text: Text):
  * inside it at the page's measure — or at the window's, when it is full width.
  */
 export function band(b: LandingBand, ctx: LandingContext, text: Text): string {
-  const name = (b.name ?? "").trim() || defaultBandName(b.id, text);
+  const name = b.hide_name ? "" : (b.name ?? "").trim() || defaultBandName(b.id, text);
   const classes = [
     "lp-band",
     b.background ? `bg-${b.background}` : "",
@@ -233,7 +243,11 @@ export function band(b: LandingBand, ctx: LandingContext, text: Text): string {
     .join(" ");
   // Every module in a band is as tall as the tallest in its row of columns:
   // two lists side by side end on one line rather than one short and one long.
-  return `<section class="${classes}" data-band="${escapeAttr(b.id)}">
+  const selected = ctx.editing && ctx.selected === b.id;
+  return `<section class="${classes}${selected ? " is-selected" : ""}" data-band="${escapeAttr(b.id)}"${
+    ctx.editing ? ` tabindex="-1"` : ""
+  }>
+    ${ctx.editing ? bandTools(text) : ""}
     <div class="lp-inner">
       ${name ? `<h2 class="lp-pill"><span>${escapeHTML(name)}</span></h2>` : ""}
       <div class="lp-cols cols-${escapeAttr(b.columns)}">
@@ -241,7 +255,7 @@ export function band(b: LandingBand, ctx: LandingContext, text: Text): string {
           .map(
             (cell, i) => `<div class="lp-col" data-column="${i}">
               ${cell.map((m) => module(m, ctx, text)).join("")}
-              ${ctx.editing && cell.length === 0 ? `<div class="lp-empty-col"></div>` : ""}
+              ${ctx.editing ? addModule(b.id, i, cell.length === 0, text) : ""}
             </div>`,
           )
           .join("")}
@@ -267,7 +281,15 @@ export function module(m: LandingModule, ctx: LandingContext, text: Text): strin
       </header>`
     : "";
   const style = m.style || "card";
-  return `<article class="lp-mod mod-${escapeAttr(m.kind)} style-${escapeAttr(style)}" data-module="${escapeAttr(m.id)}">
+  if (!ctx.editing) {
+    return `<article class="lp-mod mod-${escapeAttr(m.kind)} style-${escapeAttr(style)}" data-module="${escapeAttr(m.id)}">
+      ${head}${inner}
+    </article>`;
+  }
+  const selected = ctx.selected === m.id;
+  return `<article class="lp-mod mod-${escapeAttr(m.kind)} style-${escapeAttr(style)}${selected ? " is-selected" : ""}"
+      data-module="${escapeAttr(m.id)}" tabindex="0" aria-label="${escapeAttr(moduleLabel(m, text))}">
+    ${moduleTools(m, text)}
     ${head}${inner}
   </article>`;
 }
@@ -296,6 +318,77 @@ function moduleBody(m: LandingModule, ctx: LandingContext, text: Text): string {
   }
 }
 
+// --- editing ----------------------------------------------------------------
+
+/** What a module is called in the editor, whatever it shows. */
+export function moduleLabel(m: LandingModule, text: Text): string {
+  return (m.name ?? "").trim() || kindName(m, text) || text.t(KIND_NAMES[m.kind]);
+}
+
+/** Every kind's name in the editor, for the picker and the panel. */
+export const KIND_NAMES: Record<LandingKind, string> = {
+  heading: "landing.kindHeading",
+  text: "landing.kindText",
+  search: "landing.kindSearch",
+  boards: "landing.kindBoards",
+  reports: "landing.kindReports",
+  roadmap: "landing.kindRoadmap",
+  statistics: "landing.kindStatistics",
+  links: "landing.kindLinks",
+  image: "landing.kindImage",
+};
+
+function tool(act: string, label: string, icon: string, attrs = ""): string {
+  return `<button type="button" class="lpe-tool" data-act="${escapeAttr(act)}" ${attrs}
+    title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${icon}</button>`;
+}
+
+/**
+ * A band's controls, on its top edge while it is pointed at or chosen. Moving
+ * is by button rather than by dragging: a band is the size of the window, and
+ * dragging one past another means scrolling while holding it.
+ */
+function bandTools(text: Text): string {
+  return `<div class="lpe-tools lpe-band-tools">
+    <button type="button" class="lpe-tag" data-act="select">${icons.section(13)}<span>${escapeHTML(
+      text.t("landing.section"),
+    )}</span></button>
+    ${tool("up", text.t("landing.moveUp"), icons.chevron(14), 'data-turn="up"')}
+    ${tool("down", text.t("landing.moveDown"), icons.chevron(14), 'data-turn="down"')}
+    ${tool("copy", text.t("landing.duplicate"), icons.copy(14))}
+    ${tool("remove", text.t("action.remove"), icons.remove(14), 'data-danger="1"')}
+  </div>`;
+}
+
+/**
+ * A module's controls. The grip is the only thing that drags: the rest of the
+ * module is where its words are selected and typed, and a whole module that
+ * drags turns every attempt to select a sentence into a move.
+ */
+function moduleTools(m: LandingModule, text: Text): string {
+  return `<div class="lpe-tools lpe-mod-tools">
+    <span class="lpe-grip" draggable="true" data-grip="${escapeAttr(m.id)}"
+          title="${escapeAttr(text.t("landing.drag"))}" aria-hidden="true">${icons.grip(14)}</span>
+    ${tool("copy", text.t("landing.duplicate"), icons.copy(14))}
+    ${tool("remove", text.t("action.remove"), icons.remove(14), 'data-danger="1"')}
+  </div>`;
+}
+
+function addModule(bandID: string, column: number, empty: boolean, text: Text): string {
+  return `<button type="button" class="lpe-add${empty ? " empty" : ""}"
+      data-add-module="${escapeAttr(bandID)}" data-column="${column}">
+    ${icons.add(14)}<span>${escapeHTML(text.t("landing.addModule"))}</span>
+  </button>`;
+}
+
+function insertBand(at: number, text: Text): string {
+  return `<div class="lpe-insert">
+    <button type="button" data-add-band="${at}">${icons.add(13)}<span>${escapeHTML(
+      text.t("landing.addSection"),
+    )}</span></button>
+  </div>`;
+}
+
 // --- the modules ------------------------------------------------------------
 
 /**
@@ -308,10 +401,13 @@ function moduleBody(m: LandingModule, ctx: LandingContext, text: Text): string {
 function heading(m: LandingModule, ctx: LandingContext, text: Text): string {
   const title = (m.title ?? "").trim() || ctx.instance.name || text.t("app.name");
   const subtitle = (m.subtitle ?? "").trim() || text.t("app.tagline");
+  // Written where it is read while editing, like the words of a text module.
+  const editable = (field: "title" | "subtitle") =>
+    ctx.editing ? ` contenteditable="true" spellcheck="true" data-field="${field}" data-for="${escapeAttr(m.id)}"` : "";
   return `<div class="lp-heading${m.align === "start" ? " align-start" : ""}">
     ${m.hide_logo ? "" : `<div class="lp-logo">${brandMark(ctx.instance.logo, 56)}</div>`}
-    <h1 data-field="title">${escapeHTML(title)}</h1>
-    <p class="lp-subtitle" data-field="subtitle">${escapeHTML(subtitle)}</p>
+    <h1${editable("title")}>${escapeHTML(title)}</h1>
+    <p class="lp-subtitle"${editable("subtitle")}>${escapeHTML(subtitle)}</p>
     ${m.with_search ? search(text) : ""}
   </div>`;
 }
@@ -345,7 +441,12 @@ function words(m: LandingModule, ctx: LandingContext, text: Text): string {
     written !== ""
       ? written
       : fallback || (ctx.editing ? `<p class="words-prompt">${escapeHTML(text.t("landing.writeHere"))}</p>` : "");
-  return `<div class="words${m.tone ? ` tone-${escapeAttr(m.tone)}` : ""}">
+  // A point of the default page keeps its mark outside the words, so writing
+  // over the words does not take it away: the markup policy keeps no pictures
+  // drawn in SVG, and the mark belongs to the module, not to what it says.
+  const point = POINTS[m.id];
+  return `<div class="words${m.tone ? ` tone-${escapeAttr(m.tone)}` : ""}${point ? " point" : ""}">
+    ${point ? `<span class="point-icon" aria-hidden="true">${point.icon()}</span>` : ""}
     <div class="words-box"${ctx.editing ? ` contenteditable="true" data-words-body="${escapeAttr(m.id)}"` : ""}
          data-words-empty="${written === "" ? "1" : "0"}">${inner}</div>
   </div>`;
