@@ -6664,7 +6664,8 @@ a.stat:hover .stat-go {
 .settings-row:last-of-type { border-block-end: 0; padding-block-end: 0; }
 /* A row after a form in the same card starts a new thing: the rule the rows
    draw between themselves, drawn above it. */
-.settings-card form + .settings-row { margin-block-start: 20px; border-block-start: 1px solid var(--border); }
+.settings-card form + .settings-row,
+.settings-card .settings-list + .settings-row { margin-block-start: 20px; border-block-start: 1px solid var(--border); }
 .settings-info h4 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
 .settings-info p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim); max-inline-size: 56ch; }
 .settings-info .settings-danger { color: var(--danger-color); font-weight: 600; }

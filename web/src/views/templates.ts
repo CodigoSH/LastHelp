@@ -1228,40 +1228,82 @@ export function repositoryList(
  * a problem it cannot help with reads as broken rather than as empty.
  */
 /**
- * The panel's front page for somebody who is not an administrator.
+ * The overview for somebody on a team rather than running the server: what is
+ * waiting for them, and where they work — each organisation with the boards
+ * they work on in it, what waits in each, and, for an owner, the forge when it
+ * is not connected yet. Each line leads to the page where that work is done.
  *
- * Their world is the places they were given a role in, so that is what it
- * shows: a card each, going straight to the queue, which is the screen they
- * actually came for. It used to be the administrator's page with the numbers
- * missing and an "add an organisation" button that would have been refused —
- * an item you can see and cannot use is worse than one that was never there.
+ * It used to be a card per role with the role's name on it and a link to a
+ * queue that no longer exists, which said what somebody was and nothing about
+ * what there was to do.
  */
 export function memberHome(
-  memberships: { scope: string; role: string; organization?: string; repository?: string; name?: string }[],
+  data: {
+    waiting: number;
+    organizations: (OrganizationRow & { boards: OrganizationPanel["repositories"] })[];
+  },
   text: Text,
 ): string {
-  if (memberships.length === 0) {
+  if (data.organizations.length === 0) {
     return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
       ${emptyState(text.t("overview.noRoles"), icons.person(28))}`;
   }
 
-  const cards = memberships
-    .map((m) => {
-      const href = m.repository
-        ? `/${m.organization}/${m.repository}/queue`
-        : `/panel/${m.organization}`;
-      return `<li class="bento-card">
-        <a class="card-link" href="${escapeAttr(href)}">
-          <div class="card-head">${m.repository ? icons.repository() : icons.organization()}<h3>${escapeHTML(m.name ?? "")}</h3></div>
-          <span class="card-sub"><span class="chip">${escapeHTML(text.t(`role.${m.role}`))}</span></span>
-        </a>
-      </li>`;
+  const waiting = settingsCard(
+    text.t("item.waiting"),
+    `<div class="settings-row">
+      <div class="settings-info">
+        <h4 data-waiting="${data.waiting}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(data.waiting) }))}</h4>
+        <p>${escapeHTML(text.t(data.waiting > 0 ? "overview.waitingHelp" : "review.clear"))}</p>
+      </div>
+      <a class="button primary" href="/review">${escapeHTML(text.t("review.title"))}</a>
+    </div>`,
+  );
+
+  const roleName = (role: string) => (role === "administrator" ? text.t("people.administrator") : text.t(`role.${role}`));
+  const places = data.organizations
+    .map((o) => {
+      const boards = o.boards
+        .map((b) =>
+          settingsItem({
+            attrs: `data-repo="${escapeAttr(o.slug)}/${escapeAttr(b.slug)}"`,
+            lead: `<span class="si-mark">${icons.repository(16)}</span>`,
+            name: b.name,
+            sub: `/${o.slug}/${b.slug}`,
+            tags:
+              (b.pending > 0
+                ? `<span class="mono-tag waiting" data-pending="${b.pending}">${escapeHTML(text.t("shell.waitingCount", { count: text.number(b.pending) }))}</span>`
+                : "") + acceptsMarks(b, text),
+            href: `/panel/${o.slug}/repos/${b.slug}`,
+          }),
+        )
+        .join("");
+      // The one thing an owner is told here that a collaborator is not: a
+      // forge nobody has connected, which is why no issue can be opened.
+      const connect =
+        o.connected === false
+          ? `<div class="settings-row" data-connect="${escapeAttr(o.slug)}">
+              <div class="settings-info">
+                <h4>${escapeHTML(text.t("org.notConnected"))}</h4>
+                <p>${escapeHTML(text.t("overview.notConnectedHelp"))}</p>
+              </div>
+              <a class="button ghost" href="/panel/${escapeAttr(o.slug)}">${escapeHTML(text.t("org.connect"))}</a>
+            </div>`
+          : "";
+      return `<section class="bento-card settings-card" data-org="${escapeAttr(o.slug)}">
+        <div class="card-top">
+          <h3>${escapeHTML(o.name)}</h3>
+          <a class="button ghost" href="/panel/${escapeAttr(o.slug)}">${escapeHTML(text.t("overview.openOrganization"))}</a>
+        </div>
+        <p class="org-tags"><span class="mono-tag${o.role === "owner" ? " accent" : ""}" data-role="${escapeAttr(o.role)}">${escapeHTML(roleName(o.role))}</span></p>
+        ${boards ? `<ul class="settings-list">${boards}</ul>` : `<p class="card-sub">${escapeHTML(text.t("organizations.noRepositories"))}</p>`}
+        ${connect}
+      </section>`;
     })
     .join("");
 
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
-    <p class="lead">${escapeHTML(text.t("overview.memberLead"))}</p>
-    <ul class="bento">${cards}</ul>`;
+    <div class="settings member-home">${waiting}${places}</div>`;
 }
 
 

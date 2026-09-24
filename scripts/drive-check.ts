@@ -4045,16 +4045,26 @@ async function main() {
   await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
 
   const collaborator = await evaluate(`
+    const me = await fetch("/api/me").then(r => r.json());
     return {
       groups: [...document.querySelectorAll(".side-label")].map(e => e.textContent.trim()),
       items: [...document.querySelectorAll(".side-item")].map(e => e.textContent.trim()),
-      cards: [...document.querySelectorAll(".admin-main .bento-card h3")].map(e => e.textContent.trim()),
+      organizaciones: [...document.querySelectorAll(".member-home [data-org]")].map(e => e.dataset.org),
+      rol: document.querySelector('.member-home [data-org="codigosh"] [data-role]')?.dataset.role ?? "",
+      tableros: [...document.querySelectorAll('.member-home [data-repo] a.si-main')].map(a => a.getAttribute("href")),
+      espera: Number(document.querySelector(".member-home [data-waiting]")?.dataset.waiting ?? -1),
+      servidor: (me.pending?.reports ?? 0) + (me.pending?.messages ?? 0),
       offersToAdd: !!document.querySelector("[data-open-modal]"),
     };`);
+  // Where they work, and the way into each board's own page — not a card per
+  // role saying what they are and leading to a queue that no longer exists.
+  // And what waits for them is the number the bar's icon carries.
   check(
-    "a collaborator's panel shows the places they were given",
-    JSON.stringify(collaborator.cards) === '["Lastboard"]',
-    JSON.stringify(collaborator.cards),
+    "a collaborator's overview shows where they work and leads into each board",
+    JSON.stringify(collaborator.organizaciones) === '["codigosh"]' && collaborator.rol === "collaborator" &&
+      JSON.stringify(collaborator.tableros) === '["/panel/codigosh/repos/lastboard"]' &&
+      collaborator.espera === collaborator.servidor,
+    JSON.stringify(collaborator),
   );
   check(
     "and offers nothing they would be refused",

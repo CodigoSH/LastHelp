@@ -24,6 +24,7 @@ item.statusHelp
 item.waitingHelp
 org.addOwner
 org.confirmRevoke
+org.connect
 org.connected
 org.connectedHelp
 org.delete
@@ -32,6 +33,9 @@ org.notConnected
 org.notConnectedHelp
 org.repoCount
 org.teamLead
+overview.notConnectedHelp
+overview.openOrganization
+overview.waitingHelp
 repo.addCollaborator
 repo.channelNow
 repo.confirmRevoke
