@@ -4083,7 +4083,7 @@ async function main() {
     await goTo(ruta, ".admin-main > *");
     await sleep(300);
     const r = await evaluate(`return { donde: location.pathname,
-      falso: document.body.textContent.includes("Could not reach the release server") }`);
+      falso: document.body.textContent.includes("Cannot reach the release server") }`);
     if (r.donde !== "/panel" || r.falso) ajenas.push(`${ruta} → ${r.donde}${r.falso ? " (false message)" : ""}`);
   }
   // Adding a repository is the owner's: a collaborator on one board is sent
