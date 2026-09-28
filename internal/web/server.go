@@ -248,9 +248,7 @@ func (s *Server) routes() {
 
 	// Composing the front page. Only the administrator: it is the first thing
 	// every visitor sees.
-	private("PUT /api/landing/draft", s.handleSaveLandingDraft)
-	private("DELETE /api/landing/draft", s.handleDiscardLandingDraft)
-	private("POST /api/landing/publish", s.handlePublishLanding)
+	private("PUT /api/landing", s.handleSaveLanding)
 	private("POST /api/landing/restore", s.handleRestoreLandingDefault)
 	private("POST /api/landing/images", s.handleAddLandingImage)
 	private("POST /api/comments/{id}/moderation", s.handleModerateComment)

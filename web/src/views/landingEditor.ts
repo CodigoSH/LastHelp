@@ -26,19 +26,17 @@ export interface EditBarState {
   canUndo: boolean;
   canRedo: boolean;
   phone: boolean;
-  /** Whether what is being edited differs from what visitors see. */
-  unpublished: boolean;
   saving: "idle" | "saving" | "failed";
-  /** Why the draft cannot be saved as it is, in words for the operator. */
+  /** Why the page cannot be saved as it is, in words for the operator. */
   problem?: string;
   /** Whether the page settings are what the panel shows. */
   pageOpen?: boolean;
 }
 
 /**
- * The editor's bar: undo and redo, the width it is previewed at, where the
- * draft stands, and the two decisions — throw it away or put it in front of
- * visitors.
+ * The editor's bar: undo and redo, the width it is previewed at, and whether
+ * the last change is saved. There is nothing to publish: every change is the
+ * page, as on Lastboard's board.
  */
 export function editBar(s: EditBarState, text: Text): string {
   const state = s.problem
@@ -47,12 +45,12 @@ export function editBar(s: EditBarState, text: Text): string {
       ? `<span class="lpe-state problem" role="alert">${icons.warning(14)}<span>${escapeHTML(
           text.t("landing.notSaved"),
         )}</span></span>`
-      : s.unpublished
+      : s.saving === "saving"
         ? `<span class="lpe-state draft"><i aria-hidden="true"></i><span>${escapeHTML(
-            text.t(s.saving === "saving" ? "landing.saving" : "landing.unpublished"),
+            text.t("landing.saving"),
           )}</span></span>`
         : `<span class="lpe-state live"><i aria-hidden="true"></i><span>${escapeHTML(
-            text.t("landing.published"),
+            text.t("landing.saved"),
           )}</span></span>`;
   const barTool = (act: string, label: string, icon: string, on = true, pressed?: boolean) =>
     `<button type="button" class="icon-button${on ? "" : " cannot"}" data-bar="${act}" ${on ? "" : "disabled"}
@@ -70,13 +68,6 @@ export function editBar(s: EditBarState, text: Text): string {
     ${state}
     <div class="lpe-bar-group end">
       ${barTool("settings", text.t("landing.pageSettings"), icons.palette(16), true, s.pageOpen === true)}
-      <button type="button" class="button ghost small" data-bar="discard" ${s.unpublished ? "" : "disabled"}>${escapeHTML(
-        text.t("landing.discard"),
-      )}</button>
-      <button type="button" class="button primary small" data-bar="publish"
-        ${s.unpublished && !s.problem && s.saving !== "failed" ? "" : "disabled"}>${icons.check(14)}<span>${escapeHTML(
-          text.t("landing.publish"),
-        )}</span></button>
     </div>
   </div>`;
 }

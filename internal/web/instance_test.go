@@ -38,8 +38,9 @@ func words(body string) map[string]any {
 // TestComposingTheFrontPage.
 //
 // The front page is the one screen a stranger sees, so the halves are checked
-// together: that anybody may read it, that what is being edited is never what
-// a visitor is shown, and that only an administrator may change it.
+// together: that anybody may read it, that what the administrator saves is
+// what a visitor is shown from then on, and that only an administrator may
+// change it.
 func TestComposingTheFrontPage(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
@@ -50,64 +51,36 @@ func TestComposingTheFrontPage(t *testing.T) {
 		t.Fatalf("an untouched installation offered %q", got)
 	}
 
-	// A draft is kept and not shown.
-	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>We read everything.</p>"))); got != http.StatusOK {
-		t.Fatalf("the administrator could not keep a draft: %d", got)
-	}
-	if got := strings.Join(bandIDs(frontPage(t, visitor, "")), " "); got != "top where activity how" {
-		t.Errorf("a visitor was shown the draft: %q", got)
-	}
-	if got := strings.Join(bandIDs(frontPage(t, visitor, "?draft=1")), " "); got != "top where activity how" {
-		t.Errorf("a visitor asking for the draft was shown it: %q", got)
-	}
-	// Nor is the administrator, outside the editor: looking at their own
-	// page, they see what everybody else sees.
-	if got := strings.Join(bandIDs(frontPage(t, i, "")), " "); got != "top where activity how" {
-		t.Errorf("the administrator was shown the draft outside the editor: %q", got)
-	}
-	editing := frontPage(t, i, "?draft=1")
-	if got := strings.Join(bandIDs(editing), " "); got != "b" || editing["has_draft"] != true {
-		t.Errorf("the administrator was not given the draft: %q %v", got, editing["has_draft"])
-	}
-
-	// A page nothing can draw is refused, and the draft is left as it was.
-	bad := map[string]any{"bands": []map[string]any{{"id": "b", "columns": "1",
-		"cells": [][]map[string]any{{{"id": "x", "kind": "iframe"}}}}}}
-	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", bad)); got != http.StatusBadRequest {
-		t.Errorf("a module nothing can draw was accepted: %d", got)
-	}
-	if got := strings.Join(bandIDs(frontPage(t, i, "?draft=1")), " "); got != "b" {
-		t.Errorf("a refused page changed the draft: %q", got)
-	}
-
-	// Published, it is what everybody sees, and there is no draft any more.
-	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
-		t.Fatalf("publishing: %d", got)
+	// Saved, it is what everybody sees — bands and the foot of the page alike.
+	// There is no second copy to publish: the editor edits the page itself, the
+	// way the dashboard is edited, and leaving it changes nothing.
+	page := words("<p>We read everything.</p>")
+	page["settings"] = map[string]any{"footer_text": "Made in Lisbon", "footer_hide_credit": true}
+	if got := status(t, i.do(http.MethodPut, "/api/landing", page)); got != http.StatusOK {
+		t.Fatalf("the administrator could not save the page: %d", got)
 	}
 	shown := frontPage(t, visitor, "")
 	if got := strings.Join(bandIDs(shown), " "); got != "b" {
-		t.Errorf("a visitor was not shown the published page: %q", got)
+		t.Errorf("a visitor was not shown the saved page: %q", got)
 	}
-	if frontPage(t, i, "")["has_draft"] != false {
-		t.Error("a draft was left behind after publishing")
+	foot, _ := shown["settings"].(map[string]any)
+	if foot["footer_text"] != "Made in Lisbon" || foot["footer_hide_credit"] != true {
+		t.Errorf("a visitor was not shown the saved foot of the page: %v", foot)
 	}
 
-	// Discarding a draft puts nothing back, because nothing was touched.
-	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>Second thoughts.</p>")))
-	if got := status(t, i.do(http.MethodDelete, "/api/landing/draft", nil)); got != http.StatusOK {
-		t.Fatalf("discarding: %d", got)
-	}
-	if frontPage(t, i, "")["has_draft"] != false {
-		t.Error("a discarded draft is still there")
+	// A page nothing can draw is refused, and the page is left as it was.
+	bad := map[string]any{"bands": []map[string]any{{"id": "b", "columns": "1",
+		"cells": [][]map[string]any{{{"id": "x", "kind": "iframe"}}}}}}
+	if got := status(t, i.do(http.MethodPut, "/api/landing", bad)); got != http.StatusBadRequest {
+		t.Errorf("a module nothing can draw was accepted: %d", got)
 	}
 	if got := strings.Join(bandIDs(frontPage(t, visitor, "")), " "); got != "b" {
-		t.Errorf("discarding a draft changed the published page: %q", got)
+		t.Errorf("a refused page changed the page: %q", got)
 	}
 
 	// A stranger cannot touch any of it; this one is stopped at the door.
 	for _, call := range [][2]string{
-		{http.MethodPut, "/api/landing/draft"}, {http.MethodPost, "/api/landing/publish"},
-		{http.MethodDelete, "/api/landing/draft"}, {http.MethodPost, "/api/landing/restore"},
+		{http.MethodPut, "/api/landing"}, {http.MethodPost, "/api/landing/restore"},
 	} {
 		got := status(t, visitor.do(call[0], call[1], words("<p>x</p>")))
 		if got != http.StatusUnauthorized && got != http.StatusForbidden {
@@ -136,14 +109,14 @@ func TestComposingTheFrontPage(t *testing.T) {
 		"username": "helper", "password": "a good long passphrase",
 	}))
 	for _, call := range [][2]string{
-		{http.MethodPut, "/api/landing/draft"}, {http.MethodPost, "/api/landing/publish"},
+		{http.MethodPut, "/api/landing"}, {http.MethodPost, "/api/landing/restore"},
 	} {
 		if got := status(t, helperClient.do(call[0], call[1], words("<p>x</p>"))); got != http.StatusForbidden {
 			t.Errorf("a collaborator reached %s %s: %d", call[0], call[1], got)
 		}
 	}
-	if _, told := frontPage(t, helperClient, "")["has_draft"]; told {
-		t.Error("a collaborator was told whether there is a draft")
+	if got := strings.Join(bandIDs(frontPage(t, visitor, "")), " "); got != "b" {
+		t.Errorf("a refused caller changed the page: %q", got)
 	}
 }
 
@@ -151,30 +124,41 @@ func TestComposingTheFrontPage(t *testing.T) {
 //
 // The default page is read fresh, never stored, so a better one in a later
 // release reaches everybody who never changed theirs. An operator who restores
-// it and publishes is one of them again.
+// it is one of them again — and so is one who arranges their page back into
+// exactly the default by hand.
 func TestRestoringTheDefaultStoresNoPage(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
-	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>Mine.</p>")))
-	_ = status(t, i.do(http.MethodPost, "/api/landing/publish", nil))
+	storedPage := func() string {
+		var stored string
+		if err := i.db().QueryRow(`SELECT value FROM settings WHERE key = 'landing_layout'`).Scan(&stored); err != nil {
+			t.Fatal(err)
+		}
+		return stored
+	}
 
+	_ = status(t, i.do(http.MethodPut, "/api/landing", words("<p>Mine.</p>")))
+	if storedPage() == "" {
+		t.Fatal("a page of the operator's own was not stored")
+	}
 	if got := status(t, i.do(http.MethodPost, "/api/landing/restore", nil)); got != http.StatusOK {
 		t.Fatalf("restoring the default: %d", got)
 	}
-	if got := strings.Join(bandIDs(frontPage(t, i.anonymous(), "")), " "); got != "b" {
-		t.Errorf("restoring changed the published page before it was published: %q", got)
-	}
-	_ = status(t, i.do(http.MethodPost, "/api/landing/publish", nil))
-
-	var stored string
-	if err := i.db().QueryRow(`SELECT value FROM settings WHERE key = 'landing_layout'`).Scan(&stored); err != nil {
-		t.Fatal(err)
-	}
-	if stored != "" {
+	if stored := storedPage(); stored != "" {
 		t.Errorf("the default page was stored as a page: %.60s", stored)
 	}
 	if got := strings.Join(bandIDs(frontPage(t, i.anonymous(), "")), " "); got != "top where activity how" {
 		t.Errorf("after restoring, a visitor sees %q", got)
+	}
+
+	_ = status(t, i.do(http.MethodPut, "/api/landing", words("<p>Mine again.</p>")))
+	_ = status(t, i.do(http.MethodPost, "/api/landing/restore", nil))
+	def := frontPage(t, i, "")
+	if got := status(t, i.do(http.MethodPut, "/api/landing", map[string]any{"bands": def["bands"], "settings": def["settings"]})); got != http.StatusOK {
+		t.Fatalf("saving the default by hand: %d", got)
+	}
+	if stored := storedPage(); stored != "" {
+		t.Errorf("the default, saved by hand, was stored as a page: %.60s", stored)
 	}
 }
 
@@ -212,9 +196,8 @@ func TestAReportsModuleShowsWhatItIsAskedFor(t *testing.T) {
 			{list("voted", "most_voted")}, {list("done", "recently_done")},
 			{list("latest", "latest")}, {list("planned", "planned")},
 		}}}}
-	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", composed))
-	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
-		t.Fatalf("publishing the page: %d", got)
+	if got := status(t, i.do(http.MethodPut, "/api/landing", composed)); got != http.StatusOK {
+		t.Fatalf("saving the page: %d", got)
 	}
 
 	content, _ := frontPage(t, i.anonymous(), "")["content"].(map[string]any)
@@ -245,7 +228,7 @@ func TestAReportsModuleShowsWhatItIsAskedFor(t *testing.T) {
 //
 // The board list travels with the page for whoever is going to compose it, and
 // for nobody else: it is the picker in the editor, not something a visitor has
-// any use for. Nor is whether a draft exists.
+// any use for.
 func TestAStrangerIsHandedThePageAndNothingElse(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
@@ -253,17 +236,15 @@ func TestAStrangerIsHandedThePageAndNothingElse(t *testing.T) {
 	if _, carried := body["boards"]; carried {
 		t.Errorf("a stranger was handed the board list: %v", body["boards"])
 	}
-	if _, carried := body["has_draft"]; carried {
-		t.Errorf("a stranger was told whether there is a draft")
+	if _, carried := body["share_ready"]; carried {
+		t.Errorf("a stranger was handed the editor's settings")
 	}
 }
 
-// TestAPictureOnlyTheDraftUsesIsKept.
+// TestAPictureThePageUsesIsKept.
 //
-// A picture dropped into the draft is about to be published, and one only the
-// published page uses is still on the screen. Neither may be swept; one nothing
-// uses any more is.
-func TestAPictureOnlyTheDraftUsesIsKept(t *testing.T) {
+// A picture the page shows may not be swept; one nothing uses any more is.
+func TestAPictureThePageUsesIsKept(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
 	webp := append([]byte("RIFF\x00\x00\x00\x00WEBPVP8 "), make([]byte, 32)...)
@@ -279,20 +260,13 @@ func TestAPictureOnlyTheDraftUsesIsKept(t *testing.T) {
 		return n
 	}
 
-	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", withPicture)); got != http.StatusOK {
-		t.Fatalf("keeping a draft with a picture %q: %d", name, got)
+	if got := status(t, i.do(http.MethodPut, "/api/landing", withPicture)); got != http.StatusOK {
+		t.Fatalf("saving a page with a picture %q: %d", name, got)
 	}
 	if stored() != 1 {
-		t.Fatal("a picture the draft uses was swept")
+		t.Fatal("a picture the page shows was swept")
 	}
-	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
-		t.Fatalf("publishing the picture: %d", got)
-	}
-	_ = status(t, i.do(http.MethodPut, "/api/landing/draft", words("<p>No picture.</p>")))
-	if stored() != 1 {
-		t.Fatal("a picture the published page shows was swept")
-	}
-	_ = status(t, i.do(http.MethodPost, "/api/landing/publish", nil))
+	_ = status(t, i.do(http.MethodPut, "/api/landing", words("<p>No picture.</p>")))
 	if stored() != 0 {
 		t.Error("a picture no page uses was kept")
 	}
@@ -357,15 +331,8 @@ func TestThePageHeadCarriesThePageSettings(t *testing.T) {
 
 	page := frontPage(t, i, "")
 	page["settings"] = map[string]any{"title": `Acme "support"`, "description": "Bugs & ideas <here>"}
-	if got := status(t, i.do(http.MethodPut, "/api/landing/draft", page)); got != http.StatusOK {
-		t.Fatalf("saving the draft: %d", got)
-	}
-	// A draft is not what a link shows.
-	if got := shell(); strings.Contains(got, "Acme") {
-		t.Fatalf("the draft's title reached the head before publishing")
-	}
-	if got := status(t, i.do(http.MethodPost, "/api/landing/publish", nil)); got != http.StatusOK {
-		t.Fatalf("publishing: %d", got)
+	if got := status(t, i.do(http.MethodPut, "/api/landing", page)); got != http.StatusOK {
+		t.Fatalf("saving the page: %d", got)
 	}
 	got := shell()
 	for _, want := range []string{

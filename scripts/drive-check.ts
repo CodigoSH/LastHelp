@@ -1378,12 +1378,11 @@ async function main() {
   // point of the editor is that somebody does it with the page in front of
   // them, and an editor tested through fetch is an editor nobody has used.
   //
-  // Everything here happens in a draft, and the last step publishes it — which
-  // is the half that matters: without it this is a setting that saves and
-  // changes nothing a visitor sees.
+  // There is no draft, as on Lastboard's board: every change is the page, so
+  // what matters is that what the editor shows is what a visitor gets — before
+  // leaving the editor and after.
   await goTo("/", ".lp");
-  const leerBorrador = `return fetch("/api/landing?draft=1").then(r => r.json())`;
-  const leerPublicada = `return fetch("/api/landing").then(r => r.json())`;
+  const leerPublicada = `return fetch("/api/landing", { cache: "no-store" }).then(r => r.json())`;
   const tecla = (key: string, extra = "") =>
     evaluate(`(document.activeElement ?? document).dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(key)}, bubbles: true ${extra} }))`);
 
@@ -1393,21 +1392,20 @@ async function main() {
     return {
       secciones: [...document.querySelectorAll(".lpe-canvas [data-band]")].map(b => b.dataset.band),
       panelVacio: !!document.querySelector(".lpe-panel .lpe-panel-empty"),
-      publicado: !!document.querySelector(".lpe-state.live"),
-      // Publish and Discard with nothing to publish or discard, and looking it.
-      publicar: document.querySelector('[data-bar="publish"]')?.disabled === true &&
-        Number(getComputedStyle(document.querySelector('[data-bar="publish"]')).opacity) < 0.6,
+      guardado: !!document.querySelector(".lpe-state.live"),
+      // Nothing to publish or throw away: the page is the page.
+      sinPublicar: !document.querySelector('[data-bar="publish"], [data-bar="discard"]'),
     };
   `);
   check(
     "the editor opens on the page itself, with nothing chosen and nothing to publish",
     entrando.secciones.join() === "top,where,activity,how" && entrando.panelVacio === true &&
-      entrando.publicado === true && entrando.publicar === true,
+      entrando.guardado === true && entrando.sinPublicar === true,
     JSON.stringify(entrando),
   );
 
-  // Choosing a module and changing what it lists. The draft changes; what a
-  // visitor is served does not.
+  // Choosing a module and changing what it lists: saved as it is made, and
+  // what a visitor is served from then on.
   await evaluate(`document.querySelector('[data-module="most-voted"] .lp-head').click()`);
   await waitFor(".lpe-panel .lpe-panel-head");
   await evaluate(`
@@ -1416,17 +1414,14 @@ async function main() {
   `);
   await sleep(1300);
   const tras = await evaluate(`
-    const borrador = await (async () => { ${leerBorrador} })();
     const publicada = await (async () => { ${leerPublicada} })();
     const en = (p) => p.bands.find(b => b.id === "activity").cells[0][0].show;
     return { elegido: document.querySelector('[data-module="most-voted"]').classList.contains("is-selected"),
-             borrador: en(borrador), publicada: en(publicada), hayBorrador: borrador.has_draft,
-             aviso: !!document.querySelector(".lpe-state.draft") };
+             publicada: en(publicada), guardado: !!document.querySelector(".lpe-state.live") };
   `);
   check(
-    "a change goes to a draft, and visitors keep the published page",
-    tras.elegido === true && tras.borrador === "planned" && tras.publicada === "most_voted" &&
-      tras.hayBorrador === true && tras.aviso === true,
+    "a change is saved to the page as it is made, and visitors get it",
+    tras.elegido === true && tras.publicada === "planned" && tras.guardado === true,
     JSON.stringify(tras),
   );
 
@@ -1500,7 +1495,7 @@ async function main() {
   `);
   await sleep(1300);
   const escrito = await evaluate(`
-    const d = await (async () => { ${leerBorrador} })();
+    const d = await (async () => { ${leerPublicada} })();
     const todos = d.bands.flatMap(b => b.cells.flat());
     return { cuerpo: todos.find(m => m.id === ${JSON.stringify(colocado.id)})?.body ?? "",
              titulo: todos.find(m => m.kind === "heading")?.title ?? "" };
@@ -1551,14 +1546,13 @@ async function main() {
   await sleep(200);
   await evaluate(`document.querySelector('.lpe-panel [data-act="add-link"]').click()`);
   await sleep(200);
-  const sinEtiqueta = await evaluate(`return { aviso: !!document.querySelector(".lpe-state.problem"),
-    publicar: document.querySelector('[data-bar="publish"]').disabled }`);
+  const sinEtiqueta = await evaluate(`return { aviso: !!document.querySelector(".lpe-state.problem") }`);
   await evaluate(`const i = document.querySelector('.lpe-panel [data-link-field="label"]'); i.value = "Report a bug"; i.dispatchEvent(new Event("input", { bubbles: true }))`);
   await sleep(1200);
   const conEtiqueta = await evaluate(`return !document.querySelector(".lpe-state.problem")`);
   check(
     "a link without a label stops the save and the bar says why",
-    sinEtiqueta.aviso === true && sinEtiqueta.publicar === true && conEtiqueta === true,
+    sinEtiqueta.aviso === true && conEtiqueta === true,
     JSON.stringify({ sinEtiqueta, conEtiqueta }),
   );
 
@@ -1621,9 +1615,9 @@ async function main() {
   await evaluate(`document.querySelector('[data-bar="desktop"]').click()`);
   check("the phone preview stacks the columns", movil === 1, String(movil));
 
-  // Publishing, and leaving: what was arranged is what a visitor is shown.
-  await evaluate(`document.querySelector('[data-bar="publish"]').click()`);
-  await sleep(1300);
+  // Leaving: what was arranged is what a visitor is shown, the foot of the page
+  // included. The ✓ only leaves — as on Lastboard — and there is nothing to
+  // publish first; before, the foot was edited and went nowhere.
   await evaluate(`document.querySelector("body > nav [data-edit-done]")?.click()`);
   await waitFor(".lp:not(.lp-editing)");
   const publicado = await evaluate(`
@@ -1635,18 +1629,19 @@ async function main() {
              pie: document.querySelector(".lp-footer .lp-footer-text")?.textContent.trim() ?? "",
              credito: !!document.querySelector(".lp-footer .lp-made"),
              editable: document.querySelectorAll(".lp-footer [contenteditable]").length,
-             borrador: p.has_draft };
+             pieServido: p.settings?.footer_text ?? "" };
   `);
   check(
-    "publishing puts the draft in front of visitors, and leaving takes the controls away",
+    "leaving the editor shows the page as edited, with the controls taken away",
     publicado.titulo === "Our feedback" && publicado.palabras === true && publicado.boton === true &&
-      publicado.controles === 0 && publicado.borrador === false,
+      publicado.controles === 0,
     JSON.stringify(publicado),
   );
   check(
     "and the footer visitors get is the one written, with no editing left in it",
-    publicado.pie === "© Our team" && publicado.credito === false && publicado.editable === 0,
-    JSON.stringify({ pie: publicado.pie, credito: publicado.credito, editable: publicado.editable }),
+    publicado.pie === "© Our team" && publicado.pieServido === "© Our team" &&
+      publicado.credito === false && publicado.editable === 0,
+    JSON.stringify({ pie: publicado.pie, servido: publicado.pieServido, credito: publicado.credito, editable: publicado.editable }),
   );
 
   // The title and description are in the HTML the server sends — a link
@@ -1658,8 +1653,8 @@ async function main() {
     cabecera.slice(0, 300),
   );
 
-  // Restoring the default is a change like any other: it goes to the draft,
-  // and Ctrl+Z takes it back.
+  // Restoring the default is a change like any other: saved at once, and
+  // Ctrl+Z takes it back.
   await evaluate(`document.querySelector("body > nav [data-edit-page]")?.click()`);
   await waitFor(".lpe .lp-editing");
   await evaluate(`document.querySelector('[data-bar="settings"]').click()`);
@@ -1667,48 +1662,24 @@ async function main() {
   await evaluate(`window.confirm = () => true; document.querySelector('.lpe-panel [data-act="restore"]').click()`);
   await sleep(1500);
   const restaurado = await evaluate(`
-    const d = await (async () => { ${leerBorrador} })();
-    const p = await (async () => { ${leerPublicada} })();
-    return { titulo: d.settings?.title ?? "", secciones: d.bands.map(b => b.id).join(), publicada: p.settings?.title ?? "" };
+    const d = await (async () => { ${leerPublicada} })();
+    return { titulo: d.settings?.title ?? "", secciones: d.bands.map(b => b.id).join() };
   `);
   await evaluate(`document.activeElement?.blur()`);
   await tecla("z", ", ctrlKey: true");
   await sleep(1300);
-  const devuelto = await evaluate(`const d = await (async () => { ${leerBorrador} })(); return d.settings?.title ?? ""`);
+  const devuelto = await evaluate(`const d = await (async () => { ${leerPublicada} })(); return d.settings?.title ?? ""`);
   check(
-    "restoring the default goes to the draft, and Ctrl+Z takes it back",
-    restaurado.titulo === "" && restaurado.secciones === "top,where,activity,how" &&
-      restaurado.publicada === "Our help desk" && devuelto === "Our help desk",
+    "restoring the default is saved at once, and Ctrl+Z takes it back",
+    restaurado.titulo === "" && restaurado.secciones === "top,where,activity,how" && devuelto === "Our help desk",
     JSON.stringify({ ...restaurado, devuelto }),
-  );
-  await evaluate(`window.confirm = () => true; document.querySelector('[data-bar="discard"]').click()`);
-  await sleep(1300);
-  await evaluate(`document.querySelector("body > nav [data-edit-done]")?.click()`);
-  await waitFor(".lp:not(.lp-editing)");
-
-  // Discard: a change made and thrown away leaves the published page as it was.
-  await evaluate(`document.querySelector("body > nav [data-edit-page]")?.click()`);
-  await waitFor(".lpe .lp-editing");
-  await evaluate(`document.querySelector('[data-band="how"] [data-act="remove"]').click()`);
-  await sleep(1000);
-  const quitada = await evaluate(`const d = await (async () => { ${leerBorrador} })(); return d.bands.some(b => b.id === "how")`);
-  await evaluate(`window.confirm = () => true; document.querySelector('[data-bar="discard"]').click()`);
-  await sleep(1300);
-  const descartado = await evaluate(`
-    const d = await (async () => { ${leerBorrador} })();
-    return { enLaPagina: !!document.querySelector('.lpe-canvas [data-band="how"]'), hayBorrador: d.has_draft };
-  `);
-  check(
-    "discarding throws the draft away and shows the published page again",
-    quitada === false && descartado.enLaPagina === true && descartado.hayBorrador === false,
-    JSON.stringify({ quitada, ...descartado }),
   );
   await evaluate(`document.querySelector("body > nav [data-edit-done]")?.click()`);
   await waitFor(".lp:not(.lp-editing)");
 
   // A picture in a block of words, from the file to the page and back out; and
   // the writing bar, driven the way a hand drives it. Both on a text module put
-  // into the draft for the purpose, and the draft is thrown away at the end.
+  // on the page for the purpose, and the page is put back as it was at the end.
   //
   // The conversion to WebP is the point rather than a detail: what an operator
   // picks is a photograph off a phone, and what a front page can afford is a
@@ -1724,15 +1695,15 @@ async function main() {
   const retrato = await evaluate(`
     const csrf = () => document.cookie.split(";").map(c => c.trim())
       .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
-    const borrador = await fetch("/api/landing?draft=1").then(r => r.json());
-    borrador.bands.push({ id: "shot-band", columns: "1", cells: [[{ id: "shot", kind: "text" }]] });
-    await fetch("/api/landing/draft", { method: "PUT",
+    const antes = await fetch("/api/landing", { cache: "no-store" }).then(r => r.json());
+    const guardar = (bands, settings) => fetch("/api/landing", { method: "PUT",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() },
-      body: JSON.stringify({ bands: borrador.bands, settings: borrador.settings }) });
+      body: JSON.stringify({ bands, settings }) });
+    await guardar([...antes.bands, { id: "shot-band", columns: "1", cells: [[{ id: "shot", kind: "text" }]] }], antes.settings);
     document.querySelector("body > nav [data-edit-page]")?.click();
     for (let i = 0; i < 60 && !document.querySelector('[data-module="shot"] [data-words-body]'); i++)
       await new Promise(r => setTimeout(r, 100));
-    const texto = () => fetch("/api/landing?draft=1").then(r => r.json())
+    const texto = () => fetch("/api/landing", { cache: "no-store" }).then(r => r.json())
       .then(d => d.bands.flatMap(b => b.cells.flat()).find(m => m.id === "shot")?.body ?? "");
 
     // A picture with detail in it, so that the encoder has something to do and
@@ -1797,11 +1768,9 @@ async function main() {
     // somebody was writing, so writing over it has to take it with it.
     const trasQuitarla = await preguntar(url).then(r => r.status);
 
-    window.confirm = () => true;
-    document.querySelector('[data-bar="discard"]')?.click();
-    await new Promise(r => setTimeout(r, 1300));
     document.querySelector("body > nav [data-edit-done]")?.click();
     await new Promise(r => setTimeout(r, 900));
+    await guardar(antes.bands, antes.settings);
     return { png: png.size, webp: webp.size, mentira, vacia, creada: hecha.status, guardado,
              cabeceras, trasQuitarla, barraAntes, aparece, sigue, debajo, conEstilo, conFormato };
   `);

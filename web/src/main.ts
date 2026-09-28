@@ -288,7 +288,7 @@ let landingContent: landingViews.LandingContent = {};
 let landingEditing = false;
 let editor: LandingEditor | null = null;
 
-/** Opens the editor on the front page, over the draft if there is one. */
+/** Opens the editor on the front page. */
 async function startEditing(): Promise<void> {
   if (editor || !root) return;
   landingEditing = true;
@@ -314,9 +314,8 @@ async function startEditing(): Promise<void> {
 }
 
 /**
- * Leaves the editor. What was typed last is saved first; the page shown is the
- * published one, because that is what leaving the editor means — the draft is
- * still there next time, and the bar said so.
+ * Leaves the editor. What was typed last is saved first, so the page drawn
+ * afterwards is the one just edited — the same page visitors get.
  */
 async function stopEditing(redraw = true): Promise<void> {
   const leaving = editor;
@@ -341,7 +340,7 @@ async function fetchLanding(): Promise<void> {
     boards?: landingViews.LandingBoard[];
   };
   const composed = await api
-    .get<Composed>(landingEditing ? "/api/landing?draft=1" : "/api/landing")
+    .get<Composed>("/api/landing")
     .catch((): Composed => ({ bands: [], settings: {} }));
   landing = { bands: composed.bands ?? [], settings: composed.settings ?? {} };
   landingContent = composed.content ?? {};

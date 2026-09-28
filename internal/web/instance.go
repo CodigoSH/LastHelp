@@ -123,31 +123,18 @@ func (s *Server) handleSetInstance(w http.ResponseWriter, r *http.Request) {
 
 // handleGetLanding answers what the front page is made of.
 //
-// Open, like the name and the mark: this is the page itself. A visitor is given
-// the published page and nothing else. Whoever may compose it can ask for the
-// draft with ?draft=1, and is given the board list the editor's pickers need
-// and whether there is a draft at all.
+// Open, like the name and the mark: this is the page itself. Whoever may
+// compose it is also given the board list the editor's pickers need.
 func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	composer := false
 	if actor, ok := middleware.ActorFrom(r); ok {
 		composer = actor.Can(authz.ManageServer, authz.Scope{})
 	}
 
-	published, err := s.settings().Get(settings.LandingLayout)
+	stored, err := s.settings().Get(settings.LandingLayout)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
-	}
-	stored := published
-	draft := ""
-	if composer {
-		if draft, err = s.settings().Get(settings.LandingDraft); err != nil {
-			writeError(w, http.StatusInternalServerError, "error.internal")
-			return
-		}
-		if r.URL.Query().Get("draft") == "1" && draft != "" {
-			stored = draft
-		}
 	}
 
 	page, err := landing.Parse(stored)
@@ -166,7 +153,6 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	}
 	if composer {
 		body["boards"] = describeBoards(boards)
-		body["has_draft"] = draft != ""
 		// A share picture is announced only at an absolute address, so the
 		// editor says so when none is configured rather than letting the
 		// operator choose one nobody will ever see.
@@ -446,13 +432,19 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 // searchHits is how many reports one search answers with.
 const searchHits = 6
 
-// handleSaveLandingDraft keeps the page being edited, without showing it.
+// handleSaveLanding stores the front page, and it is what visitors see from
+// then on — the way Lastboard's board is edited: in place, each change kept as
+// it is made, with no second copy to publish or forget about.
 //
 // Validated by the domain, which refuses a page it cannot draw entirely rather
 // than keeping the parts it recognised: saving half of what somebody composed
 // and showing them the rest missing is how an editor teaches people not to
 // trust it.
-func (s *Server) handleSaveLandingDraft(w http.ResponseWriter, r *http.Request) {
+//
+// A page that is exactly the default is stored as no page at all: the default
+// is read fresh rather than stored, so an operator who restored it gets the
+// better one a later release brings, like everybody who never changed it.
+func (s *Server) handleSaveLanding(w http.ResponseWriter, r *http.Request) {
 	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
 		return
 	}
@@ -467,8 +459,11 @@ func (s *Server) handleSaveLandingDraft(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "error.bad_layout")
 		return
 	}
-	if err := s.settings().Set(settings.LandingDraft, encoded); err != nil {
-		slog.Error("storing the front page draft", "error", err)
+	if isDefaultPage(page) {
+		encoded = ""
+	}
+	if err := s.settings().Set(settings.LandingLayout, encoded); err != nil {
+		slog.Error("storing the front page", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
@@ -476,77 +471,17 @@ func (s *Server) handleSaveLandingDraft(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"bands": page.Bands, "settings": page.Settings})
 }
 
-// handlePublishLanding puts the draft in front of visitors.
-//
-// A draft that is exactly the default page is published as no page at all: the
-// default is read fresh rather than stored, so an operator who restored it gets
-// the better one a later release brings, like everybody who never changed it.
-func (s *Server) handlePublishLanding(w http.ResponseWriter, r *http.Request) {
-	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
-		return
-	}
-	draft, err := s.settings().Get(settings.LandingDraft)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	if draft == "" {
-		// Nothing to publish is not an error: the page is already what the
-		// editor shows.
-		writeJSON(w, http.StatusOK, map[string]any{"published": false})
-		return
-	}
-	page, err := landing.Parse(draft)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "error.bad_layout")
-		return
-	}
-	published := draft
-	if isDefaultPage(page) {
-		published = ""
-	}
-	if err := s.settings().Set(settings.LandingLayout, published); err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	if err := s.settings().Set(settings.LandingDraft, ""); err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	s.sweepLandingImages()
-	writeJSON(w, http.StatusOK, map[string]any{"published": true})
-}
-
-// handleDiscardLandingDraft throws the draft away. The page visitors see was
-// never touched, so there is nothing to put back.
-func (s *Server) handleDiscardLandingDraft(w http.ResponseWriter, r *http.Request) {
-	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
-		return
-	}
-	if err := s.settings().Set(settings.LandingDraft, ""); err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	s.sweepLandingImages()
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
-}
-
-// handleRestoreLandingDefault makes the draft the default page, for the
-// operator to look at and publish or discard like any other change.
+// handleRestoreLandingDefault puts the default page back in front of visitors.
 func (s *Server) handleRestoreLandingDefault(w http.ResponseWriter, r *http.Request) {
 	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
 		return
 	}
+	if err := s.settings().Set(settings.LandingLayout, ""); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	s.sweepLandingImages()
 	page := landing.Default()
-	encoded, err := page.Encode()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	if err := s.settings().Set(settings.LandingDraft, encoded); err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
 	writeJSON(w, http.StatusOK, map[string]any{"bands": page.Bands, "settings": page.Settings})
 }
 
@@ -558,28 +493,24 @@ func isDefaultPage(page landing.Page) bool {
 	return errA == nil && errB == nil && a == b
 }
 
-// sweepLandingImages forgets the pictures neither the published page nor the
-// draft refers to. After the pages are stored, never before: a sweep that ran
-// first and then failed to store would delete pictures a page still shows. Not
+// sweepLandingImages forgets the pictures the front page no longer refers to.
+// After the page is stored, never before: a sweep that ran first and then
+// failed to store would delete pictures the page still shows. Not
 // worth failing the request over — what is left behind is bytes nobody sees.
 func (s *Server) sweepLandingImages() {
-	var pages []landing.Page
-	for _, key := range []string{settings.LandingLayout, settings.LandingDraft} {
-		stored, err := s.settings().Get(key)
-		if err != nil {
-			slog.Warn("reading a front page to sweep its pictures", "error", err)
-			return
-		}
-		page, err := landing.Parse(stored)
-		if err != nil {
-			// A page that cannot be read cannot say which pictures it uses,
-			// so nothing is swept rather than everything.
-			slog.Warn("reading a front page to sweep its pictures", "error", err)
-			return
-		}
-		pages = append(pages, page)
+	stored, err := s.settings().Get(settings.LandingLayout)
+	if err != nil {
+		slog.Warn("reading the front page to sweep its pictures", "error", err)
+		return
 	}
-	if err := landing.ForgetUnusedImages(s.db, pages...); err != nil {
+	page, err := landing.Parse(stored)
+	if err != nil {
+		// A page that cannot be read cannot say which pictures it uses, so
+		// nothing is swept rather than everything.
+		slog.Warn("reading the front page to sweep its pictures", "error", err)
+		return
+	}
+	if err := landing.ForgetUnusedImages(s.db, page); err != nil {
 		slog.Warn("clearing unused front page pictures", "error", err)
 	}
 }

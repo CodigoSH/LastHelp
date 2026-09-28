@@ -3,8 +3,9 @@
  *
  * The page being edited is the page: the same markup visitors get, drawn with
  * editing on, with the controls laid over it and a panel beside it. Every change
- * goes into a draft on the server as it is made; visitors keep the published
- * page until Publish, and Discard throws the draft away.
+ * is saved to the page itself as it is made — the way Lastboard's board is
+ * edited — so what the editor shows is what visitors get, and leaving it is
+ * only leaving it.
  *
  * Kept out of main.ts because it is a small program of its own — a model, a
  * history, a save queue and a keyboard — and main.ts is the router.
@@ -50,7 +51,6 @@ type Found =
 interface Composed extends LandingPage {
   content?: LandingContent;
   boards?: LandingBoard[];
-  has_draft?: boolean;
   share_ready?: boolean;
 }
 
@@ -81,7 +81,6 @@ export class LandingEditor {
   private page: LandingPage = { bands: [], settings: {} };
   private content: LandingContent = {};
   private boards: LandingBoard[] = [];
-  private unpublished = false;
   private shareReady = false;
 
   private past: string[] = [];
@@ -123,11 +122,10 @@ export class LandingEditor {
   }
 
   private async load(): Promise<void> {
-    const composed = await api.get<Composed>("/api/landing?draft=1");
+    const composed = await api.get<Composed>("/api/landing");
     this.page = { bands: composed.bands ?? [], settings: composed.settings ?? {} };
     this.content = composed.content ?? {};
     this.boards = composed.boards ?? [];
-    this.unpublished = composed.has_draft === true;
     this.shareReady = composed.share_ready === true;
     this.filledFor = dataSignature(this.page);
   }
@@ -168,7 +166,6 @@ export class LandingEditor {
     }
     this.lastChange = { key: opts.key ?? "", at: now };
     this.future = [];
-    this.unpublished = true;
     this.scheduleSave();
     const redraw = opts.redraw ?? "all";
     if (redraw === "all") this.drawAll();
@@ -197,7 +194,6 @@ export class LandingEditor {
   private afterTimeTravel(): void {
     this.lastChange = { key: "", at: 0 };
     if (this.selected && !this.find(this.selected)) this.selected = "";
-    this.unpublished = true;
     this.scheduleSave();
     this.drawAll();
   }
@@ -253,13 +249,13 @@ export class LandingEditor {
     this.drawBar();
     this.inFlight = (async () => {
       try {
-        await api.put("/api/landing/draft", sent);
+        await api.put("/api/landing", sent);
         this.saving = "idle";
         // A module that is new, or now reads from somewhere else, has nothing
         // to show until the server says what goes in it.
         const signature = dataSignature(sent);
         if (signature !== this.filledFor && !this.stopped) {
-          const composed = await api.get<Composed>("/api/landing?draft=1");
+          const composed = await api.get<Composed>("/api/landing");
           this.content = composed.content ?? {};
           this.filledFor = signature;
           this.drawPageWhenIdle();
@@ -273,37 +269,6 @@ export class LandingEditor {
       }
     })();
     await this.inFlight;
-  }
-
-  private async publish(): Promise<void> {
-    await this.flush();
-    if (this.problem() || this.saving === "failed") return;
-    try {
-      await api.post("/api/landing/publish");
-      this.unpublished = false;
-      this.host.toast(this.host.text.t("landing.publishedNow"));
-    } catch (err) {
-      this.host.report(err);
-    }
-    this.drawBar();
-  }
-
-  private async discard(): Promise<void> {
-    if (!confirm(this.host.text.t("landing.confirmDiscard"))) return;
-    clearTimeout(this.saveTimer);
-    this.saveTimer = undefined;
-    await this.inFlight;
-    try {
-      await api.del("/api/landing/draft");
-      await this.load();
-      this.past = [];
-      this.future = [];
-      this.selected = "";
-      this.saving = "idle";
-      this.drawAll();
-    } catch (err) {
-      this.host.report(err);
-    }
   }
 
   // --- drawing -----------------------------------------------------------------
@@ -341,7 +306,6 @@ export class LandingEditor {
         canUndo: this.past.length > 0,
         canRedo: this.future.length > 0,
         phone: this.phone,
-        unpublished: this.unpublished,
         saving: this.saving,
         problem: this.problem() || undefined,
         pageOpen: this.selected === PAGE,
@@ -618,10 +582,6 @@ export class LandingEditor {
           this.phone = bar.dataset.bar === "phone";
           this.el(".lpe")?.classList.toggle("phone", this.phone);
           return this.drawBar();
-        case "publish":
-          return this.publish();
-        case "discard":
-          return this.discard();
         case "deselect":
           return this.choose("");
         case "settings":
@@ -1048,8 +1008,7 @@ export class LandingEditor {
 
   /**
    * Back to the page every installation starts with — as a change like any
-   * other: it goes to the draft, visitors see nothing until Publish, and
-   * Ctrl+Z takes it back.
+   * other, saved at once, and Ctrl+Z takes it back.
    */
   private async restore(): Promise<void> {
     if (!confirm(this.text.t("landing.confirmRestore"))) return;
