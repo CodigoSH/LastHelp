@@ -35,6 +35,12 @@ import (
 // ErrOffline is returned when the offline switch is on.
 var ErrOffline = errors.New("outbound connections are disabled (LASTHELP_OFFLINE)")
 
+// ErrTooLarge is a reply that ran past the bound. An error, never a shorter
+// body: a reply cut off in silence reads as a complete one with the wrong
+// contents, which is how a 13 MB release binary arrived as its first 8 MiB and
+// every update failed as "does not match the signed checksums".
+var ErrTooLarge = errors.New("the reply is larger than allowed")
+
 // MaxResponseBytes caps what a reply may be. A forge that answers with a
 // gigabyte — compromised, misconfigured, or just paginating badly — must not be
 // able to spend this server's memory.
@@ -45,6 +51,7 @@ const MaxResponseBytes = 8 << 20 // 8 MiB
 type Client struct {
 	http    *http.Client
 	offline bool
+	limit   int64
 }
 
 // New builds the gate. offline comes from configuration and is read on every
@@ -56,6 +63,7 @@ func New(offline bool, timeout time.Duration) *Client {
 	}
 	return &Client{
 		offline: offline,
+		limit:   MaxResponseBytes,
 		http: &http.Client{
 			Timeout: timeout,
 			// A redirect is a server telling us to go somewhere else. Following
@@ -78,6 +86,19 @@ func New(offline bool, timeout time.Duration) *Client {
 	}
 }
 
+// Bounded is the same gate with a different bound and deadline, for the one
+// caller whose replies are not forge-sized: a release binary is tens of
+// megabytes, and on a slow line takes longer than a forge call should ever be
+// allowed to. The address policy, the redirect rule and the offline switch are
+// the same ones — only how much and how long change.
+func (c *Client) Bounded(limit int64, timeout time.Duration) *Client {
+	h := *c.http
+	if timeout > 0 {
+		h.Timeout = timeout
+	}
+	return &Client{http: &h, offline: c.offline, limit: limit}
+}
+
 // Do sends a request, or refuses to.
 //
 // The caller gets a body already bounded by MaxResponseBytes, so no caller has
@@ -94,16 +115,33 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp.Body = boundedBody{ReadCloser: resp.Body, r: io.LimitReader(resp.Body, MaxResponseBytes)}
+	resp.Body = &boundedBody{ReadCloser: resp.Body, left: c.limit}
 	return resp, nil
 }
 
+// boundedBody reads up to its bound, and one byte past it is an error rather
+// than an end: see ErrTooLarge.
 type boundedBody struct {
 	io.ReadCloser
-	r io.Reader
+	left int64
 }
 
-func (b boundedBody) Read(p []byte) (int, error) { return b.r.Read(p) }
+func (b *boundedBody) Read(p []byte) (int, error) {
+	if b.left < 0 {
+		return 0, ErrTooLarge
+	}
+	// One byte more than is left, so a reply of exactly the bound ends
+	// cleanly and one a byte longer is caught.
+	if int64(len(p)) > b.left+1 {
+		p = p[:b.left+1]
+	}
+	n, err := b.ReadCloser.Read(p)
+	b.left -= int64(n)
+	if b.left < 0 {
+		return n + int(b.left), ErrTooLarge
+	}
+	return n, err
+}
 
 // allowed is the address policy: everything except the places no forge lives
 // and every URL shape a forge never has.

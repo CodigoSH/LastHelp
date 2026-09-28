@@ -77,6 +77,10 @@ var (
 // plain binary rather than an archive: there is nothing to decompress.
 const MaxBinaryBytes = 200 << 20
 
+// downloadTimeout is how long the binary may take to arrive: tens of megabytes
+// on a slow line, where the gate's own deadline is sized for an API call.
+const downloadTimeout = 10 * time.Minute
+
 // statusError carries the code, because 404 means something different from
 // every other answer: nothing is published, rather than nothing is reachable.
 type statusError struct {
@@ -385,6 +389,12 @@ func backup(dbPath, tag string) error {
 	return destination.Sync()
 }
 
+// fetch downloads one file of a release, up to limit bytes.
+//
+// The client is bounded here, per file, rather than trusted to be: the gate's
+// own bound is sized for forge replies, and a release binary is larger than
+// that. Relying on whoever built the client meant every update downloaded the
+// first 8 MiB of the binary and failed its checksum.
 func (u Updater) fetch(ctx context.Context, url string, limit int64) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -392,7 +402,13 @@ func (u Updater) fetch(ctx context.Context, url string, limit int64) ([]byte, er
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := u.Out.Do(req)
+	// A binary gets the time a slow line needs; the context the caller passed
+	// is still the outer bound.
+	timeout := time.Duration(0)
+	if limit > outbound.MaxResponseBytes {
+		timeout = downloadTimeout
+	}
+	resp, err := u.Out.Bounded(limit, timeout).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -406,10 +422,14 @@ func (u Updater) fetch(ctx context.Context, url string, limit int64) ([]byte, er
 
 // newer compares two version tags.
 //
-// Deliberately simple: numeric segments compared as numbers, and anything with
-// a pre-release suffix losing to the same numbers without one. Comparing tags
-// as strings makes v1.10.0 older than v1.9.0, which is the kind of bug that
-// only appears at the tenth release.
+// Numeric segments compared as numbers — comparing tags as strings makes
+// v1.10.0 older than v1.9.0, which is the kind of bug that only appears at the
+// tenth release — and pre-releases ordered the way Semantic Versioning orders
+// them.
+//
+// That second half was missing: with the same numbers, a pre-release never
+// beat another pre-release, so an installation on Beta.03 was told Beta.04 was
+// not newer and every beta stayed on the one it was installed from.
 func newer(candidate, current string) bool {
 	c, cPre := splitVersion(candidate)
 	r, rPre := splitVersion(current)
@@ -419,9 +439,59 @@ func newer(candidate, current string) bool {
 			return c[i] > r[i]
 		}
 	}
-	// Same numbers: a release beats a pre-release of it, and nothing beats a
-	// release.
-	return rPre != "" && cPre == ""
+	switch {
+	case cPre == "" || rPre == "":
+		// A release beats a pre-release of it, and nothing beats a release.
+		return rPre != "" && cPre == ""
+	default:
+		return comparePre(cPre, rPre) > 0
+	}
+}
+
+// comparePre orders two pre-release labels by the Semantic Versioning rules:
+// dot-separated identifiers left to right, numbers as numbers ("Beta.10" after
+// "Beta.9", and "04" is 4), words by their letters, a number before a word, and
+// a longer label after a shorter one it begins with. Letters are compared
+// without case, so "beta" and "Beta" are the same channel and "rc" still comes
+// after both.
+func comparePre(a, b string) int {
+	as, bs := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(as) && i < len(bs); i++ {
+		x, xErr := strconv.Atoi(as[i])
+		y, yErr := strconv.Atoi(bs[i])
+		switch {
+		case xErr == nil && yErr == nil:
+			if x != y {
+				return cmpInt(x, y)
+			}
+		case xErr == nil:
+			return -1
+		case yErr == nil:
+			return 1
+		default:
+			if c := strings.Compare(strings.ToLower(as[i]), strings.ToLower(bs[i])); c != 0 {
+				return c
+			}
+		}
+	}
+	return cmpInt(len(as), len(bs))
+}
+
+func cmpInt(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
+}
+
+// Prerelease says whether a version is a pre-release: v1.0.0-Beta.04 is,
+// v1.0.0 is not.
+func Prerelease(tag string) bool {
+	_, pre := splitVersion(tag)
+	return pre != ""
 }
 
 func splitVersion(tag string) ([3]int, string) {

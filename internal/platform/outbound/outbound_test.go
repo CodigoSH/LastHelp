@@ -144,9 +144,11 @@ func TestTheBodyIsBounded(t *testing.T) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Bounded, and saying so: reading stops at the cap, and the reader is
+	// told why rather than handed the first 8 MiB as if that were all.
 	n, err := io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, ErrTooLarge) {
+		t.Errorf("reading past the cap ended with %v, want ErrTooLarge", err)
 	}
 	if n != MaxResponseBytes {
 		t.Errorf("read %d bytes, want the cap of %d", n, MaxResponseBytes)
@@ -159,5 +161,43 @@ func TestOnlyHTTPGoesOut(t *testing.T) {
 		if _, err := get(t, c, addr); err == nil {
 			t.Errorf("%s was allowed", addr)
 		}
+	}
+}
+
+// TestAReplyPastTheBoundIsAnErrorNotAShorterReply.
+//
+// It used to be cut off in silence, and a body cut off in silence reads as a
+// complete one: every update downloaded the first 8 MiB of a 13 MB binary and
+// failed its checksum, with nothing anywhere saying it had been truncated.
+func TestAReplyPastTheBoundIsAnErrorNotAShorterReply(t *testing.T) {
+	const bound = 1000
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		size := bound
+		if r.URL.Path == "/over" {
+			size = bound + 1
+		}
+		_, _ = w.Write([]byte(strings.Repeat("x", size)))
+	}))
+	defer srv.Close()
+	c := New(false, time.Second).Bounded(bound, 0)
+
+	resp, err := get(t, c, srv.URL+"/exact")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil || len(body) != bound {
+		t.Errorf("a reply of exactly the bound: %d bytes, %v", len(body), err)
+	}
+
+	resp, err = get(t, c, srv.URL+"/over")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if !errors.Is(err, ErrTooLarge) {
+		t.Errorf("a reply one byte past the bound read as %v, want ErrTooLarge", err)
 	}
 }

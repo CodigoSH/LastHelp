@@ -152,6 +152,26 @@ func TestAGoodUpdateIsInstalled(t *testing.T) {
 	}
 }
 
+// TestABinaryLargerThanAForgeReplyIsInstalled.
+//
+// Real release binaries are 13 MB, and the gate bounds forge replies at 8 MiB:
+// every update failed its checksum because the download arrived cut off. The
+// stand-in binaries elsewhere are a few bytes, which is why no test saw it.
+func TestABinaryLargerThanAForgeReplyIsInstalled(t *testing.T) {
+	// The script exits before the shell reaches the padding.
+	big := append(candidateBinary(5), []byte("#"+strings.Repeat("x", outbound.MaxResponseBytes+(1<<20))+"\n")...)
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", big)
+	u, running := updaterFor(t, f, []string{public}, 2)
+
+	if err := applyIn(t, u, running, Release{Tag: "v1.1.0"}, ""); err != nil {
+		t.Fatalf("a binary past the forge bound was refused: %v", err)
+	}
+	if info, err := os.Stat(running); err != nil || info.Size() != int64(len(big)) {
+		t.Errorf("the installed binary is not the one published: %v, %v", info, err)
+	}
+}
+
 // TestAnUnsignedReleaseIsRefused.
 //
 // Never a fallback to checksum-only: a host that could tamper with the binary
@@ -294,6 +314,15 @@ func TestVersionsCompareAsNumbers(t *testing.T) {
 		{"v1.0.0", "v1.0.0-Beta.01", true},  // a release beats its own beta
 		{"v1.0.0-Beta.02", "v1.0.0", false}, // and nothing beats a release
 		{"v1.2.0-Beta.01", "v1.1.0", true},
+		// Between betas of one version: the case that kept every beta where
+		// it was installed.
+		{"v1.0.0-Beta.04", "1.0.0-Beta.03", true},
+		{"v1.0.0-Beta.03", "v1.0.0-Beta.04", false},
+		{"v1.0.0-Beta.04", "v1.0.0-Beta.04", false},
+		{"v1.0.0-Beta.10", "v1.0.0-Beta.9", true}, // numbers, not strings
+		{"v1.0.0-RC.1", "v1.0.0-Beta.12", true},
+		{"v1.0.0-beta.2", "v1.0.0-Beta.1", true},   // case is not a channel
+		{"v1.0.0-Beta.1.1", "v1.0.0-Beta.1", true}, // longer after shorter
 	}
 
 	for _, c := range cases {

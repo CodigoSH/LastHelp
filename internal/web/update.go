@@ -223,12 +223,29 @@ func keyForUpdateError(err error) string {
 // The query parameter still wins, so a check can be made against the other
 // channel without changing what the server follows — which is what "show me
 // what a beta would be" needs.
+//
+// With no channel chosen, an installation follows the one it came from: a
+// pre-release follows the betas. It used to follow the stable channel, and
+// while only betas are published that channel answers "nothing here" — so a
+// beta installation was told it was up to date with the next beta out.
 func (s *Server) wantsBeta(r *http.Request) bool {
 	if value := r.URL.Query().Get("beta"); value != "" {
 		return value == "true"
 	}
 	channel, err := s.settings().Get(settings.UpdateChannel)
-	return err == nil && channel == "beta"
+	if err != nil {
+		return false
+	}
+	return followsBeta(channel, version.Current)
+}
+
+// followsBeta is the channel an installation follows: the one chosen, or with
+// none chosen, the one its own version came from.
+func followsBeta(channel, current string) bool {
+	if channel == "" {
+		return updater.Prerelease(current)
+	}
+	return channel == "beta"
 }
 
 type channelChange struct {
