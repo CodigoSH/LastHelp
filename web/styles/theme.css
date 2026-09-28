@@ -41,6 +41,10 @@
   /* Lastboard's --surface: a card that floats on another, translucent over a
      blur, so the one under it shows through darker in the dark theme. */
   --surface-glass: rgba(255, 255, 255, 0.72);
+  /* The shadow under a card that floats on another. Long and strong on light;
+     short and soft on dark, where a long dark shadow over a dark ground has
+     only a dozen grey levels to fade through and draws them as rings. */
+  --float-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   --text-main: #12151b;
   --text-dim: #5b6470;
   --border: #e3e7ec;
@@ -138,6 +142,7 @@
   --dark-panel: #1a1a1a;
   --dark-surface-dim: #242424;
   --dark-surface-glass: rgba(28, 22, 20, 0.7);
+  --dark-float-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   --dark-sheet: #242424;
   --dark-surface-hover: rgba(var(--accent-rgb), 0.1);
   --dark-surface-active: rgba(var(--accent-rgb), 0.2);
@@ -171,6 +176,7 @@
     --surface-active: var(--dark-surface-active);
     --surface-dim: var(--dark-surface-dim);
     --surface-glass: var(--dark-surface-glass);
+    --float-shadow: var(--dark-float-shadow);
     --text-main: var(--dark-text-main);
     --text-dim: var(--dark-text-dim);
     --border: var(--dark-border);
@@ -199,6 +205,7 @@
   --surface-active: var(--dark-surface-active);
   --surface-dim: var(--dark-surface-dim);
   --surface-glass: var(--dark-surface-glass);
+  --float-shadow: var(--dark-float-shadow);
   --text-main: var(--dark-text-main);
   --text-dim: var(--dark-text-dim);
   --border: var(--dark-border);
@@ -4234,7 +4241,7 @@ body > nav .brand {
   background: var(--surface-glass);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: var(--float-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   text-align: start;
 }
 
