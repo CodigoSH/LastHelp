@@ -91,7 +91,7 @@ func TestComposingTheFrontPage(t *testing.T) {
 	// And neither can somebody who IS signed in and is not an administrator:
 	// the front page belongs to whoever runs the server.
 	accounts := account.Store{DB: i.db()}
-	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, i.now())
+	helper, err := accounts.Create("helper", "a good long passphrase", false, i.now())
 	if err != nil {
 		t.Fatal(err)
 	}

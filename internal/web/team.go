@@ -254,7 +254,7 @@ func (s *Server) handleTeam(w http.ResponseWriter, r *http.Request) {
 	accounts := make([]map[string]any, 0, len(users))
 	for _, u := range users {
 		if !u.Disabled {
-			accounts = append(accounts, map[string]any{"username": u.Username, "name": u.DisplayName})
+			accounts = append(accounts, map[string]any{"username": u.Username})
 		}
 		memberships, err := s.accounts().Memberships(u.ID)
 		if err != nil {
@@ -277,7 +277,6 @@ func (s *Server) handleTeam(w http.ResponseWriter, r *http.Request) {
 		}
 		members = append(members, map[string]any{
 			"username": u.Username,
-			"name":     u.DisplayName,
 			"avatar":   u.Avatar,
 			"admin":    u.IsAdministrator,
 			"roles":    roles,

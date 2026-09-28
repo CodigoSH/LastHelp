@@ -27,7 +27,7 @@ func store(t *testing.T) Store {
 func TestCreateAndAuthenticate(t *testing.T) {
 	s := store(t)
 
-	created, err := s.Create("Person@Example.COM ", "a good long passphrase", "Person", true, epoch)
+	created, err := s.Create("Person@Example.COM ", "a good long passphrase", true, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestCreateAndAuthenticate(t *testing.T) {
 // no account is how somebody enumerates who has one here.
 func TestAMissingAccountAndAWrongPasswordAreIndistinguishable(t *testing.T) {
 	s := store(t)
-	if _, err := s.Create("real@example.com", "a good long passphrase", "Real", false, epoch); err != nil {
+	if _, err := s.Create("real@example.com", "a good long passphrase", false, epoch); err != nil {
 		t.Fatal(err)
 	}
 
@@ -103,7 +103,7 @@ func TestTheDecoyHashIsRealWork(t *testing.T) {
 
 func TestADisabledAccountCannotSignIn(t *testing.T) {
 	s := store(t)
-	u, err := s.Create("gone@example.com", "a good long passphrase", "Gone", false, epoch)
+	u, err := s.Create("gone@example.com", "a good long passphrase", false, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,10 +121,10 @@ func TestADisabledAccountCannotSignIn(t *testing.T) {
 
 func TestTheSameAddressCannotBeTakenTwice(t *testing.T) {
 	s := store(t)
-	if _, err := s.Create("dup@example.com", "a good long passphrase", "", false, epoch); err != nil {
+	if _, err := s.Create("dup@example.com", "a good long passphrase", false, epoch); err != nil {
 		t.Fatal(err)
 	}
-	_, err := s.Create("DUP@example.com", "another passphrase entirely", "", false, epoch)
+	_, err := s.Create("DUP@example.com", "another passphrase entirely", false, epoch)
 	if !errors.Is(err, ErrNameTaken) {
 		t.Errorf("got %v, want ErrNameTaken — and note the capitals: normalisation is what makes this collide", err)
 	}
@@ -139,7 +139,7 @@ func TestActorResolvesTheOrganisationOfEachRepository(t *testing.T) {
 	s := store(t)
 	seed(t, s)
 
-	u, err := s.Create("helper@example.com", "a good long passphrase", "Helper", false, epoch)
+	u, err := s.Create("helper@example.com", "a good long passphrase", false, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestGrantReplacesInsteadOfDeleting(t *testing.T) {
 	s := store(t)
 	seed(t, s)
 
-	u, err := s.Create("promoted@example.com", "a good long passphrase", "", false, epoch)
+	u, err := s.Create("promoted@example.com", "a good long passphrase", false, epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestCountIsHowSetupKnowsTheInstanceIsUnclaimed(t *testing.T) {
 		t.Fatalf("a fresh instance reports %d accounts", n)
 	}
 
-	if _, err := s.Create("first@example.com", "a good long passphrase", "", true, epoch); err != nil {
+	if _, err := s.Create("first@example.com", "a good long passphrase", true, epoch); err != nil {
 		t.Fatal(err)
 	}
 	if n, _ = s.Count(); n != 1 {

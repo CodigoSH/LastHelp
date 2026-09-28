@@ -112,10 +112,10 @@ func (s *Server) handleDeleteRepository(w http.ResponseWriter, r *http.Request) 
 // --- people -----------------------------------------------------------------
 
 type personChange struct {
-	DisplayName string `json:"display_name"`
-	Password    string `json:"password"`
-	Disabled    *bool  `json:"disabled"`
-	Admin       *bool  `json:"admin"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Disabled *bool  `json:"disabled"`
+	Admin    *bool  `json:"admin"`
 }
 
 // handleUpdatePerson changes somebody else's account.
@@ -141,9 +141,8 @@ func (s *Server) handleUpdatePerson(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accounts := s.accounts()
-	if in.DisplayName != "" {
-		if err := accounts.SetDisplayName(userID, in.DisplayName); err != nil {
-			writeError(w, http.StatusInternalServerError, "error.internal")
+	if in.Username != "" {
+		if _, ok := s.rename(w, userID, in.Username); !ok {
 			return
 		}
 	}

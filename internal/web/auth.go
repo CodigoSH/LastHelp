@@ -30,9 +30,8 @@ const minPasswordLength = 10
 const minUsernameLength = 2
 
 type credentials struct {
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	DisplayName string `json:"display_name"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // handleStatus tells the page whether this instance has been claimed yet. It is
@@ -71,7 +70,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.accounts().Create(in.Username, in.Password, in.DisplayName, true, s.now())
+	user, err := s.accounts().Create(in.Username, in.Password, true, s.now())
 	if err != nil {
 		if errors.Is(err, account.ErrNameTaken) {
 			// The field is a username and has been since the rename. This said
@@ -214,7 +213,6 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 	if user, err := s.accounts().ByID(actor.UserID); err == nil {
 		body["username"] = user.Username
-		body["name"] = user.DisplayName
 		body["avatar"] = user.Avatar
 	}
 	// The language this account reads in, which follows the person rather than

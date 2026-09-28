@@ -155,7 +155,7 @@ func (i *instance) csrf() string {
 func (i *instance) claim() {
 	i.t.Helper()
 	resp := i.do(http.MethodPost, "/api/setup", map[string]string{
-		"username": "owner", "password": "a good long passphrase", "display_name": "Owner",
+		"username": "owner", "password": "a good long passphrase",
 	})
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {

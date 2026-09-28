@@ -893,7 +893,12 @@ async function main() {
     "About sits together: the name under its mark, no build line, the disk as a bar with a real length, the links out",
     about.meter !== null && about.meter.max > 0 && about.meter.value >= 0 &&
       about.meter.value <= about.meter.max && about.meter.ancho > 100 && about.meter.alto >= 4 &&
-      about.links.length === 2 && about.bajoElLogo >= 8 && about.bajoElLogo <= 20 &&
+      // Source code, support and donations — the three the house's Info has.
+      JSON.stringify(about.links) === JSON.stringify([
+        "https://git.codigosh.com/CodigoSH/LastHelp",
+        "https://support.codigosh.com/codigosh/lasthelp",
+        "https://opencollective.com/codigosh",
+      ]) && about.bajoElLogo >= 8 && about.bajoElLogo <= 20 &&
       about.plataforma === false,
     JSON.stringify({ meter: about.meter, links: about.links, bajoElLogo: about.bajoElLogo, plataforma: about.plataforma }),
   );
@@ -2668,7 +2673,7 @@ async function main() {
     await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
     await post("/api/session", { username: "alex", password: "una contraseña larga de verdad" });
 
-    await post("/api/people", { username: "ana", display_name: "Ana", password: "una contraseña larga de verdad" });
+    await post("/api/people", { username: "ana", password: "una contraseña larga de verdad" });
     const people = await fetch("/api/people").then(r => r.json());
     const ana = people.people.find(p => p.username === "ana");
     await post("/api/people/" + ana.id + "/grants",
@@ -2881,7 +2886,7 @@ async function main() {
       pendientes: tag ? Number(tag.dataset.pending) : 0,
       servidor: panel.pending,
       alex: document.querySelector('.team [data-member="alex"] [data-role]')?.dataset.role ?? "",
-      quitarseASiMismo: !!document.querySelector('[data-revoke-owner="alex"]'),
+      quitarseASiMismo: !!document.querySelector('[data-edit-member="alex"], [data-remove-member="alex"]'),
       ana: document.querySelector('.team [data-member="ana"] [data-role]')?.dataset.role ?? "",
     };
   `);
@@ -2892,22 +2897,43 @@ async function main() {
     JSON.stringify(secciones),
   );
 
-  // An owner added and taken off from the page, and the team back as it was.
-  const duenos = await evaluate(`
+  // The whole team is managed from here: every member but yourself has a
+  // pencil and a bin, the pencil changes what they are, the bin takes them off
+  // the team, and the form adds somebody back with either role — and the team
+  // is left as it was, because later checks count on Ana as a collaborator.
+  const equipoOrg = await evaluate(`
     window.confirm = () => true;
-    const f = document.querySelector("form.owner-add");
-    f.querySelector("#owner-who").value = "ana";
+    const esperar = (ms) => new Promise(r => setTimeout(r, ms));
+    const rol = (u) => document.querySelector('.team [data-member="' + u + '"] [data-role]')?.dataset.role ?? "";
+    const iconos = !!document.querySelector('[data-edit-member="ana"]') && !!document.querySelector('[data-remove-member="ana"]');
+
+    document.querySelector('[data-edit-member="ana"]').click();
+    await esperar(300);
+    const cajas = [...document.querySelectorAll('form.member-form input[name="roles"]')];
+    const marcadas = cajas.filter(c => c.checked).map(c => c.value);
+    cajas.forEach(c => { c.checked = c.value === "owner"; });
+    document.querySelector("form.member-form").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await esperar(1300);
+    const ahora = rol("ana");
+
+    document.querySelector('[data-remove-member="ana"]').click();
+    await esperar(1300);
+    const fuera = rol("ana");
+
+    const f = document.querySelector("form.member-add");
+    const opciones = [...f.querySelectorAll("#member-role option")].map(o => o.value);
+    f.querySelector("#member-who").value = "ana";
+    f.querySelector("#member-role").value = "repo:lastboard";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-    await new Promise(r => setTimeout(r, 1100));
-    const dueña = !!document.querySelector('[data-revoke-owner="ana"]');
-    document.querySelector('[data-revoke-owner="ana"]')?.click();
-    await new Promise(r => setTimeout(r, 1100));
-    return { dueña, vuelta: document.querySelector('.team [data-member="ana"] [data-role]')?.dataset.role ?? "" };
+    await esperar(1300);
+    return { iconos, marcadas, ahora, fuera, opciones, vuelta: rol("ana") };
   `);
   check(
-    "an owner is added and taken off from the organisation's page",
-    duenos.dueña === true && duenos.vuelta === "collaborator",
-    JSON.stringify(duenos),
+    "every member but yourself is edited and taken off from the organisation's page, and added back with either role",
+    equipoOrg.iconos === true && JSON.stringify(equipoOrg.marcadas) === '["repo:lastboard"]' && equipoOrg.ahora === "owner" &&
+      equipoOrg.fuera === "" && equipoOrg.opciones[0] === "owner" && equipoOrg.opciones.includes("repo:lastboard") &&
+      equipoOrg.vuelta === "collaborator",
+    JSON.stringify(equipoOrg),
   );
   // What a repository takes, as the marks of its kinds and not as words; each
   // named, because the picture is all a screen reader would otherwise get.

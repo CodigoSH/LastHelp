@@ -40,7 +40,6 @@ type User struct {
 	Username string
 	// Avatar is a data URL, or empty. Kept in the row so a backup is one file.
 	Avatar          string
-	DisplayName     string
 	IsAdministrator bool
 	Disabled        bool
 }
@@ -50,7 +49,7 @@ type User struct {
 // now is a parameter rather than a call to the clock: the domain does not read
 // the wall clock, which is what lets a test place an account in the past
 // without sleeping.
-func (s Store) Create(username, plainPassword, displayName string, administrator bool, now time.Time) (User, error) {
+func (s Store) Create(username, plainPassword string, administrator bool, now time.Time) (User, error) {
 	username = normaliseUsername(username)
 	if username == "" {
 		return User{}, errors.New("an account needs a username")
@@ -62,9 +61,9 @@ func (s Store) Create(username, plainPassword, displayName string, administrator
 	}
 
 	res, err := s.DB.Exec(`INSERT INTO app_user
-		(username, password_hash, display_name, is_administrator, created_at)
-		VALUES (?, ?, ?, ?, ?)`,
-		username, hash, displayName, administrator, now.Unix())
+		(username, password_hash, is_administrator, created_at)
+		VALUES (?, ?, ?, ?)`,
+		username, hash, administrator, now.Unix())
 	if err != nil {
 		if isUniqueViolation(err) {
 			return User{}, ErrNameTaken
@@ -77,7 +76,7 @@ func (s Store) Create(username, plainPassword, displayName string, administrator
 		return User{}, fmt.Errorf("creating the account: %w", err)
 	}
 	return User{
-		ID: id, Username: username, DisplayName: displayName, IsAdministrator: administrator,
+		ID: id, Username: username, IsAdministrator: administrator,
 	}, nil
 }
 
@@ -93,9 +92,9 @@ func (s Store) Authenticate(username, plainPassword string) (User, error) {
 		u          User
 		storedHash string
 	)
-	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled, avatar, password_hash
+	err := s.DB.QueryRow(`SELECT id, username, is_administrator, disabled, avatar, password_hash
 		FROM app_user WHERE username = ?`, username).
-		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &u.Avatar, &storedHash)
+		Scan(&u.ID, &u.Username, &u.IsAdministrator, &u.Disabled, &u.Avatar, &storedHash)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -123,9 +122,9 @@ func (s Store) Authenticate(username, plainPassword string) (User, error) {
 // leak from.
 func (s Store) ByID(userID int64) (User, error) {
 	var u User
-	err := s.DB.QueryRow(`SELECT id, username, display_name, is_administrator, disabled, avatar
+	err := s.DB.QueryRow(`SELECT id, username, is_administrator, disabled, avatar
 		FROM app_user WHERE id = ?`, userID).
-		Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &u.Avatar)
+		Scan(&u.ID, &u.Username, &u.IsAdministrator, &u.Disabled, &u.Avatar)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -263,7 +262,7 @@ var decoy = sync.OnceValue(func() string {
 // Ordered by name so the screen is stable: a list that reorders itself between
 // visits is one where somebody clicks the wrong row.
 func (s Store) List() ([]User, error) {
-	rows, err := s.DB.Query(`SELECT id, username, display_name, is_administrator, disabled, avatar
+	rows, err := s.DB.Query(`SELECT id, username, is_administrator, disabled, avatar
 		FROM app_user ORDER BY username`)
 	if err != nil {
 		return nil, fmt.Errorf("listing accounts: %w", err)
@@ -273,7 +272,7 @@ func (s Store) List() ([]User, error) {
 	var out []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &u.IsAdministrator, &u.Disabled, &u.Avatar); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.IsAdministrator, &u.Disabled, &u.Avatar); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -319,11 +318,19 @@ func (s Store) SetPassword(userID int64, currentPassword, newPassword string) er
 	return nil
 }
 
-// SetDisplayName changes the name shown beside a reply.
-func (s Store) SetDisplayName(userID int64, name string) error {
-	if _, err := s.DB.Exec(`UPDATE app_user SET display_name = ? WHERE id = ?`,
-		strings.TrimSpace(name), userID); err != nil {
-		return fmt.Errorf("storing the display name: %w", err)
+// Rename changes the username: the name the account signs in with, and the one
+// its replies carry. Sessions are by account, not by name, so nobody is signed
+// out by it.
+func (s Store) Rename(userID int64, username string) error {
+	username = normaliseUsername(username)
+	if username == "" {
+		return errors.New("an account needs a username")
+	}
+	if _, err := s.DB.Exec(`UPDATE app_user SET username = ? WHERE id = ?`, username, userID); err != nil {
+		if isUniqueViolation(err) {
+			return ErrNameTaken
+		}
+		return fmt.Errorf("renaming the account: %w", err)
 	}
 	return nil
 }

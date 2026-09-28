@@ -31,7 +31,7 @@ func teamSetup(t *testing.T) (admin, owner, collaborator *instance) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"olga", "ana", "newcomer"} {
-		if _, err := accounts.Create(name, "a good long passphrase", name, false, admin.now()); err != nil {
+		if _, err := accounts.Create(name, "a good long passphrase", false, admin.now()); err != nil {
 			t.Fatal(err)
 		}
 	}

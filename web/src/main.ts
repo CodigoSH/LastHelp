@@ -712,7 +712,7 @@ async function showProfile(): Promise<void> {
   if (!(await requirePanel())) return;
   await showInShell(
     views.profileScreen(
-      { username: me?.username ?? "", name: me?.name, avatar: me?.avatar, admin: me?.admin === true },
+      { username: me?.username ?? "", avatar: me?.avatar, admin: me?.admin === true },
       text,
     ),
     "/panel/account",
@@ -744,7 +744,7 @@ async function showProfile(): Promise<void> {
     event.preventDefault();
     const data = new FormData(event.currentTarget as HTMLFormElement);
     try {
-      await api.post("/api/me/profile", { display_name: String(data.get("display_name") ?? "") });
+      await api.post("/api/me/profile", { username: String(data.get("username") ?? "") });
       await render();
     } catch (err) {
       showFormError(err);
@@ -833,7 +833,6 @@ async function showPeople(): Promise<void> {
           lead: text.t("people.addHelp"),
           body:
             views.field({ id: "person-username", name: "username", label: text.t("auth.username"), required: true, example: "ana" }, text) +
-            views.field({ id: "person-name", name: "display_name", label: text.t("profile.name"), example: "Ana" }, text) +
             views.field({ id: "person-password", name: "password", label: text.t("auth.password"), type: "password", required: true, hint: text.t("auth.passwordHelp") }, text) +
             // Chosen here rather than left to whatever their browser asks for:
             // otherwise somebody's first sign-in lands in a language they did
@@ -868,7 +867,7 @@ async function showPeople(): Promise<void> {
           title: text.t("people.edit"),
           lead: text.t("people.editHelp"),
           body:
-            views.field({ id: "edit-name", name: "display_name", label: text.t("profile.name") }, text) +
+            views.field({ id: "edit-username", name: "username", label: text.t("auth.username") }, text) +
             views.field({ id: "edit-password", name: "password", label: text.t("people.newPassword"), type: "password", hint: text.t("people.newPasswordHelp") }, text),
           submit: text.t("action.save"),
           formClass: "person-edit-form",
@@ -881,7 +880,6 @@ async function showPeople(): Promise<void> {
   onSubmit("form.person-form", async (data) => {
     await api.post("/api/people", {
       username: String(data.get("username") ?? ""),
-      display_name: String(data.get("display_name") ?? ""),
       password: String(data.get("password") ?? ""),
       language: String(data.get("language") ?? ""),
     });
@@ -893,8 +891,8 @@ async function showPeople(): Promise<void> {
   root?.querySelectorAll<HTMLButtonElement>("[data-edit-person]").forEach((button) =>
     button.addEventListener("click", () => {
       editing = Number(button.dataset.editPerson ?? 0);
-      const name = root?.querySelector<HTMLInputElement>("#edit-name");
-      if (name) name.value = button.dataset.name ?? "";
+      const name = root?.querySelector<HTMLInputElement>("#edit-username");
+      if (name) name.value = button.dataset.username ?? "";
       const pass = root?.querySelector<HTMLInputElement>("#edit-password");
       if (pass) pass.value = "";
       openModal("person-edit");
@@ -902,9 +900,9 @@ async function showPeople(): Promise<void> {
   );
   onSubmit("form.person-edit-form", async (data) => {
     const payload: Record<string, string> = {};
-    const name = String(data.get("display_name") ?? "");
+    const name = String(data.get("username") ?? "");
     const pass = String(data.get("password") ?? "");
-    if (name) payload.display_name = name;
+    if (name) payload.username = name;
     if (pass) payload.password = pass;
     await api.patch(`/api/people/${editing}`, payload);
     await render();
@@ -2517,7 +2515,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   if (!data) return go("/panel/organizations");
   const team = data.can_manage
     ? await api
-        .get<{ members: views.TeamMember[]; accounts: { username: string; name: string }[] }>(`${base}/team`)
+        .get<{ members: views.TeamMember[]; accounts: { username: string }[] }>(`${base}/team`)
         .catch(() => null)
     : null;
   const forge = data.organization.forge ?? "none";
@@ -2536,6 +2534,17 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
           body: views.repositoryFields(text, forge, forge !== "none") + views.acceptsFields(text),
           submit: text.t("auth.create"),
           formClass: "repo-form",
+        },
+        text,
+      ) +
+      views.modal(
+        {
+          id: "member-modal",
+          title: text.t("people.roles"),
+          lead: text.t("org.editLead"),
+          body: views.teamRolesFields(data, text),
+          submit: text.t("action.save"),
+          formClass: "member-form",
         },
         text,
       )),
@@ -2586,17 +2595,51 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
     }),
   );
 
-  // Owners are added and taken off here; collaborators on their repository's
-  // page, where the rest of that board is.
-  onSubmit("form.owner-add", async (formData) => {
-    await api.post(`${base}/team`, { username: String(formData.get("username") ?? ""), repository: "", role: "owner" });
+  // The whole team is managed here: added with a role, changed with the pencil,
+  // taken off with the bin. A role is one of two things — "owner" of the
+  // organisation, or "repo:<slug>" for a collaborator on one repository — and
+  // each is given or taken through the same endpoint.
+  const setRole = (username: string, role: string, on: boolean) =>
+    role === "owner"
+      ? api.post(`${base}/team`, { username, repository: "", role: on ? "owner" : "" })
+      : api.post(`${base}/team`, { username, repository: role.slice("repo:".length), role: on ? "collaborator" : "" });
+  const rolesOf = (button: HTMLElement) => [
+    ...(button.dataset.owner === "true" ? ["owner"] : []),
+    ...(button.dataset.repos ?? "").split(" ").filter(Boolean).map((slug) => `repo:${slug}`),
+  ];
+
+  onSubmit("form.member-add", async (formData) => {
+    await setRole(String(formData.get("username") ?? ""), String(formData.get("role") ?? ""), true);
     await render();
   });
-  root?.querySelectorAll<HTMLButtonElement>("[data-revoke-owner]").forEach((button) =>
+
+  let member = "";
+  let memberHad: string[] = [];
+  root?.querySelectorAll<HTMLButtonElement>("[data-edit-member]").forEach((button) =>
+    button.addEventListener("click", () => {
+      member = button.dataset.editMember ?? "";
+      memberHad = rolesOf(button);
+      root?.querySelectorAll<HTMLInputElement>('form.member-form input[name="roles"]').forEach((box) => {
+        box.checked = memberHad.includes(box.value);
+      });
+      openModal("member-modal");
+    }),
+  );
+  onSubmit("form.member-form", async (formData) => {
+    const want = formData.getAll("roles").map(String);
+    // Given before taken: an owner turned into a collaborator is never, for a
+    // moment, nobody on the team.
+    for (const role of want.filter((r) => !memberHad.includes(r))) await setRole(member, role, true);
+    for (const role of memberHad.filter((r) => !want.includes(r))) await setRole(member, role, false);
+    await render();
+  });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-remove-member]").forEach((button) =>
     button.addEventListener("click", async () => {
-      if (!confirm(i18n.t("org.confirmRevoke", { name: button.dataset.name ?? "" }))) return;
+      const username = button.dataset.removeMember ?? "";
+      if (!confirm(i18n.t("org.confirmRemove", { name: username, organization: data.organization.name }))) return;
       try {
-        await api.post(`${base}/team`, { username: button.dataset.revokeOwner ?? "", repository: "", role: "" });
+        for (const role of rolesOf(button)) await setRole(username, role, false);
         await render();
       } catch (err) {
         report(err);
@@ -2632,7 +2675,7 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
   if (!repo) return go(`/panel/${encodeURIComponent(orgSlug)}`);
   const team = repo.can_manage
     ? await api
-        .get<{ members: views.TeamMember[]; accounts: { username: string; name: string }[] }>(
+        .get<{ members: views.TeamMember[]; accounts: { username: string }[] }>(
           `/api/orgs/${encodeURIComponent(orgSlug)}/team`,
         )
         .catch(() => null)

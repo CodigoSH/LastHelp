@@ -521,9 +521,9 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name, err := s.displayName(actor.UserID)
+	name, err := s.username(actor.UserID)
 	if err != nil {
-		slog.Error("reading the display name", "error", err)
+		slog.Error("reading the username a reply is signed with", "error", err)
 	}
 	if _, err := s.items().Comment(it.ID, item.AuthorTeam, name, in.Body, s.now()); err != nil {
 		writeError(w, http.StatusBadRequest, "error.invalid_comment")
@@ -532,9 +532,11 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (s *Server) displayName(userID int64) (string, error) {
+// username is what a team reply is signed with: an account has one name, as
+// on Lastboard, and it is this one.
+func (s *Server) username(userID int64) (string, error) {
 	var name string
-	err := s.db.QueryRow(`SELECT display_name FROM app_user WHERE id = ?`, userID).Scan(&name)
+	err := s.db.QueryRow(`SELECT username FROM app_user WHERE id = ?`, userID).Scan(&name)
 	return name, err
 }
 

@@ -57,7 +57,6 @@ var migrations = []migration{
 				id               INTEGER PRIMARY KEY,
 				username         TEXT    NOT NULL UNIQUE,
 				password_hash    TEXT    NOT NULL,
-				display_name     TEXT    NOT NULL DEFAULT '',
 				is_administrator INTEGER NOT NULL DEFAULT 0,
 				disabled         INTEGER NOT NULL DEFAULT 0,
 				avatar           TEXT    NOT NULL DEFAULT '',
@@ -366,6 +365,24 @@ var migrations = []migration{
 				content_type TEXT NOT NULL,
 				created_at  TEXT NOT NULL
 			)`)
+			return err
+		},
+	},
+	{
+		version: 9,
+		name:    "an account has one name",
+		// The username is the name, the way Lastboard has it: the one you sign
+		// in with is the one your replies carry. A second, "display" name made
+		// renaming yourself change something other than what you sign in with.
+		//
+		// Skipped where the column never existed — every database created by
+		// the CREATE above.
+		fn: func(tx *sql.Tx) error {
+			has, err := hasColumn(tx, "app_user", "display_name")
+			if err != nil || !has {
+				return err
+			}
+			_, err = tx.Exec(`ALTER TABLE app_user DROP COLUMN display_name`)
 			return err
 		},
 	},

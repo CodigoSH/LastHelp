@@ -847,9 +847,11 @@ export interface PickerSpec {
  */
 export function imagePicker(spec: PickerSpec, text: Text): string {
   const id = spec.what === "avatar" ? "avatar-file" : "logo-file";
+  // A logo nobody has chosen is LastHelp's own, the same one the sign-in and
+  // the bar show, rather than initials that appear nowhere else.
   const preview =
-    spec.current && spec.what === "logo"
-      ? `<img class="logo-preview" src="${escapeAttr(spec.current)}" alt="" />`
+    spec.what === "logo"
+      ? `<img class="logo-preview" src="${escapeAttr(spec.current || "/logo.svg")}" alt="" />`
       : avatar(spec.initials ?? "?", spec.current ?? "", spec.big);
 
   return `<div class="picker">
@@ -2113,35 +2115,37 @@ function settingsItem(spec: {
 }
 
 export function profileScreen(
-  me: { username: string; name?: string; avatar?: string; admin: boolean },
+  me: { username: string; avatar?: string; admin: boolean },
   text: Text,
 ): string {
   // Lastboard's "My profile" and "System password", card for card: the
-  // picture, the name and the role; the name you appear under, with its save
-  // button on the same line; and the password, closed by one button aligned
-  // with the fields rather than stretched across the card.
+  // picture, the name and the role; the username — the one name an account
+  // has, to sign in with and to sign replies — with its save button on the same
+  // line; and the password, closed by one button aligned with the fields
+  // rather than stretched across the card.
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.profile"))}</h1>
     <div class="settings">
       ${settingsCard(
         text.t("shell.profile"),
         `<div class="profile-head">
           ${imagePicker(
-            { what: "avatar", current: me.avatar, initials: me.name || me.username, label: text.t("profile.picture"), big: true },
+            { what: "avatar", current: me.avatar, initials: me.username, label: text.t("profile.picture"), big: true },
             text,
           )}
           <div class="profile-who">
-            <span class="profile-name">${escapeHTML(me.name || me.username)}</span>
+            <span class="profile-name">${escapeHTML(me.username)}</span>
             ${me.admin ? `<span class="profile-role">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
           </div>
         </div>
         <form class="profile-name">
           <div class="field">
-            <label for="display-name">${escapeHTML(text.t("profile.name"))}</label>
+            <label for="profile-username">${escapeHTML(text.t("auth.username"))}</label>
             <div class="input-row">
-              <input type="text" id="display-name" name="display_name" value="${escapeAttr(me.name ?? "")}" placeholder="Alex" />
+              <input type="text" id="profile-username" name="username" value="${escapeAttr(me.username)}" required
+                minlength="2" maxlength="60" autocomplete="username" autocapitalize="none" spellcheck="false" />
               <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button>
             </div>
-            <p class="hint">${escapeHTML(text.t("profile.nameHelp"))}</p>
+            <p class="hint">${escapeHTML(text.t("profile.usernameHelp"))}</p>
           </div>
           <p class="form-error" role="alert" hidden></p>
         </form>`,
@@ -2394,7 +2398,7 @@ export interface OrganizationPanel {
  */
 export function organizationScreen(
   data: OrganizationPanel,
-  team: { members: TeamMember[]; accounts: { username: string; name: string }[] } | null,
+  team: { members: TeamMember[]; accounts: { username: string }[] } | null,
   /** The account reading, so it is not offered a way to remove itself. */
   self: string,
   /** Where this instance answers, so the webhook address can be shown whole.
@@ -2485,71 +2489,112 @@ export function organizationScreen(
 }
 
 /**
- * Who works in an organisation: its owners, who are added and taken off here,
- * and its collaborators with the repositories they work on — each of those is
- * changed on its repository's page, where the rest of that board's settings
- * are.
+ * Who works in an organisation, all of it managed here: each member with a
+ * pencil to change what they are and a bin to take them off the team, and a
+ * form to add somebody as an owner of the organisation or a collaborator on one
+ * of its repositories.
+ *
+ * Collaborators used to be only listed here and changed on each repository's
+ * page, and the form here only knew one role — so adding a collaborator meant
+ * knowing that the organisation's own team page could not do it.
  */
 function organizationTeam(
   data: OrganizationPanel,
-  team: { members: TeamMember[]; accounts: { username: string; name: string }[] },
+  team: { members: TeamMember[]; accounts: { username: string }[] },
   self: string,
   text: Text,
 ): string {
   const isOwner = (m: TeamMember) => m.roles.some((r) => r.role === "owner" && r.repository === "");
   const owners = team.members.filter(isOwner);
   const collaborators = team.members.filter((m) => !isOwner(m));
-  const name = (m: TeamMember) => m.name || m.username;
+  const reposOf = (m: TeamMember) => m.roles.filter((r) => r.role === "collaborator" && r.repository !== "");
 
-  const ownerRow = (m: TeamMember) =>
-    settingsItem({
+  const row = (m: TeamMember) => {
+    const owner = isOwner(m);
+    return settingsItem({
       attrs: `data-member="${escapeAttr(m.username)}"`,
-      lead: avatar(name(m), m.avatar),
-      name: name(m),
-      sub: m.name && m.name !== m.username ? m.username : "",
-      tags: `<span class="mono-tag accent" data-role="owner">${escapeHTML(text.t("role.owner"))}</span>`,
-      // Not yourself: taking your own role away from this page would leave
-      // you on a page you may no longer open.
+      lead: avatar(m.username, m.avatar),
+      name: m.username,
+      // Where a collaborator works is what says what they are here.
+      sub: owner ? "" : reposOf(m).map((r) => r.where).join(", "),
+      tags: owner
+        ? `<span class="mono-tag accent" data-role="owner">${escapeHTML(text.t("role.owner"))}</span>`
+        : `<span class="mono-tag" data-role="collaborator">${escapeHTML(text.t("role.collaborator"))}</span>`,
+      // Not yourself: changing or taking away your own role from this page
+      // would leave you on a page you may no longer open.
       actions:
         m.username === self
           ? ""
-          : iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke-owner="${escapeAttr(m.username)}" data-name="${escapeAttr(name(m))}"`),
+          : `${iconButton("edit", text.t("people.edit"), `data-edit-member="${escapeAttr(m.username)}" data-owner="${owner}" data-repos="${escapeAttr(reposOf(m).map((r) => r.repository).join(" "))}"`)}
+            ${iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-remove-member="${escapeAttr(m.username)}" data-owner="${owner}" data-repos="${escapeAttr(reposOf(m).map((r) => r.repository).join(" "))}"`)}`,
     });
-  const collaboratorRow = (m: TeamMember) =>
-    settingsItem({
-      attrs: `data-member="${escapeAttr(m.username)}"`,
-      lead: avatar(name(m), m.avatar),
-      name: name(m),
-      // Where they work, which is the thing that says what they are here.
-      sub: m.roles.filter((r) => r.role === "collaborator").map((r) => r.where).join(", "),
-      tags: `<span class="mono-tag" data-role="collaborator">${escapeHTML(text.t("role.collaborator"))}</span>`,
-    });
+  };
 
-  const taken = new Set(owners.map((m) => m.username));
+  const taken = new Set(team.members.map((m) => m.username));
   const candidates = team.accounts.filter((a) => !taken.has(a.username));
   const add =
     candidates.length === 0
       ? ""
-      : `<form class="owner-add">
+      : `<form class="member-add">
           ${choiceField({
-            id: "owner-who",
+            id: "member-who",
             name: "username",
-            label: text.t("org.addOwner"),
-            options: candidates.map((a) => [a.username, a.name ? `${a.name} (${a.username})` : a.username] as [string, string]),
+            label: text.t("auth.username"),
+            options: candidates.map((a) => [a.username, a.username] as [string, string]),
+          })}
+          ${choiceField({
+            id: "member-role",
+            name: "role",
+            label: text.t("people.role"),
+            options: teamRoleOptions(data, text),
           })}
           <div class="settings-actions">
-            <button class="button primary" type="submit">${escapeHTML(text.t("people.grant"))}</button></div>
+            <button class="button primary" type="submit">${escapeHTML(text.t("org.addMember"))}</button></div>
         </form>`;
 
   return settingsCard(
     text.t("repo.team"),
     `<ul class="settings-list team">
-      ${owners.map(ownerRow).join("")}
-      ${collaborators.map(collaboratorRow).join("")}
+      ${owners.map(row).join("")}
+      ${collaborators.map(row).join("")}
     </ul>
     ${add}`,
     { lead: text.t("org.teamLead", { organization: data.organization.name }) },
   );
+}
+
+/**
+ * The roles a member can have in one organisation, as the values the add form
+ * sends: "owner" for the organisation, "repo:<slug>" for a collaborator on one
+ * repository. One select rather than a role and a repository shown and hidden
+ * by script: each option says the whole thing.
+ */
+function teamRoleOptions(data: OrganizationPanel, text: Text): [string, string][] {
+  return [
+    ["owner", text.t("org.ownerOf", { organization: data.organization.name })],
+    ...data.repositories.map(
+      (r) => [`repo:${r.slug}`, text.t("org.collaboratorOn", { repository: r.name })] as [string, string],
+    ),
+  ];
+}
+
+/**
+ * What one member is in the organisation, as boxes to tick: owner of the
+ * organisation, and collaborator on each repository. Filled in by the page
+ * when the pencil opens it; an empty set is taking them off the team.
+ */
+export function teamRolesFields(data: OrganizationPanel, text: Text): string {
+  const box = (value: string, label: string) =>
+    `<label class="check">
+      <input type="checkbox" name="roles" value="${escapeAttr(value)}" />
+      <span>${escapeHTML(label)}</span>
+    </label>`;
+  return `<div class="field">
+    <label>${escapeHTML(text.t("people.roles"))}</label>
+    <div class="checks">
+      ${teamRoleOptions(data, text).map(([value, label]) => box(value, label)).join("")}
+    </div>
+  </div>`;
 }
 
 /**
@@ -2611,7 +2656,6 @@ export interface RepositoryPanel {
 /** Who works in an organisation, as the team endpoint returns it. */
 export interface TeamMember {
   username: string;
-  name: string;
   avatar?: string;
   admin: boolean;
   roles: { role: string; repository: string; where: string }[];
@@ -2629,7 +2673,7 @@ export interface TeamMember {
 export function repositoryScreen(
   repo: RepositoryPanel,
   /** The team of the organisation, or null when the reader may not see it. */
-  team: { members: TeamMember[]; accounts: { username: string; name: string }[] } | null,
+  team: { members: TeamMember[]; accounts: { username: string }[] } | null,
   text: Text,
 ): string {
   const org = repo.organization;
@@ -2748,7 +2792,7 @@ function repositoryCrumb(org: { slug: string; name: string }, text: Text): strin
  */
 function repositoryTeam(
   repo: RepositoryPanel,
-  team: { members: TeamMember[]; accounts: { username: string; name: string }[] },
+  team: { members: TeamMember[]; accounts: { username: string }[] },
   text: Text,
 ): string {
   const owners = team.members.filter((m) => m.roles.some((r) => r.role === "owner" && r.repository === ""));
@@ -2760,14 +2804,11 @@ function repositoryTeam(
   const row = (m: TeamMember, role: string, removable: boolean) =>
     settingsItem({
       attrs: `data-member="${escapeAttr(m.username)}"`,
-      lead: avatar(m.name || m.username, m.avatar),
-      name: m.name || m.username,
-      // The username under the name, when there is a name: under itself it
-      // is the same word twice.
-      sub: m.name && m.name !== m.username ? m.username : "",
+      lead: avatar(m.username, m.avatar),
+      name: m.username,
       tags: `<span class="mono-tag${role === "owner" ? " accent" : ""}" data-role="${role}">${escapeHTML(text.t(`role.${role}`))}</span>`,
       actions: removable
-        ? iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke="${escapeAttr(m.username)}" data-name="${escapeAttr(m.name || m.username)}"`)
+        ? iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke="${escapeAttr(m.username)}" data-name="${escapeAttr(m.username)}"`)
         : "",
     });
 
@@ -2781,7 +2822,7 @@ function repositoryTeam(
             id: "team-who",
             name: "username",
             label: text.t("repo.addCollaborator"),
-            options: candidates.map((a) => [a.username, a.name ? `${a.name} (${a.username})` : a.username] as [string, string]),
+            options: candidates.map((a) => [a.username, a.username] as [string, string]),
           })}
           <div class="settings-actions">
             <button class="button primary" type="submit">${escapeHTML(text.t("people.grant"))}</button></div>
@@ -2993,7 +3034,6 @@ export function peopleScreen(
   people: {
     id: number;
     username: string;
-    name: string;
     avatar?: string;
     admin: boolean;
     disabled: boolean;
@@ -3005,9 +3045,8 @@ export function peopleScreen(
     .map((p) =>
       settingsItem({
         attrs: `data-person="${p.id}"`,
-        lead: avatar(p.name || p.username, p.avatar),
-        name: p.name || p.username,
-        sub: p.username,
+        lead: avatar(p.username, p.avatar),
+        name: p.username,
         tags: [
           p.admin ? `<span class="mono-tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : "",
           p.disabled ? `<span class="mono-tag">${escapeHTML(text.t("people.disabled"))}</span>` : "",
@@ -3018,7 +3057,7 @@ export function peopleScreen(
                 .join(""),
         ].join(""),
         actions: `${iconButton("person", text.t("people.roles"), `data-roles-person="${p.id}" data-username="${escapeAttr(p.username)}"`)}
-          ${iconButton("edit", text.t("action.edit"), `data-edit-person="${p.id}" data-name="${escapeAttr(p.name)}" data-username="${escapeAttr(p.username)}"`)}
+          ${iconButton("edit", text.t("action.edit"), `data-edit-person="${p.id}" data-username="${escapeAttr(p.username)}"`)}
           ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-person="${p.id}" data-name="${escapeAttr(p.username)}"`)}`,
       }),
     )
@@ -3195,6 +3234,7 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
 
       <nav class="about-links" aria-label="${escapeAttr(text.t("shell.about"))}">
         ${link("https://git.codigosh.com/CodigoSH/LastHelp", icons.code(15), text.t("about.sourceCode"))}
+        ${link("https://support.codigosh.com/codigosh/lasthelp", icons.comment(15), text.t("about.support"))}
         ${link("https://opencollective.com/codigosh", icons.heart(15), text.t("about.donate"))}
       </nav>
     </div>`;

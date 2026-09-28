@@ -196,7 +196,7 @@ func TestACollaboratorCannotTouchTheRepositoryNextDoor(t *testing.T) {
 
 	// Somebody who triages only lastboard.
 	accounts := account.Store{DB: team.db()}
-	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
+	helper, err := accounts.Create("helper", "a good long passphrase", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestAnOwnerOfOneOrganizationHasNothingInAnother(t *testing.T) {
 	team.createRepo("jellyfin", "server")
 
 	accounts := account.Store{DB: team.db()}
-	outsider, err := accounts.Create("otherowner", "a good long passphrase", "Other", false, team.now())
+	outsider, err := accounts.Create("otherowner", "a good long passphrase", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -516,7 +516,7 @@ func makeCollaborator(t *testing.T, team, client *instance, username string) {
 	t.Helper()
 
 	accounts := account.Store{DB: team.db()}
-	user, err := accounts.Create(username, "a good long passphrase", "Helper", false, team.now())
+	user, err := accounts.Create(username, "a good long passphrase", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -629,7 +629,7 @@ func TestOnlySomebodyWhoTriagesCanPublishAComment(t *testing.T) {
 
 	// Somebody who triages the other board, and only it.
 	accounts := account.Store{DB: team.db()}
-	neighbour, err := accounts.Create("neighbour", "a good long passphrase", "Neighbour", false, team.now())
+	neighbour, err := accounts.Create("neighbour", "a good long passphrase", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -913,7 +913,7 @@ func TestTheServerFactsAreForWhoeverRunsIt(t *testing.T) {
 	// away proves nothing here: the route is private, so the session middleware
 	// answers before the rule is ever consulted.
 	accounts := account.Store{DB: team.db()}
-	if _, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now()); err != nil {
+	if _, err := accounts.Create("helper", "a good long passphrase", false, team.now()); err != nil {
 		t.Fatal(err)
 	}
 	them := team.anonymous()
@@ -1117,7 +1117,7 @@ func TestTheWaitingCountStopsAtTheDoor(t *testing.T) {
 	team.createRepo("codigosh", "lastdav")
 
 	accounts := account.Store{DB: team.db()}
-	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
+	helper, err := accounts.Create("helper", "a good long passphrase", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1180,7 +1180,7 @@ func TestTheQueueThatSpansBoardsStopsAtTheDoor(t *testing.T) {
 	team.createRepo("codigosh", "lastdav")
 
 	accounts := account.Store{DB: team.db()}
-	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
+	helper, err := accounts.Create("helper", "a good long passphrase", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1291,7 +1291,7 @@ func TestTheTeamCanRewriteAReportAndOnlyOnTheirOwnBoard(t *testing.T) {
 
 	// And a collaborator of one board cannot rewrite the one next door.
 	accounts := account.Store{DB: team.db()}
-	helper, err := accounts.Create("helper", "a good long passphrase", "Helper", false, team.now())
+	helper, err := accounts.Create("helper", "a good long passphrase", false, team.now())
 	if err != nil {
 		t.Fatal(err)
 	}

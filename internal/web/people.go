@@ -64,10 +64,11 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 }
 
 type profileChange struct {
-	DisplayName string `json:"display_name"`
+	Username string `json:"username"`
 }
 
-// handleChangeProfile changes the name shown beside a reply.
+// handleChangeProfile renames the account: the name it signs in with and the
+// one its replies carry, which are the same name, as on Lastboard.
 func (s *Server) handleChangeProfile(w http.ResponseWriter, r *http.Request) {
 	actor, ok := middleware.ActorFrom(r)
 	if !ok {
@@ -81,15 +82,11 @@ func (s *Server) handleChangeProfile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "error.bad_request")
 		return
 	}
-	if len([]rune(strings.TrimSpace(in.DisplayName))) > maxDisplayNameLength {
-		writeError(w, http.StatusBadRequest, "error.bad_request")
+	username, ok := s.rename(w, actor.UserID, in.Username)
+	if !ok {
 		return
 	}
-	if err := s.accounts().SetDisplayName(actor.UserID, in.DisplayName); err != nil {
-		writeError(w, http.StatusInternalServerError, "error.internal")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"display_name": strings.TrimSpace(in.DisplayName)})
+	writeJSON(w, http.StatusOK, map[string]any{"username": username})
 }
 
 type languageChange struct {
@@ -125,7 +122,27 @@ func (s *Server) handleChangeLanguage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"language": in.Language})
 }
 
-const maxDisplayNameLength = 60
+const maxUsernameLength = 60
+
+// rename is the one way a username changes, for the account itself and for an
+// administrator changing somebody else's: the same bounds and the same answer
+// when the name is already somebody's.
+func (s *Server) rename(w http.ResponseWriter, userID int64, username string) (string, bool) {
+	username = strings.ToLower(strings.TrimSpace(username))
+	if n := len([]rune(username)); n < minUsernameLength || n > maxUsernameLength {
+		writeError(w, http.StatusBadRequest, "error.username_required")
+		return "", false
+	}
+	switch err := s.accounts().Rename(userID, username); {
+	case errors.Is(err, account.ErrNameTaken):
+		writeError(w, http.StatusConflict, "error.username_taken")
+		return "", false
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return "", false
+	}
+	return username, true
+}
 
 const maxAvatarBytes = 96 << 10
 
@@ -212,7 +229,6 @@ func (s *Server) handleListPeople(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"id":       u.ID,
 			"username": u.Username,
-			"name":     u.DisplayName,
 			"admin":    u.IsAdministrator,
 			"disabled": u.Disabled,
 			"avatar":   u.Avatar,
@@ -223,9 +239,8 @@ func (s *Server) handleListPeople(w http.ResponseWriter, r *http.Request) {
 }
 
 type newPerson struct {
-	Username    string `json:"username"`
-	Password    string `json:"password"`
-	DisplayName string `json:"display_name"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 	// The language this person will read in. Chosen by whoever creates the
 	// account, because the alternative is somebody's first sign-in landing in a
 	// language they did not pick and having to find the setting in it.
@@ -261,7 +276,7 @@ func (s *Server) handleCreatePerson(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := s.accounts().Create(in.Username, in.Password, in.DisplayName, false, s.now())
+	user, err := s.accounts().Create(in.Username, in.Password, false, s.now())
 	switch {
 	case errors.Is(err, account.ErrNameTaken):
 		writeError(w, http.StatusConflict, "error.username_taken")
