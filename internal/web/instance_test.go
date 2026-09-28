@@ -381,3 +381,29 @@ func TestThePageHeadCarriesThePageSettings(t *testing.T) {
 		t.Errorf("a picture was announced with no picture and no public address")
 	}
 }
+
+// TestTheAppCanBeInstalled: the manifest and the icons it names are served,
+// publicly and with their proper types — a phone asks for them before anybody
+// has signed in.
+func TestTheAppCanBeInstalled(t *testing.T) {
+	i := newInstance(t).anonymous()
+	for path, want := range map[string]string{
+		"/manifest.webmanifest":  "application/manifest+json",
+		"/icon-192.png":          "image/png",
+		"/icon-512.png":          "image/png",
+		"/icon-maskable-512.png": "image/png",
+		"/apple-touch-icon.png":  "image/png",
+	} {
+		resp := i.do(http.MethodGet, path, nil)
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || resp.Header.Get("Content-Type") != want {
+			t.Errorf("%s: %d %q, want 200 %q", path, resp.StatusCode, resp.Header.Get("Content-Type"), want)
+		}
+	}
+	resp := i.do(http.MethodGet, "/", nil)
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if !strings.Contains(string(body), `<link rel="manifest" href="/manifest.webmanifest" />`) {
+		t.Error("the page does not name its manifest, so no browser offers to install it")
+	}
+}

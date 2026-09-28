@@ -73,7 +73,8 @@ Self-hosting your forge usually means turning registration off, and that closes 
 - **Anti-abuse without a third party** — a signed single-use form token, a timing window, a honeypot, rate limits keyed on the address a caller cannot choose, duplicate and link heuristics, an operator word list, and a breaker that closes a board rather than hand somebody a queue they will not open. Every refusal is counted by layer, because a filter nobody can measure is a filter quietly turning away people who never complain.
 - **Notifications in both directions** — the team is told through ntfy, Gotify, a webhook or mail, configured per repository. Whoever reported something follows an Atom feed that needs no address, no account and no configuration, or leaves an email if a relay is set up.
 - **One binary, one file** — no database server, no runtime, no dependencies. SQLite and the whole interface are compiled in, and a backup is a copy of one file — or a button in the panel.
-- **Twenty languages**, translated by hand — not machine-filled — with right-to-left laid out properly for Arabic, Persian and Urdu. English and Spanish are complete; about a hundred strings from the newest screens are still waiting in the other eighteen and fall back to English until they are done.
+- **Twenty languages**, translated by hand — not machine-filled — with right-to-left laid out properly for Arabic, Persian and Urdu.
+- **Installable as an app** — on a phone, a tablet or a desktop, from the browser's own menu, when the instance is served over HTTPS. It needs the network to report and vote, so it does not pretend to work offline.
 - **Reproducible builds** — `-trimpath`, `CGO_ENABLED=0` and a frontend stamped with a digest of its own output, so two builds of the same commit produce the same bytes and you can check ours against yours.
 
 Bitbucket is not bridged yet. Everything else above works end to end, and is checked by driving a real browser rather than by hoping.

@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
@@ -91,6 +92,13 @@ type Server struct {
 
 // New wires the routes and returns a server ready to be handed to net/http.
 func New(cfg config.Config, db *sql.DB) (*Server, error) {
+	// Go's table does not know the web manifest's extension, so the file server
+	// sniffed it as plain text. Browsers forgive that today; the standard type
+	// is what they are entitled to, and it costs one line.
+	if err := mime.AddExtensionType(".webmanifest", "application/manifest+json"); err != nil {
+		return nil, err
+	}
+
 	assets, err := fs.Sub(content, "dist")
 	if err != nil {
 		return nil, err

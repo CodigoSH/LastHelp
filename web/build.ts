@@ -80,10 +80,11 @@ try {
   // per session, so they are copied rather than bundled.
   if (existsSync("./web/public")) await cp("./web/public", OUT, { recursive: true });
 
-  // LastHelp has no service worker and no web manifest yet. When they arrive
-  // they are rewritten here, after the copy and never before — cp would put the
-  // originals back — so that the worker names its caches after the build and a
-  // new one discards the whole of the previous one.
+  // The web manifest and the app icons are plain files in web/public, copied
+  // above with everything else — the dashboard's arrangement. No service
+  // worker, on purpose: the app installs but does not work offline, because a
+  // portal needs the network to report or vote, and a cached shell is the one
+  // that serves last week's bundle after an update.
 
   // Everything is now in place with the placeholder in it. Hash the lot —
   // paths included, so moving a file changes the stamp — and swap it in.
