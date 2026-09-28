@@ -14,6 +14,7 @@ import { escapeHTML } from "./escape";
 import { NoWebP, putImage } from "./services/landingImage";
 import { wireWords } from "./services/words";
 import * as landingViews from "./views/landing";
+import { FOOTER_ID } from "./views/landing";
 import type {
   LandingBand,
   LandingBoard,
@@ -384,7 +385,9 @@ export class LandingEditor {
     const chosen =
       this.selected === PAGE
         ? { page: this.page.settings }
-        : !found
+        : this.selected === FOOTER_ID
+          ? { footer: this.page.settings }
+          : !found
           ? null
           : found.module
             ? { module: found.module }
@@ -408,16 +411,24 @@ export class LandingEditor {
     this.selected = id;
     this.tab = "content";
     this.host.root.querySelectorAll(".lpe-canvas .is-selected").forEach((n) => n.classList.remove("is-selected"));
-    if (id) this.host.root.querySelector(`.lpe-canvas [data-module="${CSS.escape(id)}"], .lpe-canvas [data-band="${CSS.escape(id)}"]`)?.classList.add("is-selected");
+    if (id) this.chosenElement()?.classList.add("is-selected");
     this.drawPanel();
     this.drawBar();
   }
 
   private focusSelected(): void {
     if (!this.selected) return;
-    this.host.root
-      .querySelector<HTMLElement>(`.lpe-canvas [data-module="${CSS.escape(this.selected)}"], .lpe-canvas [data-band="${CSS.escape(this.selected)}"]`)
-      ?.focus({ preventScroll: false });
+    this.chosenElement()?.focus({ preventScroll: false });
+  }
+
+  /** The element on the page that is chosen: a module, a band or the footer. */
+  private chosenElement(): HTMLElement | null {
+    const id = this.selected;
+    if (!id || id === PAGE) return null;
+    if (id === FOOTER_ID) return this.host.root.querySelector<HTMLElement>(".lpe-canvas [data-footer]");
+    return this.host.root.querySelector<HTMLElement>(
+      `.lpe-canvas [data-module="${CSS.escape(id)}"], .lpe-canvas [data-band="${CSS.escape(id)}"]`,
+    );
   }
 
   // --- wiring ------------------------------------------------------------------
@@ -556,6 +567,36 @@ export class LandingEditor {
       });
     });
 
+    // The footer's line, typed in place like a heading. Plain text.
+    canvas.querySelectorAll<HTMLElement>("[data-footer-text]").forEach((field) => {
+      field.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          field.blur();
+        }
+      });
+      field.addEventListener("paste", (e) => {
+        e.preventDefault();
+        document.execCommand("insertText", false, e.clipboardData?.getData("text/plain").replace(/\s+/g, " ") ?? "");
+      });
+      field.addEventListener("input", () => {
+        const typed = (field.textContent ?? "").replace(/\s+/g, " ").trim();
+        // An emptied line leaves a <br> behind in some browsers, which would
+        // keep the placeholder from showing.
+        if (typed === "") field.innerHTML = "";
+        const settings = this.page.settings;
+        this.change(
+          () => {
+            if (typed === "") delete settings.footer_text;
+            else settings.footer_text = typed;
+          },
+          { key: "page.footer_text", redraw: "none" },
+        );
+        const mirror = this.el<HTMLInputElement>('.lpe-panel [data-bind="page.footer_text"]');
+        if (mirror) mirror.value = settings.footer_text ?? "";
+      });
+    });
+
     // A search on a page being edited would open results over the editor.
     canvas.querySelectorAll<HTMLInputElement>(".lp-search input").forEach((i) => (i.readOnly = true));
     // Links on the page being edited choose the module rather than leaving.
@@ -620,6 +661,7 @@ export class LandingEditor {
 
     // The controls on a band or a module.
     const act = target.closest<HTMLElement>(".lpe-canvas [data-act]");
+    if (act?.dataset.act === "select-footer") return this.choose(FOOTER_ID);
     if (act) {
       const owner = act.closest<HTMLElement>("[data-module]") ?? act.closest<HTMLElement>("[data-band]");
       const id = owner?.dataset.module ?? owner?.dataset.band ?? "";
@@ -644,6 +686,7 @@ export class LandingEditor {
     if (mod) return this.choose(mod.dataset.module ?? "");
     const band = target.closest<HTMLElement>("[data-band]");
     if (band) return this.choose(band.dataset.band ?? "");
+    if (target.closest("[data-footer]")) return this.choose(FOOTER_ID);
     this.choose("");
   }
 
@@ -823,15 +866,15 @@ export class LandingEditor {
    */
   private setField(bind: string, raw: string | boolean, redraw: "all" | "page"): void {
     if (bind.startsWith("page.")) {
-      const key = bind.slice(5) as "title" | "description";
-      const settings = this.page.settings;
+      const key = bind.slice(5) as "title" | "description" | "footer_text" | "footer_hide_brand" | "footer_hide_credit";
+      const settings = this.page.settings as Record<string, unknown>;
       return this.change(
         () => {
-          const value = String(raw);
-          if (value.trim() === "") delete settings[key];
-          else settings[key] = value;
+          if (raw === false || (typeof raw === "string" && raw.trim() === "")) delete settings[key];
+          else settings[key] = raw;
         },
-        { key: `${bind}`, redraw: "none" },
+        // The footer is on the page; the title and description are not.
+        { key: `${bind}`, redraw: key.startsWith("footer") ? "page" : "none" },
       );
     }
     const found = this.selected ? this.find(this.selected) : null;
@@ -912,7 +955,7 @@ export class LandingEditor {
 
   /** The list of links the panel is editing: a links module's, or the page's foot. */
   private chosenLinks(create = false): LandingLink[] | null {
-    if (this.selected === PAGE) {
+    if (this.selected === FOOTER_ID) {
       if (create && !this.page.settings.footer) this.page.settings.footer = [];
       return this.page.settings.footer ?? [];
     }

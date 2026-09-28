@@ -79,7 +79,13 @@ export interface LandingSettings {
   description?: string;
   share_image?: string;
   footer?: LandingLink[];
+  footer_text?: string;
+  footer_hide_brand?: boolean;
+  footer_hide_credit?: boolean;
 }
+
+/** The id the editor chooses the footer by. No band or module can have it: ids have no spaces. */
+export const FOOTER_ID = " footer";
 
 export interface LandingPage {
   bands: LandingBand[];
@@ -637,13 +643,42 @@ function picture(m: LandingModule, ctx: LandingContext, text: Text): string {
 }
 
 /** The foot of the page: whose it is, the operator's links, and what runs it. */
+/**
+ * The foot of the page: whose it is, a line of the operator's words, their
+ * links, and what runs it — each of them the operator's to keep or drop.
+ *
+ * A foot with nothing left in it is not drawn for visitors. While editing it
+ * always is, with its line written in place, because it is where the operator
+ * clicks to get it back.
+ */
 function footer(s: LandingSettings, ctx: LandingContext, text: Text): string {
   const links = s.footer ?? [];
-  return `<footer class="lp-footer">
+  const words = (s.footer_text ?? "").trim();
+  const brand = !s.footer_hide_brand;
+  const credit = !s.footer_hide_credit;
+  if (!ctx.editing && !brand && !words && !links.length && !credit) return "";
+  const selected = ctx.editing && ctx.selected === FOOTER_ID;
+  const line = ctx.editing
+    ? `<span class="lp-footer-text" contenteditable="true" spellcheck="true" data-footer-text
+         data-placeholder="${escapeAttr(text.t("landing.footerTextPlaceholder"))}">${escapeHTML(words)}</span>`
+    : words
+      ? `<span class="lp-footer-text">${escapeHTML(words)}</span>`
+      : "";
+  return `<footer class="lp-footer${selected ? " is-selected" : ""}"${ctx.editing ? ` data-footer tabindex="-1"` : ""}>
+    ${
+      ctx.editing
+        ? `<div class="lpe-tools lpe-band-tools">
+            <button type="button" class="lpe-tag" data-act="select-footer">${icons.section(13)}<span>${escapeHTML(
+              text.t("landing.footer"),
+            )}</span></button>
+          </div>`
+        : ""
+    }
     <div class="lp-inner">
-      <span class="lp-footer-name">${brandMark(ctx.instance.logo, 24)}<span>${escapeHTML(ctx.instance.name || text.t("app.name"))}</span></span>
+      ${brand ? `<span class="lp-footer-name">${brandMark(ctx.instance.logo, 24)}<span>${escapeHTML(ctx.instance.name || text.t("app.name"))}</span></span>` : ""}
+      ${line}
       ${links.length ? `<nav class="lp-footer-links">${links.map(linkTag).join("")}</nav>` : ""}
-      <span class="lp-made">${escapeHTML(text.t("landing.madeWith"))}</span>
+      ${credit ? `<span class="lp-made">${escapeHTML(text.t("landing.madeWith"))}</span>` : ""}
     </div>
   </footer>`;
 }

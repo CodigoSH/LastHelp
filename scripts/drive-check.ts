@@ -1562,8 +1562,7 @@ async function main() {
     JSON.stringify({ sinEtiqueta, conEtiqueta }),
   );
 
-  // The page's own settings: the title and description a shared link shows,
-  // and a link at the foot of the page.
+  // The page's own settings: the title and description a shared link shows.
   await evaluate(`document.querySelector('[data-bar="settings"]').click()`);
   await waitFor('.lpe-panel [data-bind="page.title"]');
   await evaluate(`
@@ -1571,6 +1570,33 @@ async function main() {
       i.value = v; i.dispatchEvent(new Event("input", { bubbles: true })); };
     set("page.title", "Our help desk");
     set("page.description", "Where we listen.");
+  `);
+
+  // The footer is edited like the rest of the page: chosen by clicking it, its
+  // line typed where it is read, and everything in it kept or dropped in its
+  // own panel — the credit included, which is the operator's to keep.
+  await evaluate(`document.querySelector(".lpe-canvas [data-footer]").click()`);
+  await waitFor('.lpe-panel [data-bind="page.footer_hide_credit"]');
+  await evaluate(`
+    const line = document.querySelector(".lpe-canvas [data-footer-text]");
+    line.focus(); document.execCommand("insertText", false, "© Our team");
+    line.blur();
+    const credit = document.querySelector('.lpe-panel [data-bind="page.footer_hide_credit"]');
+    credit.checked = false; credit.dispatchEvent(new Event("change", { bubbles: true }));
+  `);
+  await sleep(300);
+  const pieElegido = await evaluate(`
+    const f = document.querySelector(".lpe-canvas [data-footer]");
+    return { elegido: f.classList.contains("is-selected"),
+             reflejo: document.querySelector('.lpe-panel [data-bind="page.footer_text"]')?.value ?? "",
+             credito: !!f.querySelector(".lp-made") };
+  `);
+  check(
+    "the footer is chosen by clicking it, its line is written in place, and the credit can go",
+    pieElegido.elegido === true && pieElegido.reflejo === "© Our team" && pieElegido.credito === false,
+    JSON.stringify(pieElegido),
+  );
+  await evaluate(`
     document.querySelector('.lpe-panel [data-act="add-link"]').click();
   `);
   await sleep(200);
@@ -1606,6 +1632,9 @@ async function main() {
              palabras: document.body.textContent.includes("Typed on the page"),
              boton: [...document.querySelectorAll(".mod-links a")].some(a => a.textContent.includes("Report a bug")),
              controles: document.querySelectorAll(".lpe-tools, .lpe-add, .lpe-insert").length,
+             pie: document.querySelector(".lp-footer .lp-footer-text")?.textContent.trim() ?? "",
+             credito: !!document.querySelector(".lp-footer .lp-made"),
+             editable: document.querySelectorAll(".lp-footer [contenteditable]").length,
              borrador: p.has_draft };
   `);
   check(
@@ -1613,6 +1642,11 @@ async function main() {
     publicado.titulo === "Our feedback" && publicado.palabras === true && publicado.boton === true &&
       publicado.controles === 0 && publicado.borrador === false,
     JSON.stringify(publicado),
+  );
+  check(
+    "and the footer visitors get is the one written, with no editing left in it",
+    publicado.pie === "© Our team" && publicado.credito === false && publicado.editable === 0,
+    JSON.stringify({ pie: publicado.pie, credito: publicado.credito, editable: publicado.editable }),
   );
 
   // The title and description are in the HTML the server sends — a link

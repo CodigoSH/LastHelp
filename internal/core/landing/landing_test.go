@@ -1,6 +1,7 @@
 package landing
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -100,7 +101,8 @@ func TestAPageSurvivesTheRoundTrip(t *testing.T) {
 			{ID: "where", Columns: One, HideName: true, Cells: [][]Module{{}}},
 		},
 		Settings: Settings{Title: "Acme", Description: "Where Acme listens.",
-			Footer: []Link{{Label: "Code", To: ToURL, URL: "https://git.example.com/acme"}}},
+			Footer:     []Link{{Label: "Code", To: ToURL, URL: "https://git.example.com/acme"}},
+			FooterText: "© 2026 Acme", FooterHideBrand: true, FooterHideCredit: true},
 	}
 	encoded, err := in.Encode()
 	if err != nil {
@@ -110,9 +112,10 @@ func TestAPageSurvivesTheRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, _ := out.Encode()
-	if again != encoded {
-		t.Errorf("the page changed on the way through:\n%s\n%s", encoded, again)
+	// Against what went in, not against a second encoding: a field lost on
+	// the way out is lost both times, and two encodings would still agree.
+	if !reflect.DeepEqual(out, in) {
+		t.Errorf("the page changed on the way through:\n%+v\n%+v", in, out)
 	}
 }
 
@@ -351,5 +354,19 @@ func TestEveryPictureAPageUsesIsFound(t *testing.T) {
 		if !strings.Contains(found, id) {
 			t.Errorf("the picture %s is on the page and was not found: %s", id[:4], found)
 		}
+	}
+}
+
+// TestTheFooterTextIsBoundedInCharacters: one line, counted as a person counts
+// it — a Japanese line of the same length is three times the bytes.
+func TestTheFooterTextIsBoundedInCharacters(t *testing.T) {
+	page := Default()
+	page.Settings.FooterText = strings.Repeat("ぜ", maxSubtitle)
+	if _, err := page.Encode(); err != nil {
+		t.Errorf("a footer line of exactly the bound was refused: %v", err)
+	}
+	page.Settings.FooterText += "ぜ"
+	if _, err := page.Encode(); err == nil {
+		t.Error("a footer line past the bound was accepted")
 	}
 }

@@ -2182,8 +2182,36 @@ body > main:has(> .lpe) {
   transition: outline-color 0.15s var(--ease);
 }
 
-.lp-editing .lp-band:hover { outline-color: var(--border-strong); }
-.lp-editing .lp-band.is-selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+.lp-editing .lp-band:hover,
+.lp-editing .lp-footer:hover { outline-color: var(--border-strong); }
+.lp-editing .lp-band.is-selected,
+.lp-editing .lp-footer.is-selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* The footer is chosen like a section, with its name on the same kind of tag. */
+.lp-editing .lp-footer {
+  position: relative;
+  outline: 1px dashed transparent;
+  outline-offset: -1px;
+  cursor: pointer;
+}
+
+/* Hung on the footer's top edge: the footer is one line tall, and inside it
+   the tag covered the name and mark it sits beside. */
+.lp-footer > .lpe-band-tools { inset-block-start: -15px; }
+
+.lp-footer:hover > .lpe-band-tools,
+.lp-footer.is-selected > .lpe-band-tools,
+.lp-footer:focus-within > .lpe-band-tools { display: flex; }
+
+/* An empty line says what goes in it, from the stylesheet: the words are an
+   attribute, and content drawn by CSS is not a style the policy governs. */
+.lp-footer-text:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.lp-editing .lp-footer-text { min-inline-size: 8rem; }
 
 .lpe-tools {
   position: absolute;

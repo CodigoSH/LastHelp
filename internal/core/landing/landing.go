@@ -271,7 +271,15 @@ type Settings struct {
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
 	ShareImage  string `json:"share_image,omitempty"`
-	Footer      []Link `json:"footer,omitempty"`
+
+	// The foot of the page: its links, one line of the operator's words, and
+	// whether it carries the installation's name and mark and the credit.
+	// Everything in it is the operator's to change — the default shows the
+	// name and the credit, and a zero value keeps that default.
+	Footer           []Link `json:"footer,omitempty"`
+	FooterText       string `json:"footer_text,omitempty"`
+	FooterHideBrand  bool   `json:"footer_hide_brand,omitempty"`
+	FooterHideCredit bool   `json:"footer_hide_credit,omitempty"`
 }
 
 // Page is the whole front page.
@@ -675,6 +683,9 @@ func (s Settings) validate() error {
 	}
 	if s.ShareImage != "" && !imageName.MatchString(s.ShareImage) {
 		return fmt.Errorf("the share image %q is not a stored picture", s.ShareImage)
+	}
+	if runes(s.FooterText) > maxSubtitle {
+		return fmt.Errorf("the footer text is longer than %d characters", maxSubtitle)
 	}
 	return validateLinks("footer", s.Footer)
 }

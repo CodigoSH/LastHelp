@@ -107,7 +107,12 @@ export interface PanelContext {
  * button would make it a question whether what is on it is real.
  */
 export function panel(
-  chosen: { band: LandingBand } | { module: LandingModule } | { page: LandingSettings } | null,
+  chosen:
+    | { band: LandingBand }
+    | { module: LandingModule }
+    | { page: LandingSettings }
+    | { footer: LandingSettings }
+    | null,
   ctx: PanelContext,
   text: Text,
 ): string {
@@ -118,6 +123,7 @@ export function panel(
     </div>`;
   }
   if ("page" in chosen) return pagePanel(chosen.page, ctx, text);
+  if ("footer" in chosen) return footerPanel(chosen.footer, ctx, text);
   if ("band" in chosen) return bandPanel(chosen.band, ctx, text);
   return modulePanel(chosen.module, ctx, text);
 }
@@ -236,13 +242,30 @@ function pagePanel(set: LandingSettings, ctx: PanelContext, text: Text): string 
         </div>
         <p class="hint">${escapeHTML(text.t(ctx.shareReady ? "landing.shareImageHint" : "landing.shareImageNoURL"))}</p>
       </div>
-      <div class="field">
-        <span class="label">${escapeHTML(text.t("landing.footerLinks"))}</span>
-        ${linksFields(set.footer ?? [], ctx, text)}
-      </div>
       <div class="lpe-restore">
         <p class="hint">${escapeHTML(text.t("landing.restoreHint"))}</p>
         <button type="button" class="button ghost small danger" data-act="restore">${escapeHTML(text.t("landing.restore"))}</button>
+      </div>
+    </div>`;
+}
+
+/**
+ * The foot of the page, every part of it: the line of words, which is also
+ * written in place on the page; the name and mark and the credit, each kept or
+ * dropped; and the links.
+ */
+function footerPanel(set: LandingSettings, ctx: PanelContext, text: Text): string {
+  return `${panelHead(icons.section(16), text.t("landing.footer"), text)}
+    <div class="lpe-panel-body">
+      ${input("page.footer_text", text.t("landing.footerText"), set.footer_text ?? "", {
+        placeholder: text.t("landing.footerTextPlaceholder"),
+        max: 240,
+      })}
+      ${check("page.footer_hide_brand", text.t("landing.showBrand"), set.footer_hide_brand !== true, true)}
+      ${check("page.footer_hide_credit", text.t("landing.showCredit"), set.footer_hide_credit !== true, true)}
+      <div class="field">
+        <span class="label">${escapeHTML(text.t("landing.footerLinks"))}</span>
+        ${linksFields(set.footer ?? [], ctx, text)}
       </div>
     </div>`;
 }
