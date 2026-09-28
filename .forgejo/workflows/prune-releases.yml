@@ -36,7 +36,7 @@ jobs:
   prune:
     runs-on: ubuntu-latest
     # See ci.yml: the label lands on a 2021 Debian image by default.
-    container: node:22-bookworm
+    container: node:24-trixie
     steps:
       - name: Prune
         env:

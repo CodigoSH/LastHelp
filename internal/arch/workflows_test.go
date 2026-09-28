@@ -43,7 +43,7 @@ func TestEveryCIJobPinsItsImage(t *testing.T) {
 	containerLine := regexp.MustCompile(`^    container:\s*(\S+)?`)
 	imageLine := regexp.MustCompile(`^      image:\s*(\S+)`)
 
-	// A tag that names an exact build. `node:22-bookworm` counts: the series is
+	// A tag that names an exact build. `node:24-trixie` counts: the series is
 	// the decision and Debian's own patches inside it are not ours to pin.
 	// What does not count is a bare `latest`, or no tag at all.
 	moving := regexp.MustCompile(`(^|:)latest$|^[^:]+$`)

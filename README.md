@@ -202,7 +202,7 @@ We appreciate the organizations that support us as a gesture of goodwill to help
 
 ## Credits
 
-- **Everything drawn here**: the mark, the icons and the charts are drawn by hand in this repository — no icon library, no chart library, no frontend framework. The whole frontend is TypeScript compiled by bun, and its only dependency is the type definitions.
+- **Everything drawn here**: the mark, the icons and the charts are drawn by hand in this repository — no icon library, no chart library, no frontend framework. The whole frontend is TypeScript compiled by bun; its only dependencies are the type definitions and the TypeScript checker, both used while building and neither shipped.
 
 Full attribution, including the Go modules compiled into the binaries, lives in [NOTICE](NOTICE).
 

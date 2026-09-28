@@ -20,6 +20,12 @@ import (
 // What this refuses: a version of Go, Bun or staticcheck that disagrees with
 // the others, and a pin that floats — `latest`, a bare major, or a series
 // without its patch.
+//
+// package.json is read too, since 28-sep-2026: it said `"@types/bun":
+// "latest"` and `"typescript": "^5.9.3"` for months, two floating pins in the
+// one file this test did not open. The types are held to the Bun that builds,
+// because types that describe another runtime check code against an API the
+// build does not have.
 
 type pin struct {
 	file    string
@@ -36,6 +42,9 @@ var pins = []pin{
 	{"Dockerfile", "bun", regexp.MustCompile(`FROM oven/bun:(\S+?)-alpine`)},
 	{".forgejo/workflows/ci.yml", "bun", regexp.MustCompile(`bun-version: '?"?([^'"\s]+)`)},
 	{".forgejo/workflows/release.yml", "bun", regexp.MustCompile(`bun-version: '?"?([^'"\s]+)`)},
+	{"package.json", "bun", regexp.MustCompile(`"@types/bun":\s*"([^"]+)"`)},
+
+	{"package.json", "typescript", regexp.MustCompile(`"typescript":\s*"([^"]+)"`)},
 
 	{"scripts/release.sh", "staticcheck", regexp.MustCompile(`STATICCHECK_VERSION="(\S+?)"`)},
 
@@ -78,8 +87,8 @@ func TestEveryToolVersionIsPinnedAndAgrees(t *testing.T) {
 		}
 	}
 
-	if len(found) != 4 {
-		t.Fatalf("read %d tools, want 4 (go, bun, staticcheck, govulncheck)", len(found))
+	if len(found) != 5 {
+		t.Fatalf("read %d tools, want 5 (go, bun, typescript, staticcheck, govulncheck)", len(found))
 	}
 
 	for what, versions := range found {

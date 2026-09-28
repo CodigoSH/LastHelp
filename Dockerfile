@@ -1,5 +1,5 @@
 # ---- frontend -------------------------------------------------------------
-FROM oven/bun:1.3.11-alpine AS frontend
+FROM oven/bun:1.4.2-alpine AS frontend
 WORKDIR /src
 COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile
@@ -8,7 +8,7 @@ COPY web ./web
 RUN bun run build
 
 # ---- backend --------------------------------------------------------------
-FROM golang:1.26.7-alpine AS backend
+FROM golang:1.27.1-alpine AS backend
 WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
@@ -30,7 +30,7 @@ RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false \
         -o /out/healthcheck ./cmd/healthcheck
 
 # ---- runtime --------------------------------------------------------------
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata && \
     adduser -D -H -u 10001 lasthelp && \
     mkdir -p /data && chown lasthelp:lasthelp /data
