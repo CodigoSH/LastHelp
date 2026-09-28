@@ -419,7 +419,8 @@ body > nav {
 .nav-right {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  /* The dashboard's: its toggles sit 4px apart. */
+  gap: 4px;
 }
 
 body > main {
@@ -5194,10 +5195,43 @@ a.stat:hover .stat-go {
    of the line, which is the other end in Arabic. */
 .nav-right .sign-out .icon { transform: scaleX(var(--rtl-flip)); }
 
-.nav-right .icon-button {
-  inline-size: 2.1rem;
-  block-size: 2.1rem;
-  border-radius: var(--radius);
+/*
+ * The bar's icons are the dashboard's `.top-bar__toggle`, measured off its
+ * running binary rather than guessed: 32 by 32 with no border, the icon in the
+ * text colour at 20px and a 1.5 stroke, and a hover that dims to 0.7 over a
+ * faint grey square of radius 4. They had been the generic icon button of the
+ * panel — dim grey, smaller, rounder, brightening on hover — which is the same
+ * control in a different accent, and it read as a different product.
+ */
+.nav-right .icon-button,
+.nav-right a.review-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-inline-size: 32px;
+  block-size: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-main);
+  transition: opacity 0.2s;
+}
+
+.nav-right .icon-button svg,
+.nav-right a.review-pill svg {
+  inline-size: 20px;
+  block-size: 20px;
+  stroke-width: 1.5px;
+}
+
+.nav-right .icon-button:hover,
+.nav-right a.review-pill:hover {
+  opacity: 0.7;
+  background: rgba(128, 128, 128, 0.1);
+  border-radius: 4px;
+  color: var(--text-main);
 }
 
 /* A page that could not be shown. Centred, because there is one thing on it. */
@@ -5340,7 +5374,8 @@ a.stat:hover .stat-go {
 .toast-bar.no-drain { animation: none !important; }
 
 /* While the page is being arranged, the control that says so wears the accent,
-   the way the dashboard's own edit toggle does. */
+   the way the dashboard's own edit toggle does. The bar's own rule, above,
+   carries it there. */
 .icon-button.composing {
   color: var(--accent);
 }
@@ -5453,19 +5488,21 @@ a.stat:hover .stat-go {
    links, `.nav-right a:not(.button)`, is 0,2,1 and paints every link grey. At
    0,2,0 these lost to it, so "something is waiting" was never coloured
    anywhere but on the review screen itself. */
-.nav-right a.review-pill:hover { color: var(--text-main); background: rgba(127, 127, 127, 0.12); }
+
 
 /* Something is waiting: the colour this product already uses for "waiting",
    not the accent — which is what marks the page you are on, and the two would
    be shouting the same colour at each other on the one control that is often
    both. */
-.nav-right a.review-pill.has { color: var(--hue-hold); border-color: rgba(180, 83, 9, 0.28); }
+.nav-right a.review-pill.has,
+.nav-right a.review-pill.has:hover { color: var(--hue-hold); padding-inline: 4px; }
 
+/* The mode that is on wears the accent and nothing else, as the dashboard's
+   edit and status toggles do: no fill, no frame. */
 .nav-right a.review-pill.on,
-.nav-right a.review-pill.on.has {
+.nav-right a.review-pill.on.has,
+.nav-right .icon-button.composing {
   color: var(--accent);
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
 }
 
 /* Reviewing what is waiting.
