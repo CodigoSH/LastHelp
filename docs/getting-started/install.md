@@ -64,8 +64,15 @@ you happened to run had inside it.
 docker run -d --name lasthelp \
   -p 8080:8080 \
   -v lasthelp-data:/data \
-  lasthelp:latest
+  --restart unless-stopped \
+  git.codigosh.com/codigosh/lasthelp:beta
 ```
+
+The image is published for `linux/amd64` and `linux/arm64` with every release.
+Use `beta` until there is a stable release; `latest` only moves with a stable
+one. It runs as uid 10001: a named volume works as it is, a directory bound from
+the host has to belong to that user (`chown 10001:10001 ./data`). To update,
+pull the new image — the binary inside does not replace itself.
 
 Or with the compose file in the repository:
 

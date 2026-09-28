@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -47,11 +48,22 @@ func (s *Server) updater() updater.Updater {
 // container and then silently reverts. Telling somebody to pull a new image is
 // the honest answer; letting them press a button that appears to work and
 // quietly undoes itself is not.
-func inContainer() bool {
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		return true
+func inContainer() bool { return inContainerUnder("/") }
+
+// inContainerUnder is inContainer against a root that a test can build.
+//
+// Each engine leaves its own mark: Docker writes /.dockerenv and Podman
+// /run/.containerenv. The cgroup of the first process used to name the engine
+// too, and under cgroup v2 — the default on every current distribution — it
+// reads "0::/" and names nothing, which is how an image run by Podman offered
+// an update the next restart would have undone.
+func inContainerUnder(root string) bool {
+	for _, mark := range []string{".dockerenv", "run/.containerenv"} {
+		if _, err := os.Stat(filepath.Join(root, mark)); err == nil {
+			return true
+		}
 	}
-	if cgroup, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+	if cgroup, err := os.ReadFile(filepath.Join(root, "proc/1/cgroup")); err == nil {
 		text := string(cgroup)
 		return strings.Contains(text, "docker") || strings.Contains(text, "containerd") ||
 			strings.Contains(text, "kubepods")

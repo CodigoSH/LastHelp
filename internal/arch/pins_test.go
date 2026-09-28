@@ -35,11 +35,13 @@ type pin struct {
 
 var pins = []pin{
 	{"go.mod", "go", regexp.MustCompile(`(?m)^go (\S+)`)},
-	{"Dockerfile", "go", regexp.MustCompile(`FROM golang:(\S+?)-alpine`)},
+	// The platform flag is how the build stages cross-compile instead of
+	// emulating: optional here so the pin is read either way.
+	{"Dockerfile", "go", regexp.MustCompile(`FROM (?:--platform=\S+ )?golang:(\S+?)-alpine`)},
 	{".forgejo/workflows/ci.yml", "go", regexp.MustCompile(`go-version: '?"?([^'"\s]+)`)},
 	{".forgejo/workflows/release.yml", "go", regexp.MustCompile(`go-version: '?"?([^'"\s]+)`)},
 
-	{"Dockerfile", "bun", regexp.MustCompile(`FROM oven/bun:(\S+?)-alpine`)},
+	{"Dockerfile", "bun", regexp.MustCompile(`FROM (?:--platform=\S+ )?oven/bun:(\S+?)-alpine`)},
 	{".forgejo/workflows/ci.yml", "bun", regexp.MustCompile(`bun-version: '?"?([^'"\s]+)`)},
 	{".forgejo/workflows/release.yml", "bun", regexp.MustCompile(`bun-version: '?"?([^'"\s]+)`)},
 	{"package.json", "bun", regexp.MustCompile(`"@types/bun":\s*"([^"]+)"`)},

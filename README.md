@@ -115,19 +115,13 @@ It verifies the signature over the checksums before anything reaches the disk, i
 
 ### Docker
 
-The repository ships a `Dockerfile` and a `docker-compose.yml`, and the image is built from source: there is no published image yet.
+Images are built for `linux/amd64` and `linux/arm64` and published to our Forgejo registry with every release. **Use the `beta` tag today: there is no stable release yet**, and `latest` only ever moves with a stable one.
 
-```bash
-git clone https://git.codigosh.com/CodigoSH/LastHelp.git
-cd LastHelp
-docker compose up -d
-```
-
+**Using Docker Compose:**
 ```yaml
 services:
   lasthelp:
-    image: lasthelp:latest
-    build: .
+    image: git.codigosh.com/codigosh/lasthelp:beta
     container_name: lasthelp
     restart: unless-stopped
     ports:
@@ -135,18 +129,31 @@ services:
     volumes:
       - lasthelp-data:/data
     environment:
-      LASTHELP_PORT: "8080"
-      LASTHELP_DB_FILE: "/data/lasthelp.db"
       # Turn this on only when a reverse proxy really is in front. With it on
       # and no proxy there, the caller chooses the address we attribute their
       # requests to, and the rate limits stop meaning anything.
       LASTHELP_TRUST_PROXY: "false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   lasthelp-data:
 ```
 
-The image runs as its own unprivileged user and the binary inside refuses to update itself, because updating a container is pulling a new image.
+**Using Docker CLI:**
+```bash
+docker run -d \
+  --name lasthelp \
+  -p 8080:8080 \
+  -v lasthelp-data:/data \
+  --restart unless-stopped \
+  git.codigosh.com/codigosh/lasthelp:beta
+```
+
+The image runs as an unprivileged user (uid 10001), so a named volume just works; a directory bound from the host has to belong to that user first (`chown 10001:10001 ./data`). The binary inside refuses to update itself, because updating a container is pulling a new image: `docker compose pull && docker compose up -d`.
 
 Every setting the binary reads is listed in [.env.example](.env.example) and explained under [Settings](docs/getting-started/install.md#settings).
 

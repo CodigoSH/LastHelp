@@ -1,0 +1,113 @@
+# Builds and pushes the container image when a tag is pushed.
+#
+# Lastboard's workflow, with the image pinned like every other job here and one
+# build argument more: the commit, which this binary reports beside its version.
+#
+# No signing key. The image is built without one, and the binary inside it
+# refuses to update itself anyway: updating a container is pulling a new image,
+# and an application that rewrote its own binary would be undone by the next
+# restart. The panel says so instead of offering the button.
+name: Docker Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: git.codigosh.com
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    # Pinned rather than inherited: `ubuntu-latest` is whatever the runner
+    # mapped it to the day it registered. The Docker socket is mounted into
+    # the job container either way — the runner builds one, from
+    # `container:` or from the label, and binds /var/run/docker.sock into it
+    # (act/runner/run_context.go, forgejo-runner v13.2.0).
+    container: node:24-trixie
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Docker CLI and Buildx
+        run: |
+          # Only if they are actually missing: the image already ships curl,
+          # tar and the CA bundle.
+          if ! command -v curl >/dev/null || [ ! -e /etc/ssl/certs/ca-certificates.crt ]; then
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends curl ca-certificates
+          fi
+
+          # Retry transient gateway errors (e.g. 504) on external downloads.
+          CURL="curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30"
+
+          # Docker CLI static binary (pinned, no apt/systemd deps)
+          $CURL "https://download.docker.com/linux/static/stable/x86_64/docker-29.8.1.tgz" \
+            | tar xz --strip-components=1 -C /usr/local/bin docker/docker
+
+          # Buildx plugin (pinned)
+          mkdir -p /usr/lib/docker/cli-plugins
+          $CURL "https://github.com/docker/buildx/releases/download/v0.37.1/buildx-v0.37.1.linux-amd64" \
+            -o /usr/lib/docker/cli-plugins/docker-buildx
+          chmod +x /usr/lib/docker/cli-plugins/docker-buildx
+
+      - name: Fix Docker socket permissions
+        run: chmod 666 /var/run/docker.sock
+
+      - name: Set lowercase image name
+        id: vars
+        run: echo "image=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.vars.outputs.image }}
+          # `latest` is decided here and nowhere else. The action's default
+          # flavour is `latest=auto`, which adds the tag to whatever it judges to
+          # be the newest release — and it judges by parsing the version. A tag
+          # like v1.7.0-Beta.09 is not valid semver (a numeric prerelease
+          # identifier may not carry a leading zero), so the parse failed, the
+          # action stopped seeing a prerelease, and it moved `latest` onto that
+          # beta. Lastboard shipped that; this project pads betas to two digits
+          # the same way.
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+            type=raw,value=beta,enable=${{ contains(github.ref, 'Beta') }}
+            type=raw,value=rc,enable=${{ contains(github.ref, 'RC') }}
+            type=ref,event=tag
+
+      - name: Login to registry
+        env:
+          CI_TOKEN: ${{ secrets.CI_TOKEN }}
+        run: echo "${CI_TOKEN}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Set up Docker Buildx
+        run: |
+          docker buildx create --name multiarch --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+      - name: Build and push multi-arch image
+        run: |
+          TAGS=""
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            TAGS="$TAGS --tag $tag"
+          done <<< "${{ steps.meta.outputs.tags }}"
+
+          # Both build stages run on the builder's own platform and
+          # cross-compile, and the last stage runs nothing — so neither
+          # architecture is emulated. See the Dockerfile.
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg VERSION=${GITHUB_REF_NAME} \
+            --build-arg COMMIT=${GITHUB_SHA::7} \
+            $TAGS \
+            --push \
+            .

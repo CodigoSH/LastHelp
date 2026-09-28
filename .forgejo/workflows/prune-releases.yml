@@ -51,6 +51,9 @@ jobs:
 
           BASE = os.environ["GITHUB_API_URL"]
           REPO = os.environ["GITHUB_REPOSITORY"]
+          # The container image this repository publishes, named as docker-release.yml
+          # names it: the repository, lowercased, under its owner.
+          PKG_OWNER, PKG_NAME = REPO.split("/")[0], REPO.split("/")[1].lower()
           TOKEN = os.environ["CI_TOKEN"]
           KEEP_STABLE = int(os.environ.get("KEEP_STABLE", "2"))
           KEEP_BETA = int(os.environ.get("KEEP_BETA", "1"))
@@ -135,12 +138,19 @@ jobs:
           print(f"keeping binaries on: {[r['tag_name'] for r in stables[:KEEP_STABLE]] or 'no stables yet'}")
           print(f"keeping beta: {[r['tag_name'] for r in betas if r['id'] in keep_beta] or 'none'}")
 
+          def del_container(tag):
+              # As Lastboard does it: only ever the version-specific tag of the image
+              # (v1.0.0-Beta.03), never the moving ones — latest, beta, 1.0.
+              req("DELETE", f"/packages/{PKG_OWNER}/container/{PKG_NAME}/{tag.lower()}", expect_json=False)
+
+
           for r in doomed_betas:
               tag, rid = r["tag_name"], r["id"]
               print(f"  DELETE beta entirely: {tag}")
               if not DRY:
                   req("DELETE", f"/repos/{REPO}/releases/{rid}", expect_json=False)
                   req("DELETE", f"/repos/{REPO}/tags/{tag}", expect_json=False)
+                  del_container(tag)
 
           for r in stripped_stables:
               tag, rid, assets = r["tag_name"], r["id"], r.get("assets", [])
@@ -148,6 +158,7 @@ jobs:
               if not DRY:
                   for a in assets:
                       req("DELETE", f"/repos/{REPO}/releases/{rid}/assets/{a['id']}", expect_json=False)
+                  del_container(tag)
 
           print("Done.")
           PY
