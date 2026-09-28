@@ -25,9 +25,9 @@ jobs:
     # leaving CI green over the one thing it exists to prove.
     container: node:24-trixie
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.27.1'
 
@@ -126,9 +126,9 @@ jobs:
     # leaving CI green over the one thing it exists to prove.
     container: node:24-trixie
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: '1.27.1'
 
