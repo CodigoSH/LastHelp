@@ -1273,6 +1273,8 @@ export interface ShellSpec {
   content: string;
   /** What is waiting, already narrowed by the server to what this account may open. */
   waiting?: { reports: number; messages: number };
+  /** Something newer is released: Info in the menu says so, as in Lastboard. */
+  updateAvailable?: boolean;
 }
 
 /**
@@ -1295,9 +1297,9 @@ export function adminShell(spec: ShellSpec, text: Text): string {
       ? `<span class="side-count" aria-label="${escapeAttr(text.t("shell.waitingCount", { count: String(n) }))}">${escapeHTML(String(n))}</span>`
       : "";
 
-  const item = (href: string, label: string, icon: string, extra = "", count = 0): string => {
+  const item = (href: string, label: string, icon: string, extra = "", count = 0, after = ""): string => {
     const current = spec.path === href || (href !== "/panel" && spec.path.startsWith(href + "/"));
-    return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${icon}<span>${escapeHTML(label)}</span>${badge(count)}</a>`;
+    return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${icon}<span>${escapeHTML(label)}</span>${badge(count)}${after}</a>`;
   };
 
   const group = (label: string, items: string): string =>
@@ -1337,7 +1339,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
                 item("/panel/backups", text.t("shell.backups"), icons.backup()) +
                 // Updates live inside About, as in Lastboard: what is running
                 // and whether it is the one to run are one question.
-                item("/panel/about", text.t("shell.about"), icons.info())
+                item("/panel/about", text.t("shell.about"), icons.info(), "", 0, spec.updateAvailable ? sideUpdateBadge(text) : "")
             : "",
         )}
       </nav>
@@ -3240,43 +3242,13 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
     </div>`;
 }
 
-/**
- * Release notes, drawn rather than shown as source.
- *
- * They are Keep-a-Changelog, generated from commit subjects: "### Added"
- * headings and "- " items and nothing else. Printed as they come, the person
- * deciding whether to install read markdown punctuation. This draws exactly
- * those two shapes — every piece of text still escaped — and anything else as
- * a plain line, so a note written by hand is never lost, only left plain.
- */
-export function releaseNotes(markdown: string): string {
-  const out: string[] = [];
-  let items: string[] = [];
-  const flush = () => {
-    if (items.length > 0) out.push(`<ul>${items.map((i) => `<li>${escapeHTML(i)}</li>`).join("")}</ul>`);
-    items = [];
-  };
-  for (const raw of markdown.split("\n")) {
-    const line = raw.trim();
-    if (line.startsWith("- ") || line.startsWith("* ")) {
-      items.push(line.slice(2));
-      continue;
-    }
-    flush();
-    if (line === "") continue;
-    const heading = /^#{1,6}\s+(.*)$/.exec(line);
-    out.push(heading ? `<h4>${escapeHTML(heading[1] ?? "")}</h4>` : `<p>${escapeHTML(line)}</p>`);
-  }
-  flush();
-  return out.join("");
-}
-
 /** What /api/update says. */
 export interface UpdateStatus {
   current: string;
   latest?: string;
   available?: boolean;
-  notes?: string;
+  /** Running in a container: updated by pulling an image, never from here. */
+  container?: boolean;
   reason?: string;
   beta?: boolean;
 }
@@ -3297,28 +3269,47 @@ export function updateZone(status: UpdateStatus | "checking" | null, text: Text)
   if (status === null) {
     return `<p class="about-state warn" role="status">${icons.warning(16)}<span>${escapeHTML(text.t("error.update_unreachable"))}</span></p>`;
   }
+  if (status.container) {
+    // Lastboard's Docker notice: what manages this installation, and whether
+    // there is a newer image to pull.
+    return `<div class="about-docker" role="status">
+      ${icons.info(20)}
+      <div>
+        <h4>${escapeHTML(text.t("update.dockerMode"))}</h4>
+        <p>${escapeHTML(text.t("update.dockerDesc"))}<br>${
+          status.available
+            ? `<strong>${escapeHTML(text.t("update.newVersion"))} (${escapeHTML(status.latest ?? "")})</strong>`
+            : escapeHTML(text.t("update.upToDateDocker"))
+        }</p>
+      </div>
+    </div>`;
+  }
   if (status.available) {
-    // Lastboard's: a card within the card, lit from one corner, the badge that
-    // pulses and the version under it, and one button — the notes are read
-    // before pressing it, which is where reading them can still change a mind.
+    // Lastboard's card: the badge whose dot pulses, the version beside it, and
+    // one button. What is new is read in the dialog it opens, where reading it
+    // can still change a mind.
     return `<div class="about-new">
       <span class="about-new-glow" aria-hidden="true"></span>
       <div class="about-new-head">
         <span class="about-badge">${escapeHTML(text.t("update.badge"))}</span>
         <span class="about-new-version">${escapeHTML(status.latest ?? "")}</span>
       </div>
-      ${status.notes ? `<div class="notes release-notes">${releaseNotes(status.notes)}</div>` : ""}
-      <button class="button primary with-icon" data-update>${icons.download()}<span>${escapeHTML(text.t("update.install"))}</span></button>
-      <p class="update-note" role="status" hidden></p>
+      <button type="button" class="button primary" data-update>${escapeHTML(text.t("update.install"))}</button>
     </div>`;
   }
   if (status.latest || status.reason === "error.update_none") {
-    const said = status.reason ? text.t(status.reason) : text.t("update.upToDate");
-    return `<p class="about-state ok" role="status">${icons.done(18)}<span>${escapeHTML(said)}</span></p>`;
+    return `<p class="about-state ok" role="status">${icons.done(18)}<span>${escapeHTML(text.t("update.upToDate"))}</span></p>`;
   }
+  // It could not look, and says why: an empty answer where a reason belongs
+  // reads as "you are up to date", which it must never say by accident.
   return `<p class="about-state${status.reason === "error.update_unreachable" ? " warn" : ""}" role="status">${icons.info(16)}<span>${escapeHTML(
     text.t(status.reason ?? "error.update_unreachable"),
   )}</span></p>`;
+}
+
+/** Lastboard's "New update!" beside Info in the menu. */
+export function sideUpdateBadge(text: Text): string {
+  return `<span class="side-update">${escapeHTML(text.t("update.badge"))}</span>`;
 }
 
 /**

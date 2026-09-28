@@ -4218,7 +4218,7 @@ body > nav .brand {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
   padding: 24px;
   border: 1px solid var(--border);
   border-radius: 24px;
@@ -4240,24 +4240,6 @@ body > nav .brand {
 
 .about-new > :not(.about-new-glow) { position: relative; }
 .about-new .button { inline-size: 100%; justify-self: stretch; }
-
-/* The notes, drawn: section names as the house's small capitals, items as a
-   list. Scrolls inside itself past its cap, like any list in a tile. */
-.release-notes { white-space: normal; color: var(--text-main); background: var(--panel); }
-.release-notes h4 {
-  margin: 0.75rem 0 0.25rem;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-.release-notes h4:first-child { margin-block-start: 0; }
-.release-notes ul { margin: 0; padding-inline-start: 1.1rem; list-style: disc; }
-.release-notes li::marker { color: var(--accent); }
-.release-notes li { margin-block: 0.15rem; }
-.release-notes p { margin: 0.25rem 0; }
 
 .about-new-head { display: flex; justify-content: center; align-items: center; gap: 12px; }
 
@@ -6511,7 +6493,8 @@ a.stat:hover .stat-go {
 .settings-actions .button { min-inline-size: 160px; }
 
 /* Buttons: theirs. */
-.admin-main .button:not(.wizard .button) {
+.admin-main .button:not(.wizard .button),
+.update-dialog .button {
   block-size: var(--control-h);
   padding: 0 16px;
   border: 1px solid var(--border);
@@ -6526,7 +6509,8 @@ a.stat:hover .stat-go {
   transform: none;
 }
 
-.admin-main .button:not(.wizard .button):hover {
+.admin-main .button:not(.wizard .button):hover,
+.update-dialog .button:hover {
   border-color: var(--border-strong);
   background: var(--panel);
   color: var(--text-main);
@@ -6534,15 +6518,18 @@ a.stat:hover .stat-go {
   transform: none;
 }
 
-.admin-main .button:not(.wizard .button):active { transform: translateY(1px); }
+.admin-main .button:not(.wizard .button):active,
+.update-dialog .button:active { transform: translateY(1px); }
 
-.admin-main .button.primary:not(.wizard .button) {
+.admin-main .button.primary:not(.wizard .button),
+.update-dialog .button.primary {
   border: 2px solid var(--accent);
   background: transparent;
   color: var(--accent);
 }
 
-.admin-main .button.primary:not(.wizard .button):hover {
+.admin-main .button.primary:not(.wizard .button):hover,
+.update-dialog .button.primary:hover {
   border-color: var(--accent);
   background: rgba(var(--accent-rgb), 0.1);
   color: var(--accent);
@@ -6837,3 +6824,306 @@ a.stat:hover .stat-go {
 .item-team .team-reply textarea { inline-size: 100%; max-inline-size: none; }
 .item-team .settings-row .sel { min-inline-size: 180px; }
 
+
+/* ------------------------------------------------------------ the updater */
+
+/* Lastboard's updater, piece for piece: the red dot on the bar's panel icon,
+   "New update!" beside Info in the menu, the Docker notice, and the dialog
+   with its timeline. Values are theirs (TopBar.css, RightDrawer, SettingsContent
+   and UpdateModal.css); only the variable names are this theme's. */
+
+.panel-toggle { position: relative; }
+
+.notification-dot {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  inline-size: 8px;
+  block-size: 8px;
+  box-sizing: border-box;
+  background-color: var(--danger-color);
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  animation: notification-blink 2s infinite;
+  will-change: opacity, transform;
+}
+
+@keyframes notification-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.side-update {
+  margin-inline-start: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--danger-color);
+  background: rgba(var(--danger-rgb), 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--danger-rgb), 0.2);
+  white-space: nowrap;
+  animation: side-update-blink 2s infinite;
+}
+
+@keyframes side-update-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.about-docker {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  inline-size: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid rgba(var(--info-rgb), 0.3);
+  border-radius: var(--radius);
+  background: rgba(var(--info-rgb), 0.1);
+  text-align: start;
+}
+
+.about-docker > .icon { flex-shrink: 0; color: var(--accent); }
+.about-docker h4 { margin: 0 0 4px; font-size: 14px; color: var(--text-main); }
+.about-docker p { margin: 0; font-size: 13px; color: var(--text-dim); }
+.about-docker strong { color: var(--accent); }
+
+.update-dialog {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--canvas);
+  color: var(--text-main);
+  padding: 28px;
+  inline-size: clamp(320px, 90vw, 460px);
+  box-sizing: border-box;
+  box-shadow: var(--shadow-lg);
+}
+
+.update-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.update-dialog[open] { animation: um-in 0.3s var(--ease-bounce); }
+
+@keyframes um-in {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.um-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-block-end: 16px;
+}
+
+.um-heading { display: flex; flex-direction: column; gap: 8px; min-inline-size: 0; }
+
+.um-badge {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.um-badge.is-error {
+  color: var(--danger-color);
+  background: rgba(var(--danger-rgb), 0.12);
+  border-color: rgba(var(--danger-rgb), 0.3);
+}
+
+.um-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-main); }
+
+.um-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 36px;
+  block-size: 36px;
+  flex-shrink: 0;
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.um-close:hover,
+.um-close:focus-visible {
+  background: rgba(var(--accent-rgb), 0.1);
+  transform: rotate(90deg);
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  border-radius: var(--radius);
+}
+
+.um-versions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin-block-end: 16px;
+}
+
+.um-from { color: var(--text-dim); }
+.um-arrow { color: var(--text-dim); opacity: 0.6; }
+.um-to { color: var(--accent); font-weight: 700; }
+
+/* Two lines' worth, whatever the sentence: the swap between them would
+   otherwise resize a dialog the browser centres, and move everything above. */
+.um-message {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  min-block-size: calc(2 * 1.6 * 13px);
+}
+
+.um-notice {
+  background: rgba(var(--info-rgb), 0.1);
+  border: 1px solid rgba(var(--info-rgb), 0.3);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-block-end: 20px;
+}
+
+.um-notice-title { margin: 0 0 4px; font-size: 14px; color: var(--text-main); }
+.um-notice-text { margin: 0; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+.um-timeline { list-style: none; margin: 0 0 4px; padding: 0; }
+
+.tl-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-block-end: 18px;
+}
+
+/* The line to the next dot; green grows down the list as steps complete. */
+.tl-step::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 10px;
+  inset-block-start: 22px;
+  inset-block-end: 0;
+  inline-size: 2px;
+  background: var(--border);
+  transition: background 0.3s ease;
+}
+
+.tl-step:last-child { padding-block-end: 0; }
+.tl-step:last-child::before { display: none; }
+
+.tl-step.is-ok::before,
+.tl-step.is-skipped::before { background: rgba(var(--success-rgb), 0.5); }
+
+.tl-dot {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  inline-size: 22px;
+  block-size: 22px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--panel);
+  color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.3s ease, background 0.3s ease, color 0.3s ease;
+}
+
+.tl-dot svg { inline-size: 12px; block-size: 12px; }
+
+/* The note beside the label, not under it: under it, a note arriving mid-run
+   made the row taller and moved every step above. */
+.tl-body {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-inline-size: 0;
+  padding-block-start: 1px;
+}
+
+.tl-label { font-size: 13px; font-weight: 500; color: var(--text-dim); transition: color 0.3s ease; }
+.tl-note { font-size: 11px; color: var(--text-dim); opacity: 0.75; }
+.tl-note:empty { display: none; }
+
+.tl-step.is-running .tl-dot {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.15);
+  animation: tl-pulse 1.4s ease-in-out infinite;
+}
+
+.tl-step.is-running .tl-label { color: var(--text-main); font-weight: 600; }
+
+.tl-step.is-ok .tl-dot {
+  border-color: var(--success-color);
+  background: var(--success-color);
+  color: #06240f;
+  animation: tl-pop 0.35s var(--ease-bounce);
+}
+
+.tl-step.is-ok .tl-label { color: var(--text-main); }
+
+.tl-step.is-skipped .tl-dot { border-color: var(--border); background: var(--border); color: var(--text-dim); }
+
+.tl-step.is-error .tl-dot {
+  border-color: var(--danger-color);
+  background: var(--danger-color);
+  color: #2a0a0a;
+  animation: tl-pop 0.35s var(--ease-bounce);
+}
+
+.tl-step.is-error .tl-label { color: var(--danger-color); font-weight: 600; }
+
+/* Steps after a failure stay visibly untouched: they were never attempted. */
+.tl-step.is-pending .tl-label { opacity: 0.55; }
+
+@keyframes tl-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.15); }
+  50% { box-shadow: 0 0 0 7px rgba(var(--accent-rgb), 0.05); }
+}
+
+@keyframes tl-pop {
+  from { transform: scale(0.4); }
+  60% { transform: scale(1.15); }
+  to { transform: scale(1); }
+}
+
+.um-failure {
+  margin-block-start: 16px;
+  background: rgba(var(--danger-rgb), 0.1);
+  border: 1px solid rgba(var(--danger-rgb), 0.3);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.um-failure[hidden] { display: none; }
+.um-failure-text { margin: 0; font-size: 13px; color: var(--danger-color); line-height: 1.5; }
+
+.um-actions { display: flex; gap: 12px; justify-content: flex-end; margin-block-start: 24px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .update-dialog[open],
+  .tl-step.is-running .tl-dot,
+  .tl-step.is-ok .tl-dot,
+  .tl-step.is-error .tl-dot,
+  .notification-dot,
+  .side-update { animation: none; }
+}

@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { itemView, releaseNotes, type Text, updateZone } from "./templates";
+import { itemView, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -100,33 +100,26 @@ describe("a reporter following their own report", () => {
   });
 });
 
-describe("the release notes on About", () => {
-  test("are drawn as headings and lists, not shown as markdown", () => {
-    const html = releaseNotes("### Added\n- One thing\n- Another\n\n### Fixed\n- A third");
-    expect(html).toBe(
-      "<h4>Added</h4><ul><li>One thing</li><li>Another</li></ul><h4>Fixed</h4><ul><li>A third</li></ul>",
-    );
-  });
-
-  test("and every piece of text is still escaped", () => {
-    // They come from the release server. Drawing their shape must not turn
-    // into drawing whatever markup somebody put in a commit subject.
-    const html = releaseNotes("### <img src=x onerror=alert(1)>\n- <b>bold</b>\nplain <i>line</i>");
-    expect(html).not.toContain("<img");
-    expect(html).not.toContain("<b>");
-    expect(html).not.toContain("<i>");
-    expect(html).toContain("&lt;b&gt;bold&lt;/b&gt;");
-  });
-});
-
 describe("the update zone", () => {
   test("is green only when the release server was reached", () => {
     expect(updateZone({ current: "v1", latest: "v1", available: false }, text)).toContain("about-state ok");
     expect(updateZone({ current: "v1", reason: "error.update_none" }, text)).toContain("about-state ok");
     // Not reached, for whatever reason: never the colour of "all is well".
-    for (const reason of ["error.update_offline", "error.update_unverifiable", "error.update_container", "error.update_unreachable"]) {
+    for (const reason of ["error.update_offline", "error.update_unverifiable", "error.update_unreachable"]) {
       expect(updateZone({ current: "v1", reason }, text)).not.toContain("about-state ok");
     }
     expect(updateZone(null, text)).not.toContain("about-state ok");
+  });
+
+  test("in a container it is Lastboard's Docker notice, never a button to install", () => {
+    const zone = updateZone({ current: "v1", latest: "v2", available: true, container: true }, text);
+    expect(zone).toContain("about-docker");
+    expect(zone).not.toContain("data-update");
+  });
+
+  test("something newer is the card with its one button, and no notes beside it", () => {
+    const zone = updateZone({ current: "v1", latest: "v2", available: true }, text);
+    expect(zone).toContain("data-update");
+    expect(zone).not.toContain("release-notes");
   });
 });

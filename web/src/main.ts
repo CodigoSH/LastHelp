@@ -30,6 +30,7 @@ import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
 import * as landingViews from "./views/landing";
 import { LandingEditor } from "./landingEditor";
+import { openUpdateDialog, type UpdateInfo } from "./updateModal";
 import { icons } from "./views/icons";
 
 const text: views.Text = {
@@ -102,8 +103,43 @@ window.addEventListener("popstate", () => void render());
 
 // --- the shell -------------------------------------------------------------
 
+/**
+ * What the last update check found, for an administrator.
+ *
+ * As Lastboard does it: checked once, a moment after the panel's owner arrives,
+ * and when something newer exists the bar's panel icon carries a red dot and
+ * Info in the menu says so — the update is noticed without going to look.
+ */
+let updateFound: UpdateInfo | null = null;
+let updateChecked = false;
+
+function watchForUpdate(): void {
+  if (updateChecked || me?.admin !== true) return;
+  updateChecked = true;
+  setTimeout(async () => {
+    const status = await api.get<views.UpdateStatus>("/api/update").catch(() => null);
+    if (status) noteUpdate(status);
+  }, 2000);
+}
+
+/** Records a check's answer and shows it wherever the house shows it. */
+function noteUpdate(status: views.UpdateStatus): void {
+  updateFound = {
+    current: status.current ?? "",
+    latest: status.latest,
+    available: status.available === true,
+    container: status.container === true,
+  };
+  renderNav();
+  const info = root?.querySelector<HTMLAnchorElement>('.side-item[href="/panel/about"]');
+  const badge = info?.querySelector(".side-update");
+  if (updateFound.available && info && !badge) info.insertAdjacentHTML("beforeend", views.sideUpdateBadge(text));
+  if (!updateFound.available) badge?.remove();
+}
+
 function renderNav(): void {
   if (!nav) return;
+  watchForUpdate();
 
   // No language picker here. A visitor who has not chosen one is already
   // reading their browser's language, and somebody who wants a different one
@@ -181,6 +217,7 @@ function renderNav(): void {
            <rect class="panel-indicator${inPanel ? " on" : ""}" x="15" y="3" width="6" height="18" />
            <path d="M15 3V21" stroke-width="1.5" />
          </svg>
+         ${me.admin && updateFound?.available ? '<span class="notification-dot" aria-hidden="true"></span>' : ""}
        </button>`
     : "";
 
@@ -448,6 +485,7 @@ async function showInShell(content: string, path: string): Promise<void> {
         mayAddOrganization: me?.admin === true,
         avatar: me?.avatar,
         waiting: me?.pending,
+        updateAvailable: updateFound?.available === true,
         content,
       },
       text,
@@ -1025,6 +1063,8 @@ async function showAbout(): Promise<void> {
     // The page may have been left while the release server was thinking.
     if (!zone.isConnected) return;
     zone.innerHTML = views.updateZone(status, text);
+    // The bar and the menu follow what was just found, as they do in Lastboard.
+    if (status) noteUpdate(status);
     if (beta && status) {
       beta.checked = status.beta === true;
       beta.disabled = false;
@@ -1034,7 +1074,7 @@ async function showAbout(): Promise<void> {
       // Asking again changes nothing when the reason is a fact of this
       // installation — no keys, no network, a container — so the button is
       // only offered where a second look can say something new.
-      const fixed = ["error.update_offline", "error.update_unverifiable", "error.update_container"];
+      const fixed = ["error.update_offline", "error.update_unverifiable"];
       check.hidden = status !== null && fixed.includes(status.reason ?? "");
     }
   };
@@ -1053,25 +1093,11 @@ async function showAbout(): Promise<void> {
     await ask();
   });
 
-  // Delegated, because the zone is rewritten every time it is asked.
-  zone?.addEventListener("click", async (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-update]");
-    if (!button) return;
-    const note = zone.querySelector<HTMLParagraphElement>(".update-note");
-    button.disabled = true;
-    if (note) {
-      note.textContent = i18n.t("update.installing");
-      note.hidden = false;
-    }
-    try {
-      await api.post("/api/update");
-      // The server restarts a moment after answering, so waiting and
-      // reloading is what brings the page back on the new version.
-      setTimeout(() => location.reload(), 4000);
-    } catch (err) {
-      button.disabled = false;
-      if (note) note.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
-    }
+  // Delegated, because the zone is rewritten every time it is asked. The
+  // button opens Lastboard's dialog, which does the rest.
+  zone?.addEventListener("click", (event) => {
+    if (!(event.target as HTMLElement).closest("[data-update]") || !updateFound) return;
+    openUpdateDialog(updateFound);
   });
 
   await ask();

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -91,13 +92,14 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Every reason it could not check, said plainly rather than as an empty
 	// answer that looks like "you are up to date".
+	// In a container it still looks, as Lastboard does: the panel says a newer
+	// image exists even though pulling it is done elsewhere. No keys are needed
+	// to say that, only to install.
 	switch {
 	case s.cfg.Offline:
 		body["reason"] = "error.update_offline"
-	case len(version.ReleaseKeys) == 0:
+	case len(version.ReleaseKeys) == 0 && !inContainer():
 		body["reason"] = "error.update_unverifiable"
-	case inContainer():
-		body["reason"] = "error.update_container"
 	default:
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
@@ -114,7 +116,6 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 			body["reason"] = "error.update_unreachable"
 		default:
 			body["latest"] = release.Tag
-			body["notes"] = release.Notes
 			body["available"] = s.updater().Available(release)
 		}
 	}
@@ -148,6 +149,11 @@ func (s *Server) handleUpdatePerform(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+		s.performStreaming(ctx, w, release)
+		return
+	}
+
 	steps := make([]string, 0, 8)
 	err = s.updater().Apply(ctx, release, s.cfg.DBFile, func(step updater.Step, detail string) {
 		slog.Info("update", "step", string(step), "detail", detail)
@@ -172,6 +178,102 @@ func (s *Server) handleUpdatePerform(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go restart()
+}
+
+// UpdateSteps are the steps the panel's update dialog shows, in the order they
+// run — Lastboard's timeline, with the two this updater adds: the new binary
+// is made to run before it replaces anything, and the database is copied.
+var UpdateSteps = []string{"signature", "download", "checksum", "prove", "backup", "install", "restart"}
+
+// timelineStep says which step of the dialog an updater step belongs to. The
+// checksum list is fetched to have something to verify the signature over, so
+// the two are one step for the person watching.
+func timelineStep(step updater.Step) string {
+	switch step {
+	case updater.StepChecksums, updater.StepSignature:
+		return "signature"
+	case updater.StepDownload:
+		return "download"
+	case updater.StepVerify:
+		return "checksum"
+	case updater.StepProve:
+		return "prove"
+	case updater.StepBackup:
+		return "backup"
+	default:
+		return "install"
+	}
+}
+
+// performStreaming installs a release and reports each step as it happens,
+// the way Lastboard's updater does: one server-sent event per change, so the
+// dialog's timeline moves while the work is done rather than after.
+//
+// The stream ends in one of two ways. A step fails, and its event carries the
+// reason; or the install is done, "restart" is announced as running, and the
+// process replaces itself — the page then waits for the new version to answer.
+func (s *Server) performStreaming(ctx context.Context, w http.ResponseWriter, release updater.Release) {
+	installed := streamUpdate(w, func(progress func(updater.Step, string)) error {
+		err := s.updater().Apply(ctx, release, s.cfg.DBFile, progress)
+		if err != nil {
+			slog.Error("the update was refused", "error", err, "release", release.Tag)
+		}
+		return err
+	})
+	if !installed {
+		return
+	}
+	slog.Info("updated; restarting", "release", release.Tag)
+	go restart()
+}
+
+// streamUpdate runs apply and turns its progress into the dialog's events,
+// and says whether the release was installed. Apart from the updater so the
+// events can be checked without a release server.
+func streamUpdate(w http.ResponseWriter, apply func(progress func(updater.Step, string)) error) bool {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-store")
+	// A reverse proxy that buffers would hold every event until the end, and
+	// the timeline would jump from empty to finished.
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	flusher, _ := w.(http.Flusher)
+
+	send := func(step, status, errKey string) {
+		event := map[string]string{"step": step, "status": status}
+		if errKey != "" {
+			event["error"] = errKey
+		}
+		payload, _ := json.Marshal(event)
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", payload)
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+
+	current := ""
+	err := apply(func(step updater.Step, detail string) {
+		slog.Info("update", "step", string(step), "detail", detail)
+		next := timelineStep(step)
+		if next == current {
+			return
+		}
+		if current != "" {
+			send(current, "ok", "")
+		}
+		send(next, "running", "")
+		current = next
+	})
+	if err != nil {
+		if current == "" {
+			current = UpdateSteps[0]
+		}
+		send(current, "error", keyForUpdateError(err))
+		return false
+	}
+	send(current, "ok", "")
+	send("restart", "running", "")
+	return true
 }
 
 // restart replaces this process with the binary now on disk.

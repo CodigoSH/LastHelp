@@ -19,7 +19,7 @@ export class ApiError extends Error {
   }
 }
 
-function csrfToken(): string {
+export function csrfToken(): string {
   for (const part of document.cookie.split(";")) {
     const [name, ...rest] = part.trim().split("=");
     if (name === "lasthelp_csrf") return rest.join("=");

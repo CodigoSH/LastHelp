@@ -4,10 +4,15 @@ Three ways, and the right one depends on how you installed.
 
 ## From the panel
 
-Sign in as the administrator and open **About** in the sidebar. Under the
-version it says whether there is something newer — or why it could not check —
-and when there is, one button installs it and restarts. **Check for updates**
-asks again.
+Sign in as the administrator. When something newer is released, the panel
+icon in the top bar carries a red dot and **Info** in the sidebar says **New
+update!** — the same signals the dashboard gives.
+
+Open **Info**. Under the version it says whether there is something newer — or
+why it could not check — and when there is, **Update** opens a dialog with the
+two versions, a link to what is new, and every step listed. Confirm it there and
+each step turns green as it is done; the page reloads once the new version
+answers. **Check for updates** asks again.
 
 ![About in the panel](../images/about.png)
 
@@ -53,7 +58,8 @@ instead of Go.
 
 ## In a container
 
-Pull a new image. The panel will tell you this rather than offering a button:
+Pull a new image. Info says so, and whether a newer one exists, rather than
+offering a button:
 replacing the binary inside a container works until the next restart and then
 silently reverts, which is worse than not offering it.
 
