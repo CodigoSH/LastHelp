@@ -38,6 +38,9 @@
      20% in the dark. The track of a switch sits on it. */
   --surface-active: rgba(var(--accent-rgb), 0.12);
   --surface-dim: #eef0f4;
+  /* Lastboard's --surface: a card that floats on another, translucent over a
+     blur, so the one under it shows through darker in the dark theme. */
+  --surface-glass: rgba(255, 255, 255, 0.72);
   --text-main: #12151b;
   --text-dim: #5b6470;
   --border: #e3e7ec;
@@ -134,6 +137,7 @@
   --dark-canvas-glass: rgba(18, 18, 18, 0.78);
   --dark-panel: #1a1a1a;
   --dark-surface-dim: #242424;
+  --dark-surface-glass: rgba(28, 22, 20, 0.7);
   --dark-sheet: #242424;
   --dark-surface-hover: rgba(var(--accent-rgb), 0.1);
   --dark-surface-active: rgba(var(--accent-rgb), 0.2);
@@ -166,6 +170,7 @@
     --surface-hover: var(--dark-surface-hover);
     --surface-active: var(--dark-surface-active);
     --surface-dim: var(--dark-surface-dim);
+    --surface-glass: var(--dark-surface-glass);
     --text-main: var(--dark-text-main);
     --text-dim: var(--dark-text-dim);
     --border: var(--dark-border);
@@ -193,6 +198,7 @@
   --surface-hover: var(--dark-surface-hover);
   --surface-active: var(--dark-surface-active);
   --surface-dim: var(--dark-surface-dim);
+  --surface-glass: var(--dark-surface-glass);
   --text-main: var(--dark-text-main);
   --text-dim: var(--dark-text-dim);
   --border: var(--dark-border);
@@ -4222,8 +4228,13 @@ body > nav .brand {
   padding: 24px;
   border: 1px solid var(--border);
   border-radius: 24px;
-  background: var(--surface-dim);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* Lastboard's .update-modal exactly. The background was the same grey as the
+     card around it, and a 60px shadow under a box of the same colour reads as
+     a dark ring around nothing. */
+  background: var(--surface-glass);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   text-align: start;
 }
 
@@ -4233,7 +4244,10 @@ body > nav .brand {
   inset-inline-end: -50%;
   inline-size: 100%;
   block-size: 100%;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 60%);
+  /* closest-side: the glow fades to nothing at the edges of its own box. Sized
+     to the farthest corner, it was still visible where the box ends, halfway
+     down the card, and drew a straight line across it. */
+  background: radial-gradient(circle closest-side, var(--accent) 0%, transparent 100%);
   opacity: 0.1;
   pointer-events: none;
 }
