@@ -200,6 +200,7 @@ func TestEachFieldBelongsToTheKindsThatReadIt(t *testing.T) {
 		"a name on a text":                {ID: "m", Kind: Text, Name: "x"},
 		"a name on a heading":             {ID: "m", Kind: Heading, HideName: true},
 		"a scope on a text":               {ID: "m", Kind: Text, Scope: "acme"},
+		"a logo size on a text":           {ID: "m", Kind: Text, LogoSize: LogoLarge},
 	}
 	for why, m := range cases {
 		mustRefuse(t, "puts "+why, page(m))
@@ -213,6 +214,10 @@ func TestTheClosedChoicesOfAModule(t *testing.T) {
 	mustRefuse(t, "shows a list of its own invention", page(Module{ID: "m", Kind: Reports, Show: "trending"}))
 	mustRefuse(t, "draws boards as a grid of its own", page(Module{ID: "m", Kind: Boards, Display: "masonry"}))
 	mustRefuse(t, "aligns a heading right", page(Module{ID: "m", Kind: Heading, Align: "right"}))
+	mustRefuse(t, "draws a heading's logo at a size of its own", page(Module{ID: "m", Kind: Heading, LogoSize: "huge"}))
+	for _, size := range []string{"", LogoSmall, LogoLarge} {
+		mustAccept(t, "draws the logo "+size, page(Module{ID: "m", Kind: Heading, LogoSize: size}))
+	}
 	mustRefuse(t, "asks for more rows than the bound", page(Module{ID: "m", Kind: Reports, Rows: maxRows + 1}))
 	for _, show := range []string{"", ShowMostVoted, ShowRecentlyDone, ShowLatest, ShowPlanned} {
 		mustAccept(t, "shows "+show, page(Module{ID: "m", Kind: Reports, Show: show}))

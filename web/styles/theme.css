@@ -1713,18 +1713,26 @@ body > main:has(> .lp) {
 .lp-heading > :nth-child(3) { animation-delay: 0.14s; }
 .lp-heading > :nth-child(4) { animation-delay: 0.21s; }
 
-/* The mark, lit from behind: the one ornament on the page, and it earns its
-   place by being what the installation is recognised by. */
+/* The installation's mark, bare — the About screen draws it the same way, and
+   a tile around it was one frame more than anything else on the page wears.
+   Three sizes, which the heading module chooses; the default is About's. */
 .lp-logo {
-  display: grid;
-  place-items: center;
-  inline-size: 4.5rem;
-  block-size: 4.5rem;
+  display: block;
+  inline-size: 80px;
+  block-size: 80px;
   margin-block-end: 0.25rem;
-  border-radius: var(--radius-xl);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
+  border-radius: 18px;
+  object-fit: contain;
+}
+.lp-logo.logo-small {
+  inline-size: 56px;
+  block-size: 56px;
+  border-radius: 13px;
+}
+.lp-logo.logo-large {
+  inline-size: 120px;
+  block-size: 120px;
+  border-radius: 26px;
 }
 
 .lp-heading h1 {
@@ -2381,13 +2389,22 @@ body > main:has(> .lpe) {
   font-size: 0.75rem;
   white-space: nowrap;
   cursor: pointer;
-  opacity: 0.55;
-  transition: opacity 0.15s var(--ease);
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
 }
 
+/* Quiet at rest, and still solid: the pill sits on the line between two bands
+   and on the frames of the modules, so it dims its ink, never itself — an
+   opacity on the button let every line behind it show through. The wash on
+   hover is laid over the panel for the same reason. */
+.lpe-insert > button > * { opacity: 0.6; transition: opacity 0.15s var(--ease); }
 .lpe-insert:first-child > button { transform: translate(calc(-50% * var(--rtl-flip)), 25%); }
 .lpe-insert > button:hover,
-.lpe-insert > button:focus-visible { opacity: 1; background: var(--accent-wash); }
+.lpe-insert > button:focus-visible {
+  border-color: var(--accent);
+  background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--panel);
+}
+.lpe-insert > button:hover > *,
+.lpe-insert > button:focus-visible > * { opacity: 1; }
 
 /* ---- the panel ---- */
 
@@ -2456,6 +2473,10 @@ body > main:has(> .lpe) {
 
 .lpe-panel-body { padding: 1rem; }
 .lpe-panel-body .field { margin-block-end: 1rem; }
+/* `.field:last-of-type` zeroes the last div, and in a panel the last div can
+   be followed by a checkbox or a hint — the logo's size sat against "Show
+   search". Only what is really last loses its margin here. */
+.lpe-panel-body .field:not(:last-child) { margin-block-end: 1rem; }
 .lpe-panel-body .field > .label { display: block; font-weight: 600; margin-block-end: 0.35rem; }
 .lpe-panel-body .hint { font-size: 0.8rem; }
 .lpe-seg { margin-block-start: 0; }

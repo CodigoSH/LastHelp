@@ -372,6 +372,11 @@ function contentFields(m: LandingModule, ctx: PanelContext, text: Text): string 
           ["start", text.t("landing.alignStart")],
         ], text.t("landing.align"))}
         ${check("hide_logo", text.t("landing.showLogo"), m.hide_logo !== true, true)}
+        ${m.hide_logo ? "" : choice("logo_size", m.logo_size ?? "", [
+          ["small", text.t("landing.logoSmall")],
+          ["", text.t("landing.logoMedium")],
+          ["large", text.t("landing.logoLarge")],
+        ], text.t("landing.logoSize"))}
         ${check("with_search", text.t("landing.showSearch"), m.with_search === true)}
         <p class="hint">${escapeHTML(text.t("landing.writeOnPage"))}</p>`;
     case "text":

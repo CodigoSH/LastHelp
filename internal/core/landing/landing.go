@@ -173,6 +173,13 @@ const DisplayList = "list"
 // AlignStart puts a heading against the start edge rather than in the middle.
 const AlignStart = "start"
 
+// How big a heading draws the installation's mark. Empty is the middle size,
+// the one the About screen draws.
+const (
+	LogoSmall = "small"
+	LogoLarge = "large"
+)
+
 // Where a link goes.
 const (
 	// ToForm is a board's report form. Its Scope is "org/board".
@@ -216,12 +223,13 @@ type Module struct {
 	Body string `json:"body,omitempty"`
 	Tone string `json:"tone,omitempty"`
 
-	// Title, Subtitle, HideLogo, Align and WithSearch are a heading's. An
+	// Title, Subtitle, HideLogo, LogoSize, Align and WithSearch are a heading's. An
 	// empty title and subtitle are the installation's name and tagline, so
 	// the default page says who it belongs to without storing it twice.
 	Title      string `json:"title,omitempty"`
 	Subtitle   string `json:"subtitle,omitempty"`
 	HideLogo   bool   `json:"hide_logo,omitempty"`
+	LogoSize   string `json:"logo_size,omitempty"`
 	Align      string `json:"align,omitempty"`
 	WithSearch bool   `json:"with_search,omitempty"`
 
@@ -571,7 +579,7 @@ func (m Module) validate() error {
 		return fmt.Errorf("module %q has the tone %q", m.ID, m.Tone)
 	}
 
-	heading := m.Title != "" || m.Subtitle != "" || m.HideLogo || m.Align != "" || m.WithSearch
+	heading := m.Title != "" || m.Subtitle != "" || m.HideLogo || m.LogoSize != "" || m.Align != "" || m.WithSearch
 	if heading && m.Kind != Heading {
 		return fmt.Errorf("module %q carries a heading's settings and is not a heading", m.ID)
 	}
@@ -580,6 +588,9 @@ func (m Module) validate() error {
 	}
 	if !oneOf(m.Align, "", AlignStart) {
 		return fmt.Errorf("module %q is aligned %q", m.ID, m.Align)
+	}
+	if !oneOf(m.LogoSize, "", LogoSmall, LogoLarge) {
+		return fmt.Errorf("module %q draws its logo at the size %q", m.ID, m.LogoSize)
 	}
 
 	if err := m.validateScope(); err != nil {

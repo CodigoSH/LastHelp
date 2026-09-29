@@ -1089,10 +1089,14 @@ async function main() {
   // for it.
   await goTo("/", ".lp");
   const front = await evaluate(`
-    const mark = document.querySelector(".lp-heading .lp-logo :is(img, svg)");
+    const mark = document.querySelector(".lp-heading img.lp-logo");
+    const cs = mark ? getComputedStyle(mark) : null;
     return {
       title: document.querySelector(".lp-heading h1")?.textContent?.trim() ?? "",
       mark: mark ? Math.round(mark.getBoundingClientRect().width) : 0,
+      // Bare, as the About screen draws it: nothing wrapped round the mark.
+      framed: !mark || mark.parentElement?.classList.contains("lp-heading") !== true
+        || (cs?.borderTopWidth ?? "") !== "0px" || (cs?.boxShadow ?? "") !== "none",
       points: document.querySelectorAll(".words.point").length,
       boards: document.querySelectorAll(".lp-card").length,
       search: !!document.querySelector(".lp-heading .lp-search input"),
@@ -1100,7 +1104,7 @@ async function main() {
   `);
   check(
     "the front page announces the installation, not the software",
-    front.title === "CodigoSH" && front.mark > 30 && front.points === 3 && front.boards === 1 && front.search === true,
+    front.title === "CodigoSH" && front.mark === 80 && !front.framed && front.points === 3 && front.boards === 1 && front.search === true,
     JSON.stringify(front),
   );
 
@@ -1462,6 +1466,55 @@ async function main() {
     "Ctrl+Z undoes a change on the page and Ctrl+Shift+Z brings it back",
     conEstilo === "style-soft" && deshecho === "style-card" && rehecho === "style-soft",
     `${conEstilo} → ${deshecho} → ${rehecho}`,
+  );
+
+  // The heading draws the mark at the size its module asks for, bare.
+  await evaluate(`document.querySelector(".lp-heading").closest("[data-module]").click()`);
+  await waitFor('.lpe-panel [data-set="logo_size"]');
+  const logoAncho = () => evaluate(`return Math.round(document.querySelector(".lp-heading img.lp-logo")?.getBoundingClientRect().width ?? 0)`);
+  await evaluate(`document.querySelector('.lpe-panel [data-set="logo_size"][data-value="large"]').click()`);
+  await sleep(300);
+  const grande = await logoAncho();
+  await evaluate(`document.querySelector('.lpe-panel [data-set="logo_size"][data-value="small"]').click()`);
+  await sleep(300);
+  const pequeno = await logoAncho();
+  await evaluate(`document.querySelector('.lpe-panel [data-set="logo_size"][data-value=""]').click()`);
+  await sleep(300);
+  const mediano = await logoAncho();
+  // The choice was the last div of the panel and a generic rule took its
+  // margin, so it sat against the checkbox below: ask for the gap.
+  const holgura = await evaluate(`
+    const f = document.querySelector('.lpe-panel [data-set="logo_size"]')?.closest(".field");
+    const next = f?.nextElementSibling;
+    return f && next ? Math.round(next.getBoundingClientRect().top - f.getBoundingClientRect().bottom) : -1;
+  `);
+  check(
+    "the heading module chooses the size of the logo",
+    grande === 120 && pequeno === 56 && mediano === 80 && holgura >= 12,
+    `large ${grande}, small ${pequeno}, medium ${mediano}, gap below ${holgura}px`,
+  );
+
+  // The pill that adds a section sits on the line between two bands: it has
+  // to be solid, at rest and under the pointer, or the line shows through it.
+  const insertPill = async () => {
+    const r = await evaluate(`
+      const b = document.querySelector('[data-add-band="1"]');
+      const cs = getComputedStyle(b);
+      const box = b.getBoundingClientRect();
+      return { opacity: cs.opacity, color: cs.backgroundColor, x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    `);
+    return { ...r, solid: r.opacity === "1" && /^rgb\(/.test(r.color) };
+  };
+  const pillRest = await insertPill();
+  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
+  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: pillRest.x, y: pillRest.y });
+  await sleep(250);
+  const pillHover = await insertPill();
+  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 5, y: 5 });
+  check(
+    "the add-section pill is solid, and stays solid under the pointer",
+    pillRest.solid && pillHover.solid,
+    `rest ${pillRest.opacity} ${pillRest.color}; hover ${pillHover.opacity} ${pillHover.color}`,
   );
 
   // A ready-made section, where it was asked for, and a module in the column

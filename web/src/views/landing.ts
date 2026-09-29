@@ -51,6 +51,7 @@ export interface LandingModule {
   title?: string;
   subtitle?: string;
   hide_logo?: boolean;
+  logo_size?: "" | "small" | "large";
   align?: "" | "start";
   with_search?: boolean;
   scope?: string;
@@ -404,6 +405,17 @@ function insertBand(at: number, text: Text): string {
  * An empty title and line are the installation's own name and tagline, so the
  * default page says who it belongs to without storing it twice.
  */
+/**
+ * The installation's mark, bare, as the About screen draws it: no tile around
+ * it. Three sizes, chosen in the module; empty is About's own.
+ */
+const LOGO_PX = { small: 56, "": 80, large: 120 } as const;
+function logo(src: string | undefined, size: "" | "small" | "large"): string {
+  const px = LOGO_PX[size] ?? LOGO_PX[""];
+  const url = src && src.trim() !== "" ? src : "/logo.svg";
+  return `<img class="lp-logo${size ? ` logo-${size}` : ""}" src="${escapeAttr(url)}" alt="" width="${px}" height="${px}" />`;
+}
+
 function heading(m: LandingModule, ctx: LandingContext, text: Text): string {
   const title = (m.title ?? "").trim() || ctx.instance.name || text.t("app.name");
   const subtitle = (m.subtitle ?? "").trim() || text.t("app.tagline");
@@ -411,7 +423,7 @@ function heading(m: LandingModule, ctx: LandingContext, text: Text): string {
   const editable = (field: "title" | "subtitle") =>
     ctx.editing ? ` contenteditable="true" spellcheck="true" data-field="${field}" data-for="${escapeAttr(m.id)}"` : "";
   return `<div class="lp-heading${m.align === "start" ? " align-start" : ""}">
-    ${m.hide_logo ? "" : `<div class="lp-logo">${brandMark(ctx.instance.logo, 56)}</div>`}
+    ${m.hide_logo ? "" : logo(ctx.instance.logo, m.logo_size ?? "")}
     <h1${editable("title")}>${escapeHTML(title)}</h1>
     <p class="lp-subtitle"${editable("subtitle")}>${escapeHTML(subtitle)}</p>
     ${m.with_search ? search(text) : ""}
