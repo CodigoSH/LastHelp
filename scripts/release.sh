@@ -84,6 +84,11 @@ PROJECT="LastHelp"
 RELEASE_BRANCH="main"
 VERSION_FILE="package.json"
 
+# The other products of the house. Their names never reach what a release
+# publishes — its title, its notes, the changelog: what a project takes from
+# another becomes its own, and is described by what it does.
+OTHER_PRODUCTS=(Lastboard LastGYM LastDAV)
+
 # Where the version is stamped, as "file|match|replacement|label". The binary
 # takes its version from -ldflags at build time and the fallback in version.go
 # deliberately says "dev" — a binary that cannot say where it came from should
@@ -124,7 +129,18 @@ PREFLIGHT=(
 
 # --- Everything below is the same in every CodigoSH project ---------------
 
-die() { echo "❌ $1" >&2; exit 1; }
+die() {
+    echo "❌ $1" >&2
+    # A real run starts from a clean tree, so anything a stop leaves modified
+    # was written by this script: the version stamps, and the changelog of a
+    # stable. Put back, the tree is as it was and the run can be repeated —
+    # otherwise the next attempt is refused for a tree that is not clean.
+    # After the release is committed these match HEAD and nothing changes.
+    if [ "${DRY_RUN:-0}" != "1" ] && [ -n "${STAMPED_FILES+set}" ]; then
+        git checkout -q -- ${STAMPED_FILES[@]+"${STAMPED_FILES[@]}"} CHANGELOG.md 2>/dev/null || true
+    fi
+    exit 1
+}
 
 # Runs a command, or prints it when doing a dry run.
 run() {
@@ -420,6 +436,40 @@ CHANGED=""
 [ -n "$REFACTORS" ] && CHANGED="$REFACTORS"
 [ -n "$OTHER" ] && CHANGED="${CHANGED:+$CHANGED$'\n'}$OTHER"
 
+# A hand-written file always wins: the generated one is a list of commit
+# subjects, which is not what a reader wants. It wins for the changelog of a
+# stable too — otherwise a subject the notes were written to leave out would
+# still land in CHANGELOG.md.
+NOTES_FILE="RELEASE_NOTES_$NEW_TAG.md"
+HAND_WRITTEN=""
+[ -f "$NOTES_FILE" ] && HAND_WRITTEN=$(cat "$NOTES_FILE")
+
+# --- What is published names no other product ------------------------------
+#
+# Checked here, before anything is written, tagged or pushed, and in a dry run
+# as well: the text that would be published — the title, and the notes as
+# written or as generated, which on a stable are also the changelog entry.
+#
+# The notes are generated from commit subjects, so one subject saying where
+# something came from ("…is Lastboard's size") is a line on the release page.
+# It happened, which is why this exists. A subject cannot be changed once it
+# is pushed; the way out is to write the notes by hand.
+if [ -n "$HAND_WRITTEN" ]; then
+    PUBLISHED=$(printf '%s\n' "$TITLE" "$HAND_WRITTEN")
+else
+    PUBLISHED=$(printf '%s\n' "$TITLE" "$FEATS" "$FIXES" "$CHANGED" "$REMOVALS")
+fi
+NAMED=$(IFS='|'; printf '%s\n' "$PUBLISHED" | grep -inwE "${OTHER_PRODUCTS[*]}" || true)
+if [ -n "$NAMED" ]; then
+    die "what this release would publish names another product of the house:
+
+$(printf '%s\n' "$NAMED" | sed 's/^[0-9]*:/    /')
+
+    What a project took from another is its own now, and the notes say what it
+    does. Write $NOTES_FILE by hand without it and run this again — a
+    hand-written file always wins, for the notes and for the changelog."
+fi
+
 # --- CHANGELOG.md, on stables only -----------------------------------------
 #
 # A beta gets its own release page and its own notes; the file in the
@@ -436,10 +486,17 @@ if [ "$TYPE" == "stable" ] && [ -f "CHANGELOG.md" ]; then
     ENTRY_FILE=$(mktemp)
     {
         printf '## [%s] - %s\n\n' "$NEW_VERSION" "$DATE"
-        [ -n "$FEATS" ]    && printf '### Added\n%s\n\n' "$FEATS"
-        [ -n "$FIXES" ]    && printf '### Fixed\n%s\n\n' "$FIXES"
-        [ -n "$CHANGED" ]  && printf '### Changed\n%s\n\n' "$CHANGED"
-        [ -n "$REMOVALS" ] && printf '### Removed\n%s\n\n' "$REMOVALS"
+        if [ -n "$HAND_WRITTEN" ]; then
+            # The hand-written notes, without the bold title line that heads
+            # the release page.
+            printf '%s\n' "$HAND_WRITTEN" | sed '1{/^\*\*.*\*\*$/d}' | sed '/./,$!d'
+            printf '\n'
+        else
+            [ -n "$FEATS" ]    && printf '### Added\n%s\n\n' "$FEATS"
+            [ -n "$FIXES" ]    && printf '### Fixed\n%s\n\n' "$FIXES"
+            [ -n "$CHANGED" ]  && printf '### Changed\n%s\n\n' "$CHANGED"
+            [ -n "$REMOVALS" ] && printf '### Removed\n%s\n\n' "$REMOVALS"
+        fi
         true
     } > "$ENTRY_FILE"
 
@@ -465,10 +522,6 @@ if [ "$TYPE" == "stable" ] && [ -f "CHANGELOG.md" ]; then
 fi
 
 # --- The release body ------------------------------------------------------
-#
-# A hand-written file always wins: the generated one is a list of commit
-# subjects, which is not what a reader wants.
-NOTES_FILE="RELEASE_NOTES_$NEW_TAG.md"
 if [ -f "$NOTES_FILE" ]; then
     echo "📄 Using existing release notes: $NOTES_FILE"
 else
