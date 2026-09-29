@@ -212,6 +212,44 @@ async function main() {
   `);
   check("a reply written in the pane joins the conversation there", reply.thread === 2 && reply.bins === 2, JSON.stringify(reply));
 
+  // The same reply rewritten where it stands: the pencil beside the bin,
+  // Cancel leaving the words as they were, Save reaching the server. Both
+  // tools are asked whether they can be pressed, not only whether they exist.
+  const rewritten = await evaluate(`
+    const id = ${JSON.stringify(before.id)};
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const last = () => [...document.querySelectorAll(".rev-detail .comments .comment")].pop();
+    last()?.scrollIntoView({ block: "center" });
+    await new Promise(r => setTimeout(r, 200));
+    const pressable = (sel) => { const b = last()?.querySelector(sel); const r = b?.getBoundingClientRect();
+      return !!r && r.width > 0 && document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest(sel) === b; };
+    const tools = { pencil: pressable("[data-edit-comment]"), bin: pressable("[data-delete-comment]") };
+    // Without a pencil there is nothing to drive: said, rather than thrown.
+    if (!last()?.querySelector("[data-edit-comment]")) return { tools };
+    last().querySelector("[data-edit-comment]").click();
+    await wait(() => last()?.querySelector("form.comment-edit textarea"));
+    const prefilled = last().querySelector("form.comment-edit textarea").value;
+    last().querySelector("[data-comment-cancel]").click();
+    const cancelled = !last().querySelector("form.comment-edit") && last().querySelector(".what").hidden === false
+      && last().querySelector(".what").textContent === "Released in 1.4.3.";
+    last().querySelector("[data-edit-comment]").click();
+    await wait(() => last()?.querySelector("form.comment-edit textarea"));
+    const form = last().querySelector("form.comment-edit");
+    form.querySelector("textarea").value = "Released in 1.4.4.";
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await wait(() => last()?.querySelector(".what")?.textContent === "Released in 1.4.4." && !last()?.querySelector("form.comment-edit"));
+    const server = await fetch("/api/items/" + id).then(r => r.json());
+    return { tools, prefilled, cancelled, shown: last()?.querySelector(".what")?.textContent,
+             server: (server.comments ?? []).map(c => c.body).pop() };
+  `);
+  check(
+    "a reply is rewritten where it stands, beside the bin, and the server keeps the new words",
+    rewritten.tools.pencil && rewritten.tools.bin && rewritten.prefilled === "Released in 1.4.3." &&
+      rewritten.cancelled === true && rewritten.shown === "Released in 1.4.4." && rewritten.server === "Released in 1.4.4.",
+    JSON.stringify(rewritten),
+  );
+  await shoot("comment-edited");
+
   const unsaid = await evaluate(`
     const id = ${JSON.stringify(before.id)};
     const bins = [...document.querySelectorAll(".rev-detail [data-delete-comment]")];
@@ -222,7 +260,7 @@ async function main() {
     const server = await fetch("/api/items/" + id).then(r => r.json());
     return { thread: document.querySelectorAll(".rev-detail .comments .comment").length,
              server: (server.comments ?? []).length,
-             gone: !(server.comments ?? []).some(c => c.body === "Released in 1.4.3.") };
+             gone: !(server.comments ?? []).some(c => c.body === "Released in 1.4.4.") };
   `);
   check(
     "and deleting it, asked in the product's dialog, takes it off the pane and the server",
@@ -326,16 +364,27 @@ async function main() {
     const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
     const api = await fetch("/api/reports?limit=200").then(r => r.json());
     const boards = [...new Set((api.items ?? []).map(r => r.board?.repo))];
-    document.querySelector('[data-what="report"]').click();
-    await wait(() => document.querySelector(".rev-detail [data-rewrite]"));
+    // The first report with a conversation, so the tools on its messages
+    // are counted against something rather than against nothing.
+    const rows = [...document.querySelectorAll('[data-what="report"]')];
+    let comments = 0;
+    for (const row of rows.slice(0, 15)) {
+      row.click();
+      await wait(() => document.querySelector(".rev-detail [data-rewrite]"));
+      await new Promise(r => setTimeout(r, 300));
+      comments = document.querySelectorAll(".rev-detail .comments .comment").length;
+      if (comments > 0) break;
+    }
     return {
       boards,
-      rows: document.querySelectorAll('[data-what="report"]').length,
+      rows: rows.length,
       server: (api.items ?? []).length,
       edit: !!document.querySelector(".rev-detail [data-rewrite]"),
       status: !!document.querySelector(".rev-detail #status-select"),
       bin: !!document.querySelector(".rev-detail [data-delete-item]"),
+      comments,
       commentBins: document.querySelectorAll(".rev-detail [data-delete-comment]").length,
+      commentPencils: document.querySelectorAll(".rev-detail [data-edit-comment]").length,
     };
   `);
   check(
@@ -343,7 +392,11 @@ async function main() {
     JSON.stringify(ana.boards) === '["atlas"]' && ana.rows === ana.server && ana.edit && ana.status,
     JSON.stringify(ana),
   );
-  check("and without the bins, which are the owners' and the administrator's", ana.bin === false && ana.commentBins === 0, JSON.stringify(ana));
+  check(
+    "without the report's bin, which is the owners' and the administrator's, but with the pencil and the bin on every message",
+    ana.bin === false && ana.comments > 0 && ana.commentBins === ana.comments && ana.commentPencils === ana.comments,
+    JSON.stringify(ana),
+  );
 
   // 8. The owner: both repositories, and the bin.
   await signIn("olga");
@@ -363,6 +416,126 @@ async function main() {
     JSON.stringify(olga.boards) === '["atlas","orbit"]' && olga.bin === true,
     JSON.stringify(olga),
   );
+
+  // An owner deletes the organisation's repositories, and does not end the
+  // organisation: the bin on every repository row, none for the whole.
+  await goTo("/panel/acme", "form.org-settings");
+  const owns = await evaluate(`return {
+    repoBins: document.querySelectorAll("[data-delete-repo]").length,
+    repos: document.querySelectorAll('a[href^="/panel/acme/repos/"]').length,
+    orgBin: !!document.querySelector("[data-delete-org]"),
+  }`);
+  await goTo("/panel/acme/repos/atlas", "form.repo-settings");
+  const ownsRepo = await evaluate(`return !!document.querySelector("[data-delete-repo], .settings-danger")`);
+  check(
+    "an owner may delete the organisation's repositories, and may not end the organisation",
+    owns.repoBins === 2 && owns.orgBin === false && ownsRepo === true,
+    JSON.stringify({ owns, ownsRepo }),
+  );
+
+  // 8b. A repository's icon, chosen in its settings: a real picture handed to
+  //     the file input as somebody choosing one would, scaled down on the way,
+  //     and then on the organisation's public page and the front page — and
+  //     taken off again, back to the initials.
+  await signIn("alex");
+  await goTo("/panel/acme/repos/atlas", "form.repo-settings");
+  const chosen = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 300;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#1e88e5"; ctx.fillRect(0, 0, 300, 300);
+    ctx.fillStyle = "#ffffff"; ctx.fillRect(90, 90, 120, 120);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+    const input = document.querySelector("#icon-file");
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], "atlas.png", { type: "image/png" }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await wait(() => document.querySelector(".icon-preview img"));
+    const value = document.querySelector('form.repo-settings input[name="icon"]').value;
+    const img = new Image(); img.src = value; await img.decode();
+    return { preview: !!document.querySelector(".icon-preview img"), clear: !document.querySelector("[data-clear-icon]").hidden,
+             side: Math.max(img.naturalWidth, img.naturalHeight), bytes: value.length, isImage: value.startsWith("data:image/") };
+  `);
+  check(
+    "a repository's icon is chosen in its settings, scaled to 128px on the way",
+    chosen.preview && chosen.clear && chosen.isImage && chosen.side === 128 && chosen.bytes <= 24 * 1024,
+    JSON.stringify(chosen),
+  );
+  await evaluate(`document.querySelector("form.repo-settings").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))`);
+  await sleep(1200);
+  await goTo("/acme", ".cards");
+  const onOrg = await evaluate(`return [...document.querySelectorAll(".cards .card")].find(c => c.textContent.includes("Atlas"))?.querySelector(".card-mark img") ? true : false`);
+  await goTo("/", ".lp");
+  const onFront = await evaluate(`return [...document.querySelectorAll(".lp-card, .brief")].find(c => c.textContent.includes("Atlas"))?.querySelector(".lp-board-mark img") ? true : false`);
+  check("and it is on the organisation's public page and on the front page", onOrg === true && onFront === true, JSON.stringify({ onOrg, onFront }));
+
+  await goTo("/panel/acme/repos/atlas", "form.repo-settings");
+  await evaluate(`
+    document.querySelector("[data-clear-icon]").click();
+    document.querySelector("form.repo-settings").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  `);
+  await sleep(1200);
+  await goTo("/acme", ".cards");
+  const back = await evaluate(`
+    const card = [...document.querySelectorAll(".cards .card")].find(c => c.textContent.includes("Atlas"));
+    return { img: !!card?.querySelector(".card-mark img"), initials: card?.querySelector(".card-mark")?.textContent?.trim() ?? "" };
+  `);
+  check("taken off, the repository shows its initials again", back.img === false && back.initials.length > 0, JSON.stringify(back));
+
+  // 8c. The same for an organisation, from its settings: beside its name on
+  //     its public page and in the panel's list — and taken off again.
+  await goTo("/panel/acme", "form.org-settings");
+  const orgChosen = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#43a047"; ctx.fillRect(0, 0, 256, 256);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+    const form = document.querySelector("form.org-settings");
+    const input = form.querySelector("[data-icon-file]");
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], "acme.png", { type: "image/png" }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    await wait(() => form.querySelector(".icon-preview img"));
+    const value = form.querySelector('input[name="icon"]').value;
+    return { preview: !!form.querySelector(".icon-preview img"), isImage: value.startsWith("data:image/") };
+  `);
+  if (SHOTS) { await evaluate(`document.querySelector("form.org-settings").scrollIntoView({ block: "center" })`); await sleep(400); }
+  await shoot("org-icon-settings");
+  check("an organisation's icon is chosen in its settings", orgChosen.preview && orgChosen.isImage, JSON.stringify(orgChosen));
+  await evaluate(`document.querySelector("form.org-settings").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))`);
+  await sleep(1200);
+  await goTo("/acme", ".page-head");
+  const orgHead = await evaluate(`
+    const img = document.querySelector(".page-head .head-mark img");
+    const box = img?.getBoundingClientRect();
+    return { img: !!img, w: Math.round(box?.width ?? 0) };
+  `);
+  if (SHOTS) await sleep(900);
+  await shoot("org-icon-public-page");
+  await goTo("/panel/organizations", "[data-org]");
+  if (SHOTS) await sleep(900);
+  await shoot("org-icon-panel-list");
+  const orgRow = await evaluate(`return !!document.querySelector('[data-org="acme"] .repo-si-mark img')`);
+  check(
+    "and it is beside its name on its public page and in the panel's list",
+    orgHead.img === true && orgHead.w > 40 && orgRow === true,
+    JSON.stringify({ orgHead, orgRow }),
+  );
+  await goTo("/panel/acme", "form.org-settings");
+  await evaluate(`
+    const form = document.querySelector("form.org-settings");
+    form.querySelector("[data-clear-icon]").click();
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  `);
+  await sleep(1200);
+  await goTo("/acme", ".page-head");
+  const orgBack = await evaluate(`return { mark: !!document.querySelector(".page-head .head-mark"), title: document.querySelector(".page-head h1")?.textContent?.trim() }`);
+  check("taken off, the organisation's page is its name alone again", orgBack.mark === false && orgBack.title === "Acme", JSON.stringify(orgBack));
 
   // 9. The public list of a board: open first, a page at a time, closed on
   //    request, all of it in the address. The numbers are the server's at
