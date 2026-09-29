@@ -1,6 +1,6 @@
 {
   "name": "lasthelp",
-  "version": "1.0.0-Beta.10",
+  "version": "1.0.0-Beta.11",
   "module": "web/src/main.ts",
   "type": "module",
   "private": true,
