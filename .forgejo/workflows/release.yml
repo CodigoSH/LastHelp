@@ -288,3 +288,28 @@ jobs:
           # retention policy that quietly does not exist.
           [ "$code" = "204" ] || { echo "the prune dispatch answered HTTP $code" >&2; exit 1; }
           echo "prune dispatched"
+
+  # The website reads the latest release from this repository's API when it is
+  # built, and a build set off by the tag push happens minutes before the
+  # release above exists — so it would go on advertising the previous version
+  # until something else rebuilt it. Dispatched only once the release shipped.
+  site-rebuild:
+    name: Rebuild the website
+    needs: release
+    runs-on: ubuntu-latest
+    container: node:24-trixie
+    steps:
+      - name: Dispatch the website rebuild
+        env:
+          CI_TOKEN: ${{ secrets.CI_TOKEN }}
+        run: |
+          [ -n "$CI_TOKEN" ] || { echo "CI_TOKEN is not set" >&2; exit 1; }
+
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H "Authorization: token $CI_TOKEN" \
+            -H 'Content-Type: application/json' \
+            -d '{"ref":"main"}' \
+            "${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/actions/workflows/site-rebuild.yml/dispatches")
+
+          [ "$code" = "204" ] || { echo "the website rebuild dispatch answered HTTP $code" >&2; exit 1; }
+          echo "website rebuild dispatched"

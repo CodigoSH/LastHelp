@@ -1,0 +1,83 @@
+name: Rebuild the website
+
+# The documentation is published by codigosh.com, which builds it from this
+# repository's docs/ folder. Without this, a change to docs/ would sit
+# unpublished until something else happened to rebuild the site.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      # So a change to this job proves itself on the push that makes it.
+      - '.forgejo/workflows/site-rebuild.yml'
+  # release.yml calls this after a release is actually published. The site reads
+  # the latest release from the API at build time, and a push-triggered build
+  # happens minutes before that release exists — so it would advertise the
+  # previous version until some unrelated push rebuilt it.
+  workflow_dispatch:
+
+jobs:
+  rebuild:
+    name: Rebuild the website
+    runs-on: ubuntu-latest
+    # `ubuntu-latest` is a label the runner translates, and by default it lands
+    # on a Node image built on Debian bullseye — 2021, OpenSSL 1.1.1w. Pinned so
+    # what this runs on is a decision in the diff rather than a line in a config
+    # file on the server that nothing versions. See the house rule in
+    # codigosh/releases.md.
+    container: node:24-trixie
+    steps:
+      - name: Ask Coolify to redeploy codigosh-web
+        env:
+          COOLIFY_DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}
+          COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+        run: |
+          # An unconfigured hook is a skip on a docs push — somebody's fork must
+          # not get a red build over a secret they were never given — and a
+          # failure when a release asked for this: a rebuild that did not happen
+          # must not report success, or the site advertises the wrong version
+          # with nobody the wiser.
+          if [ -z "$COOLIFY_DEPLOY_URL" ] || [ -z "$COOLIFY_DEPLOY_TOKEN" ]; then
+            if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "A release asked for a rebuild and the deploy hook is not configured." >&2
+              echo "Set COOLIFY_DEPLOY_URL and COOLIFY_DEPLOY_TOKEN in this repository's secrets." >&2
+              exit 1
+            fi
+            echo "Coolify deploy secrets not set — skipping the website rebuild."
+            exit 0
+          fi
+
+          # The verb depends on which kind of URL is in the secret: Coolify's API
+          # deploy endpoint (/api/v1/deploy?uuid=…) wants GET and a plain deploy
+          # webhook wants POST, and asking with the wrong one answers 405. So it asks one way and,
+          # only on "wrong method", the other. Without the bearer header either
+          # of them answers 401: the endpoint is not anonymous.
+          #
+          # And force=true matters more than it looks: Coolify only redeploys
+          # when the commit touched its configured Watch Paths, and when it did
+          # not it skips the deployment and still answers 2xx — so a release
+          # could report a successful rebuild and leave the site untouched. The
+          # site's content comes from this repository's API at build time, so a
+          # rebuild is worth doing whatever the commit happened to change.
+          URL="$COOLIFY_DEPLOY_URL"
+          case "$URL" in
+            *\?*) URL="$URL&force=true" ;;
+            *)    URL="$URL?force=true" ;;
+          esac
+
+          ask() {
+            curl -s -o /dev/null -w "%{http_code}" --max-time 30 -X "$1" \
+              -H "Authorization: Bearer $COOLIFY_DEPLOY_TOKEN" \
+              "$URL"
+          }
+
+          CODE=$(ask GET)
+          if [ "$CODE" = "405" ]; then
+            echo "GET answered 405, retrying as POST"
+            CODE=$(ask POST)
+          fi
+          echo "Website rebuild HTTP $CODE"
+          case "$CODE" in
+            2*) echo "Website rebuild requested." ;;
+            *)  echo "Website rebuild failed (HTTP $CODE)"; exit 1 ;;
+          esac
