@@ -1,4 +1,4 @@
-# LastHelp
+# LastHelp Documentation
 
 A self-hosted feedback portal that speaks to your forge.
 

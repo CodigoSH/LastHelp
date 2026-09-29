@@ -2,8 +2,8 @@
 
 The structure is two levels, and they are the ones your forge already has:
 
-- An **organisation** is a connection to a forge: its address, the owner, and
-  the credentials. It is not an org chart — a token cannot span two
+- An **organisation** is a connection to a forge: its address, the account
+  that owns the repositories there, and the credentials. It is not an org chart — a token cannot span two
   organisations on any forge, so the boundary is imposed rather than invented.
 - A **repository** is one place people report about. You register only the
   ones you want feedback for.
@@ -18,6 +18,10 @@ in, and should not have to.
 From the panel: **Organisations** in the sidebar, then **Add an organisation** —
 a name, an address, and which forge it connects to, or none. Open it and add a
 repository the same way.
+
+Both can carry an **icon**, chosen in their settings: a repository's is shown on
+the front page and on its organisation's page, and an organisation's beside its
+name on its own page. Without one, a repository shows its initials.
 
 ![The organisations screen](../images/organizations.png)
 

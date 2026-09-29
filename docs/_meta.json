@@ -1,0 +1,13 @@
+{
+  "overview": "LastHelp Documentation",
+  "order": [
+    "getting-started",
+    "forges",
+    "administration"
+  ],
+  "labels": {
+    "getting-started": "Getting started",
+    "forges": "Forges",
+    "administration": "Administration"
+  }
+}

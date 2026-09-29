@@ -23,26 +23,48 @@ model — what people write in your portal reaches your database and nowhere els
    addresses, so limiting per exact address is limiting per attempt.
 5. **Content heuristics**: the same text again (a flood is one paragraph over
    and over), too many links, and a word list you control — a word that means
-   nothing on your repository is somebody else's daily traffic.
+   nothing on your repository is somebody else's daily traffic. The list has no
+   screen yet: it is the `stoplist` setting, comma separated, written straight
+   into the database (see below).
 6. **A circuit breaker.** Past sixty submissions in an hour a repository stops taking
    them for a while. Refusing for an hour beats handing you a queue you will not
    open.
 7. **The moderation queue**, which catches what the rest did not.
 
-## Moderating less
+## Everything waits for a person
 
-A queue that holds everything is right on day one and a daily chore the day your
-project gets popular. That is the real cost of not asking people for accounts,
-and the lever is per repository: hold everything, or hold only the first thing from
-each visitor.
+There is no setting that publishes without review, on purpose. Reporting needs
+no account, so there is no way to know that the second message from somebody
+comes from the same somebody as the first; "trust whoever was approved before"
+would be trusting whoever says they are them. With the numbers a self-hosted
+project actually gets, reviewing everything costs minutes a week.
 
 ## Knowing whether any of it works
 
-Every refusal is counted by layer. Look at those numbers occasionally:
+Every refusal is counted by layer and by repository. Look at those numbers
+occasionally:
 
 - A layer that never refuses anything is a layer to delete.
 - A layer that refuses nearly everything is turning away people who did nothing
   wrong — and those people do not complain, they leave.
+
+The panel does not show them yet. They are kept in the database, one row per
+repository and layer — `refused.<repository id>.<layer>` — and can be read
+while the server runs:
+
+```sh
+sqlite3 /var/lib/lasthelp/lasthelp.db \
+  "SELECT key, value FROM settings WHERE key LIKE 'refused.%' ORDER BY key"
+```
+
+The word list lives in the same table, and takes effect on the next report
+without a restart:
+
+```sh
+sqlite3 /var/lib/lasthelp/lasthelp.db \
+  "INSERT INTO settings (key, value) VALUES ('stoplist', 'casino,crypto')
+   ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+```
 
 ## What this does not stop
 

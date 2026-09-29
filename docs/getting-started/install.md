@@ -49,7 +49,7 @@ how it gets tested against a throwaway tree.
 | | |
 |---|---|
 | `/opt/lasthelp/bin/lasthelp` | the binary, owned by the service account so it can update itself |
-| `/var/lib/lasthelp/` | the database and the key that decrypts forge tokens |
+| `/var/lib/lasthelp/` | the database, and the backups taken before each update |
 | `/etc/lasthelp/lasthelp.env` | the configuration, yours to edit |
 | `/etc/systemd/system/lasthelp.service` | the unit, taken from the release and covered by its signature |
 
@@ -65,12 +65,11 @@ docker run -d --name lasthelp \
   -p 8080:8080 \
   -v lasthelp-data:/data \
   --restart unless-stopped \
-  git.codigosh.com/codigosh/lasthelp:beta
+  git.codigosh.com/codigosh/lasthelp:latest
 ```
 
 The image is published for `linux/amd64` and `linux/arm64` with every release.
-Use `beta` until there is a stable release; `latest` only moves with a stable
-one. It runs as uid 10001: a named volume works as it is, a directory bound from
+`latest` moves with each stable release and `beta` with each prerelease. It runs as uid 10001: a named volume works as it is, a directory bound from
 the host has to belong to that user (`chown 10001:10001 ./data`). To update,
 pull the new image — the binary inside does not replace itself.
 
@@ -147,7 +146,7 @@ a proxy is really there, and only then.
 
 ### About `LASTHELP_OFFLINE`
 
-It stops the forge calls and the notifications. It exists so the claim that this
+It stops the forge calls, the notifications and the update check. It exists so the claim that this
 server only talks to what you configured is something you can check rather than
 take on trust: turn it on, and if anything still reaches the network, the
 documentation is wrong.
