@@ -136,8 +136,16 @@ async function main() {
 
   // 3. The archive: everything, found among many.
   await goTo("/review?mode=all", ".rev-row");
-  const archive = await evaluate(`return document.querySelectorAll('[data-what="report"]').length`);
-  check("the archive holds every report, whatever became of it", archive === 23, `rows=${archive}`);
+  // 53 reports in all: a page of 50, and the rest behind "Show more".
+  const archive = await evaluate(`
+    const rows = () => document.querySelectorAll('[data-what="report"]').length;
+    const first = rows();
+    document.querySelector(".rev-list [data-more]")?.click();
+    for (let i = 0; i < 40 && rows() === first; i++) await new Promise(r => setTimeout(r, 100));
+    return { first, all: rows() };
+  `);
+  check("the archive holds every report, whatever became of it, a page at a time",
+    archive.first === 50 && archive.all === 53, JSON.stringify(archive));
 
   await evaluate(`
     const box = document.querySelector("[data-q]");
@@ -355,6 +363,76 @@ async function main() {
     JSON.stringify(olga.boards) === '["atlas","orbit"]' && olga.bin === true,
     JSON.stringify(olga),
   );
+
+  // 9. The public list of a board: open first, a page at a time, closed on
+  //    request, all of it in the address. The numbers are the server's at
+  //    this point of the walk — earlier steps closed one report and published
+  //    another — and the open side has to run past one page, or the paging
+  //    would not be exercised.
+  await goTo("/acme/atlas", ".items, .empty");
+  const server = await evaluate(`
+    const side = async (s) => (await fetch("/api/orgs/acme/repos/atlas/items?limit=1&state=" + s).then(r => r.json())).total;
+    return { open: await side("open"), closed: await side("closed") };
+  `);
+  const wait = `const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };`;
+  const closedWords = await evaluate(`
+    const words = await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json());
+    return ["status.done", "status.declined", "status.closed", "status.not_reproducible"].map(k => words[k]);
+  `);
+  const openSide = await evaluate(`
+    ${wait}
+    const chip = (s) => Number(document.querySelector('[data-state="' + s + '"] .count-chip')?.textContent ?? -1);
+    const rows = () => document.querySelectorAll(".items > li").length;
+    const before = { on: document.querySelector("[data-state].on")?.dataset.state, open: chip("open"), closed: chip("closed"),
+                     rows: rows(), foot: document.querySelector(".board-shown")?.textContent?.replace(/[\u2068\u2069]/g, "") ?? "" };
+    document.querySelector("[data-more]")?.click();
+    await wait(() => rows() > before.rows);
+    return { ...before, after: rows(), footAfter: !!document.querySelector("[data-board-foot]"),
+             states: [...document.querySelectorAll(".items .status")].map(e => e.textContent.trim()) };
+  `);
+  check(
+    "a board opens on what is open, a page at a time, and says how much of it is shown",
+    server.open > 20 && openSide.on === "open" && openSide.open === server.open && openSide.closed === server.closed &&
+      openSide.rows === 20 && openSide.foot.includes("20") && openSide.foot.includes(String(server.open)) &&
+      openSide.after === server.open && openSide.footAfter === false &&
+      !openSide.states.some((w: string) => closedWords.includes(w)),
+    JSON.stringify({ server, ...openSide, states: openSide.states.length }),
+  );
+
+  const closedSide = await evaluate(`
+    ${wait}
+    document.querySelector('[data-state="closed"]').click();
+    await wait(() => document.querySelector('[data-state="closed"].on'));
+    await wait(() => document.querySelectorAll(".items > li").length === ${server.closed});
+    return { address: location.search, rows: document.querySelectorAll(".items > li").length,
+             states: [...document.querySelectorAll(".items .status")].map(e => e.textContent.trim()) };
+  `);
+  check(
+    "closed is one click away, in the address, and holds only what has an answer",
+    closedSide.address.includes("state=closed") && closedSide.rows === server.closed &&
+      closedSide.states.length === server.closed && closedSide.states.every((w: string) => closedWords.includes(w)),
+    JSON.stringify({ ...closedSide, states: [...new Set(closedSide.states)] }),
+  );
+
+  await page.send("Page.reload");
+  await waitFor(".items, .empty");
+  const reloaded = await evaluate(`return { on: document.querySelector("[data-state].on")?.dataset.state, rows: document.querySelectorAll(".items > li").length }`);
+  check("and a reload lands on the same side", reloaded.on === "closed" && reloaded.rows === server.closed, JSON.stringify(reloaded));
+
+  const nothing = await evaluate(`
+    ${wait}
+    const words = await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json());
+    const box = document.querySelector(".search");
+    box.value = "zzzz-nothing-says-this";
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    await wait(() => new URLSearchParams(location.search).get("q") && document.querySelector(".empty"));
+    return { said: document.querySelector(".empty")?.textContent ?? "", expected: words["review.nothingMatches"] };
+  `);
+  check("a search that finds nothing says so, not that the board is empty", nothing.said.includes(nothing.expected), JSON.stringify(nothing));
+
+  await goTo("/acme/orbit", ".items, .empty");
+  const nextBoard = await evaluate(`return { on: document.querySelector("[data-state].on")?.dataset.state, q: document.querySelector(".search")?.value ?? "", address: location.search }`);
+  check("another board starts afresh, not with the last one's filters", nextBoard.on === "open" && nextBoard.q === "" && nextBoard.address === "", JSON.stringify(nextBoard));
 
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
   check("and the content policy refused nothing", refusedByPolicy.length === 0, refusedByPolicy.slice(0, 3).join(" | "));

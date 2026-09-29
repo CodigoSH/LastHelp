@@ -219,7 +219,22 @@ func seed(path string, now time.Time) error {
 		return err
 	}
 
-	for _, r := range reports {
+	// Older history on Atlas, enough that its open side runs past one page of
+	// the public list: every fourth one answered, the rest still open.
+	all := append([]report(nil), reports...)
+	for i := 0; i < 30; i++ {
+		r := report{"atlas", item.Idea, fmt.Sprintf("Older idea %02d from the first months", i+1),
+			"An idea from before most of the team arrived.", 200 - i, item.Published, item.StatusNew, i % 5, nil}
+		if i%2 == 1 {
+			r.kind, r.title, r.votes = item.Bug, fmt.Sprintf("Older bug %02d from the first months", i+1), 0
+		}
+		if i%4 == 0 {
+			r.status = map[item.Kind]item.Status{item.Idea: item.StatusDone, item.Bug: item.StatusClosed}[r.kind]
+		}
+		all = append(all, r)
+	}
+
+	for _, r := range all {
 		when := now.AddDate(0, 0, -r.daysAgo)
 		fields := []item.Field{}
 		for _, spec := range item.FieldsFor(r.kind) {
