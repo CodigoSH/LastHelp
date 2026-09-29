@@ -280,6 +280,6 @@ await page.send("Emulation.setDefaultBackgroundColorOverride");
 // The picture at the top of the README and the project page is composed by
 // scripts/docs-mockup.ts, from an installation with months of history.
 
-// The socket keeps the process alive otherwise.
 page.close();
-process.exit(0);
+console.log("\nlook at the images. A tick above says a file was written, nothing more.");
+export {};
