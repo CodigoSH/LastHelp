@@ -64,8 +64,8 @@ is waiting when something is, and on every report otherwise.
 The same screen is the archive: every report ever sent, found by its words or
 narrowed by type, moderation, status and repository. Whatever you choose opens
 beside the list as the whole report — edit its words, change its status, open
-or link an issue, reply, and, for the organisation's owners and the
-administrator, delete it or any comment on it. Each repository's page in the
+or link an issue, reply, edit or delete any comment on it, and, for the
+organisation's leads and the administrator, delete the report itself. Each repository's page in the
 panel opens the same screen filtered to that repository.
 
 With four repositories you will see between zero and five things a week, which
