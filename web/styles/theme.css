@@ -6951,7 +6951,10 @@ a.stat:hover .stat-go {
   inset-inline-end: 4px;
   inline-size: 8px;
   block-size: 8px;
-  box-sizing: border-box;
+  /* Content-box, as theirs is: 8px of red inside a 2px ring, 12px in all.
+     This product sets border-box on everything, and that alone had shrunk
+     the dot to 8px with 4px of red — the same recipe, visibly smaller. */
+  box-sizing: content-box;
   background-color: var(--danger-color);
   border-radius: 50%;
   border: 2px solid var(--panel);

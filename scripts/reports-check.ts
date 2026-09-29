@@ -68,6 +68,28 @@ async function main() {
   const door0 = await evaluate(`return !!document.querySelector("body > nav [data-review]")`);
   check("the administrator has the Reports icon in the bar", door0 === true, String(door0));
 
+  // The red dot on the panel's icon when an update waits: Lastboard's, measured
+  // in its own bar — 8px of red in a 2px ring, 12px in all, 4px from the
+  // icon's top and end. Drawn here into the real icon, because whether an
+  // update exists is up to the release server, not to this pass.
+  const dot = await evaluate(`
+    const toggle = document.querySelector("body > nav [data-panel-toggle]");
+    const d = document.createElement("span");
+    d.className = "notification-dot";
+    toggle.append(d);
+    const b = d.getBoundingClientRect(), t = toggle.getBoundingClientRect();
+    const cs = getComputedStyle(d);
+    const out = { size: [Math.round(b.width), Math.round(b.height)], border: cs.borderTopWidth,
+                  top: Math.round(b.top - t.top), end: Math.round(t.right - b.right) };
+    d.remove();
+    return out;
+  `);
+  check(
+    "the update dot on the panel icon is Lastboard's: 12px, a 2px ring, 4px in",
+    JSON.stringify(dot.size) === "[12,12]" && dot.border === "2px" && dot.top === 4 && dot.end === 4,
+    JSON.stringify(dot),
+  );
+
   // 1. The door. Seven things wait — five reports and two messages — and
   //    opening Reports lands on them, with the tab saying the bar's number.
   await goTo("/review", ".rev-list");
