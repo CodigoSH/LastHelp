@@ -177,4 +177,4 @@ the signature is bad.
 
 ## Supported versions
 
-While the project is pre-1.0, only the latest release receives fixes.
+Only the latest stable release receives fixes. A fix ships as a new release, and updating — from the panel, the installer or a new image — is how it reaches you.

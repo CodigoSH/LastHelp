@@ -1,8 +1,7 @@
 services:
   lasthelp:
-    image: git.codigosh.com/codigosh/lasthelp:beta
-      # `beta` until there is a stable release: `latest` is only ever moved by
-      # a stable one, so nobody pulling it lands on a prerelease by accident.
+    image: git.codigosh.com/codigosh/lasthelp:latest
+      # `latest` moves with each stable release; `beta` follows prereleases.
     # Or build it yourself from this repository:
     # build: .
     container_name: lasthelp

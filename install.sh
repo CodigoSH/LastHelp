@@ -90,8 +90,8 @@ UNIT="${LASTHELP_UNIT:-/etc/systemd/system/$NAME.service}"
 
 PORT="${LASTHELP_PORT:-8080}"
 # Answerable without a terminal, because otherwise the beta is uninstallable
-# without one: the question below is skipped in a container or a cron job, the
-# default is `stable`, and before 1.0 there is no stable release to find.
+# without one: the question below is skipped in a container or a cron job, and
+# the default is `stable`.
 CHANNEL="${LASTHELP_CHANNEL:-stable}"
 PROXIED=no
 
