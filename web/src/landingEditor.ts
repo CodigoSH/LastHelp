@@ -11,6 +11,7 @@
  * history, a save queue and a keyboard — and main.ts is the router.
  */
 import { api } from "./api";
+import { askConfirm } from "./confirm";
 import { escapeHTML } from "./escape";
 import { NoWebP, putImage } from "./services/landingImage";
 import { wireWords } from "./services/words";
@@ -1011,7 +1012,7 @@ export class LandingEditor {
    * other, saved at once, and Ctrl+Z takes it back.
    */
   private async restore(): Promise<void> {
-    if (!confirm(this.text.t("landing.confirmRestore"))) return;
+    if (!(await askConfirm(this.text.t("landing.restore"), this.text.t("landing.confirmRestore")))) return;
     try {
       await this.flush();
       const fresh = await api.post<LandingPage>("/api/landing/restore");

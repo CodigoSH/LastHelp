@@ -6268,6 +6268,38 @@ a.stat:hover .stat-go {
   inline-size: min(30rem, calc(100vw - 2rem));
 }
 
+.confirm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block-end: 20px;
+  padding-block-end: 12px;
+  border-block-end: 1px solid var(--border);
+}
+
+.confirm-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.modal.confirm .picker-close { inline-size: 36px; block-size: 36px; flex: none; }
+
+.confirm-message {
+  margin: 0 0 28px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
 /* The menu the plus opens, anchored under it. */
 .add-wrap { position: relative; display: inline-flex; }
 .add-wrap .add-menu { inset-block-start: calc(100% + 6px); inset-inline-end: 0; }
@@ -6875,11 +6907,23 @@ a.stat:hover .stat-go {
   .accent-swatch { transition: none; }
 }
 
-/* The team's report: the report card, then one card per job. The pencil sits
-   at the end of the report's meta line, where the words it edits begin. */
+/* The team's report: the report card, then one card per job. The pencil and
+   the bin sit at the end of the report's meta line, where the report begins. */
 .item-team { max-inline-size: 760px; }
 .item-team .detail { margin: 0; }
-.detail .meta .detail-edit { margin-inline-start: auto; }
+.detail .meta .detail-tools { margin-inline-start: auto; display: inline-flex; gap: 4px; }
+
+/* Who and with which role, side by side: two short choices that belong to
+   one sentence. On a phone they stack again. */
+.member-add-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.member-add-fields > .field { margin: 0; }
+@media (max-width: 34rem) {
+  .member-add-fields { grid-template-columns: minmax(0, 1fr); }
+}
 .detail-words .rewrite { display: grid; gap: 12px; }
 .detail-words .rewrite .settings-actions { gap: 8px; margin-block-start: 4px; }
 .decide-actions { display: flex; flex-wrap: wrap; gap: 8px; }

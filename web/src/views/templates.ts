@@ -2127,17 +2127,16 @@ function settingsItem(spec: {
 
 /**
  * What an account is, in one word, for under its name: the administrator, or
- * else the highest role it holds anywhere. Roles are per organisation, so an
- * owner of one and a collaborator of another reads as an owner — the most it
- * may do somewhere, which is what the word is for.
+ * the team. Roles are per organisation and per repository — one account can
+ * own one organisation and collaborate on a repository of another — so a
+ * single role written under the name would be true in one place and false in
+ * the next. The word the team's replies already carry says what is true
+ * everywhere.
  */
 export function accountRole(me: { admin?: boolean; memberships?: Array<{ role: string }> } | null, text: Text): string {
   if (!me) return "";
   if (me.admin) return text.t("people.administrator");
-  const roles = new Set((me.memberships ?? []).map((m) => m.role));
-  if (roles.has("owner")) return text.t("role.owner");
-  if (roles.has("collaborator")) return text.t("role.collaborator");
-  return "";
+  return (me.memberships ?? []).length > 0 ? text.t("comment.team") : "";
 }
 
 export function profileScreen(
@@ -2562,18 +2561,20 @@ function organizationTeam(
     candidates.length === 0
       ? ""
       : `<form class="member-add">
-          ${choiceField({
-            id: "member-who",
-            name: "username",
-            label: text.t("auth.username"),
-            options: candidates.map((a) => [a.username, a.username] as [string, string]),
-          })}
-          ${choiceField({
-            id: "member-role",
-            name: "role",
-            label: text.t("people.role"),
-            options: teamRoleOptions(data, text),
-          })}
+          <div class="member-add-fields">
+            ${choiceField({
+              id: "member-who",
+              name: "username",
+              label: text.t("auth.username"),
+              options: candidates.map((a) => [a.username, a.username] as [string, string]),
+            })}
+            ${choiceField({
+              id: "member-role",
+              name: "role",
+              label: text.t("people.role"),
+              options: teamRoleOptions(data, text),
+            })}
+          </div>
           <div class="settings-actions">
             <button class="button primary" type="submit">${escapeHTML(text.t("org.addMember"))}</button></div>
         </form>`;
@@ -2918,7 +2919,17 @@ export function itemTeamView(
         )
       : "";
 
-  const pencil = iconButton("edit", text.t("panel.rewrite"), 'class="icon-button detail-edit" data-rewrite');
+  // Editing and, for whoever runs the organisation, deleting: both at the end
+  // of the report's meta line, where the thing they act on begins. Deleting
+  // was a danger card at the foot of the page, a long way from the report.
+  const pencil = `<span class="detail-tools">
+    ${iconButton("edit", text.t("panel.rewrite"), 'data-rewrite')}
+    ${
+      statuses.can_delete
+        ? iconButton("remove", text.t("item.delete"), `class="icon-button danger" data-delete-item="${escapeAttr(item.public_id)}"`)
+        : ""
+    }
+  </span>`;
 
   const status = settingsCard(
     text.t("panel.status"),
@@ -3039,22 +3050,6 @@ export function itemTeamView(
       ${issue}
       ${conversation}
       ${merge}
-      ${
-        statuses.can_delete
-          ? // The danger zone the repository and the organisation pages have:
-            // the same card, the same words, the same red button.
-            settingsCard(
-              text.t("repo.danger"),
-              `<div class="settings-row">
-                <div class="settings-info">
-                  <h4>${escapeHTML(text.t("item.delete"))}</h4>
-                  <p class="settings-danger">${escapeHTML(text.t("item.deleteHelp"))}</p>
-                </div>
-                ${actionButton("remove", text.t("action.delete"), `data-delete-item="${escapeAttr(item.public_id)}"`, "danger")}
-              </div>`,
-            )
-          : ""
-      }
     </div>`;
 }
 

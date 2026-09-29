@@ -48,6 +48,27 @@ export function modal(spec: ModalSpec, text: Text): string {
 }
 
 /**
+ * Asking before something that cannot be taken back: Lastboard's
+ * ConfirmationModal. A title over a rule, the sentence, and one danger button
+ * at the end of the line — the cross is the way out, as in theirs. Drawn once
+ * and filled for each question; the browser's own confirm() it replaces is a
+ * grey box in another product's voice.
+ */
+export function confirmDialog(words: { close: string; confirm: string }): string {
+  return `<dialog class="modal confirm" id="confirm-dialog" aria-labelledby="confirm-title">
+    <div class="confirm-head">
+      <h2 class="confirm-title" id="confirm-title"></h2>
+      <button type="button" class="picker-close" data-confirm="no"
+        aria-label="${escapeAttr(words.close)}">${icons.close(20)}</button>
+    </div>
+    <p class="confirm-message"></p>
+    <div class="confirm-actions">
+      <button type="button" class="button danger" data-confirm="yes">${escapeHTML(words.confirm)}</button>
+    </div>
+  </dialog>`;
+}
+
+/**
  * A button that carries an icon and a label.
  *
  * The label is not optional. An icon alone is a guess for anybody who has not

@@ -1390,22 +1390,21 @@ async function main() {
       triage.opciones === triage.others,
     JSON.stringify(triage));
 
-  // The administrator runs every organisation, so the report offers deleting —
-  // at the foot, in the danger zone the repository and organisation pages
-  // have — and each comment its bin. Only looked at: deleting here would take
-  // away a report the checks below still read.
+  // The administrator runs every organisation, so the report offers deleting:
+  // a bin beside the pencil at the top, and one on each comment. Only looked
+  // at, and the question cancelled: deleting here would take away a report
+  // the checks below still read.
   const borrar = await evaluate(`
-    const b = document.querySelector("[data-delete-item]");
-    const r = b?.getBoundingClientRect();
+    const b = document.querySelector(".detail-tools [data-delete-item]");
     return {
-      boton: !!b && (r?.width ?? 0) > 40 && (r?.height ?? 0) > 20,
-      rojo: b ? getComputedStyle(b).color : "",
+      junto: !!b && !!b.parentElement?.querySelector("[data-rewrite]"),
+      tarjeta: !!document.querySelector(".settings-danger"),
       comentarios: document.querySelectorAll(".comments .comment").length,
       papeleras: document.querySelectorAll("[data-delete-comment]").length,
     };
   `);
-  check("and whoever runs the organisation can delete the report and each comment",
-    borrar.boton === true && borrar.papeleras === borrar.comentarios,
+  check("and whoever runs the organisation can delete the report, from beside the pencil, and each comment",
+    borrar.junto === true && borrar.tarjeta === false && borrar.papeleras === borrar.comentarios,
     JSON.stringify(borrar));
 
   // And rewrite it. A title that says "its broken" is the normal case, and
@@ -1420,6 +1419,26 @@ async function main() {
     const form = document.querySelector(".detail form.rewrite");
     return {
       form: !!form,
+  // Asked in the product's own dialog, not the browser's: the title says what
+  // is about to go, and the cross backs out with nothing deleted.
+  const pregunta = await evaluate(`
+    const antes = document.querySelectorAll(".comments .comment").length;
+    document.querySelector("[data-delete-comment]")?.click();
+    await new Promise(r => setTimeout(r, 300));
+    const d = document.querySelector("#confirm-dialog");
+    const words = await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json());
+    const seen = { open: !!d?.open, title: d?.querySelector(".confirm-title")?.textContent ?? "",
+                   expected: words["item.deleteComment"],
+                   danger: !!d?.querySelector(".button.danger[data-confirm='yes']") };
+    d?.querySelector("[data-confirm='no']")?.click();
+    await new Promise(r => setTimeout(r, 600));
+    return { ...seen, closed: !d?.open, antes, despues: document.querySelectorAll(".comments .comment").length };
+  `);
+  check("deleting asks in the product's dialog, and the cross deletes nothing",
+    pregunta.open && pregunta.title === pregunta.expected && pregunta.danger && pregunta.closed &&
+      pregunta.antes > 0 && pregunta.despues === pregunta.antes,
+    JSON.stringify(pregunta));
+
       prefilled: form?.querySelector("input[name=title]")?.value ?? "",
       heading: document.querySelector("h1.visually-hidden")?.textContent?.trim() ?? "",
     };
@@ -1779,7 +1798,7 @@ async function main() {
   await waitFor(".lpe .lp-editing");
   await evaluate(`document.querySelector('[data-bar="settings"]').click()`);
   await waitFor('.lpe-panel [data-act="restore"]');
-  await evaluate(`window.confirm = () => true; document.querySelector('.lpe-panel [data-act="restore"]').click()`);
+  await evaluate(`document.querySelector('.lpe-panel [data-act="restore"]').click(); await new Promise(r => setTimeout(r, 300)); document.querySelector('#confirm-dialog [data-confirm="yes"]')?.click();`);
   await sleep(1500);
   const restaurado = await evaluate(`
     const d = await (async () => { ${leerPublicada} })();
@@ -2811,7 +2830,7 @@ async function main() {
       tableros: [...document.querySelectorAll('[data-card="boards"] a')].map(a => a.getAttribute("href")),
       offersToAdd: !!document.querySelector("[data-open-modal]"),
       role: document.querySelector(".side-head .side-role")?.textContent?.trim() ?? "",
-      expected: (await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json()))["role.collaborator"],
+      expected: (await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json()))["comment.team"],
     };`);
   // The administrator's summary, over their boards: the same screen, so the
   // two read as one product, and none of the server's own numbers. What waits
@@ -2828,9 +2847,10 @@ async function main() {
     collaborator.groups.length === 2 && collaborator.offersToAdd === false,
     `${collaborator.groups.join(" · ")} — ${collaborator.items.join(", ")}`,
   );
-  // Under the name, what the account is — as the administrator's says.
+  // Under the name, what the account is — as the administrator's says. The
+  // team, not a role: one account can hold different roles in different places.
   check(
-    "a collaborator's panel says so under their name",
+    "a collaborator's panel says team under their name",
     // The walk is in whatever language an earlier step left it in, so the word
     // is compared with that catalogue rather than with the English.
     !!collaborator.role && collaborator.role === collaborator.expected,
@@ -3027,7 +3047,6 @@ async function main() {
   // the team, and the form adds somebody back with either role — and the team
   // is left as it was, because later checks count on Ana as a collaborator.
   const equipoOrg = await evaluate(`
-    window.confirm = () => true;
     const esperar = (ms) => new Promise(r => setTimeout(r, ms));
     const rol = (u) => document.querySelector('.team [data-member="' + u + '"] [data-role]')?.dataset.role ?? "";
     const iconos = !!document.querySelector('[data-edit-member="ana"]') && !!document.querySelector('[data-remove-member="ana"]');
@@ -3051,7 +3070,7 @@ async function main() {
     f.querySelector("#member-role").value = "repo:lastboard";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await esperar(1300);
-    return { iconos, marcadas, ahora, fuera, opciones, vuelta: rol("ana") };
+    return { iconos, marcadas, ahora, fuera, opciones, vuelta: rol("ana"), unaLinea };
   `);
   check(
     "every member but yourself is edited and taken off from the organisation's page, and added back with either role",
@@ -3107,7 +3126,6 @@ async function main() {
 
   // Taking a collaborator off and putting them back, from the page.
   const equipo = await evaluate(`
-    window.confirm = () => true;
     document.querySelector('[data-revoke="ana"]').click();
     await new Promise(r => setTimeout(r, 1100));
     const fuera = !document.querySelector('[data-member="ana"]');
@@ -3118,18 +3136,24 @@ async function main() {
     await new Promise(r => setTimeout(r, 1100));
     return { fuera, ofrecida,
              vuelta: document.querySelector('[data-member="ana"] [data-role]')?.dataset.role ?? "" };
+    await new Promise(r => setTimeout(r, 300)); document.querySelector('#confirm-dialog [data-confirm="yes"]')?.click();
   `);
   check(
     "a collaborator is taken off and added back from the repository's page",
     equipo.fuera === true && equipo.ofrecida === true && equipo.vuelta === "collaborator",
     JSON.stringify(equipo),
   );
+    // Who and which role, on one line: two short choices of one sentence.
+    const quien = f.querySelector("#member-who").getBoundingClientRect();
+    const cual = f.querySelector("#member-role").getBoundingClientRect();
+    const unaLinea = Math.abs(quien.top - cual.top) < 2 && (cual.left > quien.right || quien.left > cual.right);
 
   // The channel: chosen here, said back as chosen, and never read back.
   const canal = await evaluate(`
     const f = document.querySelector("form.channel");
     const kind = f.querySelector("#chan-kind");
     kind.value = "ntfy";
+  check("adding to the team asks who and which role on one line", equipoOrg.unaLinea === true, String(equipoOrg.unaLinea));
     kind.dispatchEvent(new Event("change"));
     f.querySelector("#chan-url").value = "https://ntfy.example/drive-topic";
     f.querySelector("#chan-token").value = "tk_drive";
@@ -3190,6 +3214,7 @@ async function main() {
       publicNav: getComputedStyle(document.querySelector("body > nav")).display,
       report: !!document.querySelector("article.detail"),
       crumb: [...document.querySelectorAll(".crumb a")].map(a => a.getAttribute("href")),
+    await new Promise(r => setTimeout(r, 300)); document.querySelector('#confirm-dialog [data-confirm="yes"]')?.click();
       comentar: !!document.querySelector("form.comment-form"),
       equipo: !!document.querySelector(".item-team, [data-rewrite], form.team-reply"),
     };

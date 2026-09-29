@@ -7,6 +7,7 @@
  * scrolled jumps back to the top. This house has measured that three times.
  */
 import { api, ApiError } from "./api";
+import { askConfirm } from "./confirm";
 import type {
   ItemDetail,
   ItemSummary,
@@ -992,7 +993,7 @@ async function showPeople(): Promise<void> {
 
   root?.querySelectorAll<HTMLButtonElement>("[data-delete-person]").forEach((button) =>
     button.addEventListener("click", async () => {
-      if (!confirm(i18n.t("people.confirmDelete", { name: button.dataset.name ?? "" }))) return;
+      if (!(await askConfirm(i18n.t("people.delete"), i18n.t("people.confirmDelete", { name: button.dataset.name ?? "" })))) return;
       try {
         await api.del(`/api/people/${button.dataset.deletePerson}`);
         await render();
@@ -1017,7 +1018,7 @@ async function showBackups(): Promise<void> {
     // Asked in words rather than with a second button: this replaces every
     // report anybody has written since the backup was taken, and there is no
     // undo that is not another restore.
-    if (!confirm(i18n.t("backups.confirmRestore", { file: chosen.name }))) {
+    if (!(await askConfirm(i18n.t("backups.restore"), i18n.t("backups.confirmRestore", { file: chosen.name })))) {
       file.value = "";
       return;
     }
@@ -2476,7 +2477,7 @@ async function showOrganizationsPanel(): Promise<void> {
   root?.querySelectorAll<HTMLButtonElement>("[data-delete-org]").forEach((button) =>
     button.addEventListener("click", async () => {
       const slug = button.dataset.deleteOrg ?? "";
-      if (!confirm(i18n.t("organizations.confirmDelete", { name: button.dataset.name ?? slug }))) return;
+      if (!(await askConfirm(i18n.t("org.delete"), i18n.t("organizations.confirmDelete", { name: button.dataset.name ?? slug })))) return;
       await api.del(`/api/orgs/${encodeURIComponent(slug)}`).catch(showFormError);
       await render();
     }),
@@ -2634,7 +2635,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   root?.querySelectorAll<HTMLButtonElement>("[data-delete-repo]").forEach((button) =>
     button.addEventListener("click", async () => {
       const slug = button.dataset.deleteRepo ?? "";
-      if (!confirm(i18n.t("organizations.confirmDeleteRepo", { name: button.dataset.name ?? slug }))) return;
+      if (!(await askConfirm(i18n.t("repo.delete"), i18n.t("organizations.confirmDeleteRepo", { name: button.dataset.name ?? slug })))) return;
       try {
         await api.del(`${base}/repos/${encodeURIComponent(slug)}`);
         await render();
@@ -2686,7 +2687,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   root?.querySelectorAll<HTMLButtonElement>("[data-remove-member]").forEach((button) =>
     button.addEventListener("click", async () => {
       const username = button.dataset.removeMember ?? "";
-      if (!confirm(i18n.t("org.confirmRemove", { name: username, organization: data.organization.name }))) return;
+      if (!(await askConfirm(i18n.t("org.removeMember"), i18n.t("org.confirmRemove", { name: username, organization: data.organization.name })))) return;
       try {
         for (const role of rolesOf(button)) await setRole(username, role, false);
         await render();
@@ -2703,7 +2704,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   });
 
   root?.querySelector<HTMLButtonElement>("[data-delete-org]")?.addEventListener("click", async () => {
-    if (!confirm(i18n.t("organizations.confirmDelete", { name: data.organization.name }))) return;
+    if (!(await askConfirm(i18n.t("org.delete"), i18n.t("organizations.confirmDelete", { name: data.organization.name })))) return;
     try {
       await api.del(base);
       go("/panel/organizations");
@@ -2756,7 +2757,7 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
   });
   root?.querySelectorAll<HTMLButtonElement>("[data-revoke]").forEach((button) =>
     button.addEventListener("click", async () => {
-      if (!confirm(i18n.t("repo.confirmRevoke", { name: button.dataset.name ?? "" }))) return;
+      if (!(await askConfirm(i18n.t("repo.revoke"), i18n.t("repo.confirmRevoke", { name: button.dataset.name ?? "" })))) return;
       try {
         await api.post(teamURL, { username: button.dataset.revoke ?? "", repository: repoSlug, role: "" });
         await render();
@@ -2767,7 +2768,7 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
   );
 
   root?.querySelector<HTMLButtonElement>("[data-delete-repo]")?.addEventListener("click", async () => {
-    if (!confirm(i18n.t("organizations.confirmDeleteRepo", { name: repo.name }))) return;
+    if (!(await askConfirm(i18n.t("repo.delete"), i18n.t("organizations.confirmDeleteRepo", { name: repo.name })))) return;
     try {
       await api.del(base);
       go(`/panel/${encodeURIComponent(orgSlug)}`);

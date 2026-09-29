@@ -131,9 +131,10 @@ describe("the word under an account's name", () => {
   test("is the administrator first, whatever else the account holds", () => {
     expect(accountRole({ admin: true, memberships: [owner] }, text)).toBe("[people.administrator]");
   });
-  test("is the highest role held anywhere", () => {
-    expect(accountRole({ admin: false, memberships: [collaborator, owner] }, text)).toBe("[role.owner]");
-    expect(accountRole({ admin: false, memberships: [collaborator] }, text)).toBe("[role.collaborator]");
+  test("is the team for an owner or a collaborator, whichever they are where", () => {
+    expect(accountRole({ admin: false, memberships: [collaborator, owner] }, text)).toBe("[comment.team]");
+    expect(accountRole({ admin: false, memberships: [owner] }, text)).toBe("[comment.team]");
+    expect(accountRole({ admin: false, memberships: [collaborator] }, text)).toBe("[comment.team]");
   });
   test("is nothing for an account that holds nothing", () => {
     expect(accountRole({ admin: false, memberships: [] }, text)).toBe("");
