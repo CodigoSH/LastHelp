@@ -35,6 +35,7 @@ import { icons } from "./views/icons";
 
 const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
+  markup: (key, markup) => i18n.markup(key, markup),
   date: (value) => i18n.date(value),
   number: (value) => i18n.number(value),
   bytes: (value) => i18n.bytes(value),

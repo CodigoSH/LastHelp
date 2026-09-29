@@ -7,7 +7,9 @@ import {
   formatDuration,
   resolveLanguage,
   translate,
+  translateMarkup,
 } from "./i18n.helpers";
+import { escapeHTML } from "../escape";
 
 declare const __BUILD_STAMP__: string;
 
@@ -84,6 +86,11 @@ class I18n {
 
   t(key: string, params?: Record<string, string | number>): string {
     return translate(key, this.tables.get(this.language), this.tables.get("en"), params);
+  }
+
+  /** A sentence with markup in its placeholders; the sentence itself escaped. */
+  markup(key: string, markup: Record<string, string>): string {
+    return translateMarkup(key, this.tables.get(this.language), this.tables.get("en"), markup, escapeHTML);
   }
 
   date(value: Date | number): string {

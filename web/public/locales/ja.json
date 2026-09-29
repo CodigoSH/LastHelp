@@ -243,7 +243,7 @@
   "landing.logoMedium": "中",
   "landing.logoSize": "ロゴのサイズ",
   "landing.logoSmall": "小",
-  "landing.madeWith": "LastHelp で作成",
+  "landing.madeWith": "{product} で作成",
   "landing.moduleActivity": "最新の報告",
   "landing.moduleDone": "最近解決",
   "landing.moduleLinks": "リンク",

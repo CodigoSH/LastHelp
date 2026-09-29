@@ -243,7 +243,7 @@
   "landing.logoMedium": "मध्यम",
   "landing.logoSize": "लोगो का आकार",
   "landing.logoSmall": "छोटा",
-  "landing.madeWith": "LastHelp से बना",
+  "landing.madeWith": "{product} से बना",
   "landing.moduleActivity": "नवीनतम रिपोर्ट",
   "landing.moduleDone": "हाल में हल",
   "landing.moduleLinks": "लिंक",

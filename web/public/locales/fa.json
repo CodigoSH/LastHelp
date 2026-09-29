@@ -243,7 +243,7 @@
   "landing.logoMedium": "متوسط",
   "landing.logoSize": "اندازهٔ لوگو",
   "landing.logoSmall": "کوچک",
-  "landing.madeWith": "ساخته‌شده با LastHelp",
+  "landing.madeWith": "ساخته‌شده با {product}",
   "landing.moduleActivity": "آخرین گزارش‌ها",
   "landing.moduleDone": "اخیراً حل‌شده",
   "landing.moduleLinks": "پیوندها",

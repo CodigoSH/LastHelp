@@ -33,6 +33,36 @@ export function translate(
 }
 
 /**
+ * The same lookup and the same single pass, for a sentence that carries a
+ * piece of markup — a product name that is a link, in whatever place each
+ * language puts it.
+ *
+ * The sentence is text and is escaped; what goes into a placeholder is markup
+ * the caller has already built and escaped, and it is isolated like any other
+ * value. Not a second interpolator: the one pass above, told that its values
+ * are markup, so the rule that a value keeps its own direction holds here too.
+ */
+export function translateMarkup(
+  key: string,
+  current: Record<string, string> | undefined,
+  fallback: Record<string, string> | undefined,
+  markup: Record<string, string>,
+  escape: (text: string) => string,
+): string {
+  const text = current?.[key] ?? fallback?.[key];
+  if (!text) return escape(key);
+  let out = "";
+  let at = 0;
+  for (const match of text.matchAll(/\{([a-zA-Z0-9_]+)\}/g)) {
+    const name = match[1] ?? "";
+    out += escape(text.slice(at, match.index));
+    out += name in markup ? isolate(markup[name] ?? "") : escape(match[0]);
+    at = (match.index ?? 0) + match[0].length;
+  }
+  return out + escape(text.slice(at));
+}
+
+/**
  * Wrap an interpolated value in FIRST STRONG ISOLATE … POP DIRECTIONAL ISOLATE.
  *
  * A value dropped into a translated sentence carries its own direction: a

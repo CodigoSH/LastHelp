@@ -25,6 +25,8 @@ import { areaField, choiceField, exampleFor, field, wizard } from "./wizard";
 /** Everything a template needs to say something. */
 export interface Text {
   t(key: string, params?: Record<string, string | number>): string;
+  /** A sentence, escaped, with ready-made markup in its placeholders. */
+  markup(key: string, markup: Record<string, string>): string;
   date(value: number): string;
   number(value: number): string;
   /** A size, at a scale a person reads, with the unit named in their language. */

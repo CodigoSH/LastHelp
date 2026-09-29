@@ -10,6 +10,7 @@ import {
   machineNumber,
   resolveLanguage,
   translate,
+  translateMarkup,
 } from "./i18n.helpers";
 
 const FSI = "⁨";
@@ -123,5 +124,30 @@ describe("formatting", () => {
     // would render blank. Same for CSS lengths.
     expect(machineNumber(42.5)).toBe("42.5");
     expect(machineNumber(42.5)).not.toContain(",");
+  });
+});
+
+describe("a sentence with a link in it", () => {
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const link = `<a href="/x">LastHelp</a>`;
+  test("the link goes where each language puts it, isolated like any value", () => {
+    expect(translateMarkup("made", { made: "Made with {product}" }, {}, { product: link }, esc)).toBe(
+      `Made with ${isolate(link)}`,
+    );
+    expect(translateMarkup("made", { made: "{product} で作成" }, {}, { product: link }, esc)).toBe(
+      `${isolate(link)} で作成`,
+    );
+  });
+  test("the sentence around it is text, and is escaped", () => {
+    expect(translateMarkup("made", { made: "<b>{product}</b>" }, {}, { product: link }, esc)).toBe(
+      `&lt;b&gt;${isolate(link)}&lt;/b&gt;`,
+    );
+  });
+  test("a placeholder it was not given stays as written, escaped", () => {
+    expect(translateMarkup("made", { made: "{other} <" }, {}, { product: link }, esc)).toBe("{other} &lt;");
+  });
+  test("a missing key falls back to English, then to the key", () => {
+    expect(translateMarkup("made", {}, { made: "With {product}" }, { product: link }, esc)).toBe(`With ${isolate(link)}`);
+    expect(translateMarkup("<nope>", {}, {}, { product: link }, esc)).toBe("&lt;nope&gt;");
   });
 });

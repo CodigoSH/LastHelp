@@ -10,6 +10,7 @@ import type { ItemDetail } from "../api";
 const text: Text = {
   t: (key, params) =>
     params ? `[${key} ${JSON.stringify(params)}]` : `[${key}]`,
+  markup: (key, markup) => `[${key} ${JSON.stringify(markup)}]`,
   date: () => "a date",
   number: (value) => String(value),
   bytes: (value) => `${value} bytes`,

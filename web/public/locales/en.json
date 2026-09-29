@@ -239,7 +239,7 @@
   "landing.linkPickBoard": "Select a board",
   "landing.linkTo": "Destination",
   "landing.linkURL": "URL",
-  "landing.madeWith": "Made with LastHelp",
+  "landing.madeWith": "Made with {product}",
   "landing.moduleActivity": "Latest reports",
   "landing.moduleDone": "Recently resolved",
   "landing.moduleLinks": "Links",

@@ -243,7 +243,7 @@
   "landing.logoMedium": "Mittel",
   "landing.logoSize": "Logogröße",
   "landing.logoSmall": "Klein",
-  "landing.madeWith": "Erstellt mit LastHelp",
+  "landing.madeWith": "Erstellt mit {product}",
   "landing.moduleActivity": "Neueste Meldungen",
   "landing.moduleDone": "Kürzlich erledigt",
   "landing.moduleLinks": "Links",

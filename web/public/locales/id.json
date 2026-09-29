@@ -243,7 +243,7 @@
   "landing.logoMedium": "Sedang",
   "landing.logoSize": "Ukuran logo",
   "landing.logoSmall": "Kecil",
-  "landing.madeWith": "Dibuat dengan LastHelp",
+  "landing.madeWith": "Dibuat dengan {product}",
   "landing.moduleActivity": "Laporan terbaru",
   "landing.moduleDone": "Baru diselesaikan",
   "landing.moduleLinks": "Tautan",

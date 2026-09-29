@@ -243,7 +243,7 @@
   "landing.logoMedium": "Μεσαίο",
   "landing.logoSize": "Μέγεθος λογότυπου",
   "landing.logoSmall": "Μικρό",
-  "landing.madeWith": "Φτιαγμένο με LastHelp",
+  "landing.madeWith": "Φτιαγμένο με {product}",
   "landing.moduleActivity": "Τελευταίες αναφορές",
   "landing.moduleDone": "Πρόσφατα επιλυμένες",
   "landing.moduleLinks": "Σύνδεσμοι",

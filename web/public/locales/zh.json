@@ -243,7 +243,7 @@
   "landing.logoMedium": "中",
   "landing.logoSize": "徽标大小",
   "landing.logoSmall": "小",
-  "landing.madeWith": "由 LastHelp 构建",
+  "landing.madeWith": "由 {product} 构建",
   "landing.moduleActivity": "最新反馈",
   "landing.moduleDone": "最近解决",
   "landing.moduleLinks": "链接",

@@ -243,7 +243,7 @@
   "landing.logoMedium": "متوسط",
   "landing.logoSize": "حجم الشعار",
   "landing.logoSmall": "صغير",
-  "landing.madeWith": "صُنع باستخدام LastHelp",
+  "landing.madeWith": "صُنع باستخدام {product}",
   "landing.moduleActivity": "أحدث البلاغات",
   "landing.moduleDone": "حُلّت مؤخرًا",
   "landing.moduleLinks": "روابط",

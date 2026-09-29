@@ -243,7 +243,7 @@
   "landing.logoMedium": "Orta",
   "landing.logoSize": "Logo boyutu",
   "landing.logoSmall": "Küçük",
-  "landing.madeWith": "LastHelp ile yapıldı",
+  "landing.madeWith": "{product} ile yapıldı",
   "landing.moduleActivity": "Son bildirimler",
   "landing.moduleDone": "Son çözülenler",
   "landing.moduleLinks": "Bağlantılar",

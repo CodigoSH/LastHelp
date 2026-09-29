@@ -1145,8 +1145,20 @@ async function main() {
     sidebar.pieBajo <= sidebar.ventana && sidebar.lateralBajo <= sidebar.ventana,
     JSON.stringify({ pie: sidebar.pieBajo, lateral: sidebar.lateralBajo, ventana: sidebar.ventana }),
   );
+      // The credit names the product and leads to its page on the house's site.
+      credit: (() => {
+        const a = document.querySelector(".lp-footer .lp-made a");
+        return a ? { href: a.getAttribute("href"), text: a.textContent, blank: a.target === "_blank",
+                     sentence: a.parentElement?.textContent?.replace(/[\u2068\u2069]/g, "").trim() } : null;
+      })(),
   // Pointed at, a menu row lights in the accent, as Lastboard's does — with a
   // real pointer through the protocol, because a synthetic mouseover does not
+  check(
+    "the footer's credit is a link to the product's page",
+    front.credit?.href === "https://codigosh.com/projects/lasthelp/" && front.credit?.text === "LastHelp" &&
+      front.credit?.blank === true && front.credit?.sentence === "Made with LastHelp",
+    JSON.stringify(front.credit),
+  );
   // set :hover. It was a neutral grey here.
   const fila = await evaluate(`
     const it = [...document.querySelectorAll(".side-item")].find(a => !a.hasAttribute("aria-current"));

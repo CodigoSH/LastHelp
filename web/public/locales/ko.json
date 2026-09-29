@@ -243,7 +243,7 @@
   "landing.logoMedium": "보통",
   "landing.logoSize": "로고 크기",
   "landing.logoSmall": "작게",
-  "landing.madeWith": "LastHelp로 제작",
+  "landing.madeWith": "{product}로 제작",
   "landing.moduleActivity": "최근 제보",
   "landing.moduleDone": "최근 해결",
   "landing.moduleLinks": "링크",

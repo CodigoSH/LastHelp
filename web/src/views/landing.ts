@@ -663,6 +663,12 @@ function picture(m: LandingModule, ctx: LandingContext, text: Text): string {
  * always is, with its line written in place, because it is where the operator
  * clicks to get it back.
  */
+/**
+ * Where "Made with LastHelp" leads: the product's page on the house's site,
+ * where somebody who liked this page can find what it runs on.
+ */
+export const PRODUCT_PAGE = "https://codigosh.com/projects/lasthelp/";
+
 function footer(s: LandingSettings, ctx: LandingContext, text: Text): string {
   const links = s.footer ?? [];
   const words = (s.footer_text ?? "").trim();
@@ -690,7 +696,13 @@ function footer(s: LandingSettings, ctx: LandingContext, text: Text): string {
       ${brand ? `<span class="lp-footer-name">${brandMark(ctx.instance.logo, 24)}<span>${escapeHTML(ctx.instance.name || text.t("app.name"))}</span></span>` : ""}
       ${line}
       ${links.length ? `<nav class="lp-footer-links">${links.map(linkTag).join("")}</nav>` : ""}
-      ${credit ? `<span class="lp-made">${escapeHTML(text.t("landing.madeWith"))}</span>` : ""}
+      ${
+        credit
+          ? `<span class="lp-made">${text.markup("landing.madeWith", {
+              product: `<a href="${escapeAttr(PRODUCT_PAGE)}" target="_blank" rel="noopener">LastHelp</a>`,
+            })}</span>`
+          : ""
+      }
     </div>
   </footer>`;
 }
