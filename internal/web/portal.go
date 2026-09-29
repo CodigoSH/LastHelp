@@ -102,6 +102,19 @@ func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
 		Limit:      intParam(q.Get("limit"), 50),
 		Offset:     intParam(q.Get("offset"), 0),
 	}
+	// Open or closed, the way every forge splits its issues: what still waits
+	// for an answer, and what has one. Anything else is refused rather than
+	// read as "both", which would look like a filter that works.
+	state := q.Get("state")
+	sides := map[string][]item.Status{"open": item.OpenStatuses(), "closed": item.ClosedStatuses()}
+	if state != "" {
+		statuses, ok := sides[state]
+		if !ok {
+			writeError(w, http.StatusBadRequest, "error.bad_request")
+			return
+		}
+		filter.Statuses = statuses
+	}
 	// Moderation is deliberately not taken from the query: the public listing
 	// is published items, and the queue is a different route behind a session.
 	list, err := s.items().List(filter)
@@ -111,12 +124,34 @@ func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// What the page says about the list: how many there are in all, so it can
+	// say it is showing some of them rather than stopping at fifty in silence,
+	// and how many are open and closed under the same kind and search, for the
+	// two tabs that choose between them.
+	all := filter
+	all.Limit, all.Offset = 0, 0
+	total, err := s.items().Tally(all)
+	counts := map[string]int{}
+	for side, statuses := range sides {
+		if err != nil {
+			break
+		}
+		one := all
+		one.Status, one.Statuses = "", statuses
+		counts[side], err = s.items().Tally(one)
+	}
+	if err != nil {
+		slog.Error("counting items", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
 	voter := s.voterID(w, r)
 	out := make([]map[string]any, 0, len(list))
 	for _, it := range list {
 		out = append(out, s.describeItem(it, voter))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+	writeJSON(w, http.StatusOK, map[string]any{"items": out, "total": total, "counts": counts})
 }
 
 // handleRoadmap is the board that nobody maintains by hand.

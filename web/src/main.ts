@@ -1253,43 +1253,96 @@ async function showRepositories(orgSlug: string): Promise<void> {
   show(views.repositoryList(body.organization, body.repositories ?? [], text));
 }
 
-const filters = { kind: "", sort: "new", query: "" };
+/** Reports per page of a public board: enough to read, few enough to load at once. */
+const BOARD_PAGE = 20;
 
 async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
   const base = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}`;
   const repo = await api.get<RepositorySummary>(base);
 
-  const load = async (): Promise<ItemSummary[]> => {
-    const query = new URLSearchParams();
+  // Everything the list is narrowed by lives in the address: it survives a
+  // reload and the back button, it can be sent to somebody, and it belongs to
+  // this board — a filter kept in a variable followed the visitor to the next
+  // board they opened. Open is the default, and is left out of the address.
+  const read = (): views.BoardFilters => {
+    const q = new URLSearchParams(location.search);
+    return {
+      state: q.get("state") === "closed" ? "closed" : "open",
+      kind: q.get("kind") === "bug" || q.get("kind") === "idea" ? (q.get("kind") ?? "") : "",
+      sort: q.get("sort") === "votes" ? "votes" : "new",
+      query: q.get("q") ?? "",
+    };
+  };
+  const write = (f: views.BoardFilters) => {
+    const q = new URLSearchParams();
+    if (f.state === "closed") q.set("state", "closed");
+    if (f.kind) q.set("kind", f.kind);
+    if (f.sort === "votes") q.set("sort", "votes");
+    if (f.query.trim()) q.set("q", f.query);
+    history.replaceState({}, "", location.pathname + (q.toString() ? `?${q.toString()}` : ""));
+  };
+
+  let filters = read();
+  let shown: ItemSummary[] = [];
+  let totals: views.BoardTotals = { total: 0, open: 0, closed: 0 };
+
+  const load = async (offset: number) => {
+    const query = new URLSearchParams({ state: filters.state, limit: String(BOARD_PAGE), offset: String(offset) });
     if (filters.kind) query.set("kind", filters.kind);
     if (filters.sort === "votes") query.set("sort", "votes");
     if (filters.query) query.set("q", filters.query);
-    const body = await api.get<{ items: ItemSummary[] }>(`${base}/items?${query}`);
+    const body = await api.get<{ items: ItemSummary[]; total?: number; counts?: { open?: number; closed?: number } }>(
+      `${base}/items?${query}`,
+    );
+    totals = { total: body.total ?? 0, open: body.counts?.open ?? 0, closed: body.counts?.closed ?? 0 };
     return body.items ?? [];
   };
 
   const draw = async () => {
-    show(views.board(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, await load(), filters, text));
+    shown = await load(0);
+    show(views.board(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, shown, filters, totals, text));
     wire();
   };
 
+  const change = (next: Partial<views.BoardFilters>) => {
+    filters = { ...filters, ...next };
+    write(filters);
+    return draw();
+  };
+
+  // The next page, added under the rows already read: nothing is redrawn, so
+  // the place somebody was reading and the scroll stay where they were.
+  const more = async () => {
+    const page = await load(shown.length).catch((err) => {
+      report(err);
+      return null;
+    });
+    if (!page) return;
+    shown = [...shown, ...page];
+    root?.querySelector("[data-items]")?.insertAdjacentHTML("beforeend", views.boardRows(page, text));
+    const foot = root?.querySelector("[data-board-foot]");
+    if (foot) foot.outerHTML = views.boardFoot(shown.length, totals.total, text);
+    root?.querySelector<HTMLButtonElement>("[data-more]")?.addEventListener("click", () => void more());
+  };
+
   const wire = () => {
-    root?.querySelectorAll<HTMLButtonElement>(".tab").forEach((b) =>
-      b.addEventListener("click", () => {
-        filters.kind = b.dataset.kind ?? "";
-        void draw();
-      }),
+    root?.querySelectorAll<HTMLButtonElement>("[data-state]").forEach((b) =>
+      b.addEventListener("click", () => void change({ state: b.dataset.state === "closed" ? "closed" : "open" })),
+    );
+    root?.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((b) =>
+      b.addEventListener("click", () => void change({ kind: b.dataset.kind ?? "" })),
     );
     root?.querySelectorAll<HTMLButtonElement>(".sort").forEach((b) =>
-      b.addEventListener("click", () => {
-        filters.sort = b.dataset.sort ?? "new";
-        void draw();
-      }),
+      b.addEventListener("click", () => void change({ sort: b.dataset.sort ?? "new" })),
     );
+    root?.querySelector<HTMLButtonElement>("[data-more]")?.addEventListener("click", () => void more());
     const search = root?.querySelector<HTMLInputElement>(".search");
     search?.addEventListener("input", debounce(() => {
-      filters.query = search.value;
-      void draw().then(() => root?.querySelector<HTMLInputElement>(".search")?.focus());
+      void change({ query: search.value }).then(() => {
+        const box = root?.querySelector<HTMLInputElement>(".search");
+        box?.focus();
+        box?.setSelectionRange(box.value.length, box.value.length);
+      });
     }, 250));
   };
 

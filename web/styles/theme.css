@@ -808,6 +808,17 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 .items { display: grid; gap: 0.5rem; }
 
+/* Under the list: how much of it is shown, and the way to the rest. */
+.board-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-block-start: 0.75rem;
+}
+.board-shown { color: var(--text-dim); font-size: 0.85rem; }
+
 .items > li { animation: fade 0.35s var(--ease) both; }
 .items > li:nth-child(2) { animation-delay: 0.04s; }
 .items > li:nth-child(3) { animation-delay: 0.08s; }

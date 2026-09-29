@@ -86,6 +86,37 @@ func StatusesFor(k Kind) []Status {
 	return nil
 }
 
+// Closes says whether a status is an answer: fixed, shipped, not planned, not
+// reproducible. An item there is closed — the public list files it apart from
+// what is still open, and it carries the time it was closed. Everything else
+// is open. The one place that decides it.
+func (s Status) Closes() bool {
+	switch s {
+	case StatusDone, StatusDeclined, StatusClosed, StatusNotReproducible:
+		return true
+	}
+	return false
+}
+
+// ClosedStatuses and OpenStatuses split both vocabularies by Closes, for a
+// filter that asks for one side without naming every status on it.
+func ClosedStatuses() []Status { return statusesWhere(true) }
+func OpenStatuses() []Status   { return statusesWhere(false) }
+
+func statusesWhere(closed bool) []Status {
+	var out []Status
+	seen := map[Status]bool{}
+	for _, k := range []Kind{Bug, Idea} {
+		for _, st := range StatusesFor(k) {
+			if st.Closes() == closed && !seen[st] {
+				seen[st] = true
+				out = append(out, st)
+			}
+		}
+	}
+	return out
+}
+
 func validStatus(k Kind, s Status) bool {
 	for _, candidate := range StatusesFor(k) {
 		if candidate == s {

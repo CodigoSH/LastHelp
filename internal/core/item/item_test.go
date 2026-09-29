@@ -471,3 +471,76 @@ func TestCountsGroupWhatTheListingWouldShow(t *testing.T) {
 		t.Errorf("counting by an arbitrary column was refused with %v", err)
 	}
 }
+
+// TestClosedSplitsBothVocabulariesWithoutGapOrOverlap.
+//
+// "Closed" is one decision, used by the status that stamps closed_at and by
+// the public list's open and closed tabs. Every status of both kinds is on
+// exactly one side, and the closed side is what has an answer.
+func TestClosedSplitsBothVocabulariesWithoutGapOrOverlap(t *testing.T) {
+	side := map[Status]string{}
+	for _, st := range OpenStatuses() {
+		side[st] += "open"
+	}
+	for _, st := range ClosedStatuses() {
+		side[st] += "closed"
+	}
+	for _, k := range []Kind{Bug, Idea} {
+		for _, st := range StatusesFor(k) {
+			if side[st] != "open" && side[st] != "closed" {
+				t.Errorf("%s is on %q, want exactly one side", st, side[st])
+			}
+		}
+	}
+	for _, st := range []Status{StatusDone, StatusDeclined, StatusClosed, StatusNotReproducible} {
+		if !st.Closes() {
+			t.Errorf("%s is an answer and does not close", st)
+		}
+	}
+	for _, st := range []Status{StatusNew, StatusPlanned, StatusInProgress, StatusConfirmed, StatusInForge} {
+		if st.Closes() {
+			t.Errorf("%s still waits and closes", st)
+		}
+	}
+}
+
+// TestTallyCountsWhatListWouldShowWithoutItsLimit.
+func TestTallyCountsWhatListWouldShowWithoutItsLimit(t *testing.T) {
+	s := store(t)
+	for i := 0; i < 7; i++ {
+		it, _ := report(t, s, Idea, "an idea worth having "+strings.Repeat("x", i), "")
+		if err := s.Approve(it.ID, epoch); err != nil {
+			t.Fatal(err)
+		}
+		if i < 3 {
+			if err := s.SetStatus(it.ID, StatusDone, epoch); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	for name, f := range map[string]Filter{
+		"all":    {RepoID: 1},
+		"closed": {RepoID: 1, Statuses: ClosedStatuses()},
+		"open":   {RepoID: 1, Statuses: OpenStatuses()},
+	} {
+		n, err := s.Tally(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Limit = 200
+		list, err := s.List(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n != len(list) {
+			t.Errorf("%s: tally says %d, the list has %d", name, n, len(list))
+		}
+		f.Limit = 2
+		if short, _ := s.List(f); len(short) > 2 {
+			t.Errorf("%s: the limit did not hold", name)
+		}
+	}
+	if n, _ := s.Tally(Filter{RepoID: 1, Statuses: ClosedStatuses()}); n != 3 {
+		t.Errorf("closed: %d, want 3", n)
+	}
+}

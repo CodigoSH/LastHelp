@@ -169,15 +169,42 @@ export function forgeOptions(text: Text): [string, string][] {
 }
 
 
+/** What a public board is showing, all of it read from the address. */
+export interface BoardFilters {
+  /** Open or closed: what still waits for an answer, or what has one. */
+  state: "open" | "closed";
+  kind: string;
+  sort: string;
+  query: string;
+}
+
+/** How many there are: in the list as filtered, and on each side of it. */
+export interface BoardTotals {
+  total: number;
+  open: number;
+  closed: number;
+}
+
+/**
+ * A public board: open or closed first, the way every forge splits its issues,
+ * then the kind, the order and the words, and the list — which says how much
+ * of it is shown and fetches the rest on request, rather than stopping at
+ * fifty without a word.
+ */
 export function board(
   org: OrganizationSummary,
   repo: RepositorySummary,
   items: ItemSummary[],
-  filters: { kind: string; sort: string; query: string },
+  filters: BoardFilters,
+  totals: BoardTotals,
   text: Text,
 ): string {
   const tab = (value: string, label: string) =>
     `<button class="tab${filters.kind === value ? " on" : ""}" data-kind="${escapeAttr(value)}">${escapeHTML(label)}</button>`;
+  const side = (value: "open" | "closed", label: string, count: number) =>
+    `<button class="tab${filters.state === value ? " on" : ""}" data-state="${value}" aria-pressed="${filters.state === value}">
+      ${escapeHTML(label)}<span class="count-chip">${escapeHTML(text.number(count))}</span></button>`;
+  const states = side("open", text.t("board.open"), totals.open) + side("closed", text.t("board.closed"), totals.closed);
 
   const tabs = [
     tab("", text.t("board.all")),
@@ -192,11 +219,22 @@ export function board(
   const report = `/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new`;
 
   // An empty board is not a failure, and it is the state every board starts in.
-  // It carries the one thing to do about it rather than a grey sentence.
+  // It carries the one thing to do about it rather than a grey sentence. And
+  // an empty list is not always an empty board: a search that finds nothing,
+  // or a side with nothing on it, says so rather than "no reports yet".
+  const narrowed = filters.query.trim() !== "" || filters.kind !== "";
+  const emptyWords =
+    totals.open + totals.closed === 0 && !narrowed
+      ? text.t("board.empty")
+      : narrowed
+        ? text.t("review.nothingMatches")
+        : filters.state === "open"
+          ? text.t("board.noneOpen")
+          : text.t("board.noneClosed");
   const list =
     items.length === 0
       ? emptyState(
-          text.t("board.empty"),
+          emptyWords,
           icons.queue(28),
           `<a class="button primary with-icon" href="${report}">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>`,
         )
@@ -211,9 +249,10 @@ export function board(
               : filters.kind === "idea"
                 ? text.t("kind.idea")
                 : text.t("board.all"),
-            text.number(items.length),
+            text.number(totals.total),
           )}
-          <ul class="items">${items.map((i) => itemRow(i, text)).join("")}</ul>
+          <ul class="items" data-items>${boardRows(items, text)}</ul>
+          ${boardFoot(items.length, totals.total, text)}
         </section>`;
 
   return `<div class="page">
@@ -234,6 +273,7 @@ export function board(
       </div>
     </header>
     <div class="controls">
+      <div class="tabs states">${states}</div>
       <div class="tabs">${tabs}</div>
       <div class="sorts">${sorts}</div>
       <label class="search-wrap">
@@ -243,6 +283,23 @@ export function board(
       </label>
     </div>
     ${list}
+  </div>`;
+}
+
+/** The rows of a board, on their own so a further page can be added to them. */
+export function boardRows(items: ItemSummary[], text: Text): string {
+  return items.map((i) => itemRow(i, text)).join("");
+}
+
+/**
+ * How much of the list is shown, and the way to the rest. Nothing when it is
+ * all there: a counter that says "10 of 10" under ten rows is noise.
+ */
+export function boardFoot(shown: number, total: number, text: Text): string {
+  if (shown >= total) return "";
+  return `<div class="board-foot" data-board-foot>
+    <span class="board-shown">${escapeHTML(text.t("board.showing", { shown: text.number(shown), total: text.number(total) }))}</span>
+    <button type="button" class="button" data-more>${escapeHTML(text.t("review.more"))}</button>
   </div>`;
 }
 

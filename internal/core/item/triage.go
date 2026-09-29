@@ -59,8 +59,7 @@ func (s Store) SetStatus(id int64, status Status, now time.Time) error {
 	}
 
 	closed := any(nil)
-	if status == StatusDone || status == StatusClosed ||
-		status == StatusDeclined || status == StatusNotReproducible {
+	if status.Closes() {
 		closed = now.Unix()
 	}
 	_, err := s.DB.Exec(`UPDATE item SET status = ?, closed_at = ? WHERE id = ?`,
@@ -144,6 +143,58 @@ type Filter struct {
 // it by name, which means the public listing cannot accidentally include
 // something waiting for a human.
 func (s Store) List(f Filter) ([]Item, error) {
+	where, args := f.where()
+	query := `SELECT ` + itemColumns + ` FROM item WHERE ` + where
+
+	switch {
+	case f.SortByVote:
+		query += ` ORDER BY vote_count DESC, created_at DESC`
+	case f.SortByClosed:
+		query += ` ORDER BY closed_at DESC, id DESC`
+	default:
+		query += ` ORDER BY created_at DESC`
+	}
+
+	limit := f.Limit
+	if limit <= 0 || limit > 200 {
+		// Every listing is bounded. An unbounded query over a table the public
+		// can add rows to is a page that gets slower every week and then stops.
+		limit = 50
+	}
+	query += fmt.Sprintf(" LIMIT %d OFFSET %d", limit, max(f.Offset, 0))
+
+	rows, err := s.DB.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("listing items: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Item
+	for rows.Next() {
+		it, err := s.scan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, it)
+	}
+	return out, rows.Err()
+}
+
+// Tally is how many items a filter matches, without the limit: what a list
+// says it is showing some of. It reads the same conditions List does, from
+// the same function, so the two cannot disagree about what "these" are.
+func (s Store) Tally(f Filter) (int, error) {
+	where, args := f.where()
+	var n int
+	if err := s.DB.QueryRow(`SELECT count(*) FROM item WHERE `+where, args...).Scan(&n); err != nil {
+		return 0, fmt.Errorf("counting items: %w", err)
+	}
+	return n, nil
+}
+
+// where is the filter as SQL conditions and their arguments: one place, for
+// both the list and its count.
+func (f Filter) where() (string, []any) {
 	where := []string{"merged_into IS NULL"}
 	var args []any
 
@@ -190,45 +241,11 @@ func (s Store) List(f Filter) ([]Item, error) {
 	// ambiguous and forces the select list to be rewritten with a prefix — and
 	// a helper that rewrites a column list by splitting on commas breaks on the
 	// COALESCE that is already in it. This needs no rewriting at all.
-	query := `SELECT ` + itemColumns + ` FROM item`
 	if q := strings.TrimSpace(f.Search); q != "" {
 		where = append(where, "id IN (SELECT rowid FROM item_fts WHERE item_fts MATCH ?)")
 		args = append(args, ftsQuery(q, f.AsTyped))
 	}
-	query += ` WHERE ` + strings.Join(where, " AND ")
-
-	switch {
-	case f.SortByVote:
-		query += ` ORDER BY vote_count DESC, created_at DESC`
-	case f.SortByClosed:
-		query += ` ORDER BY closed_at DESC, id DESC`
-	default:
-		query += ` ORDER BY created_at DESC`
-	}
-
-	limit := f.Limit
-	if limit <= 0 || limit > 200 {
-		// Every listing is bounded. An unbounded query over a table the public
-		// can add rows to is a page that gets slower every week and then stops.
-		limit = 50
-	}
-	query += fmt.Sprintf(" LIMIT %d OFFSET %d", limit, max(f.Offset, 0))
-
-	rows, err := s.DB.Query(query, args...)
-	if err != nil {
-		return nil, fmt.Errorf("listing items: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var out []Item
-	for rows.Next() {
-		it, err := s.scan(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, it)
-	}
-	return out, rows.Err()
+	return strings.Join(where, " AND "), args
 }
 
 // Similar is the "this looks like these three" hint, shown while somebody is
