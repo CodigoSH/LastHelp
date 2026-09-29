@@ -38,12 +38,13 @@
      20% in the dark. The track of a switch sits on it. */
   --surface-active: rgba(var(--accent-rgb), 0.12);
   --surface-dim: #eef0f4;
-  /* Lastboard's --surface: a card that floats on another, translucent over a
-     blur, so the one under it shows through darker in the dark theme. */
-  --surface-glass: rgba(255, 255, 255, 0.72);
-  /* The shadow under a card that floats on another. Long and strong on light;
-     short and soft on dark, where a long dark shadow over a dark ground has
-     only a dozen grey levels to fade through and draws them as rings. */
+  /* The one card that asks for attention — an update is waiting. On light,
+     Lastboard's frosted white with a long shadow. On dark, no shadow at all,
+     like every other card there: a dark shadow on a dark ground only draws
+     rings. It stands out by a neutral lift, an accent border and the glow in
+     its corner — no brown wash, which is what made it look off. */
+  --feature-card-bg: rgba(255, 255, 255, 0.72);
+  --feature-card-border: var(--border);
   --float-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   --text-main: #12151b;
   --text-dim: #5b6470;
@@ -141,8 +142,9 @@
   --dark-canvas-glass: rgba(18, 18, 18, 0.78);
   --dark-panel: #1a1a1a;
   --dark-surface-dim: #242424;
-  --dark-surface-glass: rgba(28, 22, 20, 0.7);
-  --dark-float-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  --dark-feature-card-bg: rgba(255, 255, 255, 0.03);
+  --dark-feature-card-border: rgba(var(--accent-rgb), 0.3);
+  --dark-float-shadow: 0 0 #0000;
   --dark-sheet: #242424;
   --dark-surface-hover: rgba(var(--accent-rgb), 0.1);
   --dark-surface-active: rgba(var(--accent-rgb), 0.2);
@@ -175,7 +177,8 @@
     --surface-hover: var(--dark-surface-hover);
     --surface-active: var(--dark-surface-active);
     --surface-dim: var(--dark-surface-dim);
-    --surface-glass: var(--dark-surface-glass);
+    --feature-card-bg: var(--dark-feature-card-bg);
+    --feature-card-border: var(--dark-feature-card-border);
     --float-shadow: var(--dark-float-shadow);
     --text-main: var(--dark-text-main);
     --text-dim: var(--dark-text-dim);
@@ -204,7 +207,8 @@
   --surface-hover: var(--dark-surface-hover);
   --surface-active: var(--dark-surface-active);
   --surface-dim: var(--dark-surface-dim);
-  --surface-glass: var(--dark-surface-glass);
+  --feature-card-bg: var(--dark-feature-card-bg);
+  --feature-card-border: var(--dark-feature-card-border);
   --float-shadow: var(--dark-float-shadow);
   --text-main: var(--dark-text-main);
   --text-dim: var(--dark-text-dim);
@@ -4233,12 +4237,9 @@ body > nav .brand {
   flex-direction: column;
   gap: 20px;
   padding: 24px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--feature-card-border);
   border-radius: 24px;
-  /* Lastboard's .update-modal exactly. The background was the same grey as the
-     card around it, and a 60px shadow under a box of the same colour reads as
-     a dark ring around nothing. */
-  background: var(--surface-glass);
+  background: var(--feature-card-bg);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   box-shadow: var(--float-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.1);
