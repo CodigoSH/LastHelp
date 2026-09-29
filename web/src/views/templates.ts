@@ -1266,6 +1266,8 @@ export interface ShellSpec {
   organizations: SideOrganization[];
   /** Shown at the foot, so it is obvious which account is acting. */
   who: string;
+  /** What the account is, written under the name; empty says nothing. */
+  role: string;
   isAdmin: boolean;
   /** True for anybody who may create an organisation. */
   mayAddOrganization: boolean;
@@ -1313,7 +1315,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
       <div class="side-head">
         ${avatar(spec.who, spec.avatar)}
         <span class="who">${escapeHTML(spec.who)}</span>
-        ${spec.isAdmin ? `<span class="side-role">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+        ${spec.role ? `<span class="side-role">${escapeHTML(spec.role)}</span>` : ""}
       </div>
       <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
         ${group(
@@ -2116,8 +2118,23 @@ function settingsItem(spec: {
   </li>`;
 }
 
+/**
+ * What an account is, in one word, for under its name: the administrator, or
+ * else the highest role it holds anywhere. Roles are per organisation, so an
+ * owner of one and a collaborator of another reads as an owner — the most it
+ * may do somewhere, which is what the word is for.
+ */
+export function accountRole(me: { admin?: boolean; memberships?: Array<{ role: string }> } | null, text: Text): string {
+  if (!me) return "";
+  if (me.admin) return text.t("people.administrator");
+  const roles = new Set((me.memberships ?? []).map((m) => m.role));
+  if (roles.has("owner")) return text.t("role.owner");
+  if (roles.has("collaborator")) return text.t("role.collaborator");
+  return "";
+}
+
 export function profileScreen(
-  me: { username: string; avatar?: string; admin: boolean },
+  me: { username: string; avatar?: string; role: string },
   text: Text,
 ): string {
   // Lastboard's "My profile" and "System password", card for card: the
@@ -2136,7 +2153,7 @@ export function profileScreen(
           )}
           <div class="profile-who">
             <span class="profile-name">${escapeHTML(me.username)}</span>
-            ${me.admin ? `<span class="profile-role">${escapeHTML(text.t("people.administrator"))}</span>` : ""}
+            ${me.role ? `<span class="profile-role">${escapeHTML(me.role)}</span>` : ""}
           </div>
         </div>
         <form class="profile-name">

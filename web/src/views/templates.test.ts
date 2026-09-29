@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { itemView, type Text, updateZone } from "./templates";
+import { accountRole, itemView, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -121,5 +121,21 @@ describe("the update zone", () => {
     const zone = updateZone({ current: "v1", latest: "v2", available: true }, text);
     expect(zone).toContain("data-update");
     expect(zone).not.toContain("release-notes");
+  });
+});
+
+describe("the word under an account's name", () => {
+  const owner = { role: "owner" };
+  const collaborator = { role: "collaborator" };
+  test("is the administrator first, whatever else the account holds", () => {
+    expect(accountRole({ admin: true, memberships: [owner] }, text)).toBe("[people.administrator]");
+  });
+  test("is the highest role held anywhere", () => {
+    expect(accountRole({ admin: false, memberships: [collaborator, owner] }, text)).toBe("[role.owner]");
+    expect(accountRole({ admin: false, memberships: [collaborator] }, text)).toBe("[role.collaborator]");
+  });
+  test("is nothing for an account that holds nothing", () => {
+    expect(accountRole({ admin: false, memberships: [] }, text)).toBe("");
+    expect(accountRole(null, text)).toBe("");
   });
 });

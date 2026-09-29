@@ -481,6 +481,7 @@ async function showInShell(content: string, path: string): Promise<void> {
         path,
         organizations: orgs,
         who: me?.username ?? "",
+        role: views.accountRole(me, text),
         isAdmin: me?.admin === true,
         mayAddOrganization: me?.admin === true,
         avatar: me?.avatar,
@@ -750,7 +751,7 @@ async function showProfile(): Promise<void> {
   if (!(await requirePanel())) return;
   await showInShell(
     views.profileScreen(
-      { username: me?.username ?? "", avatar: me?.avatar, admin: me?.admin === true },
+      { username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) },
       text,
     ),
     "/panel/account",

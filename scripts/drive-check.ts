@@ -2766,6 +2766,8 @@ async function main() {
       servidor: me.pending?.reports ?? -1,
       tableros: [...document.querySelectorAll('[data-card="boards"] a')].map(a => a.getAttribute("href")),
       offersToAdd: !!document.querySelector("[data-open-modal]"),
+      role: document.querySelector(".side-head .side-role")?.textContent?.trim() ?? "",
+      expected: (await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json()))["role.collaborator"],
     };`);
   // The administrator's summary, over their boards: the same screen, so the
   // two read as one product, and none of the server's own numbers. What waits
@@ -2781,6 +2783,14 @@ async function main() {
     "and offers nothing they would be refused",
     collaborator.groups.length === 2 && collaborator.offersToAdd === false,
     `${collaborator.groups.join(" · ")} — ${collaborator.items.join(", ")}`,
+  );
+  // Under the name, what the account is — as the administrator's says.
+  check(
+    "a collaborator's panel says so under their name",
+    // The walk is in whatever language an earlier step left it in, so the word
+    // is compared with that catalogue rather than with the English.
+    !!collaborator.role && collaborator.role === collaborator.expected,
+    `${collaborator.role} / ${collaborator.expected}`,
   );
 
   // 12a. And the administrator's screens are not theirs by address either.
