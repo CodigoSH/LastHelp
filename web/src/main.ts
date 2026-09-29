@@ -1842,7 +1842,7 @@ function showSetupStep(step: 1 | 2 | 3): void {
 }
 
 function showSetupDone(): void {
-  show(views.setupDone(text));
+  show(views.setupDone(text, instanceLogo));
 }
 
 async function showOrganizationWizard(step: 1 | 2): Promise<void> {

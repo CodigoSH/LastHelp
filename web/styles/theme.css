@@ -1526,6 +1526,22 @@ summary:focus-visible,
  * measure keeps it readable; this one shows several, so the bands run to the
  * window's edges and their contents keep the page's measure inside them.
  */
+/* The first run is the setup and nothing else, as in Lastboard: no bar above
+   it — there is nowhere yet for it to lead — and the card in the middle of the
+   window. Only the setup: its wizard is the one that hangs straight from the
+   page; the panel's wizards live inside the panel. */
+body:has(> main > .wizard) > nav { display: none; }
+body > main:has(> .wizard) {
+  display: grid;
+  place-items: center;
+  min-block-size: 100dvh;
+  box-sizing: border-box;
+  padding-block: 2rem;
+}
+/* Centred by its own grid, not shrunk to its contents: the form's width is a
+   share of this one, and a phone has to have one to share. */
+body > main > .wizard { inline-size: 100%; }
+
 body > main:has(> .lp) {
   max-inline-size: none;
   padding: 0;
@@ -2609,11 +2625,24 @@ body > main:has(> .lpe) {
 .wizard {
   display: grid;
   justify-items: center;
-  padding-block: clamp(2rem, 8vh, 5rem);
+  /* No room of its own: the page around it already gives 40px above and 80px
+     below, and adding more pushed the tallest step — the account, with its
+     picture and three fields — off the bottom of the window. */
+  padding-block: 0;
 }
 
-.wizard form {
+.wizard form,
+.wizard-done {
   inline-size: min(26rem, 100%);
+}
+
+/* The end of the first run: what comes next, said once, centred. */
+.wizard-next {
+  margin: 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 .wizard-card {
@@ -2725,10 +2754,14 @@ body > main:has(> .lpe) {
   border: 0;
 }
 
+/* One spacing between fields, Lastboard's 10px. The grid's gap used to add to
+   the margin every .field carries elsewhere, and the setup grew so tall it
+   was cut off on a 27-inch screen. */
 .wizard-fields {
   display: grid;
-  gap: 1rem;
+  gap: 10px;
 }
+.wizard-fields > .field { margin-block-end: 0; }
 
 /* The field labels in the card speak the same caption voice as the step name.
    Scoped to the card on purpose: the forms a visitor fills in are prose with a
@@ -2758,6 +2791,7 @@ body > main:has(> .lpe) {
 }
 
 .wizard-actions .button.ghost {
+  justify-self: center;
   justify-content: center;
   background: none;
   border: 0;
@@ -3662,14 +3696,12 @@ a.stat:hover {
  * The sizes a mark comes in, as classes.
  *
  * They were a --mark-size in a style attribute, which the policy this is served
- * under does not allow — and there are five of them in the whole product, so a
+ * under does not allow — and there are only a few in the whole product, so a
  * class each says the same thing with nothing dynamic about it.
  */
 .mark-24 { --mark-size: 24px; }
 .mark-26 { --mark-size: 26px; }
 .mark-44 { --mark-size: 44px; }
-.mark-52 { --mark-size: 52px; }
-.mark-56 { --mark-size: 56px; }
 
 .brand-logo {
   inline-size: var(--mark-size, 1.5rem);
@@ -4711,18 +4743,16 @@ body > nav .brand {
    card rather than a button of its own hanging under it. */
 .signin-go { inline-size: 100%; }
 
-/* The mark above the steps of the wizard. It wears the same lit tile as the one
-   on the front page and on the entrance: three screens showing the same mark
-   three different ways is how a product reads as assembled from parts. */
+/* The mark above the wizard and the entrance: bare, as the front page and the
+   About screen draw it, and at Lastboard's size — 64px with 12px under it. */
 .wizard-mark {
   display: block;
-  margin: 0 auto 1.5rem;
-  box-sizing: content-box;
-  padding: 0.75rem;
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
+  inline-size: 64px;
+  block-size: 64px;
+  /* The card's own gap puts the room under it; a margin on top of that was
+     the same spacing twice. */
+  margin: 0 auto;
+  border-radius: 14px;
 }
 
 /* The eye on a password field. Put there by a service that walks every screen,
@@ -4812,15 +4842,6 @@ a.bento-card:hover,
 
 .signin .wizard-card { box-shadow: var(--shadow-md), var(--hairline); }
 
-/* The mark on the entrance, lit the way the front page lights it. */
-.signin-head .brand-logo {
-  box-sizing: content-box;
-  padding: 0.75rem;
-  border-radius: var(--radius-lg);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-md), var(--hairline), 0 0 0 8px rgba(var(--accent-rgb), 0.05);
-}
 
 /* --------------------------------------------------- the last few details */
 

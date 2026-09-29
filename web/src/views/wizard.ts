@@ -214,7 +214,7 @@ export function wizard(spec: WizardSpec, text: Text): string {
              the page is the same logo twice on one screen. -->
         ${
           spec.mark
-            ? `<img class="wizard-mark brand-logo mark-52" src="${escapeAttr(spec.mark)}" alt="" width="52" height="52" />`
+            ? `<img class="wizard-mark" src="${escapeAttr(spec.mark)}" alt="" width="64" height="64" />`
             : ""
         }
         <header class="wizard-head">

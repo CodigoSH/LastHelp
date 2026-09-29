@@ -756,9 +756,9 @@ export function signInForm(text: Text, instance?: { name?: string; logo?: string
   return `<section class="signin">
     <form class="auth">
       <div class="wizard-card">
-        <img class="wizard-mark brand-logo mark-56" src="${escapeAttr(
+        <img class="wizard-mark" src="${escapeAttr(
           instance?.logo && instance.logo.trim() !== "" ? instance.logo : "/logo.svg",
-        )}" alt="" width="56" height="56" />
+        )}" alt="" width="64" height="64" />
         <header class="signin-head">
           <h1>${escapeHTML(instance?.name || text.t("app.name"))}</h1>
         </header>
@@ -1238,18 +1238,23 @@ export function repositoryWizard(
  * the next thing is an organisation, which is work rather than setup. A last
  * screen that only says "done" leaves somebody looking for the next door.
  */
-export function setupDone(text: Text): string {
+export function setupDone(text: Text, logo?: string): string {
+  // One card, as every step before it: the mark, where you are, what comes
+  // next, and the way there at full width. It was a heading, a card and a
+  // button loose on the page with nothing between them.
   return `<section class="wizard">
-    <header class="wizard-head">
-      <h1>${escapeHTML(text.t("setup.doneTitle"))}</h1>
-      <p class="lead">${escapeHTML(text.t("setup.doneLead"))}</p>
-    </header>
-    <div class="wizard-card">
-      <p class="hint">${escapeHTML(text.t("setup.doneNext"))}</p>
-    </div>
-    <div class="wizard-actions">
-      <span class="spacer"></span>
-      <a class="button primary" href="/panel/new">${escapeHTML(text.t("panel.newOrganization"))}</a>
+    <div class="wizard-done">
+      <div class="wizard-card">
+        <img class="wizard-mark" src="${escapeAttr(logo && logo.trim() !== "" ? logo : "/logo.svg")}" alt="" width="64" height="64" />
+        <header class="wizard-head">
+          <h1 class="wizard-where">${escapeHTML(text.t("setup.doneTitle"))}</h1>
+          <p class="lead">${escapeHTML(text.t("setup.doneLead"))}</p>
+        </header>
+        <p class="wizard-next">${escapeHTML(text.t("setup.doneNext"))}</p>
+        <div class="wizard-actions">
+          <a class="button primary" href="/panel/new">${escapeHTML(text.t("panel.newOrganization"))}</a>
+        </div>
+      </div>
     </div>
   </section>`;
 }

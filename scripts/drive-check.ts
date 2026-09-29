@@ -188,15 +188,21 @@ async function main() {
   // anywhere in the product: a name in text and an empty space beside it.
   const mark = await evaluate(`
     const el = document.querySelector(".wizard-mark");
-    return el ? { src: el.getAttribute("src"), drawn: Math.round(el.getBoundingClientRect().width) } : null;
+    const cs = el ? getComputedStyle(el) : null;
+    return el ? { src: el.getAttribute("src"), drawn: Math.round(el.getBoundingClientRect().width),
+                  bare: cs.borderTopWidth === "0px" && cs.boxShadow === "none" && cs.paddingTop === "0px" } : null;
   `);
-  check("the wizard wears the mark", mark?.src === "/logo.svg" && mark.drawn > 40, JSON.stringify(mark));
+  // Bare, as the front page and About draw it, at Lastboard's 64px.
+  check("the wizard wears the mark, bare", mark?.src === "/logo.svg" && mark.drawn === 64 && mark.bare === true, JSON.stringify(mark));
 
   check(
     "a fresh instance opens on the wizard, asking language first",
     firstStep.path === "/setup" && firstStep.prefs === true && firstStep.dots === 3 && firstStep.theme === true,
     `${firstStep.path}, ${firstStep.dots} steps, on "${firstStep.current}"`,
+      // The setup alone on the screen, as Lastboard's: no bar above it.
+      bar: (() => { const n = document.querySelector("body > nav"); return !!n && n.getBoundingClientRect().height > 0; })(),
   );
+  check("the setup is alone on the screen, with no bar above it", firstStep.bar === false, String(firstStep.bar));
 
   // Choosing dark has to work on a light system too. A toggle that only ever
   // darkens is one that cannot be turned back, and the media query alone gives
@@ -230,6 +236,16 @@ async function main() {
     return { path: location.pathname, shown: line && !line.hidden, said: line?.textContent?.trim() };`);
   check(
     "two passwords that differ are refused before the server sees them",
+  // The tallest step, as it opens, and it has to fit: the fields used to carry two spacings
+  // each, and the card ran off the bottom of a 27-inch screen.
+  const fits = await evaluate(`
+    const c = document.querySelector(".wizard-card").getBoundingClientRect();
+    return { bottom: Math.round(c.bottom), window: innerHeight };
+  `);
+  // The card, not the page: the room the page leaves under it is empty and
+  // may scroll; what may not is the card running under the bottom edge.
+  check("the account step fits the window", fits.bottom <= fits.window, JSON.stringify(fits));
+
     mismatch.path === "/setup/account" && mismatch.shown === true,
     String(mismatch.said),
   );
@@ -296,7 +312,13 @@ async function main() {
   `);
   await sleep(1100);
   const ending = await evaluate(`
-    return { path: location.pathname, next: document.querySelector(".wizard-actions a")?.getAttribute("href") };`);
+    // The pieces of the last card, and the room between each and the next:
+    // they were loose on the page, touching.
+    const parts = [...(document.querySelector(".wizard-done .wizard-card")?.children ?? [])];
+    const gaps = parts.slice(1).map((el, i) =>
+      Math.round(el.getBoundingClientRect().top - parts[i].getBoundingClientRect().bottom));
+    return { path: location.pathname, next: document.querySelector(".wizard-actions a")?.getAttribute("href"),
+             parts: parts.length, gaps };`);
   check(
     "the wizard ends by handing over to the work",
     ending.path === "/setup/done" && ending.next === "/panel/new",
@@ -315,6 +337,11 @@ async function main() {
     f.querySelector('[name=name]').value = "CodigoSH";
     f.querySelector('[name=slug]').value = "codigosh";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  check(
+    "and its last screen is one card with room between its pieces",
+    ending.parts === 4 && ending.gaps.every((g: number) => g >= 12),
+    JSON.stringify(ending),
+  );
     await new Promise(r => setTimeout(r, 1100));
     // A row per organisation, as Lastboard lists its users.
     return [...document.querySelectorAll(".settings-list .si-name")].map(e => e.textContent.trim());
@@ -833,7 +860,12 @@ async function main() {
       // Asked of the card rather than of the header inside it: what this check
       // is for is that the entrance wears the installation's mark, not where in
       // the markup that mark happens to hang.
-      mark: !!document.querySelector(".signin .brand-logo"),
+      mark: (() => {
+        const m = document.querySelector(".signin .wizard-mark");
+        const cs = m ? getComputedStyle(m) : null;
+        return !!m && Math.round(m.getBoundingClientRect().width) === 64 &&
+          cs.borderTopWidth === "0px" && cs.boxShadow === "none" && cs.paddingTop === "0px";
+      })(),
       eye: !!document.querySelector(".pw-toggle"),
       navLink: !!document.querySelector("body > nav a[href='/sign-in']"),
       lead: !!document.querySelector(".signin-head .lead"),
@@ -841,7 +873,7 @@ async function main() {
   `);
   check("the sign-in page says its one word once", signIn.times === 1 && !signIn.navLink && !signIn.lead,
     JSON.stringify(signIn));
-  check("and carries the mark and an eye on the password", signIn.mark && signIn.eye, JSON.stringify(signIn));
+  check("and carries the mark, bare, and an eye on the password", signIn.mark && signIn.eye, JSON.stringify(signIn));
 
   await evaluate(`
     const f = document.querySelector("form.auth");
