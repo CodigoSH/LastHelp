@@ -1,14 +1,14 @@
 /**
- * Toasts, the way Lastboard does them.
+ * Toasts.
  *
- * The behaviour is ported rather than reinvented — bottom centre, three at a
+ * Bottom centre, three at a
  * time with the rest queued, a draining bar that pauses under the pointer, a
  * close button, an optional action, and errors announced assertively while
  * everything else is announced politely. That is the house's, and somebody who
  * uses two CodigoSH products should not have to learn a second set of manners.
  *
- * The implementation is this project's: a module and a container on the page,
- * not a custom element with a shadow root. LastHelp has no web components, and
+ * A module and a container on the page, not a custom element with a shadow
+ * root. LastHelp has no web components, and
  * adding one for this would mean the only component in the product carries the
  * only shadow root, the only adopted stylesheet and the only reason to explain
  * both.

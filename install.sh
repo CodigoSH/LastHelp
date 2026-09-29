@@ -42,9 +42,8 @@ ENV_PREFIX="LASTHELP"
 TAGLINE="A feedback portal that speaks to your forge."
 FORGE="https://git.codigosh.com/CodigoSH/LastHelp"
 API_BASE="https://git.codigosh.com/api/v1/repos/CodigoSH/LastHelp"
-# How this project names its binaries in a release. LastGYM writes
-# lastgym_linux_amd64; this one uses dashes. It is the one thing a project
-# cannot change without also changing its own updater.
+# How this project names its binaries in a release: with dashes. It is the
+# one thing a project cannot change without also changing its own updater.
 artefact_for() { printf 'lasthelp-linux-%s' "$1"; }
 
 # The public keys a release may be signed with, one per line.
@@ -279,7 +278,7 @@ if (exec 3< /dev/tty) 2>/dev/null; then
     say ""
 fi
 
-# The opening three, in Lastboard's order and its words.
+# The opening three, in the house's order and its words.
 #
 # They are what makes an install of any of these feel like the same product in
 # the first seconds, which is the whole point of the installer being shared. The
@@ -408,7 +407,7 @@ chmod 0755 "$WORK/$ARTEFACT"
 # port was held — by the very service it was about to replace. Reading
 # /proc/<pid>/exe answers the real question, does not depend on systemd knowing
 # the unit by the name this script expects, and names the intruder in the
-# message. Ported from Lastboard's, which got here first.
+# message.
 #
 # No `ss`, no check: refusing an upgrade because the machine has no iproute2
 # would be a worse failure than the one this prevents.

@@ -52,8 +52,8 @@ func TestComposingTheFrontPage(t *testing.T) {
 	}
 
 	// Saved, it is what everybody sees — bands and the foot of the page alike.
-	// There is no second copy to publish: the editor edits the page itself, the
-	// way the dashboard is edited, and leaving it changes nothing.
+	// There is no second copy to publish: the editor edits the page itself,
+	// and leaving it changes nothing.
 	page := words("<p>We read everything.</p>")
 	page["settings"] = map[string]any{"footer_text": "Made in Lisbon", "footer_hide_credit": true}
 	if got := status(t, i.do(http.MethodPut, "/api/landing", page)); got != http.StatusOK {

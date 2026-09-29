@@ -13,7 +13,7 @@ import (
 // TestNothingAsksThroughTheBrowsersConfirm.
 //
 // Every question before something that cannot be undone goes through the
-// product's own dialog (web/src/confirm.ts, Lastboard's ConfirmationModal).
+// product's own dialog (web/src/confirm.ts).
 // window.confirm() is a grey box in the browser's voice, and ten of them had
 // piled up — deleting a report, a comment, an account, an organisation, a
 // repository, restoring a backup — while the product's dialog sat unused.

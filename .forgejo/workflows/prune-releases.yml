@@ -139,7 +139,7 @@ jobs:
           print(f"keeping beta: {[r['tag_name'] for r in betas if r['id'] in keep_beta] or 'none'}")
 
           def del_container(tag):
-              # As Lastboard does it: only ever the version-specific tag of the image
+              # Only ever the version-specific tag of the image
               # (v1.0.0-Beta.03), never the moving ones — latest, beta, 1.0.
               req("DELETE", f"/packages/{PKG_OWNER}/container/{PKG_NAME}/{tag.lower()}", expect_json=False)
 

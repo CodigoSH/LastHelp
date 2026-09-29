@@ -3,8 +3,7 @@
  *
  * The page being edited is the page: the same markup visitors get, drawn with
  * editing on, with the controls laid over it and a panel beside it. Every change
- * is saved to the page itself as it is made — the way Lastboard's board is
- * edited — so what the editor shows is what visitors get, and leaving it is
+ * is saved to the page itself as it is made, so what the editor shows is what visitors get, and leaving it is
  * only leaving it.
  *
  * Kept out of main.ts because it is a small program of its own — a model, a

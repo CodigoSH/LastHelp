@@ -112,7 +112,7 @@ describe("the update zone", () => {
     expect(updateZone(null, text)).not.toContain("about-state ok");
   });
 
-  test("in a container it is Lastboard's Docker notice, never a button to install", () => {
+  test("in a container it is the Docker notice, never a button to install", () => {
     const zone = updateZone({ current: "v1", latest: "v2", available: true, container: true }, text);
     expect(zone).toContain("about-docker");
     expect(zone).not.toContain("data-update");

@@ -1,7 +1,7 @@
 # Builds and pushes the container image when a tag is pushed.
 #
-# Lastboard's workflow, with the image pinned like every other job here and one
-# build argument more: the commit, which this binary reports beside its version.
+# The image is pinned like every other job here, and the build carries the
+# commit, which this binary reports beside its version.
 #
 # No signing key. The image is built without one, and the binary inside it
 # refuses to update itself anyway: updating a container is pulling a new image,
@@ -71,8 +71,7 @@ jobs:
           # like v1.7.0-Beta.09 is not valid semver (a numeric prerelease
           # identifier may not carry a leading zero), so the parse failed, the
           # action stopped seeing a prerelease, and it moved `latest` onto that
-          # beta. Lastboard shipped that; this project pads betas to two digits
-          # the same way.
+          # beta. Betas here are padded to two digits, so the same would happen.
           flavor: |
             latest=false
           tags: |

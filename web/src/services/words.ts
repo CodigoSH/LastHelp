@@ -1,13 +1,11 @@
 /**
  * Writing a block of words where it is seen.
  *
- * The dashboard in this house edits its note widget on the board itself rather
- * than in a dialog, and this is that: while the page is being arranged, a block
+ * On the page itself rather than in a dialog: while the page is being arranged, a block
  * of words is typed into directly, with a floating bar of tools that follows
  * whichever block has the cursor.
  *
- * Two things had to be redesigned rather than copied, and both come from the
- * policy this page is served under — `style-src 'self'`, with no unsafe-inline:
+ * Two things come from the policy this page is served under — `style-src 'self'`, with no unsafe-inline:
  *
  *   - Alignment and colour cannot be written as inline styles. The browser
  *     drops a style attribute without a word, so the buttons would appear to

@@ -1047,7 +1047,7 @@ func TestTheTeamCanReadWhatTheyHaveToDecideAbout(t *testing.T) {
 // TestEveryResponseCarriesAPolicy.
 //
 // This was in the plan for the web layer from the start — a policy on every
-// response, ported with the rest of the middleware — and it was never written.
+// response, alongside the rest of the middleware — and it was never written.
 // Nothing said so: no document promised it, so no document was lying, and the
 // only way to notice an absent header is to ask for it.
 //

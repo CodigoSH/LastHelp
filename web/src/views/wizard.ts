@@ -6,7 +6,7 @@
  * testable without a browser.
  *
  * This exists because the panel used to be a wall of inputs with no order and
- * no examples. The operator who asked for it put it plainly: he did not know
+ * no examples. The operator who asked for it put it plainly: they did not know
  * what went in each box, because the boxes asked for formats and showed none.
  */
 import { escapeAttr, escapeHTML } from "../escape";

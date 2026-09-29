@@ -7,8 +7,8 @@ export interface LocaleMetadata {
   flag: string;
 }
 
-/** The twenty, each with the flag Lastboard shows beside it in its language
- *  picker — the same flag for the same language in both products, English's
+/** The twenty, each with the flag the house shows beside it in a language
+ *  picker — the same flag for the same language in every product, English's
  *  included. This list and the server's have to agree, and a test compares
  *  them: two hand-written lists drift the first time one gains a language. */
 export const availableLocales: LocaleMetadata[] = [

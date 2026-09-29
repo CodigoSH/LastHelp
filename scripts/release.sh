@@ -8,8 +8,7 @@
 #                                              [--dry-run] [--yes] [--skip-checks]
 #
 # This is CodigoSH's release script, and the point of it is that it is the same
-# one everywhere. It came from Lastboard, which has cut a lot of releases with
-# it; what differs between projects is the CONFIGURATION block below and
+# one everywhere: what differs between projects is the CONFIGURATION block below and
 # nothing else, so a fix made in one project is a file copied to the others.
 #
 # The title is the one-line summary of the release. It heads the notes — it is
@@ -350,9 +349,9 @@ for stamp in "${VERSION_STAMPS[@]}"; do
 
     # Substitution, not `eval echo`.
     #
-    # Lastboard calls apply_version directly, so the shell expands $NEW_VERSION
+    # Called directly, apply_version gets $NEW_VERSION expanded by the shell
     # inside a double-quoted argument and the escaped quotes survive. Holding
-    # the same expressions in an array means expanding them later, and `eval
+    # the expressions in an array means expanding them later, and `eval
     # echo` was the obvious way to do it — it is also the wrong one: eval parses
     # the string a second time and eats every double quote, so
     # s/"version": ".*"/... arrives at sed as s/version: .*/... and matches

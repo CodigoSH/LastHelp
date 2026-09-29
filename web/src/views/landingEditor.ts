@@ -36,7 +36,7 @@ export interface EditBarState {
 /**
  * The editor's bar: undo and redo, the width it is previewed at, and whether
  * the last change is saved. There is nothing to publish: every change is the
- * page, as on Lastboard's board.
+ * page.
  */
 export function editBar(s: EditBarState, text: Text): string {
   const state = s.problem

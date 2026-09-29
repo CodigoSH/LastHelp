@@ -1,8 +1,7 @@
 /**
  * The one way this product asks before something that cannot be undone.
  *
- * Lastboard's confirmation, with the same promise it returns: true when the
- * danger button is pressed, false for the cross, the backdrop or Escape. It
+ * A promise: true when the danger button is pressed, false for the cross, the backdrop or Escape. It
  * replaces window.confirm(), which the browser draws in its own grey and its
  * own voice, on top of a product that otherwise never does that.
  */

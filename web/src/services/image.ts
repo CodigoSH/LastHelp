@@ -1,12 +1,12 @@
 /**
  * A picture, made small enough to store, in the browser.
  *
- * Lastboard learned this one: an avatar is scaled to a couple of hundred pixels
+ * An avatar is scaled to a couple of hundred pixels
  * and re-encoded before it is sent, so nobody is ever told their photo is too
  * large. Every photograph a phone takes is too large, and "pick a smaller one"
  * is not something to ask of the person setting up a server.
  *
- * Two things beyond what Lastboard does, both of which were bugs here:
+ * Two things that were bugs before they were rules:
  *
  *   - The cap is measured on the data URL, not on the file. The server stores
  *     the string and bounds the string; base64 is about a third longer than the

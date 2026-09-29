@@ -6,7 +6,7 @@ Three ways, and the right one depends on how you installed.
 
 Sign in as the administrator. When something newer is released, the panel
 icon in the top bar carries a red dot and **Info** in the sidebar says **New
-update!** — the same signals the dashboard gives.
+update!**.
 
 Open **Info**. Under the version it says whether there is something newer — or
 why it could not check — and when there is, **Update** opens a dialog with the

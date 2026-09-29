@@ -134,7 +134,7 @@ if [ "$FORGE_KIND" = gitlab ]; then
     fi
     # Puma defaults to 127.0.0.1:8080, and on the host network that is a real
     # port on a real machine. On the one this was written on, 8080 was held by
-    # Lastboard — so Puma could not bind, restarted for ever, and readiness
+    # another service — so Puma could not bind, restarted for ever, and readiness
     # never went green. Nothing in GitLab's own logs pointed at the host.
     PUMA_PORT="$(free_port)"
     echo "==> starting gitlab ($IMAGE, puma on $PUMA_PORT; this takes several minutes)"

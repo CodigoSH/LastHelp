@@ -68,7 +68,7 @@ type profileChange struct {
 }
 
 // handleChangeProfile renames the account: the name it signs in with and the
-// one its replies carry, which are the same name, as on Lastboard.
+// one its replies carry, which are the same name.
 func (s *Server) handleChangeProfile(w http.ResponseWriter, r *http.Request) {
 	actor, ok := middleware.ActorFrom(r)
 	if !ok {

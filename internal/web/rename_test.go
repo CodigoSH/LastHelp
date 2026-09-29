@@ -7,7 +7,7 @@ import (
 
 // TestRenamingAnAccountRenamesIt.
 //
-// An account has one name, as on Lastboard: the profile's name is the one the
+// An account has one name: the profile's name is the one the
 // account signs in with and the one its replies carry. Renaming it used to
 // change a separate "display" name and leave the sign-in name as it was.
 func TestRenamingAnAccountRenamesIt(t *testing.T) {

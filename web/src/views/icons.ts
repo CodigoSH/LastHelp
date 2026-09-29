@@ -21,8 +21,8 @@ function stroke(paths: string, size = 16): string {
  * The one icon in this set that is filled rather than stroked.
  *
  * Three dots at a 2px stroke are three tiny rings, which read as noise at 16px.
- * It is the same mark the dashboard in this house uses, copied rather than
- * approximated so a module's menu and a tile's menu are the same button.
+ * The house's mark for a menu, so every menu of three dots is the same
+ * button.
  */
 function dotsIcon(size = 16): string {
   return `<svg class="icon" viewBox="0 0 24 24" width="${size}" height="${size}"
@@ -30,8 +30,7 @@ function dotsIcon(size = 16): string {
 }
 
 /**
- * Up to date: a filled circle with the tick cut out of it — Lastboard's mark
- * for the same state, copied rather than approximated. Filled, like dots,
+ * Up to date: a filled circle with the tick cut out of it. Filled, like dots,
  * because at 18px a stroked ring and a stroked tick crowd each other.
  */
 function doneIcon(size = 18): string {
@@ -79,10 +78,8 @@ export const icons = {
     ),
 
   /**
-   * The two marks the add menu uses, copied from the dashboard in this house
-   * rather than chosen again: four squares for a thing that goes in the grid,
-   * and a dashed outline for the thing that holds them. Somebody who has used
-   * the dashboard reads this menu without looking.
+   * The two marks the add menu uses: four squares for a thing that goes in
+   * the grid, and a dashed outline for the thing that holds them.
    */
   module: (s?: number) =>
     stroke(

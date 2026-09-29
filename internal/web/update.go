@@ -92,7 +92,7 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Every reason it could not check, said plainly rather than as an empty
 	// answer that looks like "you are up to date".
-	// In a container it still looks, as Lastboard does: the panel says a newer
+	// In a container it still looks: the panel says a newer
 	// image exists even though pulling it is done elsewhere. No keys are needed
 	// to say that, only to install.
 	switch {
@@ -181,8 +181,8 @@ func (s *Server) handleUpdatePerform(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateSteps are the steps the panel's update dialog shows, in the order they
-// run — Lastboard's timeline, with the two this updater adds: the new binary
-// is made to run before it replaces anything, and the database is copied.
+// run. Two of them are what make it safe: the new binary is made to run
+// before it replaces anything, and the database is copied.
 var UpdateSteps = []string{"signature", "download", "checksum", "prove", "backup", "install", "restart"}
 
 // timelineStep says which step of the dialog an updater step belongs to. The
@@ -206,7 +206,7 @@ func timelineStep(step updater.Step) string {
 }
 
 // performStreaming installs a release and reports each step as it happens,
-// the way Lastboard's updater does: one server-sent event per change, so the
+// one server-sent event per change, so the
 // dialog's timeline moves while the work is done rather than after.
 //
 // The stream ends in one of two ways. A step fails, and its event carries the

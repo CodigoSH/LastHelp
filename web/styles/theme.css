@@ -28,18 +28,16 @@
      making for one value. */
   --canvas-glass: rgba(246, 247, 249, 0.82);
   --panel: #ffffff;
-  /* The sheet the panel is laid on: Lastboard's --surface-solid, measured on
-     its drawer — white here, #242424 in the dark. */
+  /* The sheet the panel is laid on: white here, #242424 in the dark. */
   --sheet: #ffffff;
-  /* A row pointed at, in the accent — Lastboard's --surface-hover, measured:
-     6% here, 10% in the dark. */
+  /* A row pointed at, in the accent: 6% here, 10% in the dark. */
   --surface-hover: rgba(var(--accent-rgb), 0.06);
-  /* Something switched off but alive — their --surface-active: 12% here,
-     20% in the dark. The track of a switch sits on it. */
+  /* Something switched off but alive: 12% here, 20% in the dark. The track of
+     a switch sits on it. */
   --surface-active: rgba(var(--accent-rgb), 0.12);
   --surface-dim: #eef0f4;
   /* The one card that asks for attention — an update is waiting. On light,
-     Lastboard's frosted white with a long shadow. On dark, no shadow at all,
+     a frosted white with a long shadow. On dark, no shadow at all,
      like every other card there: a dark shadow on a dark ground only draws
      rings. It stands out by a neutral lift, an accent border and the glow in
      its corner — no brown wash, which is what made it look off. */
@@ -99,9 +97,8 @@
   --prose: 46rem;
 
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
-  /* The dashboard's second curve, for what should overshoot slightly on the
-     way in: a card lifting under the pointer, a dialog arriving. Copied by
-     value so the two products move the same way. */
+  /* The second curve, for what should overshoot slightly on the way in: a
+     card lifting under the pointer, a dialog arriving. */
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Physical transforms do not follow reading direction. Anything that slides
@@ -315,17 +312,14 @@ body::before {
   opacity: 0.75;
 }
 
-/* Scrollbars: Lastboard's, everywhere.
+/* Scrollbars, everywhere.
  *
  * Thin and the colour of a border, on every element rather than through a
- * class, so a new scrolling box inherits them without anybody deciding to —
- * this is the rule its components share (src/styles/shared.css), which is
- * what somebody actually sees there: its modals, drawers and status page.
+ * class, so a new scrolling box inherits them without anybody deciding to.
  * The standard properties are the ones that take effect in current engines;
  * the webkit ones stay underneath for those that only know them.
  *
- * And none on the public pages. Lastboard's board scrolls with its bar
- * hidden — "stealth scroll" — because the page is the product and a grey
+ * And none on the public pages: they scroll with the bar hidden, because the page is the product and a grey
  * gutter down its edge is the operating system's, not the page's. Scrolling
  * still works by wheel, touch and keyboard. The panel keeps its bar: that is
  * a tool, and there the bar says how much more of the list there is. */
@@ -406,7 +400,7 @@ body > nav {
 }
 
 /*
- * The bar uses the window, the way the dashboard's does: the mark at one edge
+ * The bar uses the window: the mark at one edge
  * and the controls at the other, 20px from each. It used to share the measure
  * of the page under it, which left both of them adrift in the middle of a wide
  * screen with the space they should be using on the outside of them.
@@ -436,7 +430,7 @@ body > nav {
 .nav-right {
   display: flex;
   align-items: center;
-  /* The dashboard's: its toggles sit 4px apart. */
+  /* The toggles sit 4px apart. */
   gap: 4px;
 }
 
@@ -982,13 +976,13 @@ input, textarea, select {
 
 input:hover, textarea:hover, select:hover { border-color: var(--border-strong); }
 
-/* The house dropdown — Lastboard's Select.css, ported (web/src/services/
- * select.ts puts it over every <select>).
+/* The house dropdown (web/src/services/select.ts puts it over every
+ * <select>).
  *
  * The trigger takes the field's own padding, border and background, so it
- * sits at the height of the inputs beside it; the look is theirs: the inset
- * shade, the chevron that turns and lights up, the accent ring while open.
- * Custom properties for a compact size, as theirs has. */
+ * sits at the height of the inputs beside it; then the inset shade, the
+ * chevron that turns and lights up, the accent ring while open. Custom
+ * properties give it a compact size. */
 .sel {
   position: relative;
   display: block;
@@ -1526,7 +1520,7 @@ summary:focus-visible,
  * measure keeps it readable; this one shows several, so the bands run to the
  * window's edges and their contents keep the page's measure inside them.
  */
-/* The first run is the setup and nothing else, as in Lastboard: no bar above
+/* The first run is the setup and nothing else: no bar above
    it — there is nowhere yet for it to lead — and the card in the middle of the
    window. Only the setup: its wizard is the one that hangs straight from the
    page; the panel's wizards live inside the panel. */
@@ -2117,9 +2111,9 @@ body > main:has(> .lp) {
 
 /* -------------------------------------------------------- the page editor
  *
- * The page, with a bar above it and a panel beside it. The panel is the
- * dashboard's drawer: fixed under the top bar, a border on the side it opens
- * from, and the page keeps the rest of the window.
+ * The page, with a bar above it and a panel beside it. The panel is a
+ * drawer: fixed under the top bar, a border on the side it opens from, and
+ * the page keeps the rest of the window.
  */
 body > main:has(> .lpe) {
   max-inline-size: none;
@@ -2754,7 +2748,7 @@ body > main:has(> .lpe) {
   border: 0;
 }
 
-/* One spacing between fields, Lastboard's 10px. The grid's gap used to add to
+/* One spacing between fields, 10px. The grid's gap used to add to
    the margin every .field carries elsewhere, and the setup grew so tall it
    was cut off on a 27-inch screen. */
 .wizard-fields {
@@ -2858,8 +2852,8 @@ body > main:has(> .lpe) {
 /*
  * The bar stays. It used to disappear inside the panel, which left the one
  * control that opens and closes the panel reachable only from outside it — so
- * the way back was the browser's button. The dashboard keeps its bar on every
- * screen and the panel toggle is what opens and closes it.
+ * the way back was the browser's button. The bar is on every screen, and
+ * the panel toggle is what opens and closes it.
  */
 body.admin-view > nav {
   display: block;
@@ -2871,9 +2865,9 @@ body.admin-view > main {
   padding: 0;
 }
 
-/* Laid on Lastboard's sheet: one solid grey, the drawer's, rather than the
-   public page's dark ground with its glow — the panel is a tool, and theirs
-   reads as one surface you work on. */
+/* Laid on the sheet: one solid grey rather than the public page's dark
+   ground with its glow — the panel is a tool, and reads as one surface you
+   work on. */
 .admin {
   display: grid;
   grid-template-columns: 16rem 1fr;
@@ -2888,7 +2882,7 @@ body.admin-view > main {
    is a different rule, not a copy of this one. */
 .side {
   border-inline-end: 1px solid var(--border);
-  /* Their menu column: the sheet with a 4% veil over it, measured. */
+  /* The menu column: the sheet with a 4% veil over it. */
   background: rgba(128, 128, 128, 0.04);
   padding: 1.25rem 0.9rem;
   display: flex;
@@ -2907,8 +2901,7 @@ body.admin-view > main {
   overflow-y: auto;
 }
 
-/* The screen scrolls inside its own column, as Lastboard's drawer does, and
-   not the document. The public pages hide the document's scrollbar and the
+/* The screen scrolls inside its own column, and not the document. The public pages hide the document's scrollbar and the
    panel shows it, so a panel that scrolled the document narrowed the window
    by the bar's width the moment it opened, and every icon in the bar above
    slid 10px sideways under the pointer. Wide screens only: on a phone the
@@ -2926,9 +2919,9 @@ body.admin-view > main {
   html:has(> body.admin-view) { overflow: hidden; }
 }
 
-/* Lastboard's drawer header, to its numbers: a 64px picture, the name at 16px
-   and the role in a small monospaced badge, centred over a rule. It runs out
-   to the sidebar's edges, as the drawer's does. */
+/* Who is acting: a 64px picture, the name at 16px and the role in a small
+   monospaced badge, centred over a rule that runs out to the sidebar's
+   edges. */
 .side-head {
   display: flex;
   flex-direction: column;
@@ -2967,7 +2960,7 @@ body.admin-view > main {
   text-transform: uppercase;
 }
 
-/* Their section label: monospaced, ten pixels, quiet. */
+/* A section label: monospaced, ten pixels, quiet. */
 .side-label {
   margin: 1rem 0 0.35rem;
   padding-inline-start: 16px;
@@ -2978,7 +2971,7 @@ body.admin-view > main {
   color: var(--text-dim);
 }
 
-/* Their menu item: 13px, dimmed until it is pointed at or chosen. */
+/* A menu item: 13px, dimmed until it is pointed at or chosen. */
 .side-item {
   display: flex;
   align-items: center;
@@ -2992,9 +2985,9 @@ body.admin-view > main {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Pointed at: the accent, faintly, and the words brought up — theirs, measured
-   by moving a pointer over their menu. It was a neutral grey here, which read
-   as a different product the moment the pointer moved. */
+/* Pointed at: the accent, faintly, and the words brought up. It was a
+   neutral grey, which read as a different product the moment the pointer
+   moved. */
 .side-item:hover {
   background: var(--surface-hover);
   color: var(--text-main);
@@ -4211,24 +4204,24 @@ body > nav .brand {
   background: rgba(var(--accent-rgb), 0.07);
 }
 
-/* About, with updates inside it — Lastboard's About section, ported.
+/* About, with updates inside it.
  *
- * Its composition, in its order: the product as a statement, centred and only
+ * The composition, in order: the product as a statement, centred and only
  * as tall as what it says, with the update underneath it inside the same card;
  * the release channel as a setting on a row of its own; the server's health;
- * and the links out at the foot, over a rule. Their numbers where they have
- * them — a 72px mark, 18px name, 12px version, 18px down to the update zone. */
+ * and the links out at the foot, over a rule: a 72px mark, 18px name, 12px
+ * version, 18px down to the update zone. */
 .admin-main .about-hero {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  /* Their about card: centred, only as tall as what it says. */
+  /* The about card: centred, only as tall as what it says. */
   padding: 28px 20px 24px;
 }
 
-/* The light behind the mark. Lastboard lights its update card from a corner;
-   the product is what this card is about, so it is lit from behind that. */
+/* The light behind the mark: the product is what this card is about, so it
+   is lit from behind that. */
 
 .about-logo {
   inline-size: 72px;
@@ -4276,12 +4269,12 @@ body > nav .brand {
 
 @keyframes about-spin { to { transform: rotate(360deg); } }
 
-/* Their ghost button: outlined, in capitals, quiet until it is pointed at. */
+/* A ghost button: outlined, in capitals, quiet until it is pointed at. */
 .about-check { margin-block-start: 16px; }
 
 .about-check:disabled { opacity: 0.55; cursor: default; }
 
-/* Something newer: Lastboard's update card — a card within the card, lit from
+/* Something newer: the update card — a card within the card, lit from
    one corner, the badge whose dot pulses, the version under it in a gradient,
    and one button the width of the card. */
 .about-new {
@@ -4362,10 +4355,10 @@ body > nav .brand {
   color: transparent;
 }
 
-/* A setting on a row of its own, as theirs is: what it is and what it means on
+/* A setting on a row of its own: what it is and what it means on
    one side, the switch on the other. */
 
-/* Their switch, 44 by 24. The checkbox is still there, over the whole of it,
+/* A switch, 44 by 24. The checkbox is still there, over the whole of it,
    so a click, a key and a screen reader all reach a real control. */
 .toggle {
   position: relative;
@@ -4418,8 +4411,8 @@ body > nav .brand {
 .toggle input:focus-visible + .toggle-track { box-shadow: var(--ring); }
 .toggle input:disabled + .toggle-track { opacity: 0.5; }
 
-/* The name of a group of cards: the pill of Lastboard's section heads, with
-   the rule running on from it. */
+/* The name of a group of cards: the pill of a section head, with the rule
+   running on from it. */
 
 /* One fact about the machine: what it is, in a tile the accent marks, and the
    number — which is the point — at the size of a number. */
@@ -4497,9 +4490,9 @@ body > nav .brand {
 
 /* ---------------------------------------------------------------- toasts */
 
-/* Ported from Lastboard: bottom centre, three at a time, a bar that drains and
-   pauses under the pointer. Somebody who uses two CodigoSH products should not
-   have to learn a second set of manners. */
+/* Bottom centre, three at a time, a bar that drains and pauses under the
+   pointer. Somebody who uses two CodigoSH products should not have to learn a
+   second set of manners. */
 .toasts {
   position: fixed;
   inset-block-end: 24px;
@@ -4615,8 +4608,7 @@ body > nav .brand {
 
 /* The picture, as one control: the circle is the button.
  *
- * Lastboard's, and the same on purpose — a label, a separate upload button and
- * a sentence saying a picture is optional is three pieces of furniture for
+ * A label, a separate upload button and a sentence saying a picture is optional is three pieces of furniture for
  * something somebody either clicks or ignores. */
 .picture-field { display: flex; justify-content: center; }
 
@@ -4744,7 +4736,7 @@ body > nav .brand {
 .signin-go { inline-size: 100%; }
 
 /* The mark above the wizard and the entrance: bare, as the front page and the
-   About screen draw it, and at Lastboard's size — 64px with 12px under it. */
+   About screen draw it — 64px with 12px under it. */
 .wizard-mark {
   display: block;
   inline-size: 64px;
@@ -5273,8 +5265,7 @@ a.stat:hover .stat-go {
 .nav-right .sign-out .icon { transform: scaleX(var(--rtl-flip)); }
 
 /*
- * The bar's icons are the dashboard's `.top-bar__toggle`, measured off its
- * running binary rather than guessed: 32 by 32 with no border, the icon in the
+ * The bar's icons: 32 by 32 with no border, the icon in the
  * text colour at 20px and a 1.5 stroke, and a hover that dims to 0.7 over a
  * faint grey square of radius 4. They had been the generic icon button of the
  * panel — dim grey, smaller, rounder, brightening on hover — which is the same
@@ -5450,22 +5441,18 @@ a.stat:hover .stat-go {
    not replay, and removing this class after a reflow is what restarts it. */
 .toast-bar.no-drain { animation: none !important; }
 
-/* While the page is being arranged, the control that says so wears the accent,
-   the way the dashboard's own edit toggle does. The bar's own rule, above,
-   carries it there. */
+/* While the page is being arranged, the control that says so wears the
+   accent. The bar's own rule, above, carries it there. */
 .icon-button.composing {
   color: var(--accent);
 }
 
 /*
  * Picking what to add: a grid of cards, each with its mark, its name and a line
- * saying what it draws. Copied from the dashboard's own picker, down to the
- * track — cards that fit themselves to the width rather than a fixed number of
+ * saying what it draws. Cards that fit themselves to the width rather than a fixed number of
  * columns, so the same dialog works on a laptop and on a phone.
  */
 /*
- * Measured off their picker, not styled to taste.
- *
  * Called chooser and not picker: this stylesheet already has a `.picker`, the
  * control that chooses an image, and it carries `line-height: 0`. Naming this
  * one the same inherited that and left the title and the line under it both
@@ -5473,11 +5460,11 @@ a.stat:hover .stat-go {
  * for duplicate rules can see, which is a fault this project has met before.
  */
 .modal.chooser {
-  /* 720, which is theirs, not a round number of my own. */
+  /* 720 wide. */
   inline-size: min(720px, 95vw);
   max-inline-size: none;
   padding: 32px;
-  /* Their cap: the dialog never outgrows the window, and what does not fit
+  /* The cap: the dialog never outgrows the window, and what does not fit
      scrolls inside it rather than pushing the close button off the screen. */
   max-block-size: min(88vh, 900px);
   overflow: auto;
@@ -5495,8 +5482,8 @@ a.stat:hover .stat-go {
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  /* Their title fades from the main text colour into the dim one. It is the
-     first thing the eye lands on in that dialog and the reason the header
+  /* The title fades from the main text colour into the dim one. It is the
+     first thing the eye lands on in the dialog and the reason the header
      reads as a heading rather than as a label. */
   background: linear-gradient(135deg, var(--text-main) 0%, var(--text-dim) 100%);
   -webkit-background-clip: text;
@@ -5526,7 +5513,7 @@ a.stat:hover .stat-go {
 /* A dialog opened with showModal() puts the focus on this button, so the
    focus-ring rule applies the moment it appears — and that rule sets a radius
    of its own, which out-specifies the one above and rounds the close to 8
-   where theirs is 12. The shape is restated here rather than dropped from the
+   where it is 12. The shape is restated here rather than dropped from the
    focus rule, which exists to shape the ring on everything else. */
 .picker-close:focus,
 .picker-close:focus-visible { outline: none; border-radius: 12px; }
@@ -5535,12 +5522,12 @@ a.stat:hover .stat-go {
  *
  * A pill rather than a dot: a dot answers "is there anything?", and here the
  * question is "how much work is it?", which is what decides whether somebody
- * opens it now or after lunch. The dashboard's icons have no quantity to
+ * opens it now or after lunch. The bar's other icons have no quantity to
  * report; a queue does. The shape is this product's own count-chip, not a new
  * element invented for the bar.
  *
- * Accent while the screen is open, the way that dashboard marks the page you
- * are on — and it stays clickable there, because it is also the way out.
+ * Accent while the screen is open, marking the page you are on — and it
+ * stays clickable there, because it is also the way out.
  */
 .review-pill {
   display: inline-flex;
@@ -5574,8 +5561,8 @@ a.stat:hover .stat-go {
 .nav-right a.review-pill.has,
 .nav-right a.review-pill.has:hover { color: var(--hue-hold); padding-inline: 4px; }
 
-/* The mode that is on wears the accent and nothing else, as the dashboard's
-   edit and status toggles do: no fill, no frame. */
+/* The mode that is on wears the accent and nothing else: no fill, no
+   frame. */
 .nav-right a.review-pill.on,
 .nav-right a.review-pill.on.has,
 .nav-right .icon-button.composing {
@@ -5584,15 +5571,12 @@ a.stat:hover .stat-go {
 
 /* Reviewing what is waiting.
  *
- * The shape is Lastboard's MonitorPage, ported with its numbers: the list is
- * 545px capped at 52% with a border on its trailing edge, the detail takes the
- * rest, and the whole thing starts BELOW the top bar — which in both products
- * is exactly 48px tall. The bar stays because the control that opens this is
- * also the way out.
+ * The list is 545px capped at 52% with a border on its trailing edge, the
+ * detail takes the rest, and the whole thing starts BELOW the 48px top bar.
+ * The bar stays because the control that opens this is also the way out.
  *
- * The rows are NOT that page's cards. They are the menu's recipe — this
- * product's own .side-item, which is itself the port of Lastboard's drawer
- * menu-item: radius 8, an accent wash at 12% and a 2px line on the trailing
+ * The rows are NOT cards. They are the menu's recipe — the panel's own
+ * .side-item: radius 8, an accent wash at 12% and a 2px line on the trailing
  * edge running out to the column's own edge. A card's border-color would only
  * tint the divider under a flush row, which reads as a separator and not as a
  * selection.
@@ -5661,9 +5645,8 @@ a.stat:hover .stat-go {
   padding-block-end: 12px;
 }
 
-/* The archive's controls. The search box is Lastboard's, from the head of its
-   status page's list, to the pixel: input colours, the house radius, 12px text
-   and the glass left out. */
+/* The archive's controls. The search box: input colours, the house radius,
+   12px text and no glass. */
 .rev-filter {
   display: flex;
   flex-direction: column;
@@ -5706,8 +5689,7 @@ a.stat:hover .stat-go {
    leaves 130 — and a label that does not fit is cut short. Two also make the
    four of them a square rather than three and a stray.
  *
- * The house dropdown at its compact size, which is what Lastboard's exposes
- * its custom properties for: the same control on the same line as a search
+ * The house dropdown at its compact size: the same control on the same line as a search
  * box, at the search box's height. */
 .rev-narrow {
   --sel-padding: 5px 10px;
@@ -5875,10 +5857,10 @@ a.stat:hover .stat-go {
   color: var(--text-main);
 }
 
-/* Their fold, at their width: the list takes the screen, and a tapped row
-   opens the detail as a drawer from the trailing edge. The drawer is
-   Lastboard's MonitorHistoryDrawer: 420px or the whole width, a veil at 45%,
-   a 0.28s slide mirrored by --rtl-flip, and the square close that turns. */
+/* The fold, at 640px: the list takes the screen, and a tapped row opens the
+   detail as a drawer from the trailing edge — 420px or the whole width, a veil
+   at 45%, a 0.28s slide mirrored by --rtl-flip, and the square close that
+   turns. */
 @media (max-width: 640px) {
   .rev-side { inline-size: 100%; max-inline-size: 100%; border-inline-end: none; }
   .rev-foot { display: none; }
@@ -6141,12 +6123,10 @@ a.stat:hover .stat-go {
 
 .picker-grid {
   display: grid;
-  /* Theirs says 200. Theirs also has nine cards in three rows and so never
-     scrolls; this has eleven, the dialog is capped at the window height, and
-     the scrollbar takes the width back: measured at 639px of usable space
-     against the 640 that three 200px columns need. One pixel short reads as a
-     two-column dialog, which is not what was ported. So the floor drops by ten
-     and the layout is theirs again. */
+  /* 190, not 200: there are eleven cards, the dialog is capped at the window
+     height, and the scrollbar takes the width back — measured at 639px of
+     usable space against the 640 that three 200px columns need. One pixel
+     short reads as a two-column dialog, so the floor drops by ten. */
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 20px;
 }
@@ -6163,9 +6143,9 @@ a.stat:hover .stat-go {
   color: inherit;
   cursor: pointer;
   font: inherit;
-  /* Their card is not a flat tile that darkens: it lifts eight pixels, grows a
-     little, and lights a wash of accent behind itself. The overshoot is what
-     makes it feel like theirs, so the curve is copied along with the numbers. */
+  /* The card is not a flat tile that darkens: it lifts eight pixels, grows a
+     little, and lights a wash of accent behind itself, on the overshooting
+     curve. */
   position: relative;
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -6193,8 +6173,8 @@ a.stat:hover .stat-go {
 
 .picker-card:hover::before { opacity: 0.15; }
 
-/* The mark sits in a tile of its own, which is most of why theirs reads as a
-   card and mine read as a button with a picture on it. */
+/* The mark sits in a tile of its own, which is most of why the card reads as
+   a card and not as a button with a picture on it. */
 .picker-icon {
   inline-size: 64px;
   block-size: 64px;
@@ -6239,9 +6219,8 @@ a.stat:hover .stat-go {
   z-index: 1;
 }
 
-/* Their close does not just change colour: it turns a quarter turn into the
-   accent, with a wash behind it. Mine went grey-to-black and stayed put, which
-   is the difference somebody notices without being able to name it. */
+/* The close does not just change colour: it turns a quarter turn into the
+   accent, with a wash behind it. */
 .picker-close:hover {
   background: var(--accent-wash);
   transform: rotate(90deg);
@@ -6253,16 +6232,13 @@ a.stat:hover .stat-go {
   .picker-close:hover { transform: none; }
 }
 
-/* And their action: the whole width, outlined, in the accent, in small caps.
-   Mine was a small filled button in a corner, which is the single most visible
-   difference between the two dialogs. */
+/* And the action: the whole width, outlined, in the accent, in small caps. */
 .modal-foot { padding: 16px 24px 24px; }
 
-/* Asking before removing, measured off theirs rather than reusing the settings
-   dialog's furniture. Mine had no padding of its own, a header with no rule
-   under it, a nineteen pixel bold title, a sixteen pixel message and a button
-   stretched the whole width — five differences, all of them from wearing the
-   wrong composition. */
+/* Asking before removing: a composition of its own rather than the settings
+   dialog's furniture — its own padding, a header over a rule, an 18px title, a
+   14px message, and one button at the end of the line rather than stretched
+   across the width. */
 .modal.confirm {
   padding: 28px;
   inline-size: min(30rem, calc(100vw - 2rem));
@@ -6349,12 +6325,11 @@ a.stat:hover .stat-go {
 }
 
 /*
- * The panel comes in from the side, the way the dashboard's drawer does.
+ * The panel comes in from the side, as a drawer does.
  *
  * translateX is physical and does not follow the reading direction, so it is
  * multiplied by --rtl-flip: in Arabic the panel has to arrive from the left or
- * it slides in from the wrong edge of the screen. Same duration and curve as
- * the drawer it is copied from.
+ * it slides in from the wrong edge of the screen.
  */
 @keyframes panel-arrives {
   from {
@@ -6382,8 +6357,7 @@ a.stat:hover .stat-go {
 }
 
 /*
- * A control that cannot be used while another mode is on. Theirs exactly:
- * dimmed, greyed and deaf to the pointer, rather than missing — a bar whose
+ * A control that cannot be used while another mode is on: dimmed, greyed and deaf to the pointer, rather than missing — a bar whose
  * controls come and go is a bar you have to read again every time.
  */
 /* The side column of the panel icon, which fills while the panel is open — so
@@ -6404,12 +6378,11 @@ a.stat:hover .stat-go {
   .admin.leaving { animation: none; }
 }
 
-/* The add menu is the dashboard's, not the kebab's.
+/* The add menu, not the kebab's.
  *
  * It borrowed .kebab-menu, which is a different control: wider, rounder, in
- * body text. Theirs is a small monospaced list — 4px radius, 4px of padding,
- * 11px mono, 14px icons at 0.7 opacity — and somebody who has used the
- * dashboard recognises it before reading it. */
+ * body text. This is a small monospaced list — 4px radius, 4px of padding,
+ * 11px mono, 14px icons at 0.7 opacity. */
 .add-menu {
   position: absolute;
   inline-size: max-content;
@@ -6466,14 +6439,10 @@ a.stat:hover .stat-go {
 .add-menu-item:hover .icon { opacity: 1; }
 
 /*
- * Lastboard's settings panel, ported whole into this one.
+ * The settings panel of the house.
  *
- * Measured off its binary, section by section (My profile, Look & feel,
- * Personalization, Users, Data), not off its stylesheet alone: every panel
- * screen here is the same kind of thing as one of those, and a person who
- * uses both products should not be able to tell which one they are in.
- *
- * The recipe, from SettingsContent.css and Button.css:
+ * A person who uses more than one CodigoSH product should not be able to tell
+ * which one they are in. The recipe:
  *   - cards with no icon: a whisper of fill, a border, radius 10, 16 by 20 of
  *     padding, one under another, 16 apart;
  *   - the card's name at 11px, semibold, in dim capitals spaced 0.08em;
@@ -6486,7 +6455,7 @@ a.stat:hover .stat-go {
  *
  * Scoped to the panel's content, and never the new-organisation wizard,
  * which belongs with sign-up and sign-in: the screens that ask for one thing
- * wear Lastboard's sign-in, which is a filled button.
+ * wear a filled button.
  */
 .admin-main {
   --field: 420px;
@@ -6497,8 +6466,7 @@ a.stat:hover .stat-go {
   --sel-radius: var(--radius-control);
 }
 
-/* The page's own name is the item chosen in the menu, as in their drawer. The
-   heading stays for whoever reads the page out loud. */
+/* The page's own name is the item chosen in the menu. The heading stays for whoever reads the page out loud. */
 .admin-main > h1:not(.visually-hidden) { font-size: 1.35rem; }
 
 .settings {
@@ -6523,8 +6491,7 @@ a.stat:hover .stat-go {
 .admin-main .bento-card .card-head { gap: 0; color: inherit; margin: 0 0 4px; }
 .admin-main .bento-card .card-head > .icon { display: none; }
 
-/* 13px, measured on their panel: the stylesheet says 11 and a later rule
-   raises it, so reading the file alone gives the wrong number. */
+/* 13px. */
 .admin-main .bento-card .card-head h3,
 .admin-main .card-top h3 {
   margin: 0;
@@ -6551,7 +6518,7 @@ a.stat:hover .stat-go {
   color: var(--text-dim);
 }
 
-/* Fields: their form group, label and control. */
+/* Fields: the form group, label and control. */
 .admin-main :not(.wizard) .field { margin-block: 0 16px; max-inline-size: var(--field); }
 .admin-main :not(.wizard) .field > label {
   display: block;
@@ -6591,7 +6558,7 @@ a.stat:hover .stat-go {
 .settings-actions { display: flex; margin-block-start: 24px; }
 .settings-actions .button { min-inline-size: 160px; }
 
-/* Buttons: theirs. */
+/* Buttons. */
 .admin-main .button:not(.wizard .button),
 .update-dialog .button {
   block-size: var(--control-h);
@@ -6647,7 +6614,7 @@ a.stat:hover .stat-go {
 
 .admin-main .button .icon { inline-size: 14px; block-size: 14px; }
 
-/* A dialog's two buttons share its width, as theirs do. */
+/* A dialog's two buttons share its width. */
 .admin-main .modal-foot .button { flex: 1; justify-content: center; }
 
 /* The row: what a thing is, and the one thing you do to it at the end. */
@@ -6670,7 +6637,7 @@ a.stat:hover .stat-go {
 .settings-info p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim); max-inline-size: 56ch; }
 .settings-info .settings-danger { color: var(--danger-color); font-weight: 600; }
 
-/* Their list of users: a row per thing, a surface and a border, the accent
+/* A list of users: a row per thing, a surface and a border, the accent
    when pointed at, the actions at the far end. */
 .settings-list { display: grid; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
 .settings-list + .card-sub { margin-block-start: 12px; }
@@ -6707,7 +6674,7 @@ a.stat:hover .stat-go {
 .si-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-inline-start: auto; }
 .si-actions { display: flex; gap: 4px; flex: none; }
 
-/* Their small monospaced tag: a role, a slug, a state. */
+/* A small monospaced tag: a role, a slug, a state. */
 .mono-tag {
   display: inline-block;
   padding: 2px 8px;
@@ -6741,7 +6708,7 @@ a.stat:hover .stat-go {
 .state-mark.hold { color: var(--hue-hold); }
 .state-mark b { font-weight: 600; }
 
-/* Their profile header: the picture, and the name with its tags beside it. */
+/* The profile header: the picture, and the name with its tags beside it. */
 .profile-head { display: flex; align-items: center; gap: 20px; margin: 8px 0 32px; }
 .profile-who { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .profile-name { font-size: 17.5px; font-weight: 600; }
@@ -6751,8 +6718,8 @@ a.stat:hover .stat-go {
 .logo-row input { flex: 1; }
 .org-tags { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
 
-/* Their segmented control, for the theme: small, one line, the chosen segment
-   raised. The three large tiles it replaces were this product's own. */
+/* A segmented control, for the theme: small, one line, the chosen segment
+   raised. */
 .admin-main .theme-choice {
   display: flex;
   gap: 2px;
@@ -6794,8 +6761,8 @@ a.stat:hover .stat-go {
 
 .admin-main .theme-choice button[aria-pressed="true"] .icon { color: inherit; }
 
-/* Overview has no twin in Lastboard, so it wears the same card: no icons, the
-   quiet capital name, the number under it. */
+/* Overview wears the same card: no icons, the quiet capital name, the number
+   under it. */
 .admin-main .dash-card {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -6822,13 +6789,13 @@ a.stat:hover .stat-go {
 
 @media (max-width: 40rem) {
   .settings-row { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
-  /* A switch is small enough to stay at the end of its line, as theirs does. */
+  /* A switch is small enough to stay at the end of its line. */
   .settings-row:has(> .toggle) { grid-template-columns: minmax(0, 1fr) auto; }
   .profile-head { flex-direction: column; align-items: flex-start; }
   .si-tags { display: none; }
 }
 
-/* Their logo is a square tile with a border beside the name, not a round
+/* The logo is a square tile with a border beside the name, not a round
    portrait: a mark is not a face. */
 .logo-row .avatar,
 .logo-row .logo-preview {
@@ -6839,7 +6806,7 @@ a.stat:hover .stat-go {
   object-fit: contain;
 }
 
-/* Lastboard's accent swatches, to their numbers: 32px squares with a 4px
+/* The accent swatches: 32px squares with a 4px
    radius and a faint border, growing a little under the pointer; the chosen
    one ringed in white with a glow and its tick shown. The eighth is a
    rainbow until a colour of its own is chosen, and the device's own colour
@@ -6938,10 +6905,8 @@ a.stat:hover .stat-go {
 
 /* ------------------------------------------------------------ the updater */
 
-/* Lastboard's updater, piece for piece: the red dot on the bar's panel icon,
-   "New update!" beside Info in the menu, the Docker notice, and the dialog
-   with its timeline. Values are theirs (TopBar.css, RightDrawer, SettingsContent
-   and UpdateModal.css); only the variable names are this theme's. */
+/* The updater: the red dot on the bar's panel icon, "New update!" beside Info
+   in the menu, the Docker notice, and the dialog with its timeline. */
 
 .panel-toggle { position: relative; }
 
@@ -6951,7 +6916,7 @@ a.stat:hover .stat-go {
   inset-inline-end: 4px;
   inline-size: 8px;
   block-size: 8px;
-  /* Content-box, as theirs is: 8px of red inside a 2px ring, 12px in all.
+  /* Content-box: 8px of red inside a 2px ring, 12px in all.
      This product sets border-box on everything, and that alone had shrunk
      the dot to 8px with 4px of red — the same recipe, visibly smaller. */
   box-sizing: content-box;

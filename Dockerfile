@@ -1,4 +1,4 @@
-# The house's image, built the way Lastboard's is: both build stages run on the
+# The house's image: both build stages run on the
 # machine doing the build and cross-compile for the target, and the runtime
 # stage runs no commands at all. That is what lets one runner publish amd64
 # and arm64 without emulating anything — a RUN in the last stage would have to

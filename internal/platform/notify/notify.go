@@ -6,9 +6,8 @@
 // reads worse from outside than having no portal at all.
 //
 // Four channels and no more, chosen because they are what a self-hoster already
-// runs. The shape is Lastboard's monitor_notify.go — a config with a kind, a
-// switch, one function per channel — because that file has been in production
-// for a year and is 113 lines.
+// runs. The shape is small on purpose — a config with a kind, a switch, one
+// function per channel — because that is all four of them need.
 package notify
 
 import (

@@ -1,10 +1,10 @@
 /**
  * The house dropdown, over every <select> in the product.
  *
- * A port of Lastboard's app-select: a trigger with the field's own look and a
+ * A trigger with the field's own look and a
  * chevron that turns, and a list that opens under it with the chosen option in
  * the accent. The browser's own dropdown is a grey system menu that looks like
- * no part of either product, and it was the one control on the review screen
+ * no part of the product, and it was the one control on the review screen
  * that did not read as ours.
  *
  * It is an enhancement, not a replacement, and that is the whole design:
@@ -18,8 +18,8 @@
  *     had native selects when this was written; a fifth added tomorrow is
  *     covered without anybody knowing.
  *
- * Two things differ from Lastboard, both for this product's policy
- * (`style-src 'self'`, no unsafe-inline): the list is positioned with a rule
+ * Two things follow from this product's policy (`style-src 'self'`, no
+ * unsafe-inline): the list is positioned with a rule
  * inserted through CSSOM instead of by writing `el.style`, and it is never
  * portalled to <body> — it stays beside its trigger, so inside a <dialog> it
  * is in the top layer with it.
@@ -44,7 +44,7 @@ function labelOf(select: HTMLSelectElement): string {
  *
  * Fixed rather than absolute, so no scrolling ancestor can clip it. A fixed
  * element is placed against the window unless an ancestor has a transform or
- * a filter, and a dialog arriving has both — so, as Lastboard does, a probe is
+ * a filter, and a dialog arriving has both — so a probe is
  * placed at the origin and whatever offset it lands at is taken off.
  */
 function place(wrap: HTMLElement, trigger: HTMLElement, list: HTMLElement, id: string): void {
@@ -256,7 +256,7 @@ export function enhanceSelects(root: ParentNode): void {
  * Once, at start: enhance what is there and whatever is drawn later.
  *
  * A click outside, a scroll anywhere but in the list, and a resize all close
- * the open list — Lastboard's rules, because a list left floating where its
+ * the open list, because a list left floating where its
  * trigger used to be is worse than one that closes.
  */
 export function watchSelects(): void {

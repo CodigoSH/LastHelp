@@ -48,9 +48,9 @@ export function modal(spec: ModalSpec, text: Text): string {
 }
 
 /**
- * Asking before something that cannot be taken back: Lastboard's
- * ConfirmationModal. A title over a rule, the sentence, and one danger button
- * at the end of the line — the cross is the way out, as in theirs. Drawn once
+ * Asking before something that cannot be taken back: a title over a rule, the
+ * sentence, and one danger button at the end of the line — the cross is the
+ * way out. Drawn once
  * and filled for each question; the browser's own confirm() it replaces is a
  * grey box in another product's voice.
  */

@@ -1,5 +1,5 @@
 /**
- * The update dialog: Lastboard's, piece for piece.
+ * The update dialog.
  *
  * A badge that says where the update stands, the title, the two versions with
  * an arrow between them, one sentence, the timeline of steps, a failure block

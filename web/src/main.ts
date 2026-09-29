@@ -107,7 +107,7 @@ window.addEventListener("popstate", () => void render());
 /**
  * What the last update check found, for an administrator.
  *
- * As Lastboard does it: checked once, a moment after the panel's owner arrives,
+ * Checked once, a moment after the panel's owner arrives,
  * and when something newer exists the bar's panel icon carries a red dot and
  * Info in the menu says so — the update is noticed without going to look.
  */
@@ -149,8 +149,8 @@ function renderNav(): void {
   /**
    * Arranging the front page, from the bar above it.
    *
-   * One control that turns into the other, which is how the dashboard in this
-   * house does it: a pencil while the page is just a page, a tick in the accent
+   * One control that turns into the other: a pencil while the page is just a
+   * page, a tick in the accent
    * colour while it is being arranged. It used to be a button inside the page
    * itself, which put a control for the operator in the middle of the thing
    * every visitor sees.
@@ -158,9 +158,8 @@ function renderNav(): void {
    * Only on the front page, and only for somebody who can change it.
    */
   const composing = me?.admin === true && location.pathname === "/" && landingEditing;
-  // Arranging the front page, the panel and the review screen are exclusive,
-  // as edit mode, the drawer and the status page are in Lastboard: while one
-  // is on, every other control in the bar is shown and greyed out, and only
+  // Arranging the front page, the panel and the review screen are exclusive:
+  // while one is on, every other control in the bar is shown and greyed out, and only
   // the one that leads back out answers. Shown, not removed — a bar whose
   // icons come and go moves under the pointer, and has to be read again.
   const inPanel = document.body.classList.contains("admin-view");
@@ -172,7 +171,7 @@ function renderNav(): void {
     me?.admin === true
       ? composing
         ? // While arranging: a plus that opens a short menu, and the tick that
-          // finishes. The dashboard's shape exactly — adding is two decisions,
+          // finishes. Adding is two decisions,
           // a module or a group, and only the first needs a picker.
           `<div class="add-wrap">
              <button class="icon-button" data-add-menu
@@ -200,8 +199,7 @@ function renderNav(): void {
   // public page is the one thing on that bar nobody came for.
   // The panel's own control, which opens it and closes it.
   //
-  // The dashboard's drawer toggle: a box whose side column fills while the
-  // thing is open, so the icon says which state you are in rather than what
+  // A box whose side column fills while the thing is open, so the icon says which state you are in rather than what
   // clicking will do. Disabled while the front page is being arranged — one
   // mode at a time, and a control that does something else mid-gesture is a
   // control somebody hits by accident.
@@ -232,9 +230,9 @@ function renderNav(): void {
    * that left out the administrator instead, who holds no membership: the
    * screen that is now where every report is worked on had no door for them.
    *
-   * Never hidden when the queue is empty. It disappears in the dashboard in
-   * this house when the FEATURE is off, which is a decision of installation; a
-   * control that comes and goes with the work is one nobody learns is there,
+   * Never hidden when the queue is empty. Hiding it when a feature is off
+   * would be a decision of installation; a control that comes and goes with
+   * the work is one nobody learns is there,
    * and it takes away the only way to see that you are finished.
    *
    * The count is the server's, already narrowed to the boards this account may
@@ -246,12 +244,12 @@ function renderNav(): void {
   const review =
     me && canTriage
       ? // While the screen is open this is its way out, the way the status
-        // icon closes Lastboard's status page: it goes back where you were.
+        // icon closes a full-screen page: it goes back where you were.
         // Greyed while the front page is arranged, with no address to follow:
         // a link that only looks disabled still opens from the keyboard.
         //
-        // Live inside the panel, the one departure from Lastboard's one mode
-        // at a time, decided with the user: the reports are the team's daily
+        // Live inside the panel, the one departure from one mode at a time,
+        // decided with the user: the reports are the team's daily
         // work and the panel is where the team spends the day, so the door
         // to them answers from there, leaving the panel as it opens.
         `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}${composing ? " cannot" : ""}"
@@ -500,7 +498,7 @@ async function showInShell(content: string, path: string): Promise<void> {
     );
   }
   // Arriving at the panel, it comes in from the side the reading direction ends
-  // on — the dashboard's own drawer does exactly this. Only on arrival: moving
+  // on. Only on arrival: moving
   // between panel screens is not an arrival, and replaying it on every click
   // would be a shudder rather than an entrance.
   const arriving = !document.body.classList.contains("admin-view");
@@ -1071,7 +1069,7 @@ async function showAbout(): Promise<void> {
     // The page may have been left while the release server was thinking.
     if (!zone.isConnected) return;
     zone.innerHTML = views.updateZone(status, text);
-    // The bar and the menu follow what was just found, as they do in Lastboard.
+    // The bar and the menu follow what was just found.
     if (status) noteUpdate(status);
     if (beta && status) {
       beta.checked = status.beta === true;
@@ -1102,7 +1100,7 @@ async function showAbout(): Promise<void> {
   });
 
   // Delegated, because the zone is rewritten every time it is asked. The
-  // button opens Lastboard's dialog, which does the rest.
+  // button opens the update dialog, which does the rest.
   zone?.addEventListener("click", (event) => {
     if (!(event.target as HTMLElement).closest("[data-update]") || !updateFound) return;
     openUpdateDialog(updateFound);
@@ -1144,8 +1142,7 @@ async function render(): Promise<void> {
   }
   // Where the review screen was opened from, which is where leaving it goes:
   // the bar's icon, the close button and Escape all take you back rather than
-  // to a fixed page, the way closing Lastboard's status page leaves you on the
-  // board you were on.
+  // to a fixed page.
   if (path === "/review" && lastRendered !== "" && !lastRendered.startsWith("/review") &&
       !lastRendered.startsWith("/panel/reports")) {
     reviewCameFrom = lastRendered;
@@ -1181,8 +1178,7 @@ async function render(): Promise<void> {
       if (old.toString() !== "" && !old.has("mode")) old.set("mode", "all");
       return go(`/review${old.toString() ? `?${old.toString()}` : ""}`);
     }
-    // Where updates used to live. They are part of About now, as in
-    // Lastboard; the address is kept as a door because it is in people's
+    // Where updates used to live. They are part of About now; the address is kept as a door because it is in people's
     // bookmarks and in the documentation of older releases.
     if (path === "/panel/updates") return go("/panel/about");
     if (path === "/panel/account") return await showProfile();
@@ -2070,9 +2066,7 @@ async function showPanel(): Promise<void> {
  * Reviewing what is waiting.
  *
  * A place, not a layer: it has its own address, so a filtered view can be sent
- * to somebody and a reload lands back on it. Lastboard's equivalent is an
- * overlay because that product has no router; copying the overlay would be
- * importing a limitation rather than the design.
+ * to somebody and a reload lands back on it. An overlay could do neither.
  *
  * Everything on screen is read from the address — the mode, what is chosen and
  * every narrowing of the archive — so there is one source of truth for what is
@@ -2204,8 +2198,7 @@ async function wireReview(
   }
 
   // On a phone there is no room for the detail beside the list, so a chosen
-  // row opens it as a drawer from the trailing edge — Lastboard's answer on
-  // the same page at the same width. Only a tap opens it: arriving on the
+  // row opens it as a drawer from the trailing edge. Only a tap opens it: arriving on the
   // screen, or a decision moving to the next row, keeps the list in view.
   const narrow = () => window.matchMedia("(max-width: 640px)").matches;
   const reading = (on: boolean) => screen?.classList.toggle("reading", on);

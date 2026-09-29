@@ -532,8 +532,8 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
-// username is what a team reply is signed with: an account has one name, as
-// on Lastboard, and it is this one.
+// username is what a team reply is signed with: an account has one name, and
+// it is this one.
 func (s *Server) username(userID int64) (string, error) {
 	var name string
 	err := s.db.QueryRow(`SELECT username FROM app_user WHERE id = ?`, userID).Scan(&name)

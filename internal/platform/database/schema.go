@@ -371,7 +371,7 @@ var migrations = []migration{
 	{
 		version: 9,
 		name:    "an account has one name",
-		// The username is the name, the way Lastboard has it: the one you sign
+		// The username is the name: the one you sign
 		// in with is the one your replies carry. A second, "display" name made
 		// renaming yourself change something other than what you sign in with.
 		//

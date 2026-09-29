@@ -814,13 +814,12 @@ export interface WaitingComment {
 /**
  * The picture, as one control: the circle is the button.
  *
- * Lastboard's, and deliberately the same — a label, a separate upload button
- * and a sentence explaining that a picture is optional is three pieces of
+ * A label, a separate upload button and a sentence explaining that a picture is optional is three pieces of
  * furniture for something somebody either clicks or ignores. The badge on the
  * corner is what says it can be changed, and it says it in two words.
  *
- * Shared on purpose across the two products: somebody who has set up one
- * should recognise this.
+ * The same in every CodigoSH product: somebody who has set up one should
+ * recognise this.
  */
 export interface PickerSpec {
   /** Where the click and the clear are wired: "avatar" or "logo". */
@@ -1282,7 +1281,7 @@ export interface ShellSpec {
   content: string;
   /** What is waiting, already narrowed by the server to what this account may open. */
   waiting?: { reports: number; messages: number };
-  /** Something newer is released: Info in the menu says so, as in Lastboard. */
+  /** Something newer is released: Info in the menu says so. */
   updateAvailable?: boolean;
 }
 
@@ -1317,8 +1316,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
   return `<div class="admin">
     <aside class="side">
       <!-- No installation mark here: the bar above carries it. What heads the
-           menu is Lastboard's drawer header — who is acting: the picture, the
-           name and the role. -->
+           menu is who is acting: the picture, the name and the role. -->
       <div class="side-head">
         ${avatar(spec.who, spec.avatar)}
         <span class="who">${escapeHTML(spec.who)}</span>
@@ -1346,7 +1344,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
             ? item("/panel/people", text.t("shell.people"), icons.people()) +
                 item("/panel/personalization", text.t("shell.personalization"), icons.brush()) +
                 item("/panel/backups", text.t("shell.backups"), icons.backup()) +
-                // Updates live inside About, as in Lastboard: what is running
+                // Updates live inside About: what is running
                 // and whether it is the one to run are one question.
                 item("/panel/about", text.t("shell.about"), icons.info(), "", 0, spec.updateAvailable ? sideUpdateBadge(text) : "")
             : "",
@@ -1791,8 +1789,8 @@ export interface ReviewView {
  * waiting: the reports visible without scrolling were **none**, on a screen
  * titled Reports.
  *
- * The shape is the house's, not an invention and not a mail client: it is
- * Lastboard's MonitorPage — a list of 545px capped at 52% with its border, the
+ * The shape is the house's, not an invention and not a mail client: a list
+ * of 545px capped at 52% with its border, the
  * detail beside it, starting below the top bar because the bar stays (the icon
  * that opens this is also the way out). The rows are the menu's recipe, which
  * is what this product already uses for a chosen row.
@@ -1855,8 +1853,7 @@ export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): s
 /**
  * The archive's controls: a search box and four narrowings.
  *
- * The search box is Lastboard's, from the head of that page's list. The four
- * selects are what the screen this replaced offered as tabs and selects on a
+ * The four selects are what the screen this replaced offered as tabs and selects on a
  * row of their own; in a column of 545px they have to be compact, and a select
  * carries its own label as the first option, so nothing is spent on captions.
  * An option that would find nothing is not offered.
@@ -2089,12 +2086,12 @@ export function reviewDetail(
 }
 
 /**
- * A card of Lastboard's settings panel.
+ * A card of the settings panel.
  *
- * Its recipe, which every panel screen now wears: no icon, the card's name in
+ * The recipe every panel screen wears: no icon, the card's name in
  * small quiet capitals, what it is for underneath, then its contents. An
  * action that belongs to the whole card — adding a user, adding a repository
- * — sits at the end of the title's line, as "+ Add user" does there.
+ * — sits at the end of the title's line.
  */
 function settingsCard(title: string, body: string, opts: { lead?: string; action?: string; tag?: string } = {}): string {
   return `<section class="bento-card settings-card">
@@ -2105,7 +2102,7 @@ function settingsCard(title: string, body: string, opts: { lead?: string; action
 }
 
 /**
- * One thing in a list, as Lastboard lists its users: a row with what it is on
+ * One thing in a list: a row with what it is on
  * one side and what can be done to it on the other.
  */
 function settingsItem(spec: {
@@ -2144,8 +2141,7 @@ export function profileScreen(
   me: { username: string; avatar?: string; role: string },
   text: Text,
 ): string {
-  // Lastboard's "My profile" and "System password", card for card: the
-  // picture, the name and the role; the username — the one name an account
+  // Profile and password, a card each: the picture, the name and the role; the username — the one name an account
   // has, to sign in with and to sign replies — with its save button on the same
   // line; and the password, closed by one button aligned with the fields
   // rather than stretched across the card.
@@ -2198,7 +2194,7 @@ export function appearanceScreen(
   theme: string,
   text: Text,
 ): string {
-  // Lastboard's "Look & feel": one card, a label over each control, and the
+  // Appearance: one card, a label over each control, and the
   // theme as its segmented control rather than three large tiles.
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.appearance"))}</h1>
     <div class="settings">
@@ -2246,7 +2242,7 @@ export function personalizationScreen(
   instance: { name: string; logo: string; accent: string },
   text: Text,
 ): string {
-  // Lastboard's "Logo & panel name": the mark and the name side by side, as one
+  // Logo and name: the mark and the name side by side, as one
   // thing — they are what the header shows together — and the accent below.
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.personalization"))}</h1>
     <form class="instance-settings settings">
@@ -2273,7 +2269,7 @@ export function personalizationScreen(
 }
 
 /**
- * Lastboard's accent picker: seven swatches and an eighth for any colour, the
+ * The accent picker: seven swatches and an eighth for any colour, the
  * chosen one ringed in white with a tick.
  *
  * The house orange is one of the seven and choosing it stores nothing — the
@@ -2294,7 +2290,7 @@ export const ACCENTS: [string, string][] = [
 
 const TICK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17L4.83 12l-1.42 1.42L9 19 21 7l-1.42-1.42z"/></svg>`;
 
-/** Their palette, filled with its wells cut out — copied, not approximated. */
+/** A palette, filled with its wells cut out. */
 const PALETTE = `<svg class="acc-palette" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5 9c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm3-3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm5 0c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm3 3c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"/></svg>`;
 
 function accentChoice(current: string, text: Text): string {
@@ -2418,8 +2414,8 @@ export interface OrganizationPanel {
  *
  * It used to be one card of repositories with the forge's forms stacked under
  * it and nothing about the team at all, so an owner had to know that People
- * was where the organisation's own team lived. Each section is Lastboard's
- * settings card, the one recipe the panel uses for what it configures. A
+ * was where the organisation's own team lived. Each section is a settings
+ * card, the one recipe the panel uses for what it configures. A
  * collaborator sees the first two: where they work, and the way into it.
  */
 export function organizationScreen(
@@ -2695,8 +2691,8 @@ export interface TeamMember {
  *
  * These used to be four places — a queue screen of its own, a pencil wired to
  * nothing, a channel picker on the organisation's page and People — and a
- * team member had to know all four to run one board. Each card is Lastboard's
- * settings card, the one recipe the panel uses for everything it configures.
+ * team member had to know all four to run one board. Each card is a settings
+ * card, the one recipe the panel uses for everything it configures.
  */
 export function repositoryScreen(
   repo: RepositoryPanel,
@@ -2884,7 +2880,7 @@ function repositoryTeam(
  * single box, three widths of field and three kinds of button — and a second
  * box to write in underneath, the public one, which posted a team member's
  * words as an anonymous visitor's and held them for that same person to
- * approve. Now each job is a card of Lastboard's recipe, in the order the work
+ * approve. Now each job is a settings card, in the order the work
  * goes: decide whether it is published, read it, set where it stands, bridge
  * it, answer, and fold a duplicate away. There is one place to write.
  */
@@ -3115,7 +3111,7 @@ export function peopleScreen(
     )
     .join("");
 
-  // Lastboard's "Users": one card, the way to add somebody at the end of its
+  // Users: one card, the way to add somebody at the end of its
   // title, and a row per person with what can be done to them at the far end.
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.people"))}</h1>
     <div class="settings">
@@ -3134,10 +3130,9 @@ export function peopleScreen(
  * since, which is why it says so and asks again.
  */
 export function backupScreen(text: Text): string {
-  // Lastboard's "Full backup": one card, a row for taking one and a row for
-  // putting one back, each with its button at the end of the line and a rule
-  // between them. The warning is the restore row's own description, in red,
-  // as theirs is.
+  // Backups: one card, a row for taking one and a row for putting one back,
+  // each with its button at the end of the line and a rule between them. The
+  // warning is the restore row's own description, in red.
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.backups"))}</h1>
     <div class="settings">
       ${settingsCard(
@@ -3186,7 +3181,7 @@ export interface ServerFacts {
  *
  * Updates used to be a page of their own beside this one, with the version on
  * both. They are the same question — "what am I running, and is it the one I
- * should be" — so, as in Lastboard, they are one screen: the product and its
+ * should be" — so they are one screen: the product and its
  * version at the top with the update underneath, the release channel as a
  * setting on a row of its own, the server's health below, and the links out
  * at the foot.
@@ -3252,11 +3247,10 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
   const link = (href: string, icon: string, label: string) =>
     `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${icon}<span>${escapeHTML(label)}</span></a>`;
 
-  // Lastboard's About, card for card: the product as a statement in a card of
-  // its own — mark, name, version, and the update under it; the beta switch
-  // on a row in a card of its own; and the links out at the foot, over a
-  // rule. The server's health, which theirs does not show, is one more card
-  // of the same recipe with a row per fact.
+  // The product as a statement in a card of its own — mark, name, version,
+  // and the update under it; the beta switch on a row in a card of its own;
+  // and the links out at the foot, over a rule. The server's health is one
+  // more card of the same recipe with a row per fact.
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.about"))}</h1>
     <div class="settings about">
       <section class="bento-card about-hero">
@@ -3320,7 +3314,7 @@ export function updateZone(status: UpdateStatus | "checking" | null, text: Text)
     return `<p class="about-state warn" role="status">${icons.warning(16)}<span>${escapeHTML(text.t("error.update_unreachable"))}</span></p>`;
   }
   if (status.container) {
-    // Lastboard's Docker notice: what manages this installation, and whether
+    // The Docker notice: what manages this installation, and whether
     // there is a newer image to pull.
     return `<div class="about-docker" role="status">
       ${icons.info(20)}
@@ -3335,7 +3329,7 @@ export function updateZone(status: UpdateStatus | "checking" | null, text: Text)
     </div>`;
   }
   if (status.available) {
-    // Lastboard's card: the badge whose dot pulses, the version beside it, and
+    // The update card: the badge whose dot pulses, the version beside it, and
     // one button. What is new is read in the dialog it opens, where reading it
     // can still change a mind.
     return `<div class="about-new">
@@ -3357,7 +3351,7 @@ export function updateZone(status: UpdateStatus | "checking" | null, text: Text)
   )}</span></p>`;
 }
 
-/** Lastboard's "New update!" beside Info in the menu. */
+/** "New update!" beside Info in the menu. */
 export function sideUpdateBadge(text: Text): string {
   return `<span class="side-update">${escapeHTML(text.t("update.badge"))}</span>`;
 }

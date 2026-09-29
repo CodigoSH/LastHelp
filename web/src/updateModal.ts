@@ -1,7 +1,7 @@
 /**
- * The one place an update happens, as in Lastboard.
+ * The one place an update happens.
  *
- * Lastboard's updateStore and UpdateModal in one: it owns the whole flow —
+ * It owns the whole flow —
  * confirmation, progress, restart, outcome — and the page only opens it. The
  * dialog is drawn once and kept; its body is redrawn when the layout changes
  * (a new phase), and only the dots change while the steps advance, so no
@@ -145,7 +145,7 @@ function renderBody(): void {
  * A new phase is usually a new layout; a step changing inside one is not.
  * Running and restarting draw the same thing — the timeline, no way out — so
  * between them only the dots and the sentence change: repainting the body at
- * that moment made every finished dot pop again at once, in Lastboard.
+ * that moment made every finished dot pop again at once.
  */
 function apply(): void {
   if (!dialog?.open) return;

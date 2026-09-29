@@ -196,7 +196,7 @@ async function main() {
       dots: document.querySelectorAll(".steps li").length,
       current: document.querySelector('.steps [aria-current="step"] .step-name')?.textContent?.trim(),
       theme: !!document.querySelector("[data-theme-choice]"),
-      // The setup alone on the screen, as Lastboard's: no bar above it.
+      // The setup alone on the screen: no bar above it.
       bar: (() => { const n = document.querySelector("body > nav"); return !!n && n.getBoundingClientRect().height > 0; })(),
     };`);
   check("the setup is alone on the screen, with no bar above it", firstStep.bar === false, String(firstStep.bar));
@@ -208,7 +208,7 @@ async function main() {
     return el ? { src: el.getAttribute("src"), drawn: Math.round(el.getBoundingClientRect().width),
                   bare: cs.borderTopWidth === "0px" && cs.boxShadow === "none" && cs.paddingTop === "0px" } : null;
   `);
-  // Bare, as the front page and About draw it, at Lastboard's 64px.
+  // Bare, as the front page and About draw it, at 64px.
   check("the wizard wears the mark, bare", mark?.src === "/logo.svg" && mark.drawn === 64 && mark.bare === true, JSON.stringify(mark));
 
   check(
@@ -263,9 +263,8 @@ async function main() {
     String(mismatch.said),
   );
 
-  // The picture, as one control and with nothing around it. Lastboard's, and
-  // the same on purpose: a label, an upload button and a sentence saying it is
-  // optional is three pieces of furniture for something you click or ignore.
+  // The picture, as one control and with nothing around it: a label, an
+  // upload button and a sentence saying it is optional is three pieces of furniture for something you click or ignore.
   const picture = await evaluate(`
     return {
       pick: !!document.querySelector(".avatar-pick"),
@@ -356,7 +355,7 @@ async function main() {
     f.querySelector('[name=slug]').value = "codigosh";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await new Promise(r => setTimeout(r, 1100));
-    // A row per organisation, as Lastboard lists its users.
+    // A row per organisation.
     return [...document.querySelectorAll(".settings-list .si-name")].map(e => e.textContent.trim());
   `);
   check(
@@ -562,7 +561,7 @@ async function main() {
     const titles = rows.map(r => Math.round(r.querySelector(".item-title").getBoundingClientRect().left));
     const inner = document.querySelector("body > nav .nav-inner").getBoundingClientRect();
     return {
-      // The bar uses the window, the way the dashboard's does: its contents
+      // The bar uses the window: its contents
       // start near the left edge and end near the right one. It used to share
       // the page's measure, which put both ends adrift in the middle of a wide
       // screen. Changed on purpose, so this asks the new question.
@@ -811,7 +810,7 @@ async function main() {
   `);
   check("asking for an issue says something", issueNote.shown === true, issueNote.text.slice(0, 44));
 
-  // 11. Updates live inside About now, as in Lastboard, and the old address
+  // 11. Updates live inside About now, and the old address
   //     is a door to it. What is checked is that the zone says what the server
   //     said — never nothing, and never green unless the release server was
   //     reached and answered. An empty answer where a reason belongs reads as
@@ -978,7 +977,7 @@ async function main() {
     JSON.stringify(franja),
   );
 
-  // 11d. The panel wears Lastboard's settings recipe on every screen, measured
+  // 11d. The panel wears the settings recipe on every screen, measured
   //      on the page rather than read from the stylesheet: the button that
   //      commits is outlined, not filled; a card's name is 13px capitals; and
   //      no card carries an icon of its own. A panel restyled in pieces of its
@@ -988,7 +987,7 @@ async function main() {
   for (const ruta of ["/panel", "/panel/organizations", "/panel/codigosh", "/panel/people",
     "/panel/backups", "/panel/account", "/panel/appearance", "/panel/personalization",
     // About too: it was the one screen left in pieces of its own after the
-    // rest had been ported, and nothing measured it.
+    // rest had been redone, and nothing measured it.
     "/panel/about"]) {
     await goTo(ruta, ".admin-main > *");
     await sleep(250);
@@ -1030,12 +1029,12 @@ async function main() {
     for (const f of r.fallos) receta.push(`${ruta}: ${f}`);
   }
   check(
-    "every panel screen wears Lastboard's settings recipe: its sheet, outlined buttons, quiet 13px titles, no card icons, flags beside languages",
+    "every panel screen wears the settings recipe: its sheet, outlined buttons, quiet 13px titles, no card icons, flags beside languages",
     piezas > 15 && receta.length === 0,
     JSON.stringify({ piezas, receta: receta.slice(0, 6) }),
   );
 
-  // 11e. The accent is chosen as in Lastboard: seven swatches and an eighth
+  // 11e. The accent is chosen from seven swatches and an eighth
   //      for any colour. A swatch writes the form's field and is the only one
   //      ringed; a colour of one's own paints the eighth; and its palette sits
   //      in the middle of it — it fell into the corner when a label rule made
@@ -1058,7 +1057,7 @@ async function main() {
         Math.abs((icono.y + icono.height / 2) - (caja.y + caja.height / 2))) };
   `);
   check(
-    "the accent is chosen from Lastboard's swatches, and the eighth takes any colour",
+    "the accent is chosen from seven swatches, and the eighth takes any colour",
     acento.azul.campo === "#228be6" && acento.azul.marcadas === 1 && acento.azul.esAzul === true &&
       acento.campo === "#12ab34" && acento.pintada === "rgb(18, 171, 52)" && acento.descentrado <= 2,
     JSON.stringify(acento),
@@ -1176,7 +1175,7 @@ async function main() {
       // The bar keeps the panel's own control, which is what closes it.
       cierra: !!document.querySelector("body > nav [data-panel-toggle]"),
       who: document.querySelector(".who")?.textContent?.trim(),
-      // The bar stays on every screen now, the way the dashboard's does. What
+      // The bar stays on every screen now. What
       // must not happen is two NAVIGATIONS: the bar carries modes — the panel
       // toggle, arranging the front page — and the places you can go are down
       // the side. A link to a page in both is the fault this was written for.
@@ -1202,7 +1201,7 @@ async function main() {
     sidebar.pieBajo <= sidebar.ventana && sidebar.lateralBajo <= sidebar.ventana,
     JSON.stringify({ pie: sidebar.pieBajo, lateral: sidebar.lateralBajo, ventana: sidebar.ventana }),
   );
-  // Pointed at, a menu row lights in the accent, as Lastboard's does — with a
+  // Pointed at, a menu row lights in the accent — with a
   // real pointer through the protocol, because a synthetic mouseover does not
   // set :hover. It was a neutral grey here.
   const fila = await evaluate(`
@@ -1226,7 +1225,7 @@ async function main() {
   `);
   await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 900, y: 600 });
   check(
-    "a menu row pointed at lights in the accent, as Lastboard's does",
+    "a menu row pointed at lights in the accent",
     encima.fondo === encima.esperado && encima.fondo.replace(/\s/g, "").includes(encima.acento.replace(/\s/g, "")),
     JSON.stringify(encima),
   );
@@ -1481,7 +1480,7 @@ async function main() {
   // point of the editor is that somebody does it with the page in front of
   // them, and an editor tested through fetch is an editor nobody has used.
   //
-  // There is no draft, as on Lastboard's board: every change is the page, so
+  // There is no draft: every change is the page, so
   // what matters is that what the editor shows is what a visitor gets — before
   // leaving the editor and after.
   await goTo("/", ".lp");
@@ -1768,7 +1767,7 @@ async function main() {
   check("the phone preview stacks the columns", movil === 1, String(movil));
 
   // Leaving: what was arranged is what a visitor is shown, the foot of the page
-  // included. The ✓ only leaves — as on Lastboard — and there is nothing to
+  // included. The ✓ only leaves, and there is nothing to
   // publish first; before, the foot was edited and went nowhere.
   await evaluate(`document.querySelector("body > nav [data-edit-done]")?.click()`);
   await waitFor(".lp:not(.lp-editing)");
@@ -1953,8 +1952,7 @@ async function main() {
   );
 
   // The bar carries icons and nothing but icons, and the panel arrives from the
-  // side the reading direction ends on — the dashboard's drawer does exactly
-  // that, and this pass runs in Arabic, where getting it wrong means sliding in
+  // side the reading direction ends on — and this pass runs in Arabic, where getting it wrong means sliding in
   // from the opposite edge of the screen.
   const entrada = await evaluate(`
     document.querySelector("[data-edit-done]")?.click();
@@ -2074,7 +2072,7 @@ async function main() {
     barra.acento,
   );
 
-  // One mode at a time, as Lastboard's bar does it: arranging the front page,
+  // One mode at a time: arranging the front page,
   // the panel and the review screen each grey out the others and leave only
   // their own control answering — except Reports, which answers from inside
   // the panel too — and nothing leaves the bar, so no icon moves under the
@@ -2713,7 +2711,7 @@ async function main() {
     JSON.stringify(elegida),
   );
 
-  // Scrollbars: Lastboard's thin, border-coloured one inside the product, and
+  // Scrollbars: a thin, border-coloured one inside the product, and
   // none on the public pages, where the page is the product and a gutter down
   // its edge belongs to the operating system.
   const barraDeLaLista = await evaluate(`
@@ -2772,8 +2770,8 @@ async function main() {
 
   // The bar while the screen is open: the icon that opened it is the way out
   // and goes back where you were; the panel's toggle is greyed, one mode at a
-  // time, as Lastboard greys its bar while its status page is up. Opened from
-  // a public page: inside the panel the icon is greyed, one mode at a time.
+  // time. Opened from a public page, which is where this starts; from inside
+  // the panel the icon answers too, and the reports pass checks that.
   await goTo("/codigosh/lastboard", ".items, .empty");
   await evaluate(`document.querySelector(".review-pill").click()`);
   await waitFor(".review");

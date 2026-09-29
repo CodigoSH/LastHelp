@@ -30,7 +30,7 @@ func events(t *testing.T, body string) []string {
 
 // TestAnUpdateIsReportedStepByStep.
 //
-// The dialog's timeline is Lastboard's: every step goes running and then ok,
+// The dialog's timeline: every step goes running and then ok,
 // in order, and the last event of a good update announces the restart. Each
 // step of this updater that the dialog shows as one — the checksum list and
 // its signature — is reported once.

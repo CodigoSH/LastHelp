@@ -433,7 +433,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 const searchHits = 6
 
 // handleSaveLanding stores the front page, and it is what visitors see from
-// then on — the way Lastboard's board is edited: in place, each change kept as
+// then on — edited in place, each change kept as
 // it is made, with no second copy to publish or forget about.
 //
 // Validated by the domain, which refuses a page it cannot draw entirely rather
