@@ -229,6 +229,27 @@ func (s Store) DeleteComment(id int64) error {
 	return nil
 }
 
+// EditComment rewrites a comment or a team reply, with the limits it was
+// written under. Who wrote it and whether it is published do not change: a
+// correction is not a new message, and not a way round the queue.
+func (s Store) EditComment(id int64, body string) error {
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return fmt.Errorf("a comment needs something in it")
+	}
+	if len(body) > maxComment {
+		return fmt.Errorf("the comment is longer than %d characters", maxComment)
+	}
+	res, err := s.DB.Exec(`UPDATE comment SET body = ? WHERE id = ?`, body, id)
+	if err != nil {
+		return fmt.Errorf("editing the comment: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ApproveComment publishes one that was waiting.
 func (s Store) ApproveComment(id int64) error {
 	res, err := s.DB.Exec(`UPDATE comment SET moderation_state = ? WHERE id = ?`, string(Published), id)

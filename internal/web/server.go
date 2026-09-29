@@ -253,6 +253,7 @@ func (s *Server) routes() {
 	private("POST /api/landing/restore", s.handleRestoreLandingDefault)
 	private("POST /api/landing/images", s.handleAddLandingImage)
 	private("POST /api/comments/{id}/moderation", s.handleModerateComment)
+	private("PATCH /api/comments/{id}", s.handleEditComment)
 	private("DELETE /api/comments/{id}", s.handleDeleteComment)
 	private("POST /api/items/{id}/status", s.handleSetStatus)
 	private("POST /api/items/{id}/merge", s.handleMerge)

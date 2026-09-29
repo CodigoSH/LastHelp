@@ -628,25 +628,65 @@ func teamWork(it item.Item, actor authz.Actor, scope authz.Scope) map[string]any
 	}
 }
 
-// handleDeleteComment removes a comment or a team reply for good — the
-// organisation's owners' and the administrator's, like deleting the report.
-func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
+// commentTarget reads the {id} of a comment and checks the one permission
+// that changing it takes: Triage on the board it was written on, so a
+// collaborator looks after the conversations of the boards they work on.
+// Editing and deleting share it so the pencil and the bin cannot end up in
+// different hands. The report itself, the boards and the organisations stay
+// with whoever runs the organisation.
+func (s *Server) commentTarget(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "error.not_found")
-		return
+		return 0, false
 	}
 	it, err := s.items().CommentItem(id)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "error.not_found")
-		return
+		return 0, false
 	}
 	repo, err := s.orgs().RepositoryByID(it.RepoID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "error.not_found")
+		return 0, false
+	}
+	if !s.may(w, r, authz.Triage, authz.Repository(repo.ID, repo.OrgID)) {
+		return 0, false
+	}
+	return id, true
+}
+
+// handleEditComment rewrites a comment or a team reply: a typo in an answer,
+// or a visitor's message with an address in it that should not be public.
+func (s *Server) handleEditComment(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.commentTarget(w, r)
+	if !ok {
 		return
 	}
-	if !s.may(w, r, authz.ManageOrganization, authz.Organization(repo.OrgID)) {
+	r.Body = http.MaxBytesReader(w, r.Body, reportBodyLimit)
+	var in struct {
+		Body string `json:"body"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	if err := s.items().EditComment(id, in.Body); err != nil {
+		if errors.Is(err, item.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "error.not_found")
+			return
+		}
+		// Empty or too long: about what was typed, not about the server.
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleDeleteComment removes a comment or a team reply for good.
+func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
+	id, ok := s.commentTarget(w, r)
+	if !ok {
 		return
 	}
 	if err := s.items().DeleteComment(id); err != nil {

@@ -1636,6 +1636,36 @@ function wireTeamItem(publicID: string, item: ItemDetail, host: TeamItemHost = {
     }),
   );
 
+  // Rewriting a message where it stands, as the report's own words are: the
+  // pencil swaps the text for a form, Cancel swaps it back untouched.
+  scope?.querySelectorAll<HTMLButtonElement>("[data-edit-comment]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const comment = button.closest<HTMLElement>(".comment");
+      const words = comment?.querySelector<HTMLElement>(".what");
+      if (!comment || !words || comment.querySelector("form.comment-edit")) return;
+      const holder = document.createElement("div");
+      holder.innerHTML = views.commentEditForm(words.textContent ?? "", text);
+      const form = holder.firstElementChild as HTMLFormElement;
+      words.hidden = true;
+      button.hidden = true;
+      words.after(form);
+      const area = form.querySelector<HTMLTextAreaElement>("textarea");
+      area?.focus();
+      form.querySelector("[data-comment-cancel]")?.addEventListener("click", () => {
+        form.remove();
+        words.hidden = false;
+        button.hidden = false;
+      });
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        void act(
+          () => api.patch(`/api/comments/${button.dataset.editComment}`, { body: area?.value ?? "" }),
+          "panel.saved",
+        );
+      });
+    }),
+  );
+
   // Deleting, for whoever runs the organisation. Afterwards there is no
   // report to come back to, so it goes to the board it was on.
   scope?.querySelector<HTMLButtonElement>("[data-delete-item]")?.addEventListener("click", async () => {

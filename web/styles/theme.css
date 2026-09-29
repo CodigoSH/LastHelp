@@ -1311,6 +1311,11 @@ summary:focus-visible,
   color: var(--text-dim);
 }
 .comment .what { margin: 0; white-space: pre-wrap; }
+/* The pencil and the bin at the end of the line, after the date. */
+.comment-tools { display: inline-flex; align-items: center; gap: 2px; }
+.comment-edit { display: grid; gap: 8px; }
+.comment-edit textarea { inline-size: 100%; }
+.comment-edit .settings-actions { gap: 8px; }
 
 .queue { display: grid; gap: 0.75rem; margin-block-start: 1rem; }
 .queue li {

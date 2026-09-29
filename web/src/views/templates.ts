@@ -2987,7 +2987,7 @@ function repositoryTeam(
  */
 export function itemTeamView(
   item: ItemDetail,
-  /** What the server says this reader may do; can_delete is the owners' and the administrator's. */
+  /** What the server says this reader may do; can_delete (the report) is the owners' and the administrator's. */
   statuses: { current: string; statuses: string[]; can_delete?: boolean },
   /** The other reports on the same board, the ones this one can be merged into. */
   others: { public_id: string; title: string }[],
@@ -3095,8 +3095,14 @@ export function itemTeamView(
                 ${c.author === "team" ? `<span class="who-badge">${escapeHTML(text.t("comment.team"))}</span>` : ""}
                 <span class="when">${escapeHTML(text.date(c.created_at))}</span>
                 ${
-                  statuses.can_delete && c.id !== undefined
-                    ? iconButton("remove", text.t("action.delete"), `class="icon-button danger comment-delete" data-delete-comment="${c.id}"`)
+                  // Everybody who works on this board looks after its
+                  // conversation: the server checks the same permission as
+                  // this view, and one for the pencil and the bin together.
+                  c.id !== undefined
+                    ? `<span class="comment-tools">
+                        ${iconButton("edit", text.t("action.edit"), `class="icon-button" data-edit-comment="${c.id}"`)}
+                        ${iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-comment="${c.id}"`)}
+                      </span>`
                     : ""
                 }
               </p>
@@ -3174,6 +3180,18 @@ export function rewriteForm(current: { title: string; body: string }, text: Text
     <div class="settings-actions">
       <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button>
       <button class="button ghost" type="button" data-rewrite-cancel>${escapeHTML(text.t("action.cancel"))}</button>
+    </div>
+  </form>`;
+}
+
+/** A message's words as a form, where they stood. Cancel puts them back. */
+export function commentEditForm(body: string, text: Text): string {
+  return `<form class="comment-edit">
+    <textarea name="body" rows="4" required maxlength="10000"
+              aria-label="${escapeAttr(text.t("action.edit"))}">${escapeHTML(body)}</textarea>
+    <div class="settings-actions">
+      <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button>
+      <button class="button ghost" type="button" data-comment-cancel>${escapeHTML(text.t("action.cancel"))}</button>
     </div>
   </form>`;
 }
