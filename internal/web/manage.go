@@ -137,12 +137,16 @@ func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+// handleDeleteRepository removes a repository and its reports.
+//
+// Whoever runs the organisation: the owners, and the administrator. The
+// organisation itself stays the administrator's to end — see above.
 func (s *Server) handleDeleteRepository(w http.ResponseWriter, r *http.Request) {
 	repo, _, ok := s.lookupRepository(w, r)
 	if !ok {
 		return
 	}
-	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+	if !s.may(w, r, authz.ManageOrganization, authz.Organization(repo.OrgID)) {
 		return
 	}
 	if err := s.orgs().DeleteRepository(repo.ID); err != nil {

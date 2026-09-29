@@ -2502,7 +2502,10 @@ export interface OrganizationPanel {
   /** Whether a token and a webhook secret are stored; never what they are. */
   connection?: { token: boolean; secret: boolean };
   can_manage: boolean;
+  /** Ending the organisation: the administrator's. */
   can_delete: boolean;
+  /** Deleting one of its repositories: whoever runs it. */
+  can_delete_repos?: boolean;
 }
 
 /**
@@ -2548,7 +2551,7 @@ export function organizationScreen(
             : "") + acceptsMarks(r, text),
         href: `/panel/${org.slug}/repos/${r.slug}`,
         actions: `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
-          ${data.can_delete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`,
+          ${data.can_delete_repos ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`,
       }),
     )
     .join("");

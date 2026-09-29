@@ -165,7 +165,8 @@ func TestARepositoryPageSaysWhatEachRoleMayDo(t *testing.T) {
 		if strings.Contains(text, `"can_manage":true`) != wantManage {
 			t.Errorf("%s: can_manage should be %v: %s", name, wantManage, text)
 		}
-		wantDelete := name == "admin"
+		// Deleting a repository is whoever runs the organisation's.
+		wantDelete := name != "collaborator"
 		if strings.Contains(text, `"can_delete":true`) != wantDelete {
 			t.Errorf("%s: can_delete should be %v: %s", name, wantDelete, text)
 		}
@@ -344,5 +345,31 @@ func TestTheOverviewIsTheReadersBoards(t *testing.T) {
 	all := decode(t, admin.do(http.MethodGet, "/api/overview", nil))
 	if all["server"] != true || all["pending"] != float64(3) {
 		t.Errorf("the administrator's overview is the whole server: server=%v pending=%v", all["server"], all["pending"])
+	}
+}
+
+// TestAnOwnerDeletesARepositoryButNotTheOrganisation.
+//
+// The owner runs the organisation, so its repositories are theirs to delete;
+// ending the organisation stays the administrator's, and a repository of an
+// organisation they do not run is not theirs either. A collaborator deletes
+// neither.
+func TestAnOwnerDeletesARepositoryButNotTheOrganisation(t *testing.T) {
+	admin, owner, collaborator := teamSetup(t)
+
+	if got := status(t, collaborator.do(http.MethodDelete, "/api/orgs/acme/repos/atlas", nil)); got != http.StatusForbidden {
+		t.Errorf("a collaborator deleted a repository: %d", got)
+	}
+	if got := status(t, owner.do(http.MethodDelete, "/api/orgs/other/repos/elsewhere", nil)); got == http.StatusOK {
+		t.Errorf("an owner deleted a repository of an organisation they do not run: %d", got)
+	}
+	if got := status(t, owner.do(http.MethodDelete, "/api/orgs/acme", nil)); got != http.StatusForbidden {
+		t.Errorf("an owner ended the organisation: %d", got)
+	}
+	if got := status(t, owner.do(http.MethodDelete, "/api/orgs/acme/repos/atlas", nil)); got != http.StatusOK {
+		t.Fatalf("the owner could not delete a repository of their organisation: %d", got)
+	}
+	if got := status(t, admin.do(http.MethodGet, "/api/orgs/acme/repos/atlas", nil)); got != http.StatusNotFound {
+		t.Errorf("the deleted repository is still there: %d", got)
 	}
 }

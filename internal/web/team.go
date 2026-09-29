@@ -57,7 +57,8 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		"pending":      counts[string(item.Pending)],
 		"organization": map[string]any{"slug": organisation.Slug, "name": organisation.Name, "forge": organisation.Forge},
 		"can_manage":   actor.Can(authz.ManageOrganization, authz.Organization(organisation.ID)),
-		"can_delete":   actor.Can(authz.ManageServer, authz.Scope{}),
+		// A repository is deleted by whoever runs its organisation.
+		"can_delete": actor.Can(authz.ManageOrganization, authz.Organization(organisation.ID)),
 	})
 }
 
@@ -112,7 +113,10 @@ func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request)
 		"organization": about,
 		"repositories": rows,
 		"can_manage":   manage,
-		"can_delete":   actor.Can(authz.ManageServer, authz.Scope{}),
+		// The organisation is ended by the administrator; its repositories
+		// by whoever runs it. Two answers, because the page shows both bins.
+		"can_delete":       actor.Can(authz.ManageServer, authz.Scope{}),
+		"can_delete_repos": manage,
 	}
 
 	// Where the forge is and whether it is connected, for whoever runs it:
