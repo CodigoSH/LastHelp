@@ -40,6 +40,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# SEED=1 starts from an installation with history (scripts/seed) instead of an
+# empty one; CHECK names the pass to run against it. The defaults are the main
+# journey on an empty installation, which has to begin with the setup.
+if [ -n "${SEED:-}" ]; then
+    go run ./scripts/seed -db "$WORK/drive.db"
+fi
+
 LASTHELP_PORT="$PORT" LASTHELP_DB_FILE="$WORK/drive.db" ./bin/lasthelp > "$WORK/server.log" 2>&1 &
 SERVER_PID=$!
 
@@ -61,4 +68,4 @@ for _ in $(seq 1 80); do
     sleep 0.25
 done
 
-PORT="$PORT" CDP="$CDP" bun run scripts/drive-check.ts
+PORT="$PORT" CDP="$CDP" bun run "scripts/${CHECK:-drive-check.ts}"

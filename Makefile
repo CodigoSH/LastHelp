@@ -73,6 +73,9 @@ drive: build ## Walk the whole journey in a real browser
 	@command -v google-chrome >/dev/null || { echo "google-chrome is required"; exit 1; }
 	@scripts/drive.sh
 
+drive-reports: build ## Walk the reports screen on an installation with history
+	@SEED=1 CHECK=reports-check.ts scripts/drive.sh
+
 # Screenshots are generated, never taken by hand: a hand-taken one is one nobody
 # can reproduce when the interface changes, so the documentation ends up showing
 # a version that no longer exists.
