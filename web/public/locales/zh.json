@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "简短摘要",
   "form.version": "版本",
   "form.versionHelp": "正在使用的版本（如已知）。",
+  "icon.help": "在公开页面上显示在名称旁边。",
+  "icon.label": "图标",
   "item.addComment": "添加评论",
   "item.answers": "提供的信息",
   "item.commentDeleted": "评论已删除",

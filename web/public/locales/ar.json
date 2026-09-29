@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "ملخص قصير",
   "form.version": "الإصدار",
   "form.versionHelp": "الإصدار المستخدم، إن كان معروفًا.",
+  "icon.help": "يظهر بجانب اسمه في الصفحات العامة.",
+  "icon.label": "الأيقونة",
   "item.addComment": "أضف تعليقًا",
   "item.answers": "البيانات المقدّمة",
   "item.commentDeleted": "حُذف التعليق",

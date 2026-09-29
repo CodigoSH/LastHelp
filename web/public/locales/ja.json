@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "短い要約",
   "form.version": "バージョン",
   "form.versionHelp": "使用中のバージョン（分かる場合）。",
+  "icon.help": "公開ページで名前の横に表示されます。",
+  "icon.label": "アイコン",
   "item.addComment": "コメントを書く",
   "item.answers": "提供された情報",
   "item.commentDeleted": "コメントを削除しました",

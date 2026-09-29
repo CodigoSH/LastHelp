@@ -91,7 +91,7 @@ export function organizationList(orgs: OrganizationSummary[], text: Text): strin
   return `<ul class="cards">${orgs
     .map(
       (o) => `<li><a class="card" href="/${escapeAttr(o.slug)}">
-        <span class="card-mark" aria-hidden="true">${escapeHTML(initials(o.name))}</span>
+        ${markOf(o.name, o.icon, "card-mark")}
         <span class="card-body">
           <span class="card-title">${escapeHTML(o.name)}</span>
           <span class="card-sub">/${escapeHTML(o.slug)}</span>
@@ -114,11 +114,14 @@ export function repositoryList(
   repos: RepositorySummary[],
   text: Text,
 ): string {
-  const header = `<header class="page-head">
-    <div class="head-text">
+  // The organisation's icon, when it has one, beside its name. Without one
+  // the name stands alone, as it always did: initials there would only repeat it.
+  const title = `<div class="head-text">
       <p class="crumb"><a href="/">${escapeHTML(text.t("nav.home"))}</a></p>
       <h1>${escapeHTML(org.name)}</h1>
-    </div>
+    </div>`;
+  const header = `<header class="page-head">
+    ${org.icon ? `<div class="head-lead">${markOf(org.name, org.icon, "card-mark head-mark")}${title}</div>` : title}
   </header>`;
 
   if (repos.length === 0) {
@@ -133,7 +136,7 @@ export function repositoryList(
       <ul class="cards">${repos
         .map(
           (r) => `<li><a class="card" href="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}">
-            <span class="card-mark" aria-hidden="true">${escapeHTML(initials(r.name))}</span>
+            ${markOf(r.name, r.icon, "card-mark")}
             <span class="card-body">
               <span class="card-title">${escapeHTML(r.name)}</span>
               <span class="chips">
@@ -1202,7 +1205,7 @@ export function setupWizard(
 }
 
 /** Adding an organisation on its own, once the instance is running. */
-export function organizationWizard(step: number, text: Text, forge = "none"): string {
+export function organizationWizard(step: number, text: Text, forge = "none", icon = ""): string {
   const names = [text.t("org.stepIdentity"), text.t("org.stepForge")];
 
   if (step === 1) {
@@ -1212,7 +1215,7 @@ export function organizationWizard(step: number, text: Text, forge = "none"): st
         names,
         title: text.t("panel.newOrganization"),
         lead: text.t("setup.orgLead"),
-        body: organizationFields(text, forge),
+        body: iconField(text, "", icon, "ow-icon") + organizationFields(text, forge),
         submit: text.t("wizard.continue"),
         back: { href: "/panel", label: text.t("nav.back") },
         formClass: "setup-organization",
@@ -1440,6 +1443,41 @@ export function brandMark(logo: string | undefined, size = 24): string {
   // stylesheet, which is what put the size in a variable in the first place.
   return `<img class="brand-logo mark-${size}" src="${escapeAttr(src)}" alt=""
     width="${size}" height="${size}" />`;
+}
+
+/**
+ * The mark of a repository or an organisation: its icon when it has one, the
+ * initials of its name when it does not. One function for every place either
+ * is drawn, so an icon chosen in the panel is the icon on every public page.
+ */
+export function markOf(name: string, icon: string | undefined, cls: string): string {
+  return `<span class="${cls}${icon ? " has-icon" : ""}" aria-hidden="true">${
+    icon ? `<img src="${escapeAttr(icon)}" alt="" />` : escapeHTML(initials(name))
+  }</span>`;
+}
+
+/**
+ * Choosing the icon of a repository or an organisation: the product's picture
+ * control, square like the mark it fills. The data URL rides in a hidden field
+ * of the form, so the form sends it like any other field and nothing is
+ * redrawn while choosing. The id keeps two of them apart on one page — an
+ * organisation's settings and the dialog that adds a repository to it.
+ */
+export function iconField(text: Text, name: string, icon = "", id = "icon"): string {
+  return `<div class="field icon-field">
+    <label for="${escapeAttr(id)}-file">${escapeHTML(text.t("icon.label"))}</label>
+    <div class="picker">
+      <button type="button" class="avatar-pick icon-pick" data-pick-icon aria-label="${escapeAttr(text.t("icon.label"))}">
+        ${markOf(name, icon, "card-mark icon-preview")}
+        <span class="avatar-pick-badge">${escapeHTML(text.t("action.change"))}</span>
+      </button>
+      <button type="button" class="picker-clear" data-clear-icon ${icon ? "" : "hidden"}
+        title="${escapeAttr(text.t("action.remove"))}" aria-label="${escapeAttr(text.t("action.remove"))}">${icons.close(12)}</button>
+      <input type="file" accept="image/*" id="${escapeAttr(id)}-file" data-icon-file hidden />
+    </div>
+    <input type="hidden" name="icon" value="${escapeAttr(icon)}" />
+    <p class="hint">${escapeHTML(text.t("icon.help"))}</p>
+  </div>`;
 }
 
 /** Initials when there is no picture, which is most of the time. */
@@ -2378,6 +2416,7 @@ export interface OrganizationRow {
   slug: string;
   name: string;
   forge: string;
+  icon?: string;
   /** How many of its boards this reader works on. */
   repositories: number;
   /** What is waiting in those. */
@@ -2405,7 +2444,7 @@ export function organizationsScreen(
     .map((o) =>
       settingsItem({
         attrs: `data-org="${escapeAttr(o.slug)}"`,
-        lead: `<span class="si-mark">${icons.organization(16)}</span>`,
+        lead: o.icon ? markOf(o.name, o.icon, "si-mark repo-si-mark") : `<span class="si-mark">${icons.organization(16)}</span>`,
         name: o.name,
         sub: `/${o.slug} · ${text.t("org.repoCount", { count: text.number(o.repositories) })}`,
         tags: [
@@ -2453,12 +2492,13 @@ export interface OrganizationPanel {
     slug: string;
     name: string;
     forge: string;
+    icon?: string;
     base_url?: string;
     forge_owner?: string;
     webhook_path?: string;
   };
   /** The ones the reader may triage, each with what is waiting in it. */
-  repositories: { slug: string; name: string; accepts_bugs: boolean; accepts_ideas: boolean; pending: number }[];
+  repositories: { slug: string; name: string; accepts_bugs: boolean; accepts_ideas: boolean; pending: number; icon?: string }[];
   /** Whether a token and a webhook secret are stored; never what they are. */
   connection?: { token: boolean; secret: boolean };
   can_manage: boolean;
@@ -2499,7 +2539,7 @@ export function organizationScreen(
     .map((r) =>
       settingsItem({
         attrs: `data-repo="${escapeAttr(r.slug)}"`,
-        lead: `<span class="si-mark">${icons.repository(16)}</span>`,
+        lead: r.icon ? markOf(r.name, r.icon, "si-mark repo-si-mark") : `<span class="si-mark">${icons.repository(16)}</span>`,
         name: r.name,
         sub: `/${org.slug}/${r.slug}`,
         tags:
@@ -2535,6 +2575,7 @@ export function organizationScreen(
   const settings = settingsCard(
     text.t("repo.settings"),
     `<form class="org-settings">
+      ${iconField(text, org.name, org.icon ?? "", "os-icon")}
       ${field({ id: "os-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: org.name }, text)}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">
@@ -2726,6 +2767,8 @@ export interface RepositoryPanel {
   forge_repo: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  /** A data URL, or absent for the initials of the name. */
+  icon?: string;
   /** Which channel tells the team, never what it stores. Empty for none. */
   channel: string;
   pending: number;
@@ -2805,6 +2848,7 @@ export function repositoryScreen(
   const settings = settingsCard(
     text.t("repo.settings"),
     `<form class="repo-settings">
+      ${iconField(text, repo.name, repo.icon ?? "")}
       ${field({ id: "rs-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: repo.name }, text)}
       ${hasForge ? field({ id: "rs-forge", name: "forge_repo", label: text.t("panel.forgeRepo"), hint: text.t("panel.forgeRepoHelp"), value: repo.forge_repo }, text) : ""}
       ${acceptsFields(text, { bugs: repo.accepts_bugs, ideas: repo.accepts_ideas })}

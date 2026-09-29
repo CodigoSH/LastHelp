@@ -31,7 +31,7 @@ func (s *Server) handleOrganizations(w http.ResponseWriter, _ *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, o := range list {
-		out = append(out, map[string]any{"slug": o.Slug, "name": o.Name})
+		out = append(out, map[string]any{"slug": o.Slug, "name": o.Name, "icon": o.Icon})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"organizations": out})
 }
@@ -52,7 +52,7 @@ func (s *Server) handleRepositories(w http.ResponseWriter, r *http.Request) {
 	for _, repo := range list {
 		out = append(out, describeRepository(repo, s.mailConfigured()))
 	}
-	organisation := map[string]any{"slug": o.Slug, "name": o.Name, "forge": string(o.Forge)}
+	organisation := map[string]any{"slug": o.Slug, "name": o.Name, "forge": string(o.Forge), "icon": o.Icon}
 
 	// The webhook address, but only for somebody who may manage this
 	// organisation. It is not a secret exactly — a delivery still has to be
@@ -604,6 +604,7 @@ func describeRepository(r org.Repository, mailConfigured bool) map[string]any {
 		"name":          r.Name,
 		"accepts_bugs":  r.AcceptsBugs,
 		"accepts_ideas": r.AcceptsIdeas,
+		"icon":          r.Icon,
 		// With no relay there is nothing to notify anybody with, so the form
 		// does not ask for an address rather than collecting one it cannot use.
 		"can_notify": mailConfigured,

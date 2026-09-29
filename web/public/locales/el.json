@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "Σύντομη περίληψη",
   "form.version": "Έκδοση",
   "form.versionHelp": "Έκδοση σε χρήση, αν είναι γνωστή.",
+  "icon.help": "Εμφανίζεται δίπλα στο όνομά του στις δημόσιες σελίδες.",
+  "icon.label": "Εικονίδιο",
   "item.addComment": "Προσθήκη σχολίου",
   "item.answers": "Στοιχεία που δόθηκαν",
   "item.commentDeleted": "Το σχόλιο διαγράφηκε",

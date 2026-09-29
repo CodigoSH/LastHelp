@@ -40,6 +40,8 @@ type newOrganization struct {
 	Forge      string `json:"forge"`
 	BaseURL    string `json:"base_url"`
 	ForgeOwner string `json:"forge_owner"`
+	// Icon is a data URL, or empty for the initials of the name.
+	Icon string `json:"icon"`
 }
 
 // handleCreateOrganization adds a connection. Server-level: an organisation
@@ -49,16 +51,27 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	// Room for the icon, the one thing in here that can be large.
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit+maxIconBytes)
 	var in newOrganization
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		if tooLarge(err) {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	icon, ok := iconFrom(in.Icon)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "error.image_too_big")
 		return
 	}
 
 	created, err := s.orgs().CreateOrganization(org.Organization{
 		Slug: in.Slug, Name: in.Name, Forge: org.Forge(in.Forge),
 		BaseURL: in.BaseURL, ForgeOwner: in.ForgeOwner,
+		Icon: icon,
 	}, s.now())
 	if err != nil {
 		writeError(w, statusForOrgError(err), keyForOrgError(err))
@@ -82,6 +95,23 @@ type newRepository struct {
 	ForgeRepo    string `json:"forge_repo"`
 	AcceptsBugs  *bool  `json:"accepts_bugs"`
 	AcceptsIdeas *bool  `json:"accepts_ideas"`
+	// Icon is a data URL, or empty for the initials of the name.
+	Icon string `json:"icon"`
+}
+
+// maxIconBytes keeps a repository's icon small enough to travel inline in
+// every list that shows it: a page of twenty repositories carries twenty.
+const maxIconBytes = 24 << 10
+
+// iconFrom reads an icon — a repository's or an organisation's — as it
+// arrived: empty, or an image as a data URL
+// under the bound. Anything else is refused rather than stored and served.
+func iconFrom(raw string) (string, bool) {
+	icon := strings.TrimSpace(raw)
+	if icon == "" {
+		return "", true
+	}
+	return icon, strings.HasPrefix(icon, "data:image/") && len(icon) <= maxIconBytes
 }
 
 // handleCreateRepository registers a repository for feedback.
@@ -94,10 +124,20 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	// Room for the icon, the one thing in here that can be large.
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit+maxIconBytes)
 	var in newRepository
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		if tooLarge(err) {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	icon, ok := iconFrom(in.Icon)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "error.image_too_big")
 		return
 	}
 
@@ -108,6 +148,7 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 	created, err := s.orgs().CreateRepository(org.Repository{
 		OrgID: o.ID, Slug: in.Slug, Name: in.Name, ForgeRepo: in.ForgeRepo,
 		AcceptsBugs: accepts(in.AcceptsBugs), AcceptsIdeas: accepts(in.AcceptsIdeas),
+		Icon: icon,
 	}, s.now())
 	if err != nil {
 		writeError(w, statusForOrgError(err), keyForOrgError(err))

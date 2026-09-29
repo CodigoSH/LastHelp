@@ -50,6 +50,7 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		"forge_repo":    repo.ForgeRepo,
 		"accepts_bugs":  repo.AcceptsBugs,
 		"accepts_ideas": repo.AcceptsIdeas,
+		"icon":          repo.Icon,
 		// Which channel, and never what is in it: an endpoint that returns a
 		// stored token is a way to read one.
 		"channel":      channelKind(repo.NotifyConfig),
@@ -97,6 +98,7 @@ func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request)
 			"name":          repo.Name,
 			"accepts_bugs":  repo.AcceptsBugs,
 			"accepts_ideas": repo.AcceptsIdeas,
+			"icon":          repo.Icon,
 			"pending":       counts[string(item.Pending)],
 		})
 	}
@@ -105,7 +107,7 @@ func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	about := map[string]any{"slug": organisation.Slug, "name": organisation.Name, "forge": string(organisation.Forge)}
+	about := map[string]any{"slug": organisation.Slug, "name": organisation.Name, "forge": string(organisation.Forge), "icon": organisation.Icon}
 	body := map[string]any{
 		"organization": about,
 		"repositories": rows,
@@ -183,6 +185,7 @@ func (s *Server) handleOrganizationsPanel(w http.ResponseWriter, r *http.Request
 			"slug":         o.Slug,
 			"name":         o.Name,
 			"forge":        string(o.Forge),
+			"icon":         o.Icon,
 			"repositories": len(ids),
 			"pending":      pending,
 			"role":         actor.StandingIn(o.ID),

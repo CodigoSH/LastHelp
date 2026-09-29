@@ -496,6 +496,8 @@
   "repo.deleteHelp": "Deletes its reports, votes and replies. This cannot be undone.",
   "repo.exportDownload": "Download",
   "repo.exportHelp": "All reports as JSON, including pending and rejected.",
+  "icon.label": "Icon",
+  "icon.help": "Shown beside its name on the public pages.",
   "repo.lead": "Each repository has its own report board. Issues are created only on request.",
   "repo.noCollaborators": "No collaborators. Organisation owners also have access.",
   "repo.pending": "Pending: {count}",

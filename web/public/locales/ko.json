@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "짧은 요약",
   "form.version": "버전",
   "form.versionHelp": "사용 중인 버전(알고 있는 경우).",
+  "icon.help": "공개 페이지에서 이름 옆에 표시됩니다.",
+  "icon.label": "아이콘",
   "item.addComment": "댓글 남기기",
   "item.answers": "제공된 정보",
   "item.commentDeleted": "댓글을 삭제했습니다",

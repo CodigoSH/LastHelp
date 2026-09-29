@@ -141,6 +141,8 @@ export interface Me {
 export interface OrganizationSummary {
   slug: string;
   name: string;
+  /** A data URL, or absent for the initials of the name. */
+  icon?: string;
   /** Present when a single organisation is fetched. */
   forge?: string;
   /** Only for somebody who may manage this organisation. */
@@ -152,6 +154,8 @@ export interface RepositorySummary {
   name: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  /** A data URL, or absent for the initials of the name. */
+  icon?: string;
   /** Whether a mail relay exists. Without one the form does not ask for an
    *  address, rather than collecting one nothing can use. */
   can_notify: boolean;

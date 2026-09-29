@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "Kısa özet",
   "form.version": "Sürüm",
   "form.versionHelp": "Kullanılan sürüm, biliniyorsa.",
+  "icon.help": "Herkese açık sayfalarda adının yanında gösterilir.",
+  "icon.label": "Simge",
   "item.addComment": "Yorum ekle",
   "item.answers": "Verilen bilgiler",
   "item.commentDeleted": "Yorum silindi",

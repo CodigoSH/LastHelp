@@ -386,6 +386,26 @@ var migrations = []migration{
 			return err
 		},
 	},
+	{
+		version: 10,
+		name:    "a repository can carry an icon",
+		// A data URL in the row, like an account's picture: one small image
+		// per repository that has to survive a backup, and a backup that is one
+		// file only stays one file if nothing lives outside it. Bounded where
+		// it is uploaded, and small, because lists of repositories carry it.
+		fn: func(tx *sql.Tx) error {
+			return addColumn(tx, "repository", "icon", "TEXT NOT NULL DEFAULT ''")
+		},
+	},
+	{
+		version: 11,
+		name:    "an organisation can carry an icon",
+		// The same as a repository's, for the same reasons: a data URL in the
+		// row, small, bounded where it is uploaded.
+		fn: func(tx *sql.Tx) error {
+			return addColumn(tx, "organization", "icon", "TEXT NOT NULL DEFAULT ''")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

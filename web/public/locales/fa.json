@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "خلاصهٔ کوتاه",
   "form.version": "نسخه",
   "form.versionHelp": "نسخهٔ در حال استفاده، اگر معلوم است.",
+  "icon.help": "کنار نامش در صفحه‌های عمومی نشان داده می‌شود.",
+  "icon.label": "نماد",
   "item.addComment": "افزودن یک دیدگاه",
   "item.answers": "اطلاعات ارائه‌شده",
   "item.commentDeleted": "دیدگاه حذف شد",

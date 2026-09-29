@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "Krótkie podsumowanie",
   "form.version": "Wersja",
   "form.versionHelp": "Używana wersja, jeśli jest znana.",
+  "icon.help": "Wyświetlana obok nazwy na stronach publicznych.",
+  "icon.label": "Ikona",
   "item.addComment": "Dodaj komentarz",
   "item.answers": "Podane informacje",
   "item.commentDeleted": "Komentarz usunięty",

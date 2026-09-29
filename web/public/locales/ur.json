@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "مختصر خلاصہ",
   "form.version": "ورژن",
   "form.versionHelp": "زیرِ استعمال ورژن، اگر معلوم ہو۔",
+  "icon.help": "عوامی صفحات پر اس کے نام کے ساتھ دکھایا جاتا ہے۔",
+  "icon.label": "آئیکن",
   "item.addComment": "تبصرہ شامل کریں",
   "item.answers": "فراہم کردہ معلومات",
   "item.commentDeleted": "تبصرہ حذف ہو گیا",

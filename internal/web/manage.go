@@ -13,8 +13,11 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
-type rename struct {
-	Name string `json:"name"`
+// organizationChange is a rename, and the icon when it is sent: an edit that
+// does not mention it — a page from before icons existed — leaves it alone.
+type organizationChange struct {
+	Name string  `json:"name"`
+	Icon *string `json:"icon"`
 }
 
 // handleRenameOrganization changes the name, never the address.
@@ -27,15 +30,33 @@ func (s *Server) handleRenameOrganization(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
-	var in rename
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit+maxIconBytes)
+	var in organizationChange
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || strings.TrimSpace(in.Name) == "" {
+		if tooLarge(err) {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "error.bad_request")
 		return
+	}
+	var icon string
+	if in.Icon != nil {
+		var ok bool
+		if icon, ok = iconFrom(*in.Icon); !ok {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 	}
 	if err := s.orgs().RenameOrganization(o.ID, in.Name); err != nil {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
+	}
+	if in.Icon != nil {
+		if err := s.orgs().SetOrganizationIcon(o.ID, icon); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"name": strings.TrimSpace(in.Name)})
 }
@@ -65,6 +86,10 @@ type repositoryChange struct {
 	ForgeRepo    string `json:"forge_repo"`
 	AcceptsBugs  bool   `json:"accepts_bugs"`
 	AcceptsIdeas bool   `json:"accepts_ideas"`
+	// Icon is changed only when it is sent: an edit from a page that predates
+	// icons does not mention it, and must not wipe the one somebody chose.
+	// An empty string goes back to the initials.
+	Icon *string `json:"icon"`
 }
 
 func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) {
@@ -76,11 +101,23 @@ func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit+maxIconBytes)
 	var in repositoryChange
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil || strings.TrimSpace(in.Name) == "" {
+		if tooLarge(err) {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "error.bad_request")
 		return
+	}
+	var icon string
+	if in.Icon != nil {
+		var ok bool
+		if icon, ok = iconFrom(*in.Icon); !ok {
+			writeError(w, http.StatusBadRequest, "error.image_too_big")
+			return
+		}
 	}
 
 	switch err := s.orgs().UpdateRepository(repo.ID, in.Name, in.ForgeRepo, in.AcceptsBugs, in.AcceptsIdeas); {
@@ -90,6 +127,12 @@ func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) 
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
+	}
+	if in.Icon != nil {
+		if err := s.orgs().SetRepositoryIcon(repo.ID, icon); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

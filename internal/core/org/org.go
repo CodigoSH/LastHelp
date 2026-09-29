@@ -88,7 +88,9 @@ type Organization struct {
 	Forge      Forge
 	BaseURL    string
 	ForgeOwner string
-	CreatedAt  time.Time
+	// Icon is a data URL, or empty for the initials of its name.
+	Icon      string
+	CreatedAt time.Time
 }
 
 // Repository is what the public sees and what a collaborator triages.
@@ -105,6 +107,9 @@ type Repository struct {
 	// is opaque here on purpose: the domain has no business knowing what a
 	// Gotify token is.
 	NotifyConfig string
+
+	// Icon is a data URL, or empty for the initials of its name.
+	Icon string
 
 	CreatedAt time.Time
 }
@@ -151,9 +156,9 @@ func (s Store) CreateOrganization(o Organization, now time.Time) (Organization, 
 	}
 
 	res, err := s.DB.Exec(`INSERT INTO organization
-		(slug, name, forge_kind, base_url, forge_owner, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		o.Slug, o.Name, string(o.Forge), o.BaseURL, o.ForgeOwner, now.Unix())
+		(slug, name, forge_kind, base_url, forge_owner, icon, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		o.Slug, o.Name, string(o.Forge), o.BaseURL, o.ForgeOwner, o.Icon, now.Unix())
 	if err != nil {
 		if isUnique(err) {
 			return Organization{}, ErrSlugTaken
@@ -170,13 +175,13 @@ func (s Store) CreateOrganization(o Organization, now time.Time) (Organization, 
 // OrganizationBySlug is the lookup every public URL starts with.
 func (s Store) OrganizationBySlug(slug string) (Organization, error) {
 	return s.scanOrganization(s.DB.QueryRow(`
-		SELECT id, slug, name, forge_kind, base_url, forge_owner, created_at
+		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, created_at
 		FROM organization WHERE slug = ?`, NormaliseSlug(slug)))
 }
 
 func (s Store) OrganizationByID(id int64) (Organization, error) {
 	return s.scanOrganization(s.DB.QueryRow(`
-		SELECT id, slug, name, forge_kind, base_url, forge_owner, created_at
+		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, created_at
 		FROM organization WHERE id = ?`, id))
 }
 
@@ -184,7 +189,7 @@ func (s Store) OrganizationByID(id int64) (Organization, error) {
 // reshuffles between two loads is a list nobody trusts.
 func (s Store) ListOrganizations() ([]Organization, error) {
 	rows, err := s.DB.Query(`
-		SELECT id, slug, name, forge_kind, base_url, forge_owner, created_at
+		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, created_at
 		FROM organization ORDER BY name COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, fmt.Errorf("listing organisations: %w", err)
@@ -196,7 +201,7 @@ func (s Store) ListOrganizations() ([]Organization, error) {
 		var o Organization
 		var forge string
 		var created int64
-		if err := rows.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &created); err != nil {
+		if err := rows.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &o.Icon, &created); err != nil {
 			return nil, fmt.Errorf("listing organisations: %w", err)
 		}
 		o.Forge = Forge(forge)
@@ -227,9 +232,9 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 	// its own default. Named here so that the next person to see it in the
 	// schema does not go looking for the code that fills it.
 	res, err := s.DB.Exec(`INSERT INTO repository
-		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas, now.Unix())
+		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, icon, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas, r.Icon, now.Unix())
 	if err != nil {
 		if isUnique(err) {
 			return Repository{}, ErrSlugTaken
@@ -251,7 +256,7 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.created_at
+		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.icon, r.created_at
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
 		WHERE o.slug = ? AND r.slug = ?`, NormaliseSlug(orgSlug), NormaliseSlug(repoSlug)))
@@ -260,14 +265,14 @@ func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 func (s Store) RepositoryByID(id int64) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, notify_config, created_at
+		       accepts_bugs, accepts_ideas, notify_config, icon, created_at
 		FROM repository WHERE id = ?`, id))
 }
 
 func (s Store) ListRepositories(orgID int64) ([]Repository, error) {
 	rows, err := s.DB.Query(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, notify_config, created_at
+		       accepts_bugs, accepts_ideas, notify_config, icon, created_at
 		FROM repository WHERE org_id = ? ORDER BY name COLLATE NOCASE, id`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("listing repositories: %w", err)
@@ -291,7 +296,7 @@ func (s Store) scanOrganization(row scanner) (Organization, error) {
 	var o Organization
 	var forge string
 	var created int64
-	err := row.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &created)
+	err := row.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &o.Icon, &created)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return Organization{}, ErrNotFound
@@ -318,7 +323,7 @@ func scanRepositoryRow(row scanner) (Repository, error) {
 	var r Repository
 	var created int64
 	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.ForgeRepo,
-		&r.AcceptsBugs, &r.AcceptsIdeas, &r.NotifyConfig, &created)
+		&r.AcceptsBugs, &r.AcceptsIdeas, &r.NotifyConfig, &r.Icon, &created)
 	if err != nil {
 		return Repository{}, err
 	}
@@ -392,6 +397,34 @@ func (s Store) UpdateRepository(id int64, name, forgeRepo string, bugs, ideas bo
 	return nil
 }
 
+// SetOrganizationIcon replaces an organisation's icon; empty goes back to the
+// initials. Apart from the rename, so that one that does not mention the icon
+// leaves it alone.
+func (s Store) SetOrganizationIcon(id int64, icon string) error {
+	res, err := s.DB.Exec(`UPDATE organization SET icon = ? WHERE id = ?`, icon, id)
+	if err != nil {
+		return fmt.Errorf("setting the organisation's icon: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SetRepositoryIcon replaces a repository's icon; empty goes back to the
+// initials of its name. Apart from UpdateRepository, so that an edit which
+// does not mention the icon — a page from before it existed — leaves it alone.
+func (s Store) SetRepositoryIcon(id int64, icon string) error {
+	res, err := s.DB.Exec(`UPDATE repository SET icon = ? WHERE id = ?`, icon, id)
+	if err != nil {
+		return fmt.Errorf("setting the repository's icon: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // DeleteRepository removes a repository and every report in it.
 func (s Store) DeleteRepository(id int64) error {
 	if _, err := s.DB.Exec(`DELETE FROM repository WHERE id = ?`, id); err != nil {
@@ -420,7 +453,7 @@ type Board struct {
 func (s Store) ListBoards() ([]Board, error) {
 	rows, err := s.DB.Query(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.created_at,
+		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.icon, r.created_at,
 		       o.slug, o.name
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
@@ -435,7 +468,7 @@ func (s Store) ListBoards() ([]Board, error) {
 		var b Board
 		var created int64
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Slug, &b.Name, &b.ForgeRepo,
-			&b.AcceptsBugs, &b.AcceptsIdeas, &b.NotifyConfig, &created,
+			&b.AcceptsBugs, &b.AcceptsIdeas, &b.NotifyConfig, &b.Icon, &created,
 			&b.OrgSlug, &b.OrgName)
 		if err != nil {
 			return nil, fmt.Errorf("listing boards: %w", err)

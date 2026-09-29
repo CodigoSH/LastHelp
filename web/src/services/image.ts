@@ -52,8 +52,23 @@ async function decode(file: File): Promise<{ width: number; height: number; draw
   }
 }
 
-function render(source: { width: number; height: number; draw: CanvasImageSource }, opaque: boolean): HTMLCanvasElement {
-  const scale = Math.min(1, MAX_SIDE / Math.max(source.width, source.height));
+/** How big a picked image may come out: its longest side, and its encoded size. */
+export interface Fit {
+  side: number;
+  bytes: number;
+}
+
+/** An avatar or a logo: twice the size it is ever drawn, within the inline cap. */
+export const PICTURE: Fit = { side: MAX_SIDE, bytes: MAX_BYTES };
+
+/**
+ * A repository's icon: drawn at 40px, and carried in every list of
+ * repositories, so small — the server refuses more than 24 KB.
+ */
+export const ICON: Fit = { side: 128, bytes: 22 * 1024 };
+
+function render(source: { width: number; height: number; draw: CanvasImageSource }, opaque: boolean, side: number): HTMLCanvasElement {
+  const scale = Math.min(1, side / Math.max(source.width, source.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(source.width * scale));
   canvas.height = Math.max(1, Math.round(source.height * scale));
@@ -77,7 +92,7 @@ function render(source: { width: number; height: number; draw: CanvasImageSource
  * happen with a real picture — the caller still handles it, because a thrown
  * error is better than an upload that is refused with no explanation.
  */
-export async function shrink(file: File): Promise<string> {
+export async function shrink(file: File, fit: Fit = PICTURE): Promise<string> {
   const source = await decode(file);
 
   // Lossless first, and only then lossy. A logo is flat colour: PNG keeps it
@@ -100,11 +115,11 @@ export async function shrink(file: File): Promise<string> {
 
   let smallest = "";
   for (const attempt of attempts) {
-    const url = render(source, attempt.opaque).toDataURL(attempt.type, attempt.quality);
+    const url = render(source, attempt.opaque, fit.side).toDataURL(attempt.type, attempt.quality);
     // A browser that cannot encode the type returns a PNG instead of failing,
     // so the answer is checked rather than the request.
     if (!url.startsWith(`data:${attempt.type}`) && attempt.type !== "image/png") continue;
-    if (url.length <= MAX_BYTES) return url;
+    if (url.length <= fit.bytes) return url;
     if (!smallest || url.length < smallest.length) smallest = url;
   }
 

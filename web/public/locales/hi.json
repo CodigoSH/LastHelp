@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "संक्षिप्त सारांश",
   "form.version": "संस्करण",
   "form.versionHelp": "उपयोग में संस्करण, यदि ज्ञात हो।",
+  "icon.help": "सार्वजनिक पृष्ठों पर इसके नाम के पास दिखाया जाता है।",
+  "icon.label": "आइकन",
   "item.addComment": "टिप्पणी जोड़ें",
   "item.answers": "दी गई जानकारी",
   "item.commentDeleted": "टिप्पणी मिटा दी गई",

@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "সংক্ষিপ্ত সারাংশ",
   "form.version": "সংস্করণ",
   "form.versionHelp": "ব্যবহৃত সংস্করণ, জানা থাকলে।",
+  "icon.help": "সর্বজনীন পৃষ্ঠায় এর নামের পাশে দেখানো হয়।",
+  "icon.label": "আইকন",
   "item.addComment": "একটি মন্তব্য যোগ করুন",
   "item.answers": "প্রদত্ত তথ্য",
   "item.commentDeleted": "মন্তব্য মুছে ফেলা হয়েছে",

@@ -22,7 +22,7 @@ import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
-import { shrink, TooLarge } from "./services/image";
+import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { attachChartHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
 import { watchSelects } from "./services/select";
@@ -555,19 +555,54 @@ function wireShell(): void {
  * the file's while the server bounds the data URL — about a third longer — so a
  * file that passed here could still be refused there.
  */
-async function readAsDataURL(file: File | undefined): Promise<string | null> {
+async function readAsDataURL(file: File | undefined, fit?: Fit): Promise<string | null> {
   if (!file) return null;
   try {
     // Scaled and re-encoded rather than measured and refused. Every photograph
     // a phone takes is over the limit, and telling the person setting up a
     // server to go and find a smaller picture is not a feature.
-    return await shrink(file);
+    return await shrink(file, fit);
   } catch (err) {
     // A file this browser cannot decode — an HEIC from an iPhone, say — is not
     // a file that is too large, and saying so sends somebody off to shrink an
     // image that was never the problem.
     showFormError(new ApiError(400, err instanceof TooLarge ? "error.image_too_big" : "error.image_unreadable"));
     return null;
+  }
+}
+
+/**
+ * A repository's icon, chosen in whichever form is on the page — the one that
+ * creates a repository or the one that edits it. The picture goes into the
+ * form's hidden `icon` field and the preview changes in place; the form then
+ * sends it with the rest. Until an icon is chosen the preview is the initials
+ * of the name being typed, which is what the repository will show.
+ */
+function wireIconPicker(changed?: (icon: string) => void): void {
+  for (const button of root?.querySelectorAll<HTMLButtonElement>("[data-pick-icon]") ?? []) {
+    const box = button.closest(".icon-field");
+    const form = button.closest("form");
+    const file = box?.querySelector<HTMLInputElement>("[data-icon-file]");
+    const value = box?.querySelector<HTMLInputElement>('input[name="icon"]');
+    const clear = box?.querySelector<HTMLButtonElement>("[data-clear-icon]");
+    const name = form?.querySelector<HTMLInputElement>('input[name="name"]');
+    const paint = (icon: string) => {
+      if (value) value.value = icon;
+      if (clear) clear.hidden = icon === "";
+      const preview = button.querySelector(".icon-preview");
+      if (preview) preview.outerHTML = views.markOf(name?.value.trim() || "?", icon, "card-mark icon-preview");
+      changed?.(icon);
+    };
+    button.addEventListener("click", () => file?.click());
+    file?.addEventListener("change", async () => {
+      const picked = await readAsDataURL(file.files?.[0], ICON);
+      file.value = "";
+      if (picked !== null) paint(picked);
+    });
+    clear?.addEventListener("click", () => paint(""));
+    name?.addEventListener("input", () => {
+      if (!value?.value) paint("");
+    });
   }
 }
 
@@ -1787,13 +1822,14 @@ function wireChannel(orgSlug: string, saved?: () => Promise<void>): void {
  * in a database, and a reload landing on step three of a form whose first two
  * steps no longer exist is worse than starting again.
  */
-const draft: { forge: string; orgSlug: string; repoSlug: string; picture: string; logo: string } = {
+const draft: { forge: string; orgSlug: string; repoSlug: string; picture: string; logo: string; orgIcon: string } = {
   forge: "none",
   orgSlug: "",
   repoSlug: "",
   // Chosen before the account exists, so held here and sent the moment it does.
   picture: "",
   logo: "",
+  orgIcon: "",
 };
 
 /** The error line under a wizard card, which every step has one of. */
@@ -1923,7 +1959,11 @@ function showSetupDone(): void {
 
 async function showOrganizationWizard(step: 1 | 2): Promise<void> {
   if (!(await requireAdministrator())) return;
-  await showInShell(views.organizationWizard(step, text, draft.forge), "/panel/new");
+  await showInShell(views.organizationWizard(step, text, draft.forge, draft.orgIcon), "/panel/new");
+  // Kept in the draft: changing the forge draws this step again.
+  wireIconPicker((icon) => {
+    draft.orgIcon = icon;
+  });
 
   if (step === 1) {
     wireForgeChoice((forge) => {
@@ -1946,7 +1986,9 @@ async function showOrganizationWizard(step: 1 | 2): Promise<void> {
           forge: draft.forge,
           base_url: String(data.get("base_url") ?? ""),
           forge_owner: String(data.get("forge_owner") ?? ""),
+          icon: draft.orgIcon,
         });
+        draft.orgIcon = "";
         go(draft.forge === "none" ? `/panel/${draft.orgSlug}` : "/panel/new/connection");
       } catch (err) {
         showFormError(err);
@@ -2629,7 +2671,7 @@ async function showOrganizationsPanel(): Promise<void> {
           id: "org-modal",
           title: text.t("panel.newOrganization"),
           lead: text.t("setup.orgLead"),
-          body: views.organizationFields(text, draft.forge),
+          body: views.iconField(text, "", "", "org-new-icon") + views.organizationFields(text, draft.forge),
           submit: text.t("auth.create"),
           formClass: "org-form",
         },
@@ -2658,9 +2700,11 @@ async function showOrganizationsPanel(): Promise<void> {
       forge: String(data.get("forge") ?? "none"),
       base_url: String(data.get("base_url") ?? ""),
       forge_owner: String(data.get("forge_owner") ?? ""),
+      icon: String(data.get("icon") ?? ""),
     });
     await render();
   });
+  wireIconPicker();
 
   let renaming = "";
   root?.querySelectorAll<HTMLButtonElement>("[data-edit-org]").forEach((button) =>
@@ -2783,7 +2827,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
           id: "repo-modal",
           title: text.t("panel.newRepository"),
           lead: text.t("repo.lead"),
-          body: views.repositoryFields(text, forge, forge !== "none") + views.acceptsFields(text),
+          body: views.iconField(text, "") + views.repositoryFields(text, forge, forge !== "none") + views.acceptsFields(text),
           submit: text.t("auth.create"),
           formClass: "repo-form",
         },
@@ -2830,9 +2874,11 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
       forge_repo: String(formData.get("forge_repo") ?? ""),
       accepts_bugs: formData.get("accepts_bugs") !== null,
       accepts_ideas: formData.get("accepts_ideas") !== null,
+      icon: String(formData.get("icon") ?? ""),
     });
     await render();
   });
+  wireIconPicker();
 
   root?.querySelectorAll<HTMLButtonElement>("[data-delete-repo]").forEach((button) =>
     button.addEventListener("click", async () => {
@@ -2900,7 +2946,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   );
 
   onSubmit("form.org-settings", async (formData) => {
-    await api.patch(base, { name: String(formData.get("name") ?? "") });
+    await api.patch(base, { name: String(formData.get("name") ?? ""), icon: String(formData.get("icon") ?? "") });
     toast(i18n.t("panel.saved"));
     await render();
   });
@@ -2941,10 +2987,12 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
       forge_repo: String(data.get("forge_repo") ?? repo.forge_repo),
       accepts_bugs: data.get("accepts_bugs") !== null,
       accepts_ideas: data.get("accepts_ideas") !== null,
+      icon: String(data.get("icon") ?? ""),
     });
     toast(i18n.t("panel.saved"));
     await render();
   });
+  wireIconPicker();
 
   wireChannel(orgSlug, render);
 

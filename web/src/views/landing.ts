@@ -9,7 +9,7 @@
  */
 import { escapeAttr, escapeHTML } from "../escape";
 import { icons } from "./icons";
-import { brandMark, emptyState, initials, type Text } from "./templates";
+import { brandMark, emptyState, markOf, type Text } from "./templates";
 
 export type LandingKind =
   | "heading"
@@ -100,6 +100,7 @@ export interface LandingBoard {
   name: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  icon?: string;
 }
 
 export interface LandingReport {
@@ -482,7 +483,7 @@ function boards(m: LandingModule, rows: LandingBoard[], text: Text): string {
       ? `<ul class="lp-rows">${list
           .map(
             (b) => `<li><a class="brief" href="/${escapeAttr(b.org)}/${escapeAttr(b.slug)}">
-              <span class="lp-board-mark" aria-hidden="true">${escapeHTML(initials(b.name))}</span>
+              ${markOf(b.name, b.icon, "lp-board-mark")}
               <span class="brief-title">${escapeHTML(b.name)}</span>
               ${accepts(b, text)}
             </a></li>`,
@@ -491,7 +492,7 @@ function boards(m: LandingModule, rows: LandingBoard[], text: Text): string {
       : `<ul class="lp-cards">${list
           .map(
             (b) => `<li><a class="lp-card" href="/${escapeAttr(b.org)}/${escapeAttr(b.slug)}">
-              <span class="lp-board-mark" aria-hidden="true">${escapeHTML(initials(b.name))}</span>
+              ${markOf(b.name, b.icon, "lp-board-mark")}
               <span class="lp-card-body">
                 <span class="lp-card-title">${escapeHTML(b.name)}</span>
                 ${accepts(b, text)}

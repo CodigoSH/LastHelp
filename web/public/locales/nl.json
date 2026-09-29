@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "Korte samenvatting",
   "form.version": "Versie",
   "form.versionHelp": "Gebruikte versie, indien bekend.",
+  "icon.help": "Wordt op de openbare pagina's naast de naam getoond.",
+  "icon.label": "Pictogram",
   "item.addComment": "Een reactie toevoegen",
   "item.answers": "Verstrekte gegevens",
   "item.commentDeleted": "Reactie verwijderd",

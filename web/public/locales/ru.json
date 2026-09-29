@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "Краткое описание",
   "form.version": "Версия",
   "form.versionHelp": "Используемая версия, если известна.",
+  "icon.help": "Показывается рядом с названием на публичных страницах.",
+  "icon.label": "Значок",
   "item.addComment": "Добавить комментарий",
   "item.answers": "Предоставленные данные",
   "item.commentDeleted": "Комментарий удалён",

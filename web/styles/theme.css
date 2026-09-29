@@ -484,6 +484,16 @@ body > main {
   min-inline-size: 0;
 }
 
+/* A page title with its mark in front: the mark at the height of the crumb
+   and the title together. */
+.head-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-inline-size: 0;
+}
+.card-mark.head-mark { inline-size: 3.25rem; block-size: 3.25rem; }
+
 .head-actions {
   display: flex;
   align-items: center;
@@ -4659,6 +4669,39 @@ body > nav .brand {
 }
 
 .avatar-pick:hover .avatar-pick-badge { color: var(--text-main); }
+
+/* A repository's mark with an icon in it: the picture fills the tile to its
+   rounded corners, on a neutral ground so a transparent icon does not sit on
+   the accent's tint. Without one it stays the initials, as it always was. */
+.card-mark.has-icon,
+.lp-board-mark.has-icon,
+.repo-si-mark.has-icon {
+  overflow: hidden;
+  background: var(--panel);
+  border-color: var(--border);
+}
+.card-mark > img,
+.lp-board-mark > img,
+.repo-si-mark > img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.repo-si-mark { border: 1px solid var(--border); border-radius: var(--radius-sm); }
+
+/* The same control as the picture and the logo, square like the mark it
+   fills, at the size it is chosen at. */
+.icon-pick { border-radius: 14px; }
+.icon-pick .card-mark {
+  inline-size: 64px;
+  block-size: 64px;
+  border-radius: 14px;
+  font-size: 1.3rem;
+  transition: box-shadow 0.15s ease;
+}
+.icon-pick:hover .card-mark,
+.icon-pick:focus-visible .card-mark { box-shadow: 0 0 0 2px var(--accent); }
 
 /* The picker, and the cross that clears it.
  *

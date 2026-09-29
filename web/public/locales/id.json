@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "Ringkasan singkat",
   "form.version": "Versi",
   "form.versionHelp": "Versi yang digunakan, jika diketahui.",
+  "icon.help": "Ditampilkan di samping namanya di halaman publik.",
+  "icon.label": "Ikon",
   "item.addComment": "Tambahkan komentar",
   "item.answers": "Informasi yang diberikan",
   "item.commentDeleted": "Komentar dihapus",

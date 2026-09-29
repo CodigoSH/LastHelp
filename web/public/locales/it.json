@@ -137,6 +137,8 @@
   "form.titlePlaceholder": "Breve riepilogo",
   "form.version": "Versione",
   "form.versionHelp": "Versione in uso, se nota.",
+  "icon.help": "Mostrata accanto al nome nelle pagine pubbliche.",
+  "icon.label": "Icona",
   "item.addComment": "Aggiungi un commento",
   "item.answers": "Dati forniti",
   "item.commentDeleted": "Commento eliminato",

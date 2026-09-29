@@ -242,6 +242,7 @@ func describeBoards(boards []org.Board) []map[string]any {
 			"name":          b.Name,
 			"accepts_bugs":  b.AcceptsBugs,
 			"accepts_ideas": b.AcceptsIdeas,
+			"icon":          b.Icon,
 		})
 	}
 	return out
