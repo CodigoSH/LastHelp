@@ -1,0 +1,197 @@
+<!doctype html>
+<!--
+  The picture the project page and the README lead with, composed in a browser
+  instead of assembled by hand.
+
+  The one it replaces was a single screenshot of a public board with two
+  reports on it: it showed neither the screen the team works in nor the page a
+  visitor lands on, and nothing about it said what the product is.
+
+  This can be regenerated whenever the interface changes. The frames are drawn,
+  the background is the site's own atmosphere, and the two screens are real
+  screenshots of a seeded installation taken seconds earlier by
+  scripts/docs-mockup.ts: the team's reports screen in the laptop, and the
+  front page a visitor sees on a phone.
+
+  Rendered by scripts/docs-mockup.ts — not served to anyone.
+-->
+<meta charset="utf-8">
+<title>LastHelp mockup</title>
+<style>
+    :root {
+        --accent: #e8520e;
+        --ink: #f5f5f7;
+        --dim: #a1a1aa;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+        width: 1600px;
+        height: 900px;
+        overflow: hidden;
+        background: #0b0b0d;
+        /* The same stack the app itself declares, so the wording in the
+           mockup and the interface beside it are set in one typeface. */
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        color: var(--ink);
+        position: relative;
+        display: grid;
+        grid-template-columns: 470px 1fr;
+        align-items: center;
+    }
+
+    /* The site's atmosphere: a warm glow off the top, and the faint grid the
+       constellation sits on. */
+    .glow {
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(900px 520px at 22% 8%, rgba(232, 82, 14, 0.20), transparent 68%),
+            radial-gradient(1100px 700px at 78% 100%, rgba(232, 82, 14, 0.10), transparent 62%);
+    }
+
+    .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+            linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: radial-gradient(1200px 700px at 40% 40%, #000 20%, transparent 75%);
+    }
+
+    /* ── Left: the words ─────────────────────────────────────────────── */
+    .copy {
+        position: relative;
+        padding: 0 0 0 88px;
+    }
+
+    .lockup {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 34px;
+    }
+
+    .lockup img { width: 54px; height: 54px; }
+
+    .lockup span {
+        font-size: 38px;
+        font-weight: 600;
+        letter-spacing: -0.03em;
+    }
+
+    h1 {
+        font-size: 62px;
+        line-height: 1.04;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        margin-bottom: 26px;
+    }
+
+    h1 em {
+        font-style: normal;
+        color: var(--accent);
+    }
+
+    p {
+        font-size: 21px;
+        line-height: 1.5;
+        color: var(--dim);
+        max-width: 30ch;
+    }
+
+    .badges {
+        display: flex;
+        gap: 10px;
+        margin-top: 38px;
+    }
+
+    .badge {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--dim);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 999px;
+        padding: 7px 15px;
+    }
+
+    /* ── Right: the screens ──────────────────────────────────────────── */
+    .stage {
+        position: relative;
+        height: 100%;
+    }
+
+    /* A laptop lid: a thin bezel with a bar at the top, nothing skeuomorphic. */
+    .laptop {
+        position: absolute;
+        top: 176px;
+        left: 10px;
+        width: 1010px;
+        border-radius: 14px;
+        background: #17171a;
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 0, 0, 0.6);
+        overflow: hidden;
+    }
+
+    .bar {
+        height: 26px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 0 12px;
+        background: #202024;
+    }
+
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #3a3a40; }
+
+    .laptop img { display: block; width: 100%; }
+
+    /* The phone overlaps the laptop's corner, showing what a visitor sees. */
+    .phone {
+        position: absolute;
+        top: 300px;
+        right: 26px;
+        width: 244px;
+        border-radius: 30px;
+        background: #17171a;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 9px;
+        box-shadow: 0 34px 70px rgba(0, 0, 0, 0.6);
+        overflow: hidden;
+    }
+
+    .phone img {
+        display: block;
+        width: 100%;
+        border-radius: 22px;
+    }
+</style>
+
+<div class="glow"></div>
+<div class="grid"></div>
+
+<div class="copy">
+    <div class="lockup">
+        <img src="__LOGO__" alt="">
+        <span>LastHelp</span>
+    </div>
+    <h1>Hear from<br>everyone,<br><em>no account.</em></h1>
+    <p>A self-hosted feedback portal — bugs, ideas and votes with no account, turned into issues on your own forge.</p>
+    <div class="badges">
+        <div class="badge">Self-hosted</div>
+        <div class="badge">Single binary</div>
+        <div class="badge">Apache-2.0</div>
+    </div>
+</div>
+
+<div class="stage">
+    <div class="laptop">
+        <div class="bar"><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+        <img src="__DESKTOP__" alt="">
+    </div>
+    <div class="phone"><img src="__MOBILE__" alt=""></div>
+</div>

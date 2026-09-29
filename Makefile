@@ -82,6 +82,7 @@ drive-reports: build ## Walk the reports screen on an installation with history
 shots: build ## Regenerate the documentation screenshots
 	@command -v google-chrome >/dev/null || { echo "google-chrome is required"; exit 1; }
 	@scripts/docs-shots.sh
+	@bun scripts/docs-mockup.ts
 
 # The adapters were written from documentation, and for Gitea and Forgejo from
 # reading the structs they serialise. Everything else that tests them uses a fake

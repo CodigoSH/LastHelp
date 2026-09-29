@@ -277,27 +277,9 @@ await Bun.write(`${ASSETS}/logo.png`, Buffer.from(mark.data, "base64"));
 console.log(`  wrote ${ASSETS}/logo.png (320x320)`);
 await page.send("Emulation.setDefaultBackgroundColorOverride");
 
-// And the picture at the top of the README: a board as everybody else sees it,
-// which is what this product is for.
-await page.send("Emulation.setDeviceMetricsOverride", {
-  width: 1440, height: 900, deviceScaleFactor: 2, mobile: false,
-});
-await go("/acme/atlas");
-// Down to the last row rather than to the bottom of the page: main carries a
-// hand's width of padding under it, which in a picture is a hand's width of
-// nothing.
-const hero = await evaluate(`
-  const rows = [...document.querySelectorAll(".items li")];
-  const last = rows[rows.length - 1] ?? document.querySelector("main");
-  return Math.min(Math.ceil(last.getBoundingClientRect().bottom) + 40, 900);
-`);
-const shot = await page.send("Page.captureScreenshot", {
-  format: "png", captureBeyondViewport: true,
-  clip: { x: 0, y: 0, width: 1440, height: Number(hero), scale: 2 },
-});
-await Bun.write(`${ASSETS}/mockup.png`, Buffer.from(shot.data, "base64"));
-console.log(`  wrote ${ASSETS}/mockup.png (1440x${hero})`);
+// The picture at the top of the README and the project page is composed by
+// scripts/docs-mockup.ts, from an installation with months of history.
 
+// The socket keeps the process alive otherwise.
 page.close();
-console.log("\nlook at the images. A tick above says a file was written, nothing more.");
-export {};
+process.exit(0);
