@@ -413,6 +413,13 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 			board["organization"] = map[string]any{"slug": o.Slug, "name": o.Name}
 		}
 		body["repository"] = board
+		// For whoever works on it, what they may do to it, in the same answer:
+		// the reports screen reads a report per row chosen, and asking this
+		// separately doubled every row against the per-address ceiling.
+		scope := authz.Repository(repo.ID, repo.OrgID)
+		if actor, ok := middleware.ActorFrom(r); ok && actor.Can(authz.Triage, scope) {
+			body["team"] = teamWork(it, actor, scope)
+		}
 	}
 	// The reporter is the only one who can be here before publication, and the
 	// only one who needs to be told so. Without this the page had no way to

@@ -464,12 +464,10 @@ func TestTheRoadmapIsPublicAndTheControlIsNot(t *testing.T) {
 		t.Errorf("the planned column has %d items", got)
 	}
 
-	// Nobody without a session may ask what statuses are available, let alone
-	// set one.
-	resp = public.do(http.MethodGet, "/api/items/"+id+"/statuses", nil)
-	_ = resp.Body.Close()
-	if resp.StatusCode != http.StatusUnauthorized {
-		t.Errorf("the status list answered %d to the public", resp.StatusCode)
+	// Nobody without a session is told what statuses are available, let alone
+	// sets one.
+	if _, has := decode(t, public.do(http.MethodGet, "/api/items/"+id, nil))["team"]; has {
+		t.Error("the public was handed the team's part of the report")
 	}
 
 	resp = public.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": "done"})

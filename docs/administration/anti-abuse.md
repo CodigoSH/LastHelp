@@ -56,11 +56,17 @@ Anyone claiming a spam filter stops a determined human is selling something.
 
 ![The moderation queue](../images/queue.png)
 
-Everything waiting is decided in **Review**, in the panel's top bar: every
+Everything waiting is decided in **Reports**, the icon in the top bar: every
 repository you work on in one list, the report beside it, and three buttons —
-publish, reject, and spam. The arrow keys move down the list. Each
-repository's page in the panel links to the same screen filtered to that
-repository.
+publish, reject, and spam. The arrow keys move down the list. It opens on what
+is waiting when something is, and on every report otherwise.
+
+The same screen is the archive: every report ever sent, found by its words or
+narrowed by type, moderation, status and repository. Whatever you choose opens
+beside the list as the whole report — edit its words, change its status, open
+or link an issue, reply, and, for the organisation's owners and the
+administrator, delete it or any comment on it. Each repository's page in the
+panel opens the same screen filtered to that repository.
 
 With four repositories you will see between zero and five things a week, which
 is why there are no bulk actions: anything that assumes scale on this side is

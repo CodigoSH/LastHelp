@@ -1657,7 +1657,7 @@ export function overviewScreen(data: OverviewData, text: Text): string {
          ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
          : `<ul class="board-rows">${data.boards
              .map(
-               (b) => `<li><a href="/panel/reports?board=${escapeAttr(`${b.org}/${b.repo}`)}">
+               (b) => `<li><a href="/review?mode=all&amp;board=${escapeAttr(`${b.org}/${b.repo}`)}">
                  <span class="board-name">
                    <span class="card-title">${escapeHTML(b.name)}</span>
                    <span class="card-sub">${escapeHTML(b.organization)}</span>
@@ -1680,10 +1680,10 @@ export function overviewScreen(data: OverviewData, text: Text): string {
   );
 
   const all: Record<OverviewCard, string> = {
-    reports: stat("reports", total, text.t("overview.reports"), icons.repository(), "/panel/reports"),
-    waiting: stat("waiting", data.pending, text.t("panel.queue"), icons.queue(), "/panel/reports?moderation=pending"),
-    published: stat("published", data.published, text.t("overview.published"), icons.check(), "/panel/reports?moderation=published"),
-    votes: stat("votes", data.votes, text.t("overview.votes"), icons.idea(), "/panel/reports?kind=idea&sort=votes"),
+    reports: stat("reports", total, text.t("overview.reports"), icons.repository(), "/review?mode=all"),
+    waiting: stat("waiting", data.pending, text.t("panel.queue"), icons.queue(), "/review?mode=pending"),
+    published: stat("published", data.published, text.t("overview.published"), icons.check(), "/review?mode=all&moderation=published"),
+    votes: stat("votes", data.votes, text.t("overview.votes"), icons.idea(), "/review?mode=all&kind=idea&sort=votes"),
     organizations: stat("organizations", data.organizations, text.t("shell.organizations"), icons.organization(), "/panel/organizations"),
     people: stat("people", data.people, text.t("shell.people"), icons.people(), "/panel/people"),
     activity,
@@ -1778,6 +1778,8 @@ export interface ReviewView {
   more: boolean;
   /** Seconds since the epoch, given rather than read so the rows can be tested. */
   now: number;
+  /** What waits, as the bar counts it: shown on its tab from either mode. */
+  waiting?: number;
 }
 
 /**
@@ -1814,11 +1816,10 @@ export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): s
         <button class="tab${view.mode === "pending" ? " on" : ""}" data-mode="pending">
           ${escapeHTML(text.t("review.pending"))}
           ${
-            // The waiting count stays on its tab while the archive is open:
-            // it is the number the bar shows, and the two never disagree.
-            view.mode === "pending"
-              ? `<span class="count-chip">${escapeHTML(text.number(total))}</span>`
-              : ""
+            // The waiting count stays on its tab from either mode. In the
+            // queue it is what the list draws; from the archive it is the
+            // server's, the number the bar shows — the two never disagree.
+            `<span class="count-chip">${escapeHTML(text.number(view.mode === "pending" ? total : (view.waiting ?? 0)))}</span>`
           }</button>
         <button class="tab${view.mode === "all" ? " on" : ""}" data-mode="all">${escapeHTML(text.t("board.all"))}</button>
       </div>
@@ -2707,19 +2708,27 @@ export function repositoryScreen(
   const board = `${org.slug}/${repo.slug}`;
   const hasForge = !!org.forge && org.forge !== "none";
 
-  // What is waiting, and the way to it. Review filtered to this board is the
-  // queue now; a second list of the same reports here would be a second place
-  // for the same decision.
+  // This board's reports, and what waits among them: both are the reports
+  // screen filtered to it. A second list of the same reports here would be a
+  // second place for the same work.
   const review = `/review?${new URLSearchParams({ mode: "all", moderation: "pending", board }).toString()}`;
+  const reports = `/review?${new URLSearchParams({ mode: "all", board }).toString()}`;
   const summary = settingsCard(
     repo.name,
     `<p class="org-tags"><span class="mono-tag">/${escapeHTML(board)}</span>${acceptsMarks(repo, text)}</p>
     <div class="settings-row">
       <div class="settings-info">
+        <h4>${escapeHTML(text.t("review.title"))}</h4>
+        <p>${escapeHTML(text.t("repo.reportsHelp"))}</p>
+      </div>
+      <a class="button primary" href="${escapeAttr(reports)}" data-repo-reports>${escapeHTML(text.t("action.open"))}</a>
+    </div>
+    <div class="settings-row">
+      <div class="settings-info">
         <h4>${escapeHTML(text.t("repo.pending", { count: text.number(repo.pending) }))}</h4>
         <p>${escapeHTML(text.t("repo.pendingHelp"))}</p>
       </div>
-      <a class="button primary" href="${escapeAttr(review)}" data-repo-review>${escapeHTML(text.t("review.title"))}</a>
+      <a class="button ghost" href="${escapeAttr(review)}" data-repo-review>${escapeHTML(text.t("action.open"))}</a>
     </div>
     <div class="settings-row">
       <div class="settings-info">

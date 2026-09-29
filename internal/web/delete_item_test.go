@@ -45,10 +45,10 @@ func TestOnlyWhoRunsTheOrganisationDeletesAReport(t *testing.T) {
 	_ = status(t, team.do(http.MethodPost, "/api/items/"+duplicate+"/merge", map[string]string{"into": report}))
 
 	// The page is told who may, by the server.
-	if got := decode(t, team.do(http.MethodGet, "/api/items/"+report+"/statuses", nil))["can_delete"]; got != true {
+	if got := teamPart(t, team, report)["can_delete"]; got != true {
 		t.Errorf("the administrator was not offered deleting: %v", got)
 	}
-	if got := decode(t, collaborator.do(http.MethodGet, "/api/items/"+report+"/statuses", nil))["can_delete"]; got != false {
+	if got := teamPart(t, collaborator, report)["can_delete"]; got != false {
 		t.Errorf("a collaborator was offered deleting: %v", got)
 	}
 
@@ -135,4 +135,71 @@ func TestOnlyWhoRunsTheOrganisationDeletesAComment(t *testing.T) {
 	if after := thread(); len(after) != 0 {
 		t.Errorf("the deleted comment is still in the thread: %v", after)
 	}
+}
+
+// TestTheReportCarriesWhatTheTeamMayDoToIt.
+//
+// The reports screen reads one report per row chosen. What the reader may do
+// to it — the statuses, whether it can be deleted — rides in the same answer,
+// for whoever may triage it and nobody else.
+func TestTheReportCarriesWhatTheTeamMayDoToIt(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	accounts := account.Store{DB: team.db()}
+	helper, err := accounts.Create("helper", "a good long passphrase", false, team.now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var boardID int64
+	if err := team.db().QueryRow(`SELECT id FROM repository WHERE slug = 'lastboard'`).Scan(&boardID); err != nil {
+		t.Fatal(err)
+	}
+	if err := accounts.Grant(helper.ID, authz.Repository(boardID, 0), authz.RoleCollaborator, team.now()); err != nil {
+		t.Fatal(err)
+	}
+	collaborator := team.anonymous()
+	_ = status(t, collaborator.do(http.MethodPost, "/api/session", map[string]string{
+		"username": "helper", "password": "a good long passphrase",
+	}))
+
+	public := team.anonymous()
+	report, _ := public.submit("codigosh", "lastboard", "bug", "crash on import")
+	_ = status(t, team.do(http.MethodPost, "/api/items/"+report+"/moderation", map[string]string{"state": "published"}))
+
+	for _, c := range []struct {
+		who       string
+		as        *instance
+		team      bool
+		canDelete bool
+	}{
+		{"a visitor", team.anonymous(), false, false},
+		{"a collaborator", collaborator, true, false},
+		{"the administrator", team, true, true},
+	} {
+		got := decode(t, c.as.do(http.MethodGet, "/api/items/"+report, nil))
+		work, has := got["team"].(map[string]any)
+		if has != c.team {
+			t.Errorf("%s: the report carried the team's part: %v, want %v", c.who, has, c.team)
+			continue
+		}
+		if !has {
+			continue
+		}
+		if work["can_delete"] != c.canDelete {
+			t.Errorf("%s: can_delete %v, want %v", c.who, work["can_delete"], c.canDelete)
+		}
+		if work["current"] != "new" || len(work["statuses"].([]any)) == 0 {
+			t.Errorf("%s: the statuses it can move to are missing: %v", c.who, work)
+		}
+	}
+}
+
+// teamPart is what the report says its reader may do to it, or nothing.
+func teamPart(t *testing.T, as *instance, report string) map[string]any {
+	t.Helper()
+	work, _ := decode(t, as.do(http.MethodGet, "/api/items/"+report, nil))["team"].(map[string]any)
+	return work
 }

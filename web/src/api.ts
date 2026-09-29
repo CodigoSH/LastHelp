@@ -192,6 +192,8 @@ export interface ItemDetail extends ItemSummary {
   merged_into?: string;
   issue?: { number: number; url: string };
   comments: Array<{ id?: number; author: string; name: string; body: string; created_at: number }>;
+  /** What the reader may do to it, when they work on it; absent for anybody else. */
+  team?: { current: string; statuses: string[]; can_delete?: boolean };
 }
 
 export interface Submitted {

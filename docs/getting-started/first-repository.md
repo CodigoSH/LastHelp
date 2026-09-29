@@ -82,10 +82,10 @@ confirmed bug and a planned idea are the same news.
 | Level | Role | Can |
 |---|---|---|
 | Server | **Administrator** | Everything, and the only one who crosses organisations |
-| Organisation | **Owner** | Its connection and **its token**, its repositories, and who works in it |
-| Repository | **Collaborator** | Triage that repository: moderate, change status, reply, create and link issues. **Never sees the token** |
+| Organisation | **Owner** | Its connection and **its token**, its repositories, who works in it, and deleting reports and comments |
+| Repository | **Collaborator** | Triage that repository: moderate, edit, change status, reply, create and link issues. **Never sees the token** |
 
-Accounts are created by the administrator, under **People**. Who works where is
+Accounts are created by the administrator, under **Users**. Who works where is
 given where the work is: owners on the organisation's page, collaborators on
 each repository's page — by the administrator or by any owner of that
 organisation.

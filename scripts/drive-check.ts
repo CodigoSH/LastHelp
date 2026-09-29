@@ -37,6 +37,11 @@ const consoleErrors: string[] = [];
 // straight past this file.
 const refusedByPolicy: string[] = [];
 
+// What the server turned away for being asked too often. A pass that reaches
+// the per-address ceiling fails far from the cause, on whatever screen could
+// not load next; this says why.
+const tooMany: string[] = [];
+
 async function target(url: string) {
   const res = await fetch(`http://127.0.0.1:${CDP}/json/new?${encodeURIComponent(url)}`, { method: "PUT" });
   return (await res.json()) as { id: string; webSocketDebuggerUrl: string };
@@ -60,6 +65,9 @@ function open(url: string) {
       }
       if (msg.method === "Runtime.consoleAPICalled" && msg.params?.type === "error") {
         consoleErrors.push(msg.params.args?.map((a: any) => a.value ?? a.description).join(" ") ?? "console.error");
+      }
+      if (msg.method === "Network.responseReceived" && msg.params?.response?.status === 429) {
+        tooMany.push(String(msg.params.response.url ?? "").replace(/^https?:\/\/[^/]+/, ""));
       }
       if (msg.method === "Log.entryAdded") {
         const entry = msg.params?.entry ?? {};
@@ -90,6 +98,7 @@ async function main() {
   await page.send("Page.enable");
   await page.send("Runtime.enable");
   await page.send("Log.enable");
+  await page.send("Network.enable");
 
   const evaluate = async (expression: string) => {
     const result = await page.send("Runtime.evaluate", {
@@ -124,7 +133,11 @@ async function main() {
       );
       if (there) return;
       if (Date.now() > until) {
-        throw new Error(`nothing matched ${selector} after ${within}ms`);
+        // What the page said before giving up is usually the reason.
+        const said = (consoleErrors.length ? `; the page said: ${consoleErrors.slice(-3).join(" | ")}` : "") +
+          (tooMany.length ? `; refused as too many: ${tooMany.length}, last ${tooMany.slice(-3).join(" | ")}` : "");
+        const where = await evaluate(`return location.pathname + location.search`);
+        throw new Error(`nothing matched ${selector} after ${within}ms at ${where}${said}`);
       }
       await sleep(80);
     }
@@ -183,7 +196,10 @@ async function main() {
       dots: document.querySelectorAll(".steps li").length,
       current: document.querySelector('.steps [aria-current="step"] .step-name')?.textContent?.trim(),
       theme: !!document.querySelector("[data-theme-choice]"),
+      // The setup alone on the screen, as Lastboard's: no bar above it.
+      bar: (() => { const n = document.querySelector("body > nav"); return !!n && n.getBoundingClientRect().height > 0; })(),
     };`);
+  check("the setup is alone on the screen, with no bar above it", firstStep.bar === false, String(firstStep.bar));
   // The mark, on the first screen anybody ever sees of this. There was none
   // anywhere in the product: a name in text and an empty space beside it.
   const mark = await evaluate(`
@@ -199,10 +215,7 @@ async function main() {
     "a fresh instance opens on the wizard, asking language first",
     firstStep.path === "/setup" && firstStep.prefs === true && firstStep.dots === 3 && firstStep.theme === true,
     `${firstStep.path}, ${firstStep.dots} steps, on "${firstStep.current}"`,
-      // The setup alone on the screen, as Lastboard's: no bar above it.
-      bar: (() => { const n = document.querySelector("body > nav"); return !!n && n.getBoundingClientRect().height > 0; })(),
   );
-  check("the setup is alone on the screen, with no bar above it", firstStep.bar === false, String(firstStep.bar));
 
   // Choosing dark has to work on a light system too. A toggle that only ever
   // darkens is one that cannot be turned back, and the media query alone gives
@@ -223,6 +236,16 @@ async function main() {
   await evaluate(`document.querySelector("form.setup-preferences").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));`);
   await sleep(700);
 
+  // The tallest step, as it opens, and it has to fit: the fields used to carry two spacings
+  // each, and the card ran off the bottom of a 27-inch screen.
+  const fits = await evaluate(`
+    const c = document.querySelector(".wizard-card").getBoundingClientRect();
+    return { bottom: Math.round(c.bottom), window: innerHeight };
+  `);
+  // The card, not the page: the room the page leaves under it is empty and
+  // may scroll; what may not is the card running under the bottom edge.
+  check("the account step fits the window", fits.bottom <= fits.window, JSON.stringify(fits));
+
   // The second box is the one thing standing between a typo and an instance
   // nobody can sign into: there is no reset here.
   const mismatch = await evaluate(`
@@ -236,16 +259,6 @@ async function main() {
     return { path: location.pathname, shown: line && !line.hidden, said: line?.textContent?.trim() };`);
   check(
     "two passwords that differ are refused before the server sees them",
-  // The tallest step, as it opens, and it has to fit: the fields used to carry two spacings
-  // each, and the card ran off the bottom of a 27-inch screen.
-  const fits = await evaluate(`
-    const c = document.querySelector(".wizard-card").getBoundingClientRect();
-    return { bottom: Math.round(c.bottom), window: innerHeight };
-  `);
-  // The card, not the page: the room the page leaves under it is empty and
-  // may scroll; what may not is the card running under the bottom edge.
-  check("the account step fits the window", fits.bottom <= fits.window, JSON.stringify(fits));
-
     mismatch.path === "/setup/account" && mismatch.shown === true,
     String(mismatch.said),
   );
@@ -324,6 +337,11 @@ async function main() {
     ending.path === "/setup/done" && ending.next === "/panel/new",
     `${ending.path} → ${ending.next}`,
   );
+  check(
+    "and its last screen is one card with room between its pieces",
+    ending.parts === 4 && ending.gaps.every((g: number) => g >= 12),
+    JSON.stringify(ending),
+  );
 
   // 4b. An organisation and a repository, made the way an operator makes them:
   //     from a modal on the screen that lists them.
@@ -337,11 +355,6 @@ async function main() {
     f.querySelector('[name=name]').value = "CodigoSH";
     f.querySelector('[name=slug]').value = "codigosh";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-  check(
-    "and its last screen is one card with room between its pieces",
-    ending.parts === 4 && ending.gaps.every((g: number) => g >= 12),
-    JSON.stringify(ending),
-  );
     await new Promise(r => setTimeout(r, 1100));
     // A row per organisation, as Lastboard lists its users.
     return [...document.querySelectorAll(".settings-list .si-name")].map(e => e.textContent.trim());
@@ -512,8 +525,8 @@ async function main() {
   );
 
   // The detail is drawn after the list: wait for the button, not for a time.
-  await waitFor(".rev-detail [data-act='published']");
-  await evaluate(`document.querySelector(".rev-detail [data-act='published']").click()`);
+  await waitFor(".rev-detail [data-moderate='published']");
+  await evaluate(`document.querySelector(".rev-detail [data-moderate='published']").click()`);
   await sleep(900);
   const emptied = await evaluate(`return document.querySelectorAll('[data-what="report"]').length`);
   check("publishing removes it from the queue", emptied === 0, `rows=${emptied}`);
@@ -691,7 +704,7 @@ async function main() {
   // Waiting for the list rather than for a row: if a message whose report is
   // not in the list were counted and not drawn, there would be no row to wait
   // for, and the pass would stop on a timeout instead of on this check.
-  await goTo("/review", ".rev-list");
+  await goTo("/review?mode=pending", ".rev-list");
   const spanning = await evaluate(`
     const fila = document.querySelector('[data-what="comment"]');
     fila?.click();
@@ -1132,8 +1145,20 @@ async function main() {
       points: document.querySelectorAll(".words.point").length,
       boards: document.querySelectorAll(".lp-card").length,
       search: !!document.querySelector(".lp-heading .lp-search input"),
+      // The credit names the product and leads to its page on the house's site.
+      credit: (() => {
+        const a = document.querySelector(".lp-footer .lp-made a");
+        return a ? { href: a.getAttribute("href"), text: a.textContent, blank: a.target === "_blank",
+                     sentence: a.parentElement?.textContent?.replace(/[\u2068\u2069]/g, "").trim() } : null;
+      })(),
     };
   `);
+  check(
+    "the footer's credit is a link to the product's page",
+    front.credit?.href === "https://codigosh.com/projects/lasthelp/" && front.credit?.text === "LastHelp" &&
+      front.credit?.blank === true && front.credit?.sentence === "Made with LastHelp",
+    JSON.stringify(front.credit),
+  );
   check(
     "the front page announces the installation, not the software",
     front.title === "CodigoSH" && front.mark === 80 && !front.framed && front.points === 3 && front.boards === 1 && front.search === true,
@@ -1177,20 +1202,8 @@ async function main() {
     sidebar.pieBajo <= sidebar.ventana && sidebar.lateralBajo <= sidebar.ventana,
     JSON.stringify({ pie: sidebar.pieBajo, lateral: sidebar.lateralBajo, ventana: sidebar.ventana }),
   );
-      // The credit names the product and leads to its page on the house's site.
-      credit: (() => {
-        const a = document.querySelector(".lp-footer .lp-made a");
-        return a ? { href: a.getAttribute("href"), text: a.textContent, blank: a.target === "_blank",
-                     sentence: a.parentElement?.textContent?.replace(/[\u2068\u2069]/g, "").trim() } : null;
-      })(),
   // Pointed at, a menu row lights in the accent, as Lastboard's does — with a
   // real pointer through the protocol, because a synthetic mouseover does not
-  check(
-    "the footer's credit is a link to the product's page",
-    front.credit?.href === "https://codigosh.com/projects/lasthelp/" && front.credit?.text === "LastHelp" &&
-      front.credit?.blank === true && front.credit?.sentence === "Made with LastHelp",
-    JSON.stringify(front.credit),
-  );
   // set :hover. It was a neutral grey here.
   const fila = await evaluate(`
     const it = [...document.querySelectorAll(".side-item")].find(a => !a.hasAttribute("aria-current"));
@@ -1407,18 +1420,6 @@ async function main() {
     borrar.junto === true && borrar.tarjeta === false && borrar.papeleras === borrar.comentarios,
     JSON.stringify(borrar));
 
-  // And rewrite it. A title that says "its broken" is the normal case, and
-  // until now the only way to fix one was to ask the person who wrote it.
-  // Checked on the page rather than through the API: the form has to be
-  // reachable, prefilled with what is actually there, and the heading has to
-  // end up saying the new thing.
-  const rewritable = await evaluate(`
-    // Behind the pencil, in the report card where the words stand.
-    document.querySelector("[data-rewrite]")?.click();
-    await new Promise(r => setTimeout(r, 200));
-    const form = document.querySelector(".detail form.rewrite");
-    return {
-      form: !!form,
   // Asked in the product's own dialog, not the browser's: the title says what
   // is about to go, and the cross backs out with nothing deleted.
   const pregunta = await evaluate(`
@@ -1439,6 +1440,18 @@ async function main() {
       pregunta.antes > 0 && pregunta.despues === pregunta.antes,
     JSON.stringify(pregunta));
 
+  // And rewrite it. A title that says "its broken" is the normal case, and
+  // until now the only way to fix one was to ask the person who wrote it.
+  // Checked on the page rather than through the API: the form has to be
+  // reachable, prefilled with what is actually there, and the heading has to
+  // end up saying the new thing.
+  const rewritable = await evaluate(`
+    // Behind the pencil, in the report card where the words stand.
+    document.querySelector("[data-rewrite]")?.click();
+    await new Promise(r => setTimeout(r, 200));
+    const form = document.querySelector(".detail form.rewrite");
+    return {
+      form: !!form,
       prefilled: form?.querySelector("input[name=title]")?.value ?? "",
       heading: document.querySelector("h1.visually-hidden")?.textContent?.trim() ?? "",
     };
@@ -2062,9 +2075,10 @@ async function main() {
   );
 
   // One mode at a time, as Lastboard's bar does it: arranging the front page,
-  // the panel and the review screen each grey out the other two and leave
-  // only their own control answering — and nothing leaves the bar, so no icon
-  // moves under the pointer when a mode starts. The panel's icon disappeared
+  // the panel and the review screen each grey out the others and leave only
+  // their own control answering — except Reports, which answers from inside
+  // the panel too — and nothing leaves the bar, so no icon moves under the
+  // pointer when a mode starts. The panel's icon disappeared
   // to nobody and Review stayed live inside the panel, which is what this
   // measures: which answer, and where each one is.
   const modos: Record<string, any> = {};
@@ -2106,7 +2120,9 @@ async function main() {
     presentes && quietos &&
       vivos(modos.portada) === "lapiz,panel,revision" &&
       vivos(modos.editando) === "lapiz" &&
-      vivos(modos.panel) === "panel" &&
+      // Reports answers from the panel: the team's daily work, and the one
+      // departure from the rule, decided with the user.
+      vivos(modos.panel) === "panel,revision" &&
       vivos(modos.revision) === "revision",
     JSON.stringify(Object.fromEntries(Object.entries(modos).map(([k, m]) =>
       [k, `${vivos(m)} @ ${m.lapiz?.x}/${m.panel?.x}/${m.revision?.x} doc=${m.doc} admin=${m.admin}`]))) +
@@ -2315,7 +2331,7 @@ async function main() {
     "and every number on it leads to the list it counts",
     tiles.stats > 0 &&
       tiles.links.every((href: string) => href.length > 0) &&
-      tiles.links.filter((href: string) => href.startsWith("/panel/reports")).length >= 2,
+      tiles.links.filter((href: string) => href.startsWith("/review")).length >= 2,
     JSON.stringify(tiles.links),
   );
 
@@ -2337,7 +2353,7 @@ async function main() {
         fields: { version: "1.4.2", steps: "1. search for a word with an accent" }, token: form.token }),
     });
   `);
-  await goTo("/review", ".rev-row, .rev-empty");
+  await goTo("/review?mode=pending", ".rev-row, .rev-empty");
 
   const bandeja = await evaluate(`
     const filas = [...document.querySelectorAll("[data-pick]")];
@@ -2396,31 +2412,32 @@ async function main() {
     pildora.tieneTrabajo === true && pildora.color === pildora.esperado,
     JSON.stringify(pildora),
   );
-  await goTo("/review", ".rev-row");
-  await waitFor(".rev-detail .rev-title");
+  // With something waiting, the door opens on it.
+  await goTo("/review", ".rev-list, .rev-empty");
+  const puertaConTrabajo = await evaluate(`return document.querySelector(".rev-modes .tab.on")?.dataset.mode ?? ""`);
+  check("with something waiting, the reports screen opens on it", puertaConTrabajo === "pending", puertaConTrabajo);
+  await goTo("/review?mode=pending", ".rev-row");
+  await waitFor(".rev-detail .detail-words h1");
 
-  // La ficha, al lado y entera: el cuerpo completo sin abrir otra pantalla.
+  // La ficha, al lado y entera: no un resumen de lectura con la puerta en otra
+  // parte, sino el reporte como lo trabaja el equipo — el cuerpo, las
+  // respuestas, la decisión, y editar, borrar y el estado ahí mismo.
   const ficha = await evaluate(`
     const det = document.querySelector(".rev-detail");
-    // Lo que separa cada parte de la siguiente. Las respuestas no llevaban
-    // margen debajo y las tres decisiones salían pegadas a su caja.
-    const partes = [...(det.querySelector("[data-detail]")?.children ?? [])];
-    const huecos = partes.slice(1).map((p, i) =>
-      Math.round(p.getBoundingClientRect().top - partes[i].getBoundingClientRect().bottom));
     return {
-      huecos,
+      titulo: det.querySelector(".detail-words h1")?.textContent?.trim() ?? "",
+      cuerpo: (det.querySelector(".detail .body")?.textContent ?? "").trim().length,
       conRespuestas: !!det.querySelector(".answers"),
-      titulo: det.querySelector(".rev-title")?.textContent?.trim() ?? "",
-      cuerpo: (det.querySelector(".rev-full")?.textContent ?? "").trim().length,
-      decisiones: det.querySelectorAll("[data-act]").length,
-      sinDesplazar: det.scrollHeight <= det.clientHeight,
+      decisiones: det.querySelectorAll("[data-moderate]").length,
+      lapiz: !!det.querySelector("[data-rewrite]"),
+      papelera: !!det.querySelector("[data-delete-item]"),
+      estado: !!det.querySelector("#status-select"),
     };
   `);
   check(
-    "and the one chosen is read beside it, whole, with its decision there",
-    ficha.titulo !== "" && ficha.cuerpo > 20 && ficha.decisiones === 3 && ficha.sinDesplazar === true &&
-      // Y cada parte separada de la siguiente, respuestas incluidas.
-      ficha.conRespuestas === true && ficha.huecos.length >= 3 && ficha.huecos.every((h: number) => h >= 12),
+    "and the one chosen is its whole team view beside it: decision, edit, delete and status",
+    ficha.titulo !== "" && ficha.cuerpo > 20 && ficha.conRespuestas && ficha.decisiones === 3 &&
+      ficha.lapiz && ficha.papelera && ficha.estado,
     JSON.stringify(ficha),
   );
 
@@ -2447,9 +2464,59 @@ async function main() {
     JSON.stringify({ antes: antesDeTeclas, trasBajar }),
   );
 
+  // En el archivo, la ficha también es de trabajo: se edita el título desde el
+  // panel y la fila de la lista lo lleva al momento, sin mover la lista. Y la
+  // pestaña de pendientes dice lo mismo que la barra aunque se esté aquí.
+  await goTo("/review?mode=all", ".rev-row");
+  const archivo = await evaluate(`
+    const esperar = (ms) => new Promise(r => setTimeout(r, ms));
+    const hasta = async (f) => { for (let i = 0; i < 40 && !f(); i++) await esperar(100); return f(); };
+    const me = await fetch("/api/me").then(r => r.json());
+    const fila = document.querySelector(".rev-row:not(.child)");
+    const id = fila?.dataset.pick ?? "";
+    fila?.click();
+    await hasta(() => document.querySelector(".rev-detail [data-rewrite]"));
+    const original = document.querySelector(".rev-detail .detail-words h1")?.textContent?.trim() ?? "";
+    const escribir = async (titulo) => {
+      document.querySelector(".rev-detail [data-rewrite]").click();
+      await hasta(() => document.querySelector(".rev-detail form.rewrite"));
+      const f = document.querySelector(".rev-detail form.rewrite");
+      f.querySelector("input[name=title]").value = titulo;
+      f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      await hasta(() => document.querySelector(".rev-detail .detail-words h1")?.textContent?.trim() === titulo);
+    };
+    const lista = document.querySelector("[data-list]");
+    const arriba = lista.scrollTop;
+    await escribir(original + " (edited)");
+    const tras = {
+      fila: document.querySelector('[data-pick="' + id + '"] .rev-t')?.textContent?.trim() ?? "",
+      panel: document.querySelector(".rev-detail .detail-words h1")?.textContent?.trim() ?? "",
+      elegida: document.querySelector(".rev-row.on")?.dataset.pick ?? "",
+      scroll: lista.scrollTop === arriba,
+    };
+    await escribir(original);
+    return {
+      original, ...tras, esperado: original + " (edited)",
+      vueltaAtras: document.querySelector('[data-pick="' + id + '"] .rev-t')?.textContent?.trim() === original,
+      pestana: Number(document.querySelector('[data-mode="pending"] .count-chip')?.textContent ?? -1),
+      barra: (me.pending?.reports ?? 0) + (me.pending?.messages ?? 0),
+    };
+  `);
+  check(
+    "in the archive the report is worked on in place: an edit reaches its row and the list stays put",
+    archivo.original !== "" && archivo.fila === archivo.esperado && archivo.panel === archivo.esperado &&
+      archivo.elegida !== "" && archivo.scroll === true && archivo.vueltaAtras === true,
+    JSON.stringify(archivo),
+  );
+  check(
+    "and the pending tab counts what the bar counts, from the archive too",
+    archivo.pestana === archivo.barra,
+    JSON.stringify({ pestana: archivo.pestana, barra: archivo.barra }),
+  );
+
   // Y una decisión, con la tecla, sobre lo que de verdad está esperando: la
   // fila se va sin repintar la pantalla, y el servidor lo confirma.
-  await goTo("/review", ".rev-row");
+  await goTo("/review?mode=pending", ".rev-row");
   const antesDeDecidir = await evaluate(`
     return { filas: document.querySelectorAll("[data-pick]").length,
              elegido: document.querySelector(".rev-row.on")?.dataset.pick ?? "" };
@@ -2760,7 +2827,7 @@ async function main() {
     const r = d?.getBoundingClientRect();
     return {
       izquierda: Math.round(r?.left ?? NaN), derecha: Math.round(r?.right ?? NaN), ancho: innerWidth,
-      titulo: d?.querySelector(".rev-title")?.textContent?.trim() ?? "",
+      titulo: d?.querySelector(".rev-title, .detail-words h1")?.textContent?.trim() ?? "",
       visible: d ? getComputedStyle(d).visibility : "(no detail)",
       // The close button can be pressed: what is at its centre is the button
       // itself. Drawn from the window's top edge, it sat under the top bar —
@@ -2839,7 +2906,7 @@ async function main() {
     "a collaborator's overview is the summary of their boards, not the server's",
     collaborator.equipo === true && collaborator.personas === false &&
       collaborator.pendientes === collaborator.servidor &&
-      JSON.stringify(collaborator.tableros) === '["/panel/reports?board=codigosh/lastboard"]',
+      JSON.stringify(collaborator.tableros) === '["/review?mode=all&board=codigosh/lastboard"]',
     JSON.stringify(collaborator),
   );
   check(
@@ -2924,6 +2991,12 @@ async function main() {
     JSON.stringify(noBadge),
   );
 
+  // The door names no mode, and with nothing waiting it opens on everything:
+  // an empty queue is not where somebody opening Reports wants to be.
+  await goTo("/review", ".rev-list, .rev-empty");
+  const puertaVacia = await evaluate(`return document.querySelector(".rev-modes .tab.on")?.dataset.mode ?? ""`);
+  check("with nothing waiting, the reports screen opens on everything", puertaVacia === "all", puertaVacia);
+
   // 12d. A repository's page in the panel, as the collaborator sees it: what
   //      is waiting and the way to it, and nothing they would be refused.
   //      Checked before the administrator's view, because the page is drawn
@@ -2934,6 +3007,7 @@ async function main() {
     return {
       tarjetas: document.querySelectorAll(".admin-main .settings-card").length,
       revision: document.querySelector("[data-repo-review]")?.getAttribute("href") ?? "",
+      reportes: document.querySelector("[data-repo-reports]")?.getAttribute("href") ?? "",
       exportar: document.querySelector("[data-export]")?.getAttribute("href") ?? "",
       formularios: document.querySelectorAll(".admin-main form").length,
     };
@@ -2942,6 +3016,8 @@ async function main() {
     "a collaborator's repository page is what waits there and the way to it, and nothing else",
     suyo.tarjetas === 1 && suyo.formularios === 0 &&
       suyo.revision.includes("board=codigosh%2Flastboard") &&
+      // And every report of the board, current and past, the same screen filtered.
+      suyo.reportes === "/review?mode=all&board=codigosh%2Flastboard" &&
       suyo.exportar === "/api/orgs/codigosh/repos/lastboard/export",
     JSON.stringify(suyo),
   );
@@ -3061,17 +3137,23 @@ async function main() {
     const ahora = rol("ana");
 
     document.querySelector('[data-remove-member="ana"]').click();
+    await new Promise(r => setTimeout(r, 300)); document.querySelector('#confirm-dialog [data-confirm="yes"]')?.click();
     await esperar(1300);
     const fuera = rol("ana");
 
     const f = document.querySelector("form.member-add");
     const opciones = [...f.querySelectorAll("#member-role option")].map(o => o.value);
+    // Who and which role, on one line: two short choices of one sentence.
+    const quien = f.querySelector("#member-who").getBoundingClientRect();
+    const cual = f.querySelector("#member-role").getBoundingClientRect();
+    const unaLinea = Math.abs(quien.top - cual.top) < 2 && (cual.left > quien.right || quien.left > cual.right);
     f.querySelector("#member-who").value = "ana";
     f.querySelector("#member-role").value = "repo:lastboard";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await esperar(1300);
     return { iconos, marcadas, ahora, fuera, opciones, vuelta: rol("ana"), unaLinea };
   `);
+  check("adding to the team asks who and which role on one line", equipoOrg.unaLinea === true, String(equipoOrg.unaLinea));
   check(
     "every member but yourself is edited and taken off from the organisation's page, and added back with either role",
     equipoOrg.iconos === true && JSON.stringify(equipoOrg.marcadas) === '["repo:lastboard"]' && equipoOrg.ahora === "owner" &&
@@ -3127,6 +3209,7 @@ async function main() {
   // Taking a collaborator off and putting them back, from the page.
   const equipo = await evaluate(`
     document.querySelector('[data-revoke="ana"]').click();
+    await new Promise(r => setTimeout(r, 300)); document.querySelector('#confirm-dialog [data-confirm="yes"]')?.click();
     await new Promise(r => setTimeout(r, 1100));
     const fuera = !document.querySelector('[data-member="ana"]');
     const ofrecida = [...document.querySelectorAll("#team-who option")].map(o => o.value).includes("ana");
@@ -3136,24 +3219,18 @@ async function main() {
     await new Promise(r => setTimeout(r, 1100));
     return { fuera, ofrecida,
              vuelta: document.querySelector('[data-member="ana"] [data-role]')?.dataset.role ?? "" };
-    await new Promise(r => setTimeout(r, 300)); document.querySelector('#confirm-dialog [data-confirm="yes"]')?.click();
   `);
   check(
     "a collaborator is taken off and added back from the repository's page",
     equipo.fuera === true && equipo.ofrecida === true && equipo.vuelta === "collaborator",
     JSON.stringify(equipo),
   );
-    // Who and which role, on one line: two short choices of one sentence.
-    const quien = f.querySelector("#member-who").getBoundingClientRect();
-    const cual = f.querySelector("#member-role").getBoundingClientRect();
-    const unaLinea = Math.abs(quien.top - cual.top) < 2 && (cual.left > quien.right || quien.left > cual.right);
 
   // The channel: chosen here, said back as chosen, and never read back.
   const canal = await evaluate(`
     const f = document.querySelector("form.channel");
     const kind = f.querySelector("#chan-kind");
     kind.value = "ntfy";
-  check("adding to the team asks who and which role on one line", equipoOrg.unaLinea === true, String(equipoOrg.unaLinea));
     kind.dispatchEvent(new Event("change"));
     f.querySelector("#chan-url").value = "https://ntfy.example/drive-topic";
     f.querySelector("#chan-token").value = "tk_drive";
@@ -3214,7 +3291,6 @@ async function main() {
       publicNav: getComputedStyle(document.querySelector("body > nav")).display,
       report: !!document.querySelector("article.detail"),
       crumb: [...document.querySelectorAll(".crumb a")].map(a => a.getAttribute("href")),
-    await new Promise(r => setTimeout(r, 300)); document.querySelector('#confirm-dialog [data-confirm="yes"]')?.click();
       comentar: !!document.querySelector("form.comment-form"),
       equipo: !!document.querySelector(".item-team, [data-rewrite], form.team-reply"),
     };

@@ -2111,6 +2111,9 @@ body > main:has(> .lp) {
 .lp-footer-links .lp-link { color: var(--text-dim); font-weight: 400; }
 .lp-footer-links .lp-link:hover { color: var(--text-main); }
 .lp-made { margin-inline-start: auto; font-size: 0.8rem; }
+.lp-made a { color: inherit; text-decoration: none; font-weight: 600; }
+.lp-made a:hover,
+.lp-made a:focus-visible { color: var(--accent-alt); text-decoration: underline; text-underline-offset: 2px; }
 
 /* -------------------------------------------------------- the page editor
  *
@@ -2127,9 +2130,6 @@ body > main:has(> .lpe) {
   --lpe-top: 49px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 22rem;
-.lp-made a { color: inherit; text-decoration: none; font-weight: 600; }
-.lp-made a:hover,
-.lp-made a:focus-visible { color: var(--accent-alt); text-decoration: underline; text-underline-offset: 2px; }
   grid-template-rows: auto 1fr;
   min-block-size: calc(100vh - var(--lpe-top));
 }

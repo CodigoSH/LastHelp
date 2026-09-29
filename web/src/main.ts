@@ -13,7 +13,6 @@ import type {
   ItemSummary,
   Me,
   OrganizationSummary,
-  ReportField,
   RepositorySummary,
   Status,
   Submitted,
@@ -226,10 +225,12 @@ function renderNav(): void {
   /**
    * What is waiting, and the way into it.
    *
-   * Shown to whoever may triage something — a collaborator on a repository or
-   * the owner of an organisation — and NOT to an administrator as such: the
-   * person who moderates daily is usually the first and not the second, and
-   * hanging this off `admin` would hide it from exactly them.
+   * Shown to whoever may triage something — a collaborator on a repository,
+   * the owner of an organisation, and the administrator, who may triage every
+   * board. It once hung off memberships alone, so that the person who
+   * moderates daily was not left out for not being the administrator — and
+   * that left out the administrator instead, who holds no membership: the
+   * screen that is now where every report is worked on had no door for them.
    *
    * Never hidden when the queue is empty. It disappears in the dashboard in
    * this house when the FEATURE is off, which is a decision of installation; a
@@ -240,17 +241,21 @@ function renderNav(): void {
    * open — the page has no way to know which those are, and a number it worked
    * out itself would be a second opinion on a permission.
    */
-  const canTriage = (me?.memberships?.length ?? 0) > 0;
+  const canTriage = me?.admin === true || (me?.memberships?.length ?? 0) > 0;
   const waiting = (me?.pending?.reports ?? 0) + (me?.pending?.messages ?? 0);
   const review =
     me && canTriage
       ? // While the screen is open this is its way out, the way the status
         // icon closes Lastboard's status page: it goes back where you were.
-        // Greyed while the front page is arranged or the panel is open, with
-        // no address to follow: a link that only looks disabled still opens
-        // from the keyboard.
-        `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}${composing || inPanel ? " cannot" : ""}"
-             ${composing || inPanel ? 'aria-disabled="true" tabindex="-1"' : `href="${escapeAttr(inReview ? reviewCameFrom : "/review")}"`} data-review
+        // Greyed while the front page is arranged, with no address to follow:
+        // a link that only looks disabled still opens from the keyboard.
+        //
+        // Live inside the panel, the one departure from Lastboard's one mode
+        // at a time, decided with the user: the reports are the team's daily
+        // work and the panel is where the team spends the day, so the door
+        // to them answers from there, leaving the panel as it opens.
+        `<a class="review-pill${inReview ? " on" : ""}${waiting > 0 ? " has" : ""}${composing ? " cannot" : ""}"
+             ${composing ? 'aria-disabled="true" tabindex="-1"' : `href="${escapeAttr(inReview ? reviewCameFrom : "/review")}"`} data-review
              title="${escapeAttr(i18n.t("review.title"))}"
              aria-label="${escapeAttr(i18n.t("review.title"))}">
            ${icons.queue(16)}${waiting > 0 ? `<b>${escapeHTML(text.number(waiting))}</b>` : ""}
@@ -1169,7 +1174,13 @@ async function render(): Promise<void> {
     // Where the queue used to live. Kept as a door rather than a 404: it is in
     // people's history and in links they sent each other, and the archive it
     // used to hold is a mode of the screen that replaced it.
-    if (path === "/panel/reports") return go("/review" + location.search);
+    // An address saved before the reports screen existed. A filter in it
+    // means the archive — the queue is never filtered — so it opens there.
+    if (path === "/panel/reports") {
+      const old = new URLSearchParams(location.search);
+      if (old.toString() !== "" && !old.has("mode")) old.set("mode", "all");
+      return go(`/review${old.toString() ? `?${old.toString()}` : ""}`);
+    }
     // Where updates used to live. They are part of About now, as in
     // Lastboard; the address is kept as a door because it is in people's
     // bookmarks and in the documentation of older releases.
@@ -1414,14 +1425,10 @@ async function showItem(publicID: string): Promise<void> {
   const path = `/api/items/${encodeURIComponent(publicID)}${token ? `?k=${encodeURIComponent(token)}` : ""}`;
   const item = await api.get<ItemDetail>(path);
 
-  // Whether this person works on this report is the server's to say: asking
-  // is the check, and a page that decides for itself who may act is a second
-  // implementation of the rules.
-  const allowed = me
-    ? await api
-        .get<{ current: string; statuses: string[] }>(`/api/items/${encodeURIComponent(publicID)}/statuses`)
-        .catch(() => null)
-    : null;
+  // Whether this person works on this report is the server's to say, and it
+  // says it in the report itself: a page that decides for itself who may act
+  // is a second implementation of the rules.
+  const allowed = item.team ?? null;
 
   // The address is the public one — this is the page that travels — but for
   // the team it is where the work is done, so they get the panel around it and
@@ -1430,14 +1437,7 @@ async function showItem(publicID: string): Promise<void> {
   const org = item.repository?.organization?.slug ?? "";
   if (allowed) {
     const board = item.repository ? `${org}/${item.repository.slug}` : "";
-    const siblings = board
-      ? await api
-          .get<views.ReportsData>(`/api/reports?${new URLSearchParams({ board, limit: "200" }).toString()}`)
-          .catch(() => null)
-      : null;
-    const others = (siblings?.items ?? [])
-      .filter((r) => r.public_id !== publicID)
-      .map((r) => ({ public_id: r.public_id, title: r.title }));
+    const others = (await mergeCandidates(board)).filter((r) => r.public_id !== publicID);
     await showInShell(views.itemTeamView(item, allowed, others, text), org ? `/panel/${org}` : "/panel");
     wireVote(publicID);
     wireTeamItem(publicID, item);
@@ -1478,8 +1478,8 @@ async function showItem(publicID: string): Promise<void> {
   });
 }
 
-function wireVote(publicID: string): void {
-  root?.querySelector<HTMLButtonElement>("[data-vote]")?.addEventListener("click", async (event) => {
+function wireVote(publicID: string, scope: ParentNode | null = root): void {
+  scope?.querySelector<HTMLButtonElement>("[data-vote]")?.addEventListener("click", async (event) => {
     const button = event.currentTarget as HTMLButtonElement;
     const voted = button.classList.contains("voted");
     const result = await api[voted ? "del" : "post"]<{ votes: number; voted: boolean }>(
@@ -1503,38 +1503,64 @@ function wireVote(publicID: string): void {
  * status appear in more than one place on this screen, and updating the one
  * that was easy to reach is how the two start disagreeing.
  */
-function wireTeamItem(publicID: string, item: ItemDetail): void {
+/**
+ * What a report's team view does, wherever it is drawn.
+ *
+ * On its own page (/i/…) that is the whole page; on the reports screen it is
+ * the pane beside the list. The pane passes its own scope and says what
+ * happens afterwards — the row in the list changes, or goes — instead of the
+ * whole screen being redrawn under the person working down it.
+ */
+interface TeamItemHost {
+  /** Where the view is drawn. The page, when not given. */
+  scope?: ParentNode | null;
+  /** After a change: redraw what shows it. The whole page, when not given. */
+  changed?: () => Promise<void>;
+  /** After the report is deleted. Its repository's page, when not given. */
+  deleted?: () => void;
+  /** A moderation decision, when the host takes those itself. */
+  moderate?: (state: string) => Promise<void>;
+}
+
+function wireTeamItem(publicID: string, item: ItemDetail, host: TeamItemHost = {}): void {
+  const scope = host.scope ?? root;
   const base = `/api/items/${encodeURIComponent(publicID)}`;
   const act = async (call: () => Promise<unknown>, done?: string) => {
     try {
       await call();
+      // A new title, a merge: what the merge lists say has changed.
+      boardReports.clear();
       if (done) toast(i18n.t(done));
-      await render();
+      await (host.changed ?? render)();
     } catch (err) {
       report(err);
     }
   };
 
-  root?.querySelectorAll<HTMLButtonElement>("[data-moderate]").forEach((button) =>
+  scope?.querySelectorAll<HTMLButtonElement>("[data-moderate]").forEach((button) =>
     button.addEventListener("click", () =>
-      act(() => api.post(`${base}/moderation`, { state: button.dataset.moderate })),
+      host.moderate
+        ? host.moderate(button.dataset.moderate ?? "")
+        : act(() => api.post(`${base}/moderation`, { state: button.dataset.moderate })),
     ),
   );
 
-  root?.querySelectorAll<HTMLButtonElement>("[data-delete-comment]").forEach((button) =>
-    button.addEventListener("click", () => {
-      if (!confirm(i18n.t("item.confirmDeleteComment"))) return;
+  scope?.querySelectorAll<HTMLButtonElement>("[data-delete-comment]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      if (!(await askConfirm(i18n.t("item.deleteComment"), i18n.t("item.confirmDeleteComment")))) return;
       void act(() => api.del(`/api/comments/${button.dataset.deleteComment}`), "item.commentDeleted");
     }),
   );
 
   // Deleting, for whoever runs the organisation. Afterwards there is no
   // report to come back to, so it goes to the board it was on.
-  root?.querySelector<HTMLButtonElement>("[data-delete-item]")?.addEventListener("click", async () => {
-    if (!confirm(i18n.t("item.confirmDelete", { title: item.title }))) return;
+  scope?.querySelector<HTMLButtonElement>("[data-delete-item]")?.addEventListener("click", async () => {
+    if (!(await askConfirm(i18n.t("item.delete"), i18n.t("item.confirmDelete", { title: item.title })))) return;
     try {
       await api.del(base);
+      boardReports.clear();
       toast(i18n.t("item.deleted"));
+      if (host.deleted) return host.deleted();
       const org = item.repository?.organization?.slug;
       go(org && item.repository ? `/panel/${org}/repos/${item.repository.slug}` : "/panel");
     } catch (err) {
@@ -1542,14 +1568,14 @@ function wireTeamItem(publicID: string, item: ItemDetail): void {
     }
   });
 
-  root?.querySelector<HTMLSelectElement>("#status-select")?.addEventListener("change", (e) =>
+  scope?.querySelector<HTMLSelectElement>("#status-select")?.addEventListener("change", (e) =>
     act(() => api.post(`${base}/status`, { status: (e.target as HTMLSelectElement).value }), "toast.statusChanged"),
   );
 
   // Rewriting, where the words stand: the pencil swaps them for a form, and
   // Cancel swaps them back without asking the server anything.
-  const words = root?.querySelector<HTMLElement>(".detail-words");
-  const pencil = root?.querySelector<HTMLButtonElement>("[data-rewrite]");
+  const words = scope?.querySelector<HTMLElement>(".detail-words");
+  const pencil = scope?.querySelector<HTMLButtonElement>("[data-rewrite]");
   pencil?.addEventListener("click", () => {
     if (!words || words.querySelector("form.rewrite")) return;
     const kept = words.innerHTML;
@@ -1574,7 +1600,7 @@ function wireTeamItem(publicID: string, item: ItemDetail): void {
   // Creating an issue answers "queued", not "created": the request does not
   // call the forge — forges rate-limit and forges go down — so saying it was
   // created would be reporting something that has not happened yet.
-  root?.querySelector<HTMLButtonElement>("[data-create-issue]")?.addEventListener("click", async () => {
+  scope?.querySelector<HTMLButtonElement>("[data-create-issue]")?.addEventListener("click", async () => {
     try {
       await api.post(`${base}/issue`);
       toast(i18n.t("panel.issueQueued"));
@@ -1582,14 +1608,14 @@ function wireTeamItem(publicID: string, item: ItemDetail): void {
       report(err);
     }
   });
-  const attach = root?.querySelector<HTMLFormElement>("form.attach");
+  const attach = scope?.querySelector<HTMLFormElement>("form.attach");
   attach?.addEventListener("submit", (event) => {
     event.preventDefault();
     const value = String(new FormData(attach).get("issue") ?? "");
     void act(() => api.post(`${base}/attach`, { issue: value }), "toast.issueAttached");
   });
 
-  const reply = root?.querySelector<HTMLFormElement>("form.team-reply");
+  const reply = scope?.querySelector<HTMLFormElement>("form.team-reply");
   reply?.addEventListener("submit", (event) => {
     event.preventDefault();
     const body = String(new FormData(reply).get("body") ?? "");
@@ -1599,8 +1625,8 @@ function wireTeamItem(publicID: string, item: ItemDetail): void {
   // Typing narrows the list of reports to the titles that contain it. Hidden
   // options are what the house dropdown leaves out, so the picker shows the
   // same narrowing; the chosen one moves to the first that still matches.
-  const search = root?.querySelector<HTMLInputElement>("[data-merge-search]");
-  const into = root?.querySelector<HTMLSelectElement>("#merge-into");
+  const search = scope?.querySelector<HTMLInputElement>("[data-merge-search]");
+  const into = scope?.querySelector<HTMLSelectElement>("#merge-into");
   search?.addEventListener("input", () => {
     if (!into) return;
     const q = search.value.trim().toLocaleLowerCase();
@@ -1615,10 +1641,10 @@ function wireTeamItem(publicID: string, item: ItemDetail): void {
     }
     // Nothing matches: nothing to merge into, and a button that looks ready
     // and does nothing is worse than one that says it cannot.
-    const submit = root?.querySelector<HTMLButtonElement>("form.merge [type=submit]");
+    const submit = scope?.querySelector<HTMLButtonElement>("form.merge [type=submit]");
     if (submit) submit.disabled = first === null;
   });
-  const merge = root?.querySelector<HTMLFormElement>("form.merge");
+  const merge = scope?.querySelector<HTMLFormElement>("form.merge");
   merge?.addEventListener("submit", (event) => {
     event.preventDefault();
     const target = String(new FormData(merge).get("into") ?? "");
@@ -2066,7 +2092,12 @@ async function showReview(): Promise<void> {
   if (!me) return go("/sign-in");
 
   const query = new URLSearchParams(location.search);
-  const mode = query.get("mode") === "all" ? "all" : "pending";
+  // The door in the bar names no mode: it lands on what is waiting when
+  // something is, and on everything when nothing is — an empty queue is not
+  // where somebody opening "Reports" wants to be. The tabs always name theirs.
+  const waiting = (me.pending?.reports ?? 0) + (me.pending?.messages ?? 0);
+  const asked = query.get("mode");
+  const mode = asked === "all" ? "all" : asked === "pending" ? "pending" : waiting > 0 ? "pending" : "all";
   const filters: views.ReportFilters = {
     moderation: "",
     kind: "",
@@ -2119,6 +2150,7 @@ async function showReview(): Promise<void> {
     filters,
     more: rows.length === REVIEW_PAGE,
     now: Math.floor(Date.now() / 1000),
+    waiting,
   };
 
   show(views.reviewScreen(data, view, text));
@@ -2148,7 +2180,28 @@ async function wireReview(
     id.startsWith("c:")
       ? ((data.comments ?? []).find((c) => String(c.id) === id.slice(2)) ?? null)
       : null;
-  const fields = new Map<string, ReportField[]>();
+  // What the pane needs for a report: the whole of it, what this account may
+  // do to it, and — once per board — the reports it could be merged into.
+  // Kept once asked for, and dropped when the report changes: stepping back to
+  // a row already read asks the server nothing, and two reads of the same row
+  // at once — arriving, then a click on it — share the one request.
+  const teams = new Map<string, ReturnType<typeof fetchTeam>>();
+  const loadTeam = (id: string) => {
+    let kept = teams.get(id);
+    if (!kept) {
+      kept = fetchTeam(id);
+      teams.set(id, kept);
+      kept.catch(() => teams.delete(id));
+    }
+    return kept;
+  };
+  async function fetchTeam(id: string) {
+    // One request per report: what this account may do to it comes inside.
+    const item = await api.get<ItemDetail>(`/api/items/${encodeURIComponent(id)}`);
+    const allowed = item.team ?? { current: item.status, statuses: [] };
+    const board = item.repository ? `${item.repository.organization?.slug ?? ""}/${item.repository.slug}` : "";
+    return { item, allowed, others: (await mergeCandidates(board)).filter((o) => o.public_id !== id) };
+  }
 
   // On a phone there is no room for the detail beside the list, so a chosen
   // row opens it as a drawer from the trailing edge — Lastboard's answer on
@@ -2157,24 +2210,89 @@ async function wireReview(
   const narrow = () => window.matchMedia("(max-width: 640px)").matches;
   const reading = (on: boolean) => screen?.classList.toggle("reading", on);
 
-  const draw = async (id: string) => {
+  // What the pane is showing. Choosing the same row again leaves it alone: the
+  // pane may be holding a half-written edit or reply, and drawing it again
+  // would throw that away.
+  let shown = "";
+  const draw = async (id: string, settle = false, force = false) => {
     if (!pane) return;
+    if (id === shown && !force) return;
     const note = commentOf(id);
     if (note) {
       pane.innerHTML = views.reviewDetail(null, [], text, note);
+      shown = id;
       return;
     }
     const row = rowOf(id);
-    if (row && !fields.has(id)) {
-      const full = await api
-        .get<{ fields?: ReportField[] }>(`/api/items/${encodeURIComponent(id)}`)
-        .catch(() => ({ fields: [] as ReportField[] }));
-      fields.set(id, full.fields ?? []);
+    if (!row) {
+      pane.innerHTML = views.reviewDetail(null, [], text);
+      shown = "";
+      return;
     }
-    pane.innerHTML = views.reviewDetail(row, fields.get(id) ?? [], text);
+    // Walking with the keys, once the selection has settled: a held arrow
+    // passes a row every few milliseconds, and reading each one would reach
+    // the server's per-address ceiling. A row only passed over is never asked
+    // for. Arriving, clicking or deciding reads at once.
+    if (settle && !teams.has(id)) {
+      await new Promise((r) => setTimeout(r, SETTLE_MS));
+      if (view.chosen !== id) return;
+    }
+    // The report as the team works on it — edit, delete, status, issue, the
+    // conversation — not a read-only summary with its door somewhere else.
+    const team = await loadTeam(id).catch((err) => {
+      report(err);
+      return null;
+    });
+    // Another row may have been chosen while this one loaded, or another read
+    // of this one drew it first.
+    if (view.chosen !== id || !team || (id === shown && !force)) return;
+    pane.innerHTML = `<div class="rev-team">${views.itemTeamView(team.item, team.allowed, team.others, text)}</div>`;
+    shown = id;
+    wireVote(id, pane);
+    const changed = async () => {
+      teams.delete(id);
+      // The row wears what changed — its title, its status — and the pane
+      // is drawn again from the server, where the list stays put. One read
+      // serves both.
+      const fresh = await loadTeam(id).catch(() => null);
+      const at = data.items.find((r) => r.public_id === id);
+      if (fresh && at) {
+        at.title = fresh.item.title;
+        at.status = fresh.item.status;
+        if (fresh.item.moderation) at.moderation = fresh.item.moderation;
+        redrawList();
+      }
+      await draw(id, false, true);
+    };
+    wireTeamItem(id, team.item, {
+      scope: pane,
+      changed,
+      deleted: () => drop(id),
+      // What is waiting goes through the queue's own decision, which moves on
+      // to the next row. Anything else — approving a report rejected last
+      // week — is a change like any other, and stays where it is.
+      moderate: async (state) => {
+        if (rowOf(id)?.moderation === "pending") return decide(state);
+        try {
+          await api.post(`/api/items/${encodeURIComponent(id)}/moderation`, { state });
+          await changed();
+        } catch (err) {
+          report(err);
+        }
+      },
+    });
   };
 
-  const select = (id: string) => {
+  // The list, drawn again where it stands: a row changed, and the scroll and
+  // the selection stay where the person left them.
+  const redrawList = () => {
+    if (!list) return;
+    const top = list.scrollTop;
+    list.innerHTML = views.reviewList(data, view, text);
+    list.scrollTop = top;
+  };
+
+  const select = (id: string, settle = false) => {
     view.chosen = id;
     for (const el of root?.querySelectorAll<HTMLElement>("[data-pick]") ?? []) {
       el.classList.toggle("on", el.dataset.pick === id);
@@ -2185,7 +2303,7 @@ async function wireReview(
     const next = new URLSearchParams(location.search);
     next.set("at", id);
     history.replaceState({}, "", `/review?${next.toString()}`);
-    void draw(id);
+    void draw(id, settle);
   };
 
   // Delegated to the list, which survives a further page being drawn into it.
@@ -2268,7 +2386,7 @@ async function wireReview(
     const all = order();
     const at = all.findIndex((el) => el.dataset.pick === view.chosen);
     const next = all[Math.min(all.length - 1, Math.max(0, at + by))];
-    if (next) select(next.dataset.pick ?? "");
+    if (next) select(next.dataset.pick ?? "", true);
   };
 
   const decide = async (state: string) => {
@@ -2276,7 +2394,6 @@ async function wireReview(
     if (!id) return;
     const all = order();
     const at = all.findIndex((el) => el.dataset.pick === id);
-    const after = all[at + 1] ?? all[at - 1];
     // Only what is waiting can be decided: in the archive a key press on a
     // report published last March would undo somebody's work by accident.
     const row = rowOf(id);
@@ -2301,13 +2418,22 @@ async function wireReview(
       // leave it looking undecided.
       if (row) row.moderation = state;
       all[at]?.classList.toggle("out", state === "rejected" || state === "spam");
-      void draw(id);
+      teams.delete(id);
+      void draw(id, false, true);
       if (me) me = await api.get<Me>("/api/me").catch(() => me);
       renderNav();
       return;
     }
-    // Gone from the list and from the data behind it, so stepping and counting
-    // agree with what is on the screen.
+    drop(id);
+  };
+
+  // Gone from the list and from the data behind it, so stepping and counting
+  // agree with what is on the screen; the next row is chosen. What a decision
+  // does in the queue, and what deleting does anywhere.
+  function drop(id: string): void {
+    const all = order();
+    const at = all.findIndex((el) => el.dataset.pick === id);
+    const after = all[at + 1] ?? all[at - 1];
     all[at]?.remove();
     data.items = data.items.filter((r) => r.public_id !== id);
     if (id.startsWith("c:")) {
@@ -2316,11 +2442,14 @@ async function wireReview(
     if (after) select(after.dataset.pick ?? "");
     else {
       if (pane) pane.innerHTML = views.reviewDetail(null, [], text);
+      shown = "";
       reading(false);
     }
-    if (me) me = await api.get<Me>("/api/me").catch(() => me);
-    renderNav();
-  };
+    void api.get<Me>("/api/me").then((fresh) => {
+      me = fresh;
+      renderNav();
+    }).catch(() => undefined);
+  }
 
   // Delegated, because the detail pane is rewritten on every selection and a
   // listener bound to its buttons would die with them.
@@ -2340,6 +2469,33 @@ async function wireReview(
     find: () => search?.focus(),
   });
 }
+
+/**
+ * The reports a report can be merged into, per board, kept for a minute.
+ *
+ * Every report read in the pane needs its board's list, and the reports screen
+ * is opened again and again: asked each time, it was a request per visit
+ * against the per-address ceiling, for a list that changes when somebody
+ * writes a report. At worst one that arrived this minute is not offered yet;
+ * a change made here drops the list at once.
+ */
+const boardReports = new Map<string, { at: number; list: { public_id: string; title: string }[] }>();
+const BOARD_REPORTS_MS = 60_000;
+
+async function mergeCandidates(board: string): Promise<{ public_id: string; title: string }[]> {
+  if (!board) return [];
+  const kept = boardReports.get(board);
+  if (kept && Date.now() - kept.at < BOARD_REPORTS_MS) return kept.list;
+  const siblings = await api
+    .get<views.ReportsData>(`/api/reports?${new URLSearchParams({ board, limit: "200" }).toString()}`)
+    .catch(() => null);
+  const list = (siblings?.items ?? []).map((r) => ({ public_id: r.public_id, title: r.title }));
+  boardReports.set(board, { at: Date.now(), list });
+  return list;
+}
+
+/** How long a selection has to stay before the pane asks the server for it. */
+const SETTLE_MS = 150;
 
 /** Set while the review screen is up, so its keys are removed when it is not. */
 let reviewKeys: (() => void) | null = null;

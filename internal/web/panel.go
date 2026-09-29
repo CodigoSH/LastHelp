@@ -566,25 +566,17 @@ func keyForOrgError(err error) string {
 	}
 }
 
-// handleStatuses tells the panel which statuses this item may take.
-//
-// The list comes from the domain rather than being written into the page: a
-// status the server refuses but the interface offers is a button that fails,
-// and a status the server accepts but the interface never offers is a state
-// nobody can reach.
-func (s *Server) handleStatuses(w http.ResponseWriter, r *http.Request) {
-	it, scope, ok := s.triageTarget(w, r)
-	if !ok {
-		return
-	}
-	actor, _ := middleware.ActorFrom(r)
-
+// teamWork is what the team may do to a report: the statuses it can be moved
+// to and whether it can be deleted. It rides inside the report itself for
+// whoever may triage it — it used to be an endpoint of its own, and the
+// reports screen doubled every row it read asking it separately.
+func teamWork(it item.Item, actor authz.Actor, scope authz.Scope) map[string]any {
 	statuses := item.StatusesFor(it.Kind)
 	out := make([]string, 0, len(statuses))
 	for _, status := range statuses {
 		out = append(out, string(status))
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	return map[string]any{
 		"kind":     string(it.Kind),
 		"current":  string(it.Status),
 		"statuses": out,
@@ -592,7 +584,7 @@ func (s *Server) handleStatuses(w http.ResponseWriter, r *http.Request) {
 		// collaborator can reject or mark as spam, which hides a report and
 		// loses nothing. Said here so the page does not work it out itself.
 		"can_delete": actor.Can(authz.ManageOrganization, authz.Organization(scope.OrgID)),
-	})
+	}
 }
 
 // handleDeleteComment removes a comment or a team reply for good — the
