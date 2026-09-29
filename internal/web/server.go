@@ -245,6 +245,7 @@ func (s *Server) routes() {
 	// Separate from moderation on purpose: one endpoint that could change the
 	// text and the state is one where an authorisation mistake costs both.
 	private("PATCH /api/items/{id}", s.handleEditItem)
+	private("DELETE /api/items/{id}", s.handleDeleteItem)
 
 	// Composing the front page. Only the administrator: it is the first thing
 	// every visitor sees.
@@ -252,6 +253,7 @@ func (s *Server) routes() {
 	private("POST /api/landing/restore", s.handleRestoreLandingDefault)
 	private("POST /api/landing/images", s.handleAddLandingImage)
 	private("POST /api/comments/{id}/moderation", s.handleModerateComment)
+	private("DELETE /api/comments/{id}", s.handleDeleteComment)
 	private("GET /api/items/{id}/statuses", s.handleStatuses)
 	private("POST /api/items/{id}/status", s.handleSetStatus)
 	private("POST /api/items/{id}/merge", s.handleMerge)

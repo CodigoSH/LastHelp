@@ -2856,7 +2856,8 @@ function repositoryTeam(
  */
 export function itemTeamView(
   item: ItemDetail,
-  statuses: { current: string; statuses: string[] },
+  /** What the server says this reader may do; can_delete is the owners' and the administrator's. */
+  statuses: { current: string; statuses: string[]; can_delete?: boolean },
   /** The other reports on the same board, the ones this one can be merged into. */
   others: { public_id: string; title: string }[],
   text: Text,
@@ -2952,6 +2953,11 @@ export function itemTeamView(
                 <span class="who-name">${escapeHTML(who)}</span>
                 ${c.author === "team" ? `<span class="who-badge">${escapeHTML(text.t("comment.team"))}</span>` : ""}
                 <span class="when">${escapeHTML(text.date(c.created_at))}</span>
+                ${
+                  statuses.can_delete && c.id !== undefined
+                    ? iconButton("remove", text.t("action.delete"), `class="icon-button danger comment-delete" data-delete-comment="${c.id}"`)
+                    : ""
+                }
               </p>
               <p class="what">${escapeHTML(c.body)}</p>
             </li>`;
@@ -3009,6 +3015,22 @@ export function itemTeamView(
       ${issue}
       ${conversation}
       ${merge}
+      ${
+        statuses.can_delete
+          ? // The danger zone the repository and the organisation pages have:
+            // the same card, the same words, the same red button.
+            settingsCard(
+              text.t("repo.danger"),
+              `<div class="settings-row">
+                <div class="settings-info">
+                  <h4>${escapeHTML(text.t("item.delete"))}</h4>
+                  <p class="settings-danger">${escapeHTML(text.t("item.deleteHelp"))}</p>
+                </div>
+                ${actionButton("remove", text.t("action.delete"), `data-delete-item="${escapeAttr(item.public_id)}"`, "danger")}
+              </div>`,
+            )
+          : ""
+      }
     </div>`;
 }
 

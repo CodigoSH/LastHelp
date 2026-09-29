@@ -1518,6 +1518,27 @@ function wireTeamItem(publicID: string, item: ItemDetail): void {
     ),
   );
 
+  root?.querySelectorAll<HTMLButtonElement>("[data-delete-comment]").forEach((button) =>
+    button.addEventListener("click", () => {
+      if (!confirm(i18n.t("item.confirmDeleteComment"))) return;
+      void act(() => api.del(`/api/comments/${button.dataset.deleteComment}`), "item.commentDeleted");
+    }),
+  );
+
+  // Deleting, for whoever runs the organisation. Afterwards there is no
+  // report to come back to, so it goes to the board it was on.
+  root?.querySelector<HTMLButtonElement>("[data-delete-item]")?.addEventListener("click", async () => {
+    if (!confirm(i18n.t("item.confirmDelete", { title: item.title }))) return;
+    try {
+      await api.del(base);
+      toast(i18n.t("item.deleted"));
+      const org = item.repository?.organization?.slug;
+      go(org && item.repository ? `/panel/${org}/repos/${item.repository.slug}` : "/panel");
+    } catch (err) {
+      report(err);
+    }
+  });
+
   root?.querySelector<HTMLSelectElement>("#status-select")?.addEventListener("change", (e) =>
     act(() => api.post(`${base}/status`, { status: (e.target as HTMLSelectElement).value }), "toast.statusChanged"),
   );

@@ -216,6 +216,19 @@ func (s Store) CommentItem(commentID int64) (Item, error) {
 	return s.ByID(itemID)
 }
 
+// DeleteComment removes a comment or a team reply for good. Rejecting hides
+// one and keeps it; this is for what should not be kept at all.
+func (s Store) DeleteComment(id int64) error {
+	res, err := s.DB.Exec(`DELETE FROM comment WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting the comment: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ApproveComment publishes one that was waiting.
 func (s Store) ApproveComment(id int64) error {
 	res, err := s.DB.Exec(`UPDATE comment SET moderation_state = ? WHERE id = ?`, string(Published), id)

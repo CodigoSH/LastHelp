@@ -389,6 +389,7 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	thread := make([]map[string]any, 0, len(comments))
 	for _, c := range comments {
 		thread = append(thread, map[string]any{
+			"id":         c.ID,
 			"author":     string(c.Author),
 			"name":       c.AuthorRef,
 			"body":       c.Body,

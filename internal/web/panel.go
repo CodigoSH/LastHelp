@@ -573,10 +573,11 @@ func keyForOrgError(err error) string {
 // and a status the server accepts but the interface never offers is a state
 // nobody can reach.
 func (s *Server) handleStatuses(w http.ResponseWriter, r *http.Request) {
-	it, _, ok := s.triageTarget(w, r)
+	it, scope, ok := s.triageTarget(w, r)
 	if !ok {
 		return
 	}
+	actor, _ := middleware.ActorFrom(r)
 
 	statuses := item.StatusesFor(it.Kind)
 	out := make([]string, 0, len(statuses))
@@ -587,5 +588,65 @@ func (s *Server) handleStatuses(w http.ResponseWriter, r *http.Request) {
 		"kind":     string(it.Kind),
 		"current":  string(it.Status),
 		"statuses": out,
+		// Deleting is the organisation's owners' and the administrator's: a
+		// collaborator can reject or mark as spam, which hides a report and
+		// loses nothing. Said here so the page does not work it out itself.
+		"can_delete": actor.Can(authz.ManageOrganization, authz.Organization(scope.OrgID)),
 	})
+}
+
+// handleDeleteComment removes a comment or a team reply for good — the
+// organisation's owners' and the administrator's, like deleting the report.
+func (s *Server) handleDeleteComment(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+	it, err := s.items().CommentItem(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+	repo, err := s.orgs().RepositoryByID(it.RepoID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+	if !s.may(w, r, authz.ManageOrganization, authz.Organization(repo.OrgID)) {
+		return
+	}
+	if err := s.items().DeleteComment(id); err != nil {
+		slog.Error("deleting a comment", "error", err, "comment", id)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// handleDeleteItem removes a report for good.
+//
+// Behind ManageOrganization rather than Triage, on purpose: it cannot be
+// undone, and everything a collaborator needs — rejecting, marking as spam,
+// merging a duplicate — takes a report out of sight without losing it.
+func (s *Server) handleDeleteItem(w http.ResponseWriter, r *http.Request) {
+	it, ok := s.lookupItem(w, r)
+	if !ok {
+		return
+	}
+	repo, err := s.orgs().RepositoryByID(it.RepoID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+	if !s.may(w, r, authz.ManageOrganization, authz.Organization(repo.OrgID)) {
+		return
+	}
+	if err := s.items().Delete(it.ID); err != nil {
+		slog.Error("deleting a report", "error", err, "item", it.PublicID)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	slog.Info("report deleted", "item", it.PublicID)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

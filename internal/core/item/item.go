@@ -287,6 +287,21 @@ func (s Store) ByID(id int64) (Item, error) {
 	return s.withFields(it)
 }
 
+// Delete removes a report for good, with its votes, comments and fields — the
+// schema cascades them. Reports that were merged into it keep existing and
+// lose the pointer (ON DELETE SET NULL), so they come back as reports of their
+// own rather than disappearing with it.
+func (s Store) Delete(id int64) error {
+	res, err := s.DB.Exec(`DELETE FROM item WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting the report: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // CheckFollowToken says whether this secret link belongs to this item.
 //
 // Constant-time, and the comparison is on the hash rather than the token, so

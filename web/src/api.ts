@@ -191,7 +191,7 @@ export interface ItemDetail extends ItemSummary {
   fields?: ReportField[];
   merged_into?: string;
   issue?: { number: number; url: string };
-  comments: Array<{ author: string; name: string; body: string; created_at: number }>;
+  comments: Array<{ id?: number; author: string; name: string; body: string; created_at: number }>;
 }
 
 export interface Submitted {

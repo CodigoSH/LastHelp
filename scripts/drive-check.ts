@@ -1342,6 +1342,24 @@ async function main() {
       triage.opciones === triage.others,
     JSON.stringify(triage));
 
+  // The administrator runs every organisation, so the report offers deleting —
+  // at the foot, in the danger zone the repository and organisation pages
+  // have — and each comment its bin. Only looked at: deleting here would take
+  // away a report the checks below still read.
+  const borrar = await evaluate(`
+    const b = document.querySelector("[data-delete-item]");
+    const r = b?.getBoundingClientRect();
+    return {
+      boton: !!b && (r?.width ?? 0) > 40 && (r?.height ?? 0) > 20,
+      rojo: b ? getComputedStyle(b).color : "",
+      comentarios: document.querySelectorAll(".comments .comment").length,
+      papeleras: document.querySelectorAll("[data-delete-comment]").length,
+    };
+  `);
+  check("and whoever runs the organisation can delete the report and each comment",
+    borrar.boton === true && borrar.papeleras === borrar.comentarios,
+    JSON.stringify(borrar));
+
   // And rewrite it. A title that says "its broken" is the normal case, and
   // until now the only way to fix one was to ask the person who wrote it.
   // Checked on the page rather than through the API: the form has to be
