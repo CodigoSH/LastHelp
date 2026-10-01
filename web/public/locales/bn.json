@@ -116,6 +116,7 @@
   "error.update_wont_run": "ডাউনলোড করা বাইনারি এই মেশিনে চলে না। কিছুই ইনস্টল হয়নি।",
   "error.username_required": "ব্যবহারকারীর নাম আবশ্যক।",
   "error.username_taken": "ব্যবহারকারীর নাম ইতিমধ্যে ব্যবহৃত।",
+  "error.voting_closed": "এই ধারণায় ভোট দেওয়া বন্ধ হয়েছে।",
   "field.steps": "পুনরায় ঘটানোর ধাপ",
   "field.version": "সংস্করণ",
   "form.body": "বিস্তারিত",

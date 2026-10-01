@@ -37,6 +37,11 @@ var (
 	// ErrNotVotable is returned when somebody tries to vote a bug.
 	ErrNotVotable = errors.New("only ideas are voted")
 
+	// ErrVotingClosed is returned for a vote, or for taking one back, on an idea
+	// the team has answered. The count is then the record of how many people
+	// wanted it when it was answered, and it stops moving.
+	ErrVotingClosed = errors.New("voting is closed on an answered idea")
+
 	// ErrAlreadyVoted is not an error the page shows as a failure: it means the
 	// vote is already there, which is what the person wanted.
 	ErrAlreadyVoted = errors.New("already voted")
@@ -84,6 +89,12 @@ func StatusesFor(k Kind) []Status {
 		return []Status{StatusNew, StatusConfirmed, StatusInForge, StatusClosed, StatusNotReproducible}
 	}
 	return nil
+}
+
+// Votable says whether somebody can still vote on this: an idea the team has
+// not answered. A bug is never voted, and an answered idea keeps its count.
+func (i Item) Votable() bool {
+	return i.Kind == Idea && !i.Status.Closes()
 }
 
 // Closes says whether a status is an answer: fixed, shipped, not planned, not
@@ -363,8 +374,8 @@ func (s Store) Vote(itemID int64, voterID string, now time.Time) error {
 		return errors.New("a vote needs a voter")
 	}
 
-	var kind string
-	err := s.DB.QueryRow(`SELECT kind FROM item WHERE id = ?`, itemID).Scan(&kind)
+	var kind, status string
+	err := s.DB.QueryRow(`SELECT kind, status FROM item WHERE id = ?`, itemID).Scan(&kind, &status)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return ErrNotFound
@@ -373,6 +384,9 @@ func (s Store) Vote(itemID int64, voterID string, now time.Time) error {
 	}
 	if Kind(kind) != Idea {
 		return ErrNotVotable
+	}
+	if Status(status).Closes() {
+		return ErrVotingClosed
 	}
 
 	res, err := s.DB.Exec(`INSERT INTO vote (item_id, voter_id, created_at)
@@ -400,6 +414,19 @@ func (s Store) Vote(itemID int64, voterID string, now time.Time) error {
 
 // Unvote takes a vote back.
 func (s Store) Unvote(itemID int64, voterID string) error {
+	// Taking a vote back changes the count as much as giving one does, so an
+	// answered idea refuses it too.
+	var status string
+	switch err := s.DB.QueryRow(`SELECT status FROM item WHERE id = ?`, itemID).Scan(&status); {
+	case errors.Is(err, sql.ErrNoRows):
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("looking up the item: %w", err)
+	}
+	if Status(status).Closes() {
+		return ErrVotingClosed
+	}
+
 	res, err := s.DB.Exec(`DELETE FROM vote WHERE item_id = ? AND voter_id = ?`, itemID, voterID)
 	if err != nil {
 		return fmt.Errorf("removing the vote: %w", err)

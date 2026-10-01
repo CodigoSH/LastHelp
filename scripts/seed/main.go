@@ -259,15 +259,17 @@ func seed(path string, now time.Time) error {
 		if err != nil {
 			return fmt.Errorf("%q: moderation: %w", r.title, err)
 		}
-		if r.status != item.StatusNew {
-			if err := items.SetStatus(made.ID, r.status, later.Add(24*time.Hour)); err != nil {
-				return fmt.Errorf("%q: status: %w", r.title, err)
-			}
-		}
+		// The votes come first, as they did: an answered idea takes no more, so
+		// the team answers after the people have voted.
 		// Only ideas are voted on; a bug is confirmed, not liked.
 		for v := 0; r.kind == item.Idea && v < r.votes; v++ {
 			if err := items.Vote(made.ID, fmt.Sprintf("seed-voter-%d", v), later); err != nil {
 				return fmt.Errorf("%q: vote: %w", r.title, err)
+			}
+		}
+		if r.status != item.StatusNew {
+			if err := items.SetStatus(made.ID, r.status, later.Add(24*time.Hour)); err != nil {
+				return fmt.Errorf("%q: status: %w", r.title, err)
 			}
 		}
 		for i, l := range r.talk {

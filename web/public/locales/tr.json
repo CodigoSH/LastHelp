@@ -116,6 +116,7 @@
   "error.update_wont_run": "İndirilen ikili dosya bu makinede çalışmıyor. Hiçbir şey kurulmadı.",
   "error.username_required": "Kullanıcı adı gerekli.",
   "error.username_taken": "Kullanıcı adı zaten kullanımda.",
+  "error.voting_closed": "Bu fikir için oylama kapandı.",
   "field.steps": "Yeniden yaşatma adımları",
   "field.version": "Sürüm",
   "form.body": "Ayrıntılar",

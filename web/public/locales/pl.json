@@ -116,6 +116,7 @@
   "error.update_wont_run": "Pobrany plik binarny nie uruchamia się na tym komputerze. Niczego nie zainstalowano.",
   "error.username_required": "Nazwa użytkownika jest wymagana.",
   "error.username_taken": "Nazwa użytkownika jest już używana.",
+  "error.voting_closed": "Głosowanie na ten pomysł zostało zamknięte.",
   "field.steps": "Kroki do powtórzenia",
   "field.version": "Wersja",
   "form.body": "Szczegóły",

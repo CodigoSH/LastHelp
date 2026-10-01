@@ -116,6 +116,7 @@
   "error.update_wont_run": "O binário transferido não é executado nesta máquina. Nada foi instalado.",
   "error.username_required": "Nome de utilizador obrigatório.",
   "error.username_taken": "Nome de utilizador já em uso.",
+  "error.voting_closed": "A votação desta ideia está encerrada.",
   "field.steps": "Passos para reproduzir",
   "field.version": "Versão",
   "form.body": "Detalhes",

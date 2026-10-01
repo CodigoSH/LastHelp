@@ -116,6 +116,7 @@
   "error.update_wont_run": "Het gedownloade binaire bestand draait niet op deze machine. Er is niets geïnstalleerd.",
   "error.username_required": "Gebruikersnaam vereist.",
   "error.username_taken": "Gebruikersnaam al in gebruik.",
+  "error.voting_closed": "Stemmen op dit idee is gesloten.",
   "field.steps": "Stappen om het na te doen",
   "field.version": "Versie",
   "form.body": "Details",

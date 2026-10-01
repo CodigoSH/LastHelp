@@ -116,6 +116,7 @@
   "error.update_wont_run": "Il binario scaricato non si avvia su questa macchina. Nulla è stato installato.",
   "error.username_required": "Nome utente obbligatorio.",
   "error.username_taken": "Nome utente già in uso.",
+  "error.voting_closed": "Il voto su questa idea è chiuso.",
   "field.steps": "Passi per riprodurlo",
   "field.version": "Versione",
   "form.body": "Dettagli",

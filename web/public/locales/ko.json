@@ -116,6 +116,7 @@
   "error.update_wont_run": "다운로드한 바이너리가 이 컴퓨터에서 실행되지 않습니다. 설치된 것이 없습니다.",
   "error.username_required": "사용자 이름이 필요합니다.",
   "error.username_taken": "이미 사용 중인 사용자 이름입니다.",
+  "error.voting_closed": "이 아이디어의 투표는 마감되었습니다.",
   "field.steps": "재현 절차",
   "field.version": "버전",
   "form.body": "자세히",

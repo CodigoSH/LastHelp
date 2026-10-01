@@ -116,6 +116,7 @@
   "error.update_wont_run": "Le binaire téléchargé ne s'exécute pas sur cette machine. Rien n'a été installé.",
   "error.username_required": "Nom d'utilisateur requis.",
   "error.username_taken": "Nom d'utilisateur déjà utilisé.",
+  "error.voting_closed": "Le vote est clos pour cette idée.",
   "field.steps": "Étapes pour reproduire",
   "field.version": "Version",
   "form.body": "Détails",

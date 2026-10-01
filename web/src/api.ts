@@ -171,6 +171,9 @@ export interface ItemSummary {
   status: string;
   votes: number;
   voted: boolean;
+  /** False once the team has answered an idea: the count stays, the button goes.
+   *  Absent means votable, which is what the team's own views carry. */
+  votable?: boolean;
   created_at: number;
 }
 

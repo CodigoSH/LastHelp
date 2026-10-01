@@ -656,8 +656,15 @@ function answers(fields: ReportField[], text: Text): string {
  * turns the words into a form where they stand.
  */
 function reportArticle(item: ItemDetail, text: Text, pencil = ""): string {
+  // An answered idea keeps its count and loses the button: the number is then
+  // the record of how many people wanted it when it was answered.
   const vote =
-    item.kind === "idea"
+    item.kind === "idea" && item.votable === false
+      ? `<div class="vote-block closed">
+           <span class="count">${escapeHTML(text.number(item.votes))}</span>
+           <span class="label">${escapeHTML(text.t("item.votesLabel"))}</span>
+         </div>`
+      : item.kind === "idea"
       ? `<button class="vote-block${item.voted ? " voted" : ""}" data-vote
            aria-pressed="${item.voted ? "true" : "false"}">
            <span class="count">${escapeHTML(text.number(item.votes))}</span>

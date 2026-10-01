@@ -116,6 +116,7 @@
   "error.update_wont_run": "The downloaded binary does not run on this machine. Nothing was installed.",
   "error.username_required": "Username required.",
   "error.username_taken": "Username already in use.",
+  "error.voting_closed": "Voting is closed on this idea.",
   "field.steps": "Steps to reproduce",
   "field.version": "Version",
   "form.body": "Details",

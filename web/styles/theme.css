@@ -4014,6 +4014,10 @@ body > nav .brand {
 
 .vote-block .label { font-size: 0.8rem; color: var(--text-dim); }
 
+/* An answered idea: the number, with nothing to press. */
+.vote-block.closed { cursor: default; }
+.vote-block.closed:hover { transform: none; border-color: var(--border); }
+
 .vote-block.voted {
   border-color: var(--accent);
   background: rgba(var(--accent-rgb), 0.12);

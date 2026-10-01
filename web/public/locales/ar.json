@@ -116,6 +116,7 @@
   "error.update_wont_run": "الملف التنفيذي الذي تم تنزيله لا يعمل على هذا الجهاز. لم يُثبَّت شيء.",
   "error.username_required": "اسم المستخدم مطلوب.",
   "error.username_taken": "اسم المستخدم مستخدم بالفعل.",
+  "error.voting_closed": "تم إغلاق التصويت على هذه الفكرة.",
   "field.steps": "خطوات إعادة الحدوث",
   "field.version": "الإصدار",
   "form.body": "التفاصيل",

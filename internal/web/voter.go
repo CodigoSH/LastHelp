@@ -14,10 +14,12 @@ import (
 // authority: the worst somebody can do with a stolen one is un-vote.
 const VoterCookie = "lasthelp_voter"
 
-// voterCookieLife is deliberately long. A voter identity that expires is a
-// person who can vote for the same idea again next year, and the count is the
-// one number the roadmap is ordered by.
-const voterCookieLife = 5 * 365 * 24 * time.Hour
+// voterCookieLife is a year. It only has to outlast an idea being open: once the
+// team answers one it stops taking votes at all (item.ErrVotingClosed), so an
+// identity that expires can let somebody vote again only on an idea left open
+// for more than a year, and only if they come back. Anything longer is an
+// identifier kept in a stranger's browser for longer than it does any work.
+const voterCookieLife = 365 * 24 * time.Hour
 
 // voterID reads the signed voter cookie, or mints one.
 //

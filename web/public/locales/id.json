@@ -116,6 +116,7 @@
   "error.update_wont_run": "Biner yang diunduh tidak berjalan di mesin ini. Tidak ada yang dipasang.",
   "error.username_required": "Nama pengguna wajib diisi.",
   "error.username_taken": "Nama pengguna sudah digunakan.",
+  "error.voting_closed": "Pemungutan suara untuk ide ini sudah ditutup.",
   "field.steps": "Langkah untuk mengulang",
   "field.version": "Versi",
   "form.body": "Rincian",

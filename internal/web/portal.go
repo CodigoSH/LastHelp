@@ -491,6 +491,9 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, item.ErrNotVotable):
 		writeError(w, http.StatusBadRequest, "error.not_votable")
 		return
+	case errors.Is(err, item.ErrVotingClosed):
+		writeError(w, http.StatusConflict, "error.voting_closed")
+		return
 	case err != nil:
 		slog.Error("voting", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
@@ -507,6 +510,10 @@ func (s *Server) handleUnvote(w http.ResponseWriter, r *http.Request) {
 	}
 	voter := s.voterID(w, r)
 	if err := s.items().Unvote(it.ID, voter); err != nil {
+		if errors.Is(err, item.ErrVotingClosed) {
+			writeError(w, http.StatusConflict, "error.voting_closed")
+			return
+		}
 		slog.Error("removing a vote", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
@@ -635,6 +642,7 @@ func (s *Server) describeItem(it item.Item, voter string) map[string]any {
 		"status":     string(it.Status),
 		"votes":      it.VoteCount,
 		"voted":      voted,
+		"votable":    it.Votable(),
 		"created_at": it.CreatedAt.Unix(),
 	}
 }

@@ -116,6 +116,7 @@
   "error.update_wont_run": "El binario descargado no se ejecuta en esta máquina. No se ha instalado nada.",
   "error.username_required": "Nombre de usuario obligatorio.",
   "error.username_taken": "Nombre de usuario ya en uso.",
+  "error.voting_closed": "La votación de esta idea está cerrada.",
   "field.steps": "Pasos para reproducirlo",
   "field.version": "Versión",
   "form.body": "Detalles",

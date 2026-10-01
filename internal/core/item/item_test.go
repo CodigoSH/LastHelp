@@ -128,6 +128,57 @@ func TestVotingTwiceCountsOnce(t *testing.T) {
 	}
 }
 
+// TestAnAnsweredIdeaStopsTakingVotes.
+//
+// Once the team has said done, declined or closed, the count is a record of how
+// many people wanted it when it was answered. If it kept moving it would stop
+// being one. Taking a vote back is closed too, or the number the team answered
+// to could still be edited afterwards.
+func TestAnAnsweredIdeaStopsTakingVotes(t *testing.T) {
+	for _, answer := range []Status{StatusDone, StatusDeclined} {
+		t.Run(string(answer), func(t *testing.T) {
+			s := store(t)
+			idea, _ := report(t, s, Idea, "dark mode", "")
+			if err := s.Vote(idea.ID, "voter-1", epoch); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.SetStatus(idea.ID, answer, epoch); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := s.Vote(idea.ID, "voter-2", epoch); !errors.Is(err, ErrVotingClosed) {
+				t.Errorf("voting an answered idea gave %v, want ErrVotingClosed", err)
+			}
+			if err := s.Unvote(idea.ID, "voter-1"); !errors.Is(err, ErrVotingClosed) {
+				t.Errorf("taking a vote back from an answered idea gave %v, want ErrVotingClosed", err)
+			}
+			loaded, err := s.ByID(idea.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if loaded.VoteCount != 1 {
+				t.Errorf("the count moved to %d after the idea was answered", loaded.VoteCount)
+			}
+		})
+	}
+}
+
+// TestAReopenedIdeaTakesVotesAgain: whether voting is open is read from the
+// status each time, not remembered, so reopening needs nothing else.
+func TestAReopenedIdeaTakesVotesAgain(t *testing.T) {
+	s := store(t)
+	idea, _ := report(t, s, Idea, "dark mode", "")
+	if err := s.SetStatus(idea.ID, StatusDeclined, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetStatus(idea.ID, StatusPlanned, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Vote(idea.ID, "voter-1", epoch); err != nil {
+		t.Errorf("a reopened idea refused a vote: %v", err)
+	}
+}
+
 func TestTakingAVoteBackNeverGoesBelowZero(t *testing.T) {
 	s := store(t)
 	idea, _ := report(t, s, Idea, "dark mode", "")

@@ -110,6 +110,14 @@ documented limit rather than a defect. The alternative is asking people to
 create an account, which is the thing this product exists not to do, so treat a
 vote count as a signal of what is popular rather than as a count of people.
 
+**An answered idea stops taking votes.** When you mark an idea done, declined or
+closed, its page keeps the number and loses the button, and a vote can no longer
+be given or taken back. The count is then the record of how many people wanted
+it when you answered. Reopen the idea and voting opens with it. The voter cookie
+lasts a year, which is more than an idea normally stays open; the one case it
+cannot cover is an idea left open for longer than that, where somebody who comes
+back after the cookie expired can vote once more.
+
 ## Taking your data with you
 
 Every repository exports as JSON, from its page in the panel or at

@@ -32,7 +32,7 @@ Following a board with Atom stores nothing about the reader.
 | Cookie | Who gets it | What it is for | Lasts |
 |---|---|---|---|
 | `lasthelp_csrf` | Every visitor | Refuses a form submitted from another site | The browser session |
-| `lasthelp_voter` | Whoever votes | A random, signed identity, so one browser counts once | Five years |
+| `lasthelp_voter` | Whoever votes | A random, signed identity, so one browser counts once | One year |
 | `lasthelp_session` | Your team, after signing in | Keeps them signed in | Thirty days since last seen |
 
 All three are needed for something the visitor asked for or for security, and

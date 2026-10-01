@@ -164,6 +164,48 @@ func TestTheWholeJourney(t *testing.T) {
 	}
 }
 
+// TestAnAnsweredIdeaShowsItsCountAndNoButton is the same rule seen from the
+// page: the number stays, the way to change it goes, and an old page that still
+// has the button gets a refusal in words rather than a silent change.
+func TestAnAnsweredIdeaShowsItsCountAndNoButton(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submit("codigosh", "lastboard", "idea", "dark mode")
+	resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+
+	resp = public.do(http.MethodPost, "/api/items/"+id+"/votes", nil)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("the first vote returned %d", resp.StatusCode)
+	}
+
+	open := decode(t, public.do(http.MethodGet, "/api/items/"+id, nil))
+	if open["votable"] != true {
+		t.Errorf("an open idea is not votable: %v", open["votable"])
+	}
+
+	resp = team.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": string(item.StatusDone)})
+	_ = resp.Body.Close()
+
+	answered := decode(t, public.do(http.MethodGet, "/api/items/"+id, nil))
+	if answered["votable"] != false || answered["votes"] != float64(1) {
+		t.Errorf("an answered idea says votable=%v votes=%v, want false and 1", answered["votable"], answered["votes"])
+	}
+
+	for _, method := range []string{http.MethodPost, http.MethodDelete} {
+		resp = public.do(method, "/api/items/"+id+"/votes", nil)
+		body := decode(t, resp)
+		if resp.StatusCode != http.StatusConflict || body["error"] != "error.voting_closed" {
+			t.Errorf("%s on an answered idea returned %d %v", method, resp.StatusCode, body)
+		}
+	}
+}
+
 func TestABugCannotBeVoted(t *testing.T) {
 	team := newInstance(t)
 	team.claim()
@@ -385,6 +427,35 @@ func TestAStatusFromTheOtherKindIsRefusedAtTheEdge(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("a bug could not be confirmed: %d", resp.StatusCode)
 	}
+}
+
+// TestTheVoterCookieLastsAYear.
+//
+// It only has to outlast an idea being open, since an answered idea takes no
+// more votes. Five years was an identifier kept in a stranger's browser long
+// after it stopped doing anything.
+func TestTheVoterCookieLastsAYear(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+
+	public := team.anonymous()
+	id, _ := public.submit("codigosh", "lastboard", "idea", "dark mode")
+	resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+
+	resp = public.do(http.MethodPost, "/api/items/"+id+"/votes", nil)
+	_ = resp.Body.Close()
+	for _, c := range resp.Cookies() {
+		if c.Name == VoterCookie {
+			if year := 365 * 24 * 60 * 60; c.MaxAge != year {
+				t.Errorf("the voter cookie lasts %d seconds, want a year (%d)", c.MaxAge, year)
+			}
+			return
+		}
+	}
+	t.Fatal("voting did not set a voter cookie")
 }
 
 // TestAVoterCookieCannotBeForged.

@@ -116,6 +116,7 @@
   "error.update_wont_run": "Das heruntergeladene Binary läuft auf diesem Rechner nicht. Es wurde nichts installiert.",
   "error.username_required": "Benutzername erforderlich.",
   "error.username_taken": "Benutzername bereits vergeben.",
+  "error.voting_closed": "Die Abstimmung über diese Idee ist beendet.",
   "field.steps": "Schritte zum Nachstellen",
   "field.version": "Version",
   "form.body": "Details",

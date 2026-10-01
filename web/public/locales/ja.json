@@ -116,6 +116,7 @@
   "error.update_wont_run": "ダウンロードしたバイナリはこのマシンで実行できません。何もインストールされていません。",
   "error.username_required": "ユーザー名は必須です。",
   "error.username_taken": "このユーザー名は既に使用されています。",
+  "error.voting_closed": "このアイデアへの投票は終了しました。",
   "field.steps": "再現手順",
   "field.version": "バージョン",
   "form.body": "詳細",

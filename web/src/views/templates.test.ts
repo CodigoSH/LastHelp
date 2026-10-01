@@ -85,6 +85,19 @@ describe("the vote", () => {
     // crash harder.
     expect(itemView(report({ kind: "bug" }), text)).not.toContain("vote-block");
   });
+
+  test("an answered idea keeps its count and has nothing to press", () => {
+    const html = itemView(report({ kind: "idea", votes: 12, votable: false }), text);
+    expect(html).toContain("vote-block closed");
+    expect(html).toContain(">12<");
+    expect(html).not.toContain("data-vote");
+    expect(html).not.toContain("<button class=\"vote-block");
+  });
+
+  test("an idea with no word about it is still votable", () => {
+    // The team's own views carry no `votable`; absent means open.
+    expect(itemView(report({ kind: "idea" }), text)).toContain("data-vote");
+  });
 });
 
 describe("a reporter following their own report", () => {

@@ -116,6 +116,7 @@
   "error.update_wont_run": "下载的二进制文件无法在此机器上运行。未安装任何内容。",
   "error.username_required": "用户名为必填项。",
   "error.username_taken": "用户名已被使用。",
+  "error.voting_closed": "此想法的投票已关闭。",
   "field.steps": "重现步骤",
   "field.version": "版本",
   "form.body": "详细说明",

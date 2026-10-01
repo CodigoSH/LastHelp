@@ -116,6 +116,7 @@
   "error.update_wont_run": "डाउनलोड की गई बाइनरी इस मशीन पर नहीं चलती। कुछ भी इंस्टॉल नहीं हुआ।",
   "error.username_required": "उपयोगकर्ता नाम आवश्यक है।",
   "error.username_taken": "उपयोगकर्ता नाम पहले से उपयोग में है।",
+  "error.voting_closed": "इस विचार पर मतदान बंद हो चुका है।",
   "field.steps": "दोहराने के चरण",
   "field.version": "संस्करण",
   "form.body": "विवरण",

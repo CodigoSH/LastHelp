@@ -116,6 +116,7 @@
   "error.update_wont_run": "فایل اجرایی دریافت‌شده روی این دستگاه اجرا نمی‌شود. چیزی نصب نشد.",
   "error.username_required": "نام کاربری لازم است.",
   "error.username_taken": "این نام کاربری در حال استفاده است.",
+  "error.voting_closed": "رأی‌گیری برای این ایده بسته شده است.",
   "field.steps": "گام‌های بازتولید",
   "field.version": "نسخه",
   "form.body": "جزئیات",
