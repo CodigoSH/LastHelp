@@ -112,11 +112,13 @@ vote count as a signal of what is popular rather than as a count of people.
 
 **An answered idea stops taking votes.** When you mark an idea done, declined or
 closed, its page keeps the number and loses the button, and a vote can no longer
-be given or taken back. The count is then the record of how many people wanted
-it when you answered. Reopen the idea and voting opens with it. The voter cookie
-lasts a year, which is more than an idea normally stays open; the one case it
-cannot cover is an idea left open for longer than that, where somebody who comes
-back after the cookie expired can vote once more.
+be given or taken back, so the count is what people wanted when you answered.
+Reopen the idea and voting opens with it.
+
+Votes are there to point you at what people want, not to decide it. Anybody can
+vote again by changing browser, clearing cookies or changing address, and that
+is accepted: the voter cookie lasts a year, and past that the number is still
+only a guide.
 
 ## Taking your data with you
 
