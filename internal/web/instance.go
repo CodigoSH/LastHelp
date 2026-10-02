@@ -149,10 +149,10 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	body := map[string]any{"bands": page.Bands, "settings": page.Settings}
 	boards, needed := s.boardsForLanding(page, composer)
 	if needed {
-		body["content"] = landingContentFrom(page, boards, s.reportsFor, s.comingIn, s.countedIn)
+		body["content"] = landingContentFrom(page, boards, s.describeBoards, s.reportsFor, s.comingIn, s.countedIn)
 	}
 	if composer {
-		body["boards"] = describeBoards(boards)
+		body["boards"] = s.describeBoards(boards)
 		// A share picture is announced only at an absolute address, so the
 		// editor says so when none is configured rather than letting the
 		// operator choose one nobody will ever see.
@@ -182,6 +182,7 @@ func (s *Server) boardsForLanding(page landing.Page, composer bool) ([]org.Board
 // front page that errors because one module could not be filled is a front page
 // that goes down when a board is deleted.
 func landingContentFrom(page landing.Page, boards []org.Board,
+	describe func([]org.Board) []map[string]any,
 	reports func([]org.Board, string) []map[string]any,
 	coming func([]org.Board) map[string]any,
 	counted func([]org.Board) map[string]any) map[string]any {
@@ -189,7 +190,7 @@ func landingContentFrom(page landing.Page, boards []org.Board,
 	for _, m := range page.Modules() {
 		switch m.Kind {
 		case landing.Boards:
-			content[m.ID] = cut(describeBoards(inScope(boards, m.Scope)), m.Rows)
+			content[m.ID] = cut(describe(inScope(boards, m.Scope)), m.Rows)
 		case landing.Reports:
 			content[m.ID] = cut(reports(inScope(boards, m.Scope), m.Show), m.Rows)
 		case landing.Roadmap:
@@ -232,7 +233,18 @@ func inScope(boards []org.Board, scope string) []org.Board {
 	return out
 }
 
-func describeBoards(boards []org.Board) []map[string]any {
+func (s *Server) describeBoards(boards []org.Board) []map[string]any {
+	ids := make([]int64, 0, len(boards))
+	for _, b := range boards {
+		ids = append(ids, b.ID)
+	}
+	open, err := s.items().OpenByKind(ids)
+	if err != nil {
+		// The cards are still worth drawing: they say what a board takes, and
+		// the numbers are the part that is missing.
+		slog.Error("counting open reports for the front page", "error", err)
+	}
+
 	out := make([]map[string]any, 0, len(boards))
 	for _, b := range boards {
 		out = append(out, map[string]any{
@@ -243,6 +255,10 @@ func describeBoards(boards []org.Board) []map[string]any {
 			"accepts_bugs":  b.AcceptsBugs,
 			"accepts_ideas": b.AcceptsIdeas,
 			"icon":          b.Icon,
+			// Open and published: what the board's own "open" tab shows. Only the
+			// kinds the board takes are drawn, so a missing one is not a zero.
+			"open_bugs":  open[b.ID][item.Bug],
+			"open_ideas": open[b.ID][item.Idea],
 		})
 	}
 	return out
@@ -427,7 +443,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": hits, "boards": describeBoards(boards)})
+	writeJSON(w, http.StatusOK, map[string]any{"items": hits, "boards": s.describeBoards(boards)})
 }
 
 // searchHits is how many reports one search answers with.

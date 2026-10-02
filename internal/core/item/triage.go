@@ -347,6 +347,51 @@ func (s Store) Counts(repoIDs []int64, column string) (map[string]int, error) {
 	return out, rows.Err()
 }
 
+// OpenByKind is how many reports of each kind are open on each board: published,
+// not folded into another, and not answered. It is the number the board's own
+// "open" tab shows, so the front page and the page behind it cannot disagree.
+//
+// Counted in the database in one query for every board asked about, because the
+// front page is the one strangers load.
+func (s Store) OpenByKind(repoIDs []int64) (map[int64]map[Kind]int, error) {
+	out := map[int64]map[Kind]int{}
+	if len(repoIDs) == 0 {
+		return out, nil
+	}
+
+	closed := ClosedStatuses()
+	args := make([]any, 0, len(repoIDs)+len(closed))
+	for _, id := range repoIDs {
+		args = append(args, id)
+	}
+	for _, st := range closed {
+		args = append(args, string(st))
+	}
+	rows, err := s.DB.Query(`SELECT repo_id, kind, count(*) FROM item
+		WHERE merged_into IS NULL AND moderation_state = '`+string(Published)+`'
+		  AND repo_id IN (`+placeholders(len(repoIDs))+`)
+		  AND status NOT IN (`+placeholders(len(closed))+`)
+		GROUP BY repo_id, kind`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("counting open reports: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var repoID int64
+		var kind string
+		var n int
+		if err := rows.Scan(&repoID, &kind, &n); err != nil {
+			return nil, err
+		}
+		if out[repoID] == nil {
+			out[repoID] = map[Kind]int{}
+		}
+		out[repoID][Kind(kind)] = n
+	}
+	return out, rows.Err()
+}
+
 // Counts is how much has come in and where it got to.
 //
 // Three numbers and no more. "Received" is everything a person let through,

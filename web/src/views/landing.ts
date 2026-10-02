@@ -100,6 +100,9 @@ export interface LandingBoard {
   name: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  /** Published and still open, per kind: what the board's own open tab shows. */
+  open_bugs?: number;
+  open_ideas?: number;
   icon?: string;
 }
 
@@ -513,12 +516,19 @@ function boards(m: LandingModule, rows: LandingBoard[], text: Text): string {
     .join("");
 }
 
-/** What a board takes, as the marks of its kinds, each named for a reader. */
+/**
+ * What a board takes, as the marks of its kinds, each with how many are open.
+ * A kind the board does not take has no mark, so a missing one is never read as
+ * a zero.
+ */
 function accepts(b: LandingBoard, text: Text): string {
-  const mark = (kind: "bug" | "idea") =>
-    `<span class="kind kind-${kind}" role="img" title="${escapeAttr(text.t(`kind.${kind}`))}"
-       aria-label="${escapeAttr(text.t(`kind.${kind}`))}">${kind === "bug" ? icons.bug(14) : icons.idea(14)}</span>`;
-  return `<span class="lp-accepts">${b.accepts_bugs ? mark("bug") : ""}${b.accepts_ideas ? mark("idea") : ""}</span>`;
+  const mark = (kind: "bug" | "idea", open: number) => {
+    const name = text.t(`kind.${kind}`);
+    const label = `${name} ${text.number(open)}`;
+    return `<span class="kind kind-${kind}" role="img" title="${escapeAttr(label)}"
+       aria-label="${escapeAttr(label)}">${kind === "bug" ? icons.bug(14) : icons.idea(14)}<span>${escapeHTML(text.number(open))}</span></span>`;
+  };
+  return `<span class="lp-accepts">${b.accepts_bugs ? mark("bug", b.open_bugs ?? 0) : ""}${b.accepts_ideas ? mark("idea", b.open_ideas ?? 0) : ""}</span>`;
 }
 
 /**
