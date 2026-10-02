@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "此仓库不接受此类反馈。",
   "error.last_administrator": "这是唯一的管理员。请先指定另一位。",
   "error.no_forge": "此组织未连接代码托管平台。",
-  "error.no_webp": "此浏览器无法编码 WebP 图片。请使用最新版 Firefox、Chrome 或 Safari。",
   "error.not_a_backup": "不是与此版本兼容的 LastHelp 备份。",
   "error.not_an_image": "不支持的图片文件。",
   "error.not_found": "未找到。",

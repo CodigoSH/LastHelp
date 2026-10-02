@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "Questo repository non accetta questo tipo di segnalazione.",
   "error.last_administrator": "È l'unico amministratore. Assegnane prima un altro.",
   "error.no_forge": "Nessuna forge collegata a questa organizzazione.",
-  "error.no_webp": "Questo browser non può codificare immagini WebP. Usa una versione aggiornata di Firefox, Chrome o Safari.",
   "error.not_a_backup": "Backup di LastHelp non compatibile con questa versione.",
   "error.not_an_image": "File immagine non supportato.",
   "error.not_found": "Non trovato.",

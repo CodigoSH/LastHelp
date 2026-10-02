@@ -1,6 +1,10 @@
 package web
 
 import (
+	"bytes"
+	"encoding/base64"
+	"image"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"strings"
@@ -247,7 +251,9 @@ func TestAStrangerIsHandedThePageAndNothingElse(t *testing.T) {
 func TestAPictureThePageUsesIsKept(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
-	webp := append([]byte("RIFF\x00\x00\x00\x00WEBPVP8 "), make([]byte, 32)...)
+	// A real one-pixel WebP: the store reads the header now, so a file that
+	// only begins like one is refused, as it should be.
+	webp, _ := base64.StdEncoding.DecodeString("UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==")
 	name, err := landing.StoreImage(i.db(), webp, i.now())
 	if err != nil {
 		t.Fatal(err)
@@ -269,6 +275,49 @@ func TestAPictureThePageUsesIsKept(t *testing.T) {
 	_ = status(t, i.do(http.MethodPut, "/api/landing", words("<p>No picture.</p>")))
 	if stored() != 0 {
 		t.Error("a picture no page uses was kept")
+	}
+}
+
+// TestAPictureFromSafariReachesTheFrontPage.
+//
+// Safari asked for WebP hands back a PNG without saying so, and the browser
+// then sends a JPEG. When the front page took WebP only, every picture an
+// operator on a Mac or an iPhone added was refused. This walks that path from
+// the upload to the page that shows it.
+func TestAPictureFromSafariReachesTheFrontPage(t *testing.T) {
+	i := newInstance(t)
+	i.claim()
+
+	var photo bytes.Buffer
+	if err := jpeg.Encode(&photo, image.NewRGBA(image.Rect(0, 0, 32, 24)), nil); err != nil {
+		t.Fatal(err)
+	}
+	resp := i.doBytes(http.MethodPost, "/api/landing/images", photo.Bytes())
+	body := decode(t, resp)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("a JPEG was refused: %d %v", resp.StatusCode, body)
+	}
+	name, _ := body["url"].(string)
+	if !strings.HasSuffix(name, ".jpg") {
+		t.Errorf("a JPEG was named %q; the name is what the page links to", name)
+	}
+
+	served := i.anonymous().do(http.MethodGet, name, nil)
+	_ = served.Body.Close()
+	if served.StatusCode != http.StatusOK || served.Header.Get("Content-Type") != "image/jpeg" {
+		t.Errorf("serving it answered %d %q", served.StatusCode, served.Header.Get("Content-Type"))
+	}
+
+	page := map[string]any{"bands": []map[string]any{{"id": "b", "columns": "1",
+		"cells": [][]map[string]any{{{"id": "p", "kind": "image", "image": name, "alt": "A screen"}}}}}}
+	if got := status(t, i.do(http.MethodPut, "/api/landing", page)); got != http.StatusOK {
+		t.Errorf("a page showing the JPEG was refused: %d", got)
+	}
+
+	fake := i.doBytes(http.MethodPost, "/api/landing/images", []byte("RIFF\x00\x00\x00\x00WEBPVP8 junk"))
+	_ = fake.Body.Close()
+	if fake.StatusCode != http.StatusBadRequest {
+		t.Errorf("a file that only begins like a WebP was taken: %d", fake.StatusCode)
 	}
 }
 

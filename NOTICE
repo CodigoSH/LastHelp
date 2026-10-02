@@ -50,6 +50,12 @@ THIRD-PARTY COMPONENTS
 
      golang.org/x/net                    BSD 3-Clause
 
+   Reading WebP and scaling pictures, for the images people attach to their
+   reports and the ones on the front page. The standard library reads and
+   writes JPEG and PNG but neither reads WebP nor scales well:
+
+     golang.org/x/image                  BSD 3-Clause
+
    Everything else this binary does uses the Go standard library.
 
    Required by go.mod and NOT in what we publish. The SQLite driver lists them

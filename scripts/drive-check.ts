@@ -1871,7 +1871,16 @@ async function main() {
     const subir = (blob, type) => fetch("/api/landing/images", { method: "POST",
       headers: { "X-CSRF-Token": csrf(), "Content-Type": type }, body: blob });
     // What is not WebP is refused on the bytes, not on the header it declared.
-    const mentira = await subir(png, "image/webp").then(r => r.status);
+    // The bytes decide, never the declared type: junk calling itself WebP is
+    // refused, and a real PNG calling itself WebP is kept — as a PNG.
+    const mentira = await subir(new Blob(["not a picture at all"], { type: "image/webp" }), "image/webp").then(r => r.status);
+    const disfrazada = await subir(png, "image/webp");
+    const disfrazadaUrl = disfrazada.status === 201 ? (await disfrazada.json()).url : "";
+    // Asked at once: nothing shows it, so the next save sweeps it away.
+    const comoPng = disfrazadaUrl
+      ? { estado: disfrazada.status, nombre: disfrazadaUrl.slice(-4),
+          tipo: (await fetch(disfrazadaUrl, { cache: "no-store" })).headers.get("content-type") }
+      : { estado: disfrazada.status };
     const vacia = await subir(new Blob([], { type: "image/webp" }), "image/webp").then(r => r.status);
     const hecha = await subir(webp, "image/webp");
     const { url } = await hecha.json();
@@ -1922,20 +1931,22 @@ async function main() {
     document.querySelector("body > nav [data-edit-done]")?.click();
     await new Promise(r => setTimeout(r, 900));
     await guardar(antes.bands, antes.settings);
-    return { png: png.size, webp: webp.size, mentira, vacia, creada: hecha.status, guardado,
+    return { png: png.size, webp: webp.size, mentira, vacia, comoPng, creada: hecha.status, guardado,
              cabeceras, trasQuitarla, barraAntes, aparece, sigue, debajo, conEstilo, conFormato };
   `);
   check(
-    "a picture is stored as WebP, served for a year, and swept when nothing shows it",
+    "a picture is stored as what its bytes are, served for a year, and swept when nothing shows it",
     retrato.webp < retrato.png &&
       retrato.creada === 201 && retrato.mentira === 400 && retrato.vacia === 400 &&
+      retrato.comoPng.estado === 201 && retrato.comoPng.nombre === ".png" && retrato.comoPng.tipo === "image/png" &&
       retrato.guardado.includes('width="480"') && retrato.guardado.includes('alt="A shot"') &&
       retrato.guardado.includes('loading="lazy"') &&
       retrato.cabeceras.estado === 200 && retrato.cabeceras.tipo === "image/webp" &&
       retrato.cabeceras.cache.includes("immutable") &&
       retrato.trasQuitarla === 404,
     JSON.stringify({ pesos: { png: retrato.png, webp: retrato.webp },
-                     subida: { creada: retrato.creada, noEsWebp: retrato.mentira, vacia: retrato.vacia },
+                     subida: { creada: retrato.creada, basura: retrato.mentira, vacia: retrato.vacia,
+                               pngDisfrazado: retrato.comoPng },
                      guardado: retrato.guardado, cabeceras: retrato.cabeceras,
                      trasQuitarla: retrato.trasQuitarla }),
   );

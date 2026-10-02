@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "Este repositório não aceita este tipo de relato.",
   "error.last_administrator": "É o único administrador. Atribua outro primeiro.",
   "error.no_forge": "Nenhuma forja ligada a esta organização.",
-  "error.no_webp": "Este navegador não consegue codificar imagens WebP. Use uma versão atual do Firefox, Chrome ou Safari.",
   "error.not_a_backup": "Não é uma cópia do LastHelp compatível com esta versão.",
   "error.not_an_image": "Ficheiro de imagem não suportado.",
   "error.not_found": "Não encontrado.",

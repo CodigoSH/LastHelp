@@ -1,15 +1,14 @@
 package landing
 
 import (
-	"bytes"
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/picture"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
 )
 
@@ -24,24 +23,27 @@ const ImagePrefix = "/api/landing/images/"
 // MaxImageBytes is what one picture may weigh.
 //
 // The browser scales and re-encodes before sending — see web/src/services/
-// landingImage.ts — so this is not the limit somebody meets with a photograph
-// off a phone. It is the limit that stops a handler being handed a hundred
-// megabytes by something that is not the browser.
+// picture.ts — so this is not the limit somebody meets with a photograph off a
+// phone. It is the limit that stops a handler being handed a hundred megabytes
+// by something that is not the browser.
 const MaxImageBytes = 2 << 20
 
-// ErrNotAPicture is a body that is not the format this accepts.
-var ErrNotAPicture = errors.New("that is not a WebP image")
+// ErrNotAPicture is a body that is not a format this accepts.
+var ErrNotAPicture = picture.ErrNotAPicture
 
-// webpMagic is the first bytes of every WebP file: "RIFF", four bytes of
-// length, then "WEBP".
-//
-// Checked rather than trusted, and checked on the bytes rather than on the
-// content type the request declared: a caller chooses its own header, and the
-// one thing that cannot be chosen is what the file actually is.
-func isWebP(data []byte) bool {
-	return len(data) >= 12 &&
-		bytes.Equal(data[0:4], []byte("RIFF")) &&
-		bytes.Equal(data[8:12], []byte("WEBP"))
+// extensions names a stored picture by what it is. The name is what a page
+// links to, and a JPEG behind a name ending in .webp is a promise the file
+// does not keep.
+var extensions = map[picture.Format]string{picture.WebP: ".webp", picture.JPEG: ".jpg", picture.PNG: ".png"}
+
+// withoutExtension is the id inside a picture's name, whichever it ends in.
+func withoutExtension(name string) string {
+	for _, ext := range extensions {
+		if trimmed, ok := strings.CutSuffix(name, ext); ok {
+			return trimmed
+		}
+	}
+	return name
 }
 
 // Image is a picture stored for the front page.
@@ -56,18 +58,20 @@ type Image struct {
 // The time is given rather than read: a store that reads the wall clock is a
 // store whose tests have to sleep.
 //
-// WebP only, and that is the point rather than a restriction: it is what the
-// browser encodes to before sending, it is a third the weight of the PNG or
-// JPEG that went in, and a front page that loads quickly is the half of SEO
-// that is actually under our control. Accepting the original as well would
-// mean the promise holds only for whoever happened to use a browser that could
-// encode it.
+// WebP when the browser can write it, JPEG or PNG when it cannot: Safari asked
+// for WebP returns a PNG without saying so, and refusing that refused every
+// picture an operator on a Mac or an iPhone tried to add. What arrives is read
+// by its bytes, and a picture whose header asks for more pixels than the server
+// opens is refused before anything else. It is kept as sent: the operator is
+// the one sending it, and the browser has already drawn it again from its
+// pixels, which is what strips what a camera writes into a file.
 func StoreImage(db database.Execer, data []byte, now time.Time) (string, error) {
 	if len(data) == 0 || len(data) > MaxImageBytes {
 		return "", fmt.Errorf("%w: %d bytes", ErrNotAPicture, len(data))
 	}
-	if !isWebP(data) {
-		return "", ErrNotAPicture
+	info, err := picture.Inspect(data)
+	if err != nil {
+		return "", err
 	}
 
 	raw := make([]byte, 16)
@@ -76,19 +80,19 @@ func StoreImage(db database.Execer, data []byte, now time.Time) (string, error) 
 	}
 	id := hex.EncodeToString(raw)
 
-	_, err := db.Exec(
+	_, err = db.Exec(
 		`INSERT INTO landing_image (id, bytes, content_type, created_at) VALUES (?, ?, ?, ?)`,
-		id, data, "image/webp", now.UTC().Format(time.RFC3339),
+		id, data, string(info.Format), now.UTC().Format(time.RFC3339),
 	)
 	if err != nil {
 		return "", fmt.Errorf("storing the picture: %w", err)
 	}
-	return ImagePrefix + id + ".webp", nil
+	return ImagePrefix + id + extensions[info.Format], nil
 }
 
 // ReadImage returns one picture by the name in its path.
 func ReadImage(db database.Execer, id string) (Image, error) {
-	id = strings.TrimSuffix(id, ".webp")
+	id = withoutExtension(id)
 	if !looksLikeImageID(id) {
 		return Image{}, sql.ErrNoRows
 	}
@@ -177,7 +181,7 @@ func imageIDsIn(body string) []string {
 		if end < 0 {
 			end = len(rest)
 		}
-		id := strings.TrimSuffix(rest[:end], ".webp")
+		id := withoutExtension(rest[:end])
 		if looksLikeImageID(id) {
 			found = append(found, id)
 		}

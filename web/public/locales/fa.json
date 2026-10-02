@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "این مخزن این نوع گزارش را نمی‌پذیرد.",
   "error.last_administrator": "این تنها مدیر است. ابتدا مدیر دیگری تعیین کنید.",
   "error.no_forge": "هیچ فورجی به این سازمان متصل نیست.",
-  "error.no_webp": "این مرورگر نمی‌تواند تصاویر WebP را رمزگذاری کند. از نسخهٔ جدید Firefox، Chrome یا Safari استفاده کنید.",
   "error.not_a_backup": "پشتیبان LastHelp سازگار با این نسخه نیست.",
   "error.not_an_image": "فایل تصویر پشتیبانی نمی‌شود.",
   "error.not_found": "پیدا نشد.",

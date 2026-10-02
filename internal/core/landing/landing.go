@@ -743,7 +743,7 @@ func isSlug(v string) bool {
 // answers with, and what a page keeps. Built from the one constant the server
 // serves under, so the two cannot drift: a copy of that path here is a picture
 // that uploads and then disappears the first time the page is read back.
-var imageName = regexp.MustCompile(`^` + regexp.QuoteMeta(ImagePrefix) + `[0-9a-f]{32}\.webp$`)
+var imageName = regexp.MustCompile(`^` + regexp.QuoteMeta(ImagePrefix) + `[0-9a-f]{32}\.(webp|jpg|png)$`)
 
 func oneOf(v string, allowed ...string) bool {
 	for _, a := range allowed {

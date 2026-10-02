@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "यह रिपॉज़िटरी इस प्रकार की रिपोर्ट स्वीकार नहीं करती।",
   "error.last_administrator": "यह एकमात्र व्यवस्थापक है। पहले कोई दूसरा नियुक्त करें।",
   "error.no_forge": "इस संगठन से कोई फोर्ज जुड़ा नहीं है।",
-  "error.no_webp": "यह ब्राउज़र WebP छवियाँ एन्कोड नहीं कर सकता। Firefox, Chrome या Safari का नया संस्करण उपयोग करें।",
   "error.not_a_backup": "यह इस संस्करण के अनुकूल LastHelp बैकअप नहीं है।",
   "error.not_an_image": "असमर्थित छवि फ़ाइल।",
   "error.not_found": "नहीं मिला।",
