@@ -66,6 +66,7 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 
 - **Reporting without an account** — a bug or an idea, in one form, from anybody. What they get back is a secret link: the only way to their own report, and the reason no sign-up is needed at all.
 - **Bugs and ideas are two journeys** — a bug is asked which version and how to see it happen, and is not voted; an idea is one sentence, and gathers votes.
+- **Screenshots with the report** — the person reporting attaches up to five pictures and the team replies with its own. Nothing is shown before the team has looked, the location and camera data in a photo are removed, and the pictures are erased thirty days after the report closes.
 - **Similar reports while typing**, so the tenth person with the same crash adds a vote or a comment instead of a duplicate.
 - **A roadmap nobody maintains** — three columns built from the state of each report, so it cannot be out of date.
 - **Following without an address** — an Atom feed per repository that needs no account and stores nothing about whoever reads it, or an optional email when a mail relay is set up.

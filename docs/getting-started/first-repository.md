@@ -127,6 +127,40 @@ vote again by changing browser, clearing cookies or changing address, and that
 is accepted: the voter cookie lasts a year, and past that the number is still
 only a guide.
 
+## Pictures
+
+A screenshot is often the quickest way to show a bug, so a report can carry
+pictures.
+
+- **Who adds them.** The person reporting, on the form — up to **five** — and on
+  their own follow-ups, up to **three** each, with their secret link. Your team,
+  on its replies, up to three each. A visitor's comment carries words only.
+- **What happens to them.** The browser makes each one smaller before it is sent.
+  The server then draws it again from its pixels, at most 1600 pixels on its
+  longest side plus a small copy for the report page. Anything else the file
+  carried is not kept: the place a phone photo was taken, the camera, anything
+  hidden after the image.
+- **Who sees them.** A picture waits with what it belongs to. Until you approve
+  the report, or the follow-up, only your team and the reporter see it, even
+  with its address. That is the moment to look at each one: you can **take out a
+  single picture** and approve the rest, because a report can be right while one
+  screenshot shows something it should not.
+- **Taking one back.** The reporter can remove their own from their report's
+  page. Your team can remove any.
+- **When they go.** Thirty days after a report is closed, so reopening it in that
+  time loses nothing. At once when a report or a message is rejected, marked as
+  spam or deleted. When you fold a duplicate into another report, the pictures on
+  the duplicate move to the one that stays.
+- **Limits.** Twenty pictures per report, counting every message on it, and
+  2 MB per picture as it arrives. The whole installation keeps at most 512 MB of
+  pictures. When that is full, new ones are refused with a message that says so.
+
+Each repository has a switch for this in its settings, **Images from reporters
+and the team**, on by default. Turn it off and the forms stop offering pictures.
+
+Pictures live in the database, so a backup includes them. A repository's JSON
+export, below, does not.
+
 ## Taking your data with you
 
 Every repository exports as JSON, from its page in the panel or at

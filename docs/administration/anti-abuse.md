@@ -31,6 +31,22 @@ model — what people write in your portal reaches your database and nowhere els
    open.
 7. **The moderation queue**, which catches what the rest did not.
 
+## Pictures
+
+A picture is the easiest thing a stranger can send that costs you something:
+disk, and the time it takes to look at it. So only the person reporting can
+attach pictures, with the secret link they get after passing every layer above,
+and only your team can attach them to its replies. A visitor's comment carries
+none.
+
+What can arrive is bounded at every level: five on a report, three on a
+message, twenty per report all told, 2 MB each, and 512 MB for the whole
+installation, which refuses new pictures with a message once it is full. Every
+picture is drawn again from its pixels before it is kept, so a file that only
+looks like a picture is refused, and one whose header asks for more pixels than
+the server opens is refused before it is read. Nothing is shown before your team
+has seen it, and each repository can turn pictures off.
+
 ## Everything waits for a person
 
 There is no setting that publishes without review, on purpose. Reporting needs
