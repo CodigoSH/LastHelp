@@ -5095,6 +5095,26 @@ a.bento-card:hover,
 
 .detail .body p { line-height: 1.65; }
 
+/* Whatever a stranger typed has to stay inside the box it is drawn in. A line of
+   text breaks at spaces, and a URL, a path or a log pasted whole has none: it
+   ran out of the card, widened the page to tens of thousands of pixels and was
+   cut off at the edge on a phone. `anywhere` rather than `break-word`, because
+   it also lowers the width the text asks for, which is what lets a grid or flex
+   parent shrink the column instead of growing it. Words with spaces still wrap
+   where they always did; only a run too long for its line is broken. */
+.detail h1,
+.detail .body p,
+.answers dd,
+.comment .what,
+.similar a { overflow-wrap: anywhere; }
+
+/* The merge form shows the title of the report chosen, which a stranger wrote.
+   Every form is a one-column grid whose column is as wide as its widest child,
+   and a title with no spaces is a child that is as wide as itself even though
+   the dropdown then cuts it with an ellipsis: the column, the card and the page
+   grew to fit it. A column that may shrink lets the ellipsis do its job. */
+form.merge { grid-template-columns: minmax(0, 1fr); }
+
 .answers dl > div {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--border);
