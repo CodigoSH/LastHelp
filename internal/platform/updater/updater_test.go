@@ -323,6 +323,14 @@ func TestVersionsCompareAsNumbers(t *testing.T) {
 		{"v1.0.0-RC.1", "v1.0.0-Beta.12", true},
 		{"v1.0.0-beta.2", "v1.0.0-Beta.1", true},   // case is not a channel
 		{"v1.0.0-Beta.1.1", "v1.0.0-Beta.1", true}, // longer after shorter
+		// A build past a tag, as `git describe` names it: the tag and some work,
+		// so the tag is not an update to it and the next one still is.
+		{"v1.0.0", "v1.0.0-7-g0725c10", false},
+		{"v1.0.0", "v1.0.0-7-g0725c10-dirty", false},
+		{"v1.0.1", "v1.0.0-7-g0725c10-dirty", true},
+		{"v1.0.0", "v1.0.0-Beta.12-3-gabc1234", true}, // past a beta, the release is ahead
+		{"v1.0.0-Beta.12", "v1.0.0-Beta.12-3-gabc1234", false},
+		{"v1.0.0-Beta.13", "v1.0.0-Beta.12-3-gabc1234", true},
 	}
 
 	for _, c := range cases {
