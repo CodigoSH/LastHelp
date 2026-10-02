@@ -45,6 +45,16 @@ func (s Store) Comment(itemID int64, author Author, authorRef, body string, now 
 		return Comment{}, fmt.Errorf("the comment is longer than %d characters", maxComment)
 	}
 
+	// Before anything is written: a reply and a visitor's comment go through the
+	// same rule, because the conversation closes for both at once.
+	_, status, err := s.standing(itemID)
+	if err != nil {
+		return Comment{}, err
+	}
+	if status.Closes() {
+		return Comment{}, ErrConversationClosed
+	}
+
 	moderation := Pending
 	if author == AuthorTeam {
 		moderation = Published

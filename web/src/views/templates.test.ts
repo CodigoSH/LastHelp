@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, itemView, type Text, updateZone } from "./templates";
+import { accountRole, itemTeamView, itemView, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -152,5 +152,27 @@ describe("the word under an account's name", () => {
   test("is nothing for an account that holds nothing", () => {
     expect(accountRole({ admin: false, memberships: [] }, text)).toBe("");
     expect(accountRole(null, text)).toBe("");
+  });
+});
+
+describe("the conversation", () => {
+  const allowed = { current: "new", statuses: ["new", "closed"] };
+
+  test("an open report has a form for a comment and one for the team", () => {
+    expect(itemView(report(), text)).toContain("comment-form");
+    expect(itemTeamView(report(), allowed, [], text)).toContain("team-reply");
+  });
+
+  test("an answered report keeps its thread and loses both forms", () => {
+    const answered = report({
+      commentable: false,
+      comments: [{ id: 1, author: "visitor", name: "", body: "me too", created_at: 0 }],
+    });
+    for (const html of [itemView(answered, text), itemTeamView(answered, allowed, [], text)]) {
+      expect(html).toContain("me too");
+      expect(html).toContain("item.commentsClosed");
+      expect(html).not.toContain("<form class=\"comment-form");
+      expect(html).not.toContain("<form class=\"team-reply");
+    }
   });
 });

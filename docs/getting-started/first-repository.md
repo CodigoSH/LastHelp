@@ -115,6 +115,13 @@ closed, its page keeps the number and loses the button, and a vote can no longer
 be given or taken back, so the count is what people wanted when you answered.
 Reopen the idea and voting opens with it.
 
+**An answered report stops taking comments.** The same moment, for an idea and
+for a bug, and for you as much as for visitors: the thread stays on the page,
+the comment form and your reply box are replaced by a line saying it is closed,
+and a comment or reply sent from a page opened earlier is refused. You can still
+edit or delete what is already there. Reopen the report and the conversation
+opens with it.
+
 Votes are there to point you at what people want, not to decide it. Anybody can
 vote again by changing browser, clearing cookies or changing address, and that
 is accepted: the voter cookie lasts a year, and past that the number is still
