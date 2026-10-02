@@ -140,8 +140,8 @@ export function repositoryList(
             <span class="card-body">
               <span class="card-title">${escapeHTML(r.name)}</span>
               <span class="chips">
-                ${r.accepts_bugs ? `<span class="chip">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
-                ${r.accepts_ideas ? `<span class="chip">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
+                ${r.accepts_bugs ? `<span class="chip kind-bug">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
+                ${r.accepts_ideas ? `<span class="chip kind-idea">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
               </span>
             </span>
             <span class="card-go" aria-hidden="true">${icons.chevron(18)}</span>
@@ -264,8 +264,8 @@ export function board(
         <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
         <h1>${escapeHTML(repo.name)}</h1>
         <span class="chips">
-          ${repo.accepts_bugs ? `<span class="chip">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
-          ${repo.accepts_ideas ? `<span class="chip">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
+          ${repo.accepts_bugs ? `<span class="chip kind-bug">${icons.bug(12)}<span>${escapeHTML(text.t("kind.bug"))}</span></span>` : ""}
+          ${repo.accepts_ideas ? `<span class="chip kind-idea">${icons.idea(12)}<span>${escapeHTML(text.t("kind.idea"))}</span></span>` : ""}
         </span>
       </div>
       <div class="head-actions">

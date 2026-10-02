@@ -1438,3 +1438,56 @@ func TestAnAnsweredReportClosesItsConversation(t *testing.T) {
 		}
 	}
 }
+
+// TestTheFrontPageCardCountsWhatTheBoardPageCounts: the number beside each kind
+// on a board's card is the number on the open tab of the page behind it. Two
+// paths computing one magnitude are how a screen ends up contradicting itself,
+// so what is asserted is the relation, not either figure.
+func TestTheFrontPageCardCountsWhatTheBoardPageCounts(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	publish := func(kind, title string) string {
+		id, _ := public.submit("codigosh", "lastboard", kind, title)
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+		return id
+	}
+	publish("idea", "dark mode")
+	publish("idea", "export")
+	answered := publish("idea", "tags")
+	publish("bug", "crash")
+	closedBug := publish("bug", "freeze")
+	public.submit("codigosh", "lastboard", "bug", "still waiting") // never published
+
+	for id, answer := range map[string]string{answered: string(item.StatusDone), closedBug: string(item.StatusClosed)} {
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": answer})
+		_ = resp.Body.Close()
+	}
+
+	card := map[string]any{}
+	content, _ := decode(t, public.do(http.MethodGet, "/api/landing", nil))["content"].(map[string]any)
+	for _, rows := range content {
+		list, _ := rows.([]any)
+		for _, row := range list {
+			if b, _ := row.(map[string]any); b["slug"] == "lastboard" && b["org"] == "codigosh" {
+				card = b
+			}
+		}
+	}
+	if card["open_ideas"] != float64(2) || card["open_bugs"] != float64(1) {
+		t.Fatalf("the card says %v ideas and %v bugs open, want 2 and 1 (an answered one and an unpublished one do not count)",
+			card["open_ideas"], card["open_bugs"])
+	}
+
+	for kind, key := range map[string]string{"idea": "open_ideas", "bug": "open_bugs"} {
+		page := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/items?kind="+kind, nil))
+		counts, _ := page["counts"].(map[string]any)
+		if counts["open"] != card[key] {
+			t.Errorf("the card says %v open %ss and the board's open tab says %v", card[key], kind, counts["open"])
+		}
+	}
+}

@@ -670,6 +670,11 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 
 .chip .icon { color: var(--text-dim); }
+
+/* A kind wears its colour wherever it appears as a pill, the same two as the
+   marks on the front page: the accent for a bug, blue for an idea. */
+.chip.kind-bug .icon { color: var(--accent); }
+.chip.kind-idea .icon { color: var(--hue-open); }
 .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
 
 /* ------------------------------------------------------------------ board */
@@ -1991,7 +1996,7 @@ body > main:has(> .lp) {
   font-size: 0.75rem;
 }
 
-.lp-accepts { display: flex; gap: 0.35rem; }
+.lp-accepts { display: flex; gap: 0.6rem; }
 
 .lp-org + .lp-org { margin-block-start: 1.1rem; }
 
