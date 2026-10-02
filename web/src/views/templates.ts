@@ -602,6 +602,26 @@ export function pictureStrip(pictures: readonly ReportPicture[], text: Text, vie
     .join("")}</ul>`;
 }
 
+/**
+ * The viewer a picture opens in: the picture as large as the screen allows,
+ * over the page, with the way back and the way to its neighbours. Built once
+ * and reused; what it shows is set when it opens.
+ */
+export function pictureViewer(text: Text): string {
+  return `<dialog class="viewer" aria-label="${escapeAttr(text.t("pictures.viewer"))}">
+    <figure class="viewer-figure">
+      <img class="viewer-picture" alt="" />
+      <figcaption class="viewer-count" aria-live="polite"></figcaption>
+    </figure>
+    <button type="button" class="viewer-close" data-viewer-close
+            aria-label="${escapeAttr(text.t("action.close"))}" title="${escapeAttr(text.t("action.close"))}">${icons.close(18)}</button>
+    <button type="button" class="viewer-step viewer-prev" data-viewer-step="-1"
+            aria-label="${escapeAttr(text.t("pictures.previous"))}" title="${escapeAttr(text.t("pictures.previous"))}">${icons.chevron(22)}</button>
+    <button type="button" class="viewer-step viewer-next" data-viewer-step="1"
+            aria-label="${escapeAttr(text.t("pictures.next"))}" title="${escapeAttr(text.t("pictures.next"))}">${icons.chevron(22)}</button>
+  </dialog>`;
+}
+
 /** The pictures on the report itself, or on one message (by its id). */
 function picturesOn(item: ItemDetail, commentID: number): ReportPicture[] {
   return (item.images ?? []).filter((p) => p.comment_id === commentID);

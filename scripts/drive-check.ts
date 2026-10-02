@@ -465,6 +465,29 @@ async function main() {
   `);
   check("an instant submission is refused, visibly", tooFast.shown === true, tooFast.text.slice(0, 50));
 
+  // A screenshot attached the way a person attaches one: chosen in the tray,
+  // which prepares it in the browser and shows it small before anything is
+  // sent. It goes up after the report, hung on it by the follow link.
+  const attached = await evaluate(`
+    const c = document.createElement("canvas");
+    c.width = 1800; c.height = 1000;
+    const g = c.getContext("2d");
+    g.fillStyle = "#f4f4f5"; g.fillRect(0, 0, 1800, 1000);
+    g.fillStyle = "#e8520e"; g.fillRect(100, 100, 700, 400);
+    const blob = await new Promise(r => c.toBlob(r, "image/png"));
+    const input = document.querySelector("form.report [data-tray-input]");
+    if (!input) return { tray: false };
+    const dt = new DataTransfer();
+    dt.items.add(new File([blob], "screen.png", { type: "image/png" }));
+    input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+    for (let i = 0; i < 40 && !document.querySelector("form.report .tray-thumb img"); i++)
+      await new Promise(r => setTimeout(r, 100));
+    return { tray: true, previews: document.querySelectorAll("form.report .tray-thumb img").length };
+  `);
+  check("a picture chosen in the form is shown small before it is sent",
+    attached.tray === true && attached.previews === 1, JSON.stringify(attached));
+
   // Now wait the way a person filling in a form does.
   await sleep(2500);
   await fillIn();
@@ -499,6 +522,36 @@ async function main() {
     "and the report itself opens from it",
     landed.path.startsWith("/i/") && landed.title === "dark mode for the dashboard",
     JSON.stringify(landed),
+  );
+
+  // 5c. The picture went with it: on the reporter's own page, served by the
+  //     server to the holder of the follow link, and opened large in the
+  //     viewer, which Escape closes and gives the focus back from.
+  const viewed = await evaluate(`
+    const link = document.querySelector(".detail .pictures a.picture-open");
+    if (!link) return { strip: 0 };
+    const thumb = link.querySelector("img")?.getAttribute("src") ?? "";
+    const asked = await fetch(thumb, { cache: "no-store" });
+    link.click();
+    const dialog = document.querySelector("dialog.viewer");
+    const picture = dialog?.querySelector(".viewer-picture");
+    for (let i = 0; i < 40 && !(picture?.complete && picture.naturalWidth > 0); i++)
+      await new Promise(r => setTimeout(r, 100));
+    const opened = { open: dialog?.open === true, width: picture?.naturalWidth ?? 0 };
+    dialog?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    dialog?.close();
+    await new Promise(r => setTimeout(r, 200));
+    return {
+      strip: document.querySelectorAll(".detail .pictures img").length,
+      served: asked.status, kind: asked.headers.get("content-type"),
+      ...opened, closed: dialog?.open === false, focusBack: document.activeElement === link,
+    };
+  `);
+  check(
+    "the picture is on the reporter's page, and opens large and closes back to it",
+    viewed.strip === 1 && viewed.served === 200 && viewed.kind === "image/jpeg" &&
+      viewed.open === true && viewed.width === 1600 && viewed.closed === true && viewed.focusBack === true,
+    JSON.stringify(viewed),
   );
 
   // 6. Nothing waiting is on the public board.
