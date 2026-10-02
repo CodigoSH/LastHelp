@@ -8,6 +8,7 @@
  */
 import type {
   ItemDetail,
+  ReportPicture,
   ItemSummary,
   OrganizationSummary,
   ReportField,
@@ -424,6 +425,8 @@ export function reportForm(
   repo: RepositorySummary,
   kind: string,
   text: Text,
+  /** How many pictures the report may carry; 0 draws no tray. */
+  pictures = 0,
 ): string {
   // A card each, not two words in a row: the choice decides which questions
   // come next, and it is the first thing anybody touches on this page.
@@ -514,6 +517,8 @@ export function reportForm(
 
         ${bugFields}
 
+        ${pictures > 0 ? pictureTray("report-pictures", pictures, text) : ""}
+
         ${
           // Only when there is a relay to notify with. Asking for an address the
           // server cannot use is collecting personal data for nothing.
@@ -542,6 +547,66 @@ export function reportForm(
   </div>`;
 }
 
+/**
+ * The place to choose pictures, small enough not to change the form around it:
+ * one row with a tile to add and the previews beside it. It holds nothing until
+ * something is chosen, and the tile goes once the ceiling is reached.
+ */
+export function pictureTray(id: string, max: number, text: Text): string {
+  return `<div class="tray" data-tray data-max="${max}">
+    <ul class="tray-thumbs" data-tray-thumbs hidden></ul>
+    <label class="tray-add" for="${escapeAttr(id)}" data-tray-add>
+      ${icons.image(18)}
+      <span class="tray-add-label">${escapeHTML(text.t("pictures.add"))}</span>
+      <span class="tray-add-hint">${escapeHTML(text.t("pictures.hint", { count: text.number(max) }))}</span>
+    </label>
+    <input id="${escapeAttr(id)}" class="tray-input" type="file" accept="image/*" multiple data-tray-input />
+    <p class="hint">${escapeHTML(text.t("pictures.privacy"))}</p>
+  </div>`;
+}
+
+/** How the pictures on a page are drawn for this reader. */
+export interface PictureView {
+  /** Who may take a picture out: "team" any, "reporter" their own, or nobody. */
+  remove?: "team" | "reporter";
+  /** The reporter's follow link, added to the address of a picture that is
+   *  not public yet so their own page can show it. */
+  token?: string;
+}
+
+/**
+ * A row of small pictures. Each opens at full size; the bin, when this reader
+ * may use it, takes one out. The width and height are the picture's own, so
+ * the row keeps its place before the pictures arrive.
+ */
+export function pictureStrip(pictures: readonly ReportPicture[], text: Text, view: PictureView = {}, removable = false): string {
+  if (pictures.length === 0) return "";
+  const withToken = (address: string) =>
+    view.token ? `${address}${address.includes("?") ? "&" : "?"}k=${encodeURIComponent(view.token)}` : address;
+  return `<ul class="pictures">${pictures
+    .map(
+      (p, i) => `<li class="picture">
+        <a class="picture-open" href="${escapeAttr(withToken(p.url))}" target="_blank" rel="noopener"
+           data-picture="${escapeAttr(p.id)}" title="${escapeAttr(text.t("pictures.open"))}">
+          <img src="${escapeAttr(withToken(p.thumb))}" width="${p.width}" height="${p.height}" loading="lazy" decoding="async"
+               alt="${escapeAttr(text.t("pictures.alt", { n: text.number(i + 1), count: text.number(pictures.length) }))}" />
+        </a>
+        ${
+          removable
+            ? `<button type="button" class="picture-remove" data-remove-picture="${escapeAttr(p.id)}"
+                 aria-label="${escapeAttr(text.t("pictures.remove"))}" title="${escapeAttr(text.t("pictures.remove"))}">${icons.close(12)}</button>`
+            : ""
+        }
+      </li>`,
+    )
+    .join("")}</ul>`;
+}
+
+/** The pictures on the report itself, or on one message (by its id). */
+function picturesOn(item: ItemDetail, commentID: number): ReportPicture[] {
+  return (item.images ?? []).filter((p) => p.comment_id === commentID);
+}
+
 export function similarItems(items: Array<{ public_id: string; title: string }>, text: Text): string {
   if (items.length === 0) return "";
   return `<p class="similar-head">${escapeHTML(text.t("form.similar"))}</p>
@@ -560,7 +625,15 @@ export function similarItems(items: Array<{ public_id: string; title: string }>,
  * paragraph of a page of prose.
  */
 export function submitted(
-  sent: { link: string; path: string; org: string; repo: string; board: string },
+  sent: {
+    link: string;
+    path: string;
+    org: string;
+    repo: string;
+    board: string;
+    /** Why some of the pictures did not go in, when some did not. */
+    problem?: string;
+  },
   text: Text,
 ): string {
   return `<div class="page narrow">
@@ -570,6 +643,7 @@ export function submitted(
         <h1>${escapeHTML(text.t("sent.waiting"))}</h1>
       </div>
     </header>
+    ${sent.problem ? `<p class="notice">${icons.info()}<span>${escapeHTML(sent.problem)}</span></p>` : ""}
     <section class="bento-card">
       <div class="card-head">${icons.copy()}<h3>${escapeHTML(text.t("sent.copy"))}</h3></div>
       <span class="card-sub">${escapeHTML(text.t("sent.keepLink"))}</span>
@@ -655,7 +729,7 @@ function answers(fields: ReportField[], text: Text): string {
  * same report differently. The team's carries a pencil in its meta line that
  * turns the words into a form where they stand.
  */
-function reportArticle(item: ItemDetail, text: Text, pencil = ""): string {
+function reportArticle(item: ItemDetail, text: Text, pencil = "", view: PictureView = {}): string {
   // An answered idea keeps its count and loses the button: the number is then
   // the record of how many people wanted it when it was answered.
   const vote =
@@ -708,12 +782,23 @@ function reportArticle(item: ItemDetail, text: Text, pencil = ""): string {
           <div class="body">${body}</div>
         </div>
         ${answers(item.fields ?? [], text)}
+        ${
+          // The report's own pictures are the reporter's: they or the team take
+          // one out.
+          pictureStrip(picturesOn(item, 0), text, view, view.remove !== undefined)
+        }
       </div>
       ${vote}
     </article>`;
 }
 
-export function itemView(item: ItemDetail, text: Text): string {
+export function itemView(
+  item: ItemDetail,
+  text: Text,
+  view: PictureView = {},
+  /** How many pictures a follow-up may carry; 0 draws no tray. */
+  pictures = 0,
+): string {
   const board = item.repository;
   const org = board?.organization;
   const crumb = board
@@ -766,13 +851,19 @@ export function itemView(item: ItemDetail, text: Text): string {
                 <span class="when">${escapeHTML(text.date(c.created_at))}</span>
               </p>
               <p class="what">${escapeHTML(c.body)}</p>
+              ${
+                c.id !== undefined
+                  ? pictureStrip(picturesOn(item, c.id), text, view,
+                      view.remove === "team" || (view.remove === "reporter" && c.author === "reporter"))
+                  : ""
+              }
             </li>`;
           })
           .join("")}</ul>`;
 
   return `<div class="page">
     ${crumb}${merged}${waiting}
-    ${reportArticle(item, text)}
+    ${reportArticle(item, text, "", view)}
 
     ${yours}
 
@@ -788,6 +879,7 @@ export function itemView(item: ItemDetail, text: Text): string {
         <textarea id="comment-body" name="body" rows="3"
                   placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
         <p class="hint">${escapeHTML(text.t("item.commentHint"))}</p>
+        ${pictures > 0 ? pictureTray("comment-pictures", pictures, text) : ""}
         <div class="comment-actions">
           <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
           <p class="comment-sent" role="status" hidden>${escapeHTML(text.t("item.commentWaiting"))}</p>
@@ -1091,7 +1183,7 @@ export function repositoryFields(text: Text, forge: string, hasForge: boolean): 
 
 /** What a board takes. Both on by default: a board that accepts nothing is
  *  refused by the server, and defaulting to off makes that the common mistake. */
-export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean }): string {
+export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean; images?: boolean }): string {
   // Two checkboxes that say what they turn on, not two pills reading "Bug" and
   // "Idea". This is a settings form: the control people know here is a
   // checkbox with a sentence beside it, and the words are what somebody
@@ -1107,6 +1199,7 @@ export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: bool
     <div class="checks">
       ${box("accepts_bugs", text.t("repo.acceptsBugs"), current?.bugs ?? true)}
       ${box("accepts_ideas", text.t("repo.acceptsIdeas"), current?.ideas ?? true)}
+      ${box("accepts_images", text.t("repo.acceptsImages"), current?.images ?? true)}
     </div>
     <p class="hint">${escapeHTML(text.t("repo.acceptsHelp"))}</p>
   </div>`;
@@ -2781,6 +2874,8 @@ export interface RepositoryPanel {
   forge_repo: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  /** Whether reporters and the team may attach pictures. */
+  accepts_images?: boolean;
   /** A data URL, or absent for the initials of the name. */
   icon?: string;
   /** Which channel tells the team, never what it stores. Empty for none. */
@@ -2865,7 +2960,7 @@ export function repositoryScreen(
       ${iconField(text, repo.name, repo.icon ?? "")}
       ${field({ id: "rs-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: repo.name }, text)}
       ${hasForge ? field({ id: "rs-forge", name: "forge_repo", label: text.t("panel.forgeRepo"), hint: text.t("panel.forgeRepoHelp"), value: repo.forge_repo }, text) : ""}
-      ${acceptsFields(text, { bugs: repo.accepts_bugs, ideas: repo.accepts_ideas })}
+      ${acceptsFields(text, { bugs: repo.accepts_bugs, ideas: repo.accepts_ideas, images: repo.accepts_images ?? true })}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
@@ -3006,6 +3101,8 @@ export function itemTeamView(
   /** The other reports on the same board, the ones this one can be merged into. */
   others: { public_id: string; title: string }[],
   text: Text,
+  /** How many pictures a reply may carry; 0 draws no tray. */
+  pictures = 0,
 ): string {
   const board = item.repository;
   const org = board?.organization;
@@ -3121,6 +3218,7 @@ export function itemTeamView(
                 }
               </p>
               <p class="what">${escapeHTML(c.body)}</p>
+              ${c.id !== undefined ? pictureStrip(picturesOn(item, c.id), text, { remove: "team" }, true) : ""}
             </li>`;
           })
           .join("")}</ul>`;
@@ -3136,6 +3234,7 @@ export function itemTeamView(
         <textarea id="team-reply-body" name="body" rows="3" required
                   placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
         <p class="hint">${escapeHTML(text.t("item.replyHelp"))}</p>
+        ${pictures > 0 ? pictureTray("team-reply-pictures", pictures, text) : ""}
       </div>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button></div>
@@ -3175,7 +3274,7 @@ export function itemTeamView(
     <h1 class="visually-hidden">${escapeHTML(item.title)}</h1>
     <div class="settings item-team">
       ${decide}
-      ${reportArticle(item, text, pencil)}
+      ${reportArticle(item, text, pencil, { remove: "team" })}
       ${status}
       ${issue}
       ${conversation}

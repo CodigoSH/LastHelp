@@ -23,6 +23,7 @@ import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/t
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
+import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
 import { attachChartHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
 import { watchSelects } from "./services/select";
@@ -1402,11 +1403,24 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
     return;
   }
 
-  show(views.reportForm(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, kind, text));
+  show(
+    views.reportForm(
+      repo.organization ?? { slug: orgSlug, name: orgSlug },
+      repo,
+      kind,
+      text,
+      repo.accepts_images ? PICTURES_ON_A_REPORT : 0,
+    ),
+  );
 
   const form = root?.querySelector<HTMLFormElement>("form.report");
   const similar = root?.querySelector<HTMLDivElement>(".similar");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
+  const tray = wireTray(form ?? null, { remove: i18n.t("pictures.remove") }, (key) => {
+    if (!errorLine) return;
+    errorLine.textContent = i18n.t(key);
+    errorLine.hidden = false;
+  });
 
   root?.querySelectorAll<HTMLButtonElement>(".choice-card").forEach((button) =>
     button.addEventListener("click", () => {
@@ -1465,6 +1479,13 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
         },
         token: ticket.token,
       });
+      // The pictures go after the report, hung on it by its follow link. A
+      // refused one costs only itself, and the page says which reason.
+      const chosen = tray?.pictures() ?? [];
+      const refused =
+        sent.public_id && chosen.length > 0
+          ? await sendPictures(sent.public_id, chosen, { token: sent.follow_token })
+          : "";
       // The address to keep, and the path to walk. The first is absolute
       // because it is going into somebody's notes; the second is what this
       // page's own button follows, and the router only takes a path.
@@ -1478,6 +1499,7 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
             org: orgSlug,
             repo: repoSlug,
             board: repo.name,
+            problem: refused ? i18n.t("pictures.someFailed", { reason: i18n.t(refused) }) : "",
           },
           text,
         ),
@@ -1522,16 +1544,36 @@ async function showItem(publicID: string): Promise<void> {
   if (allowed) {
     const board = item.repository ? `${org}/${item.repository.slug}` : "";
     const others = (await mergeCandidates(board)).filter((r) => r.public_id !== publicID);
-    await showInShell(views.itemTeamView(item, allowed, others, text), org ? `/panel/${org}` : "/panel");
+    await showInShell(
+      views.itemTeamView(item, allowed, others, text, repliesTakePictures(item) ? PICTURES_ON_A_MESSAGE : 0),
+      org ? `/panel/${org}` : "/panel",
+    );
     wireVote(publicID);
     wireTeamItem(publicID, item);
     return;
   }
 
+  // The reporter sees their own pictures before they are public, and may take
+  // one back; their follow-ups may carry pictures too.
+  const view: views.PictureView = item.mine ? { remove: "reporter", token: token ?? undefined } : {};
+  const followUps = item.mine && repliesTakePictures(item) ? PICTURES_ON_A_MESSAGE : 0;
   const staff = me !== null && (me.admin === true || (me.memberships ?? []).length > 0);
-  if (staff) await showInShell(views.itemView(item, text), org ? `/panel/${org}` : "/panel");
-  else show(views.itemView(item, text));
+  if (staff) await showInShell(views.itemView(item, text, view, followUps), org ? `/panel/${org}` : "/panel");
+  else show(views.itemView(item, text, view, followUps));
   wireVote(publicID);
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-remove-picture]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      if (!(await askConfirm(i18n.t("pictures.remove"), i18n.t("pictures.confirmRemove")))) return;
+      try {
+        await removePicture(publicID, button.dataset.removePicture ?? "", token ?? undefined);
+        toast(i18n.t("pictures.removed"));
+        await showItem(publicID);
+      } catch (err) {
+        report(err);
+      }
+    }),
+  );
 
   // The reporter's way back to their own report. The address is this page's,
   // token and all, and it is filled in here rather than in the template
@@ -1547,25 +1589,45 @@ async function showItem(publicID: string): Promise<void> {
   }
 
   const commentForm = root?.querySelector<HTMLFormElement>("form.comment-form");
+  const commentSent = commentForm?.querySelector<HTMLParagraphElement>(".comment-sent");
+  const commentTray = wireTray(commentForm ?? null, { remove: i18n.t("pictures.remove") }, (key) => {
+    if (!commentSent) return;
+    commentSent.textContent = i18n.t(key);
+    commentSent.hidden = false;
+  });
   commentForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(commentForm);
-    const sent = commentForm.querySelector<HTMLParagraphElement>(".comment-sent");
     // Said as it was, not as "sent": a page opened before the team answered
     // would otherwise promise a review that is never going to happen.
-    const failure = await api
-      .post(`/api/items/${encodeURIComponent(publicID)}/comments`, {
+    let said: string;
+    try {
+      const posted = await api.post<{ id: number }>(`/api/items/${encodeURIComponent(publicID)}/comments`, {
         body: String(data.get("body") ?? ""),
         token: token ?? "",
-      })
-      .then(() => "")
-      .catch((err: unknown) => i18n.t(err instanceof ApiError ? err.key : "error.internal"));
-    if (failure === "") commentForm.reset();
-    if (sent) {
-      sent.textContent = failure === "" ? i18n.t("item.commentWaiting") : failure;
-      sent.hidden = false;
+      });
+      said = i18n.t("item.commentWaiting");
+      const chosen = commentTray?.pictures() ?? [];
+      if (chosen.length > 0) {
+        const refused = await sendPictures(publicID, chosen, { comment: posted.id, token: token ?? undefined });
+        if (refused) said += " " + i18n.t("pictures.someFailed", { reason: i18n.t(refused) });
+      }
+      commentForm.reset();
+      commentTray?.clear();
+    } catch (err) {
+      said = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+    }
+    if (commentSent) {
+      commentSent.textContent = said;
+      commentSent.hidden = false;
     }
   });
+}
+
+/** Whether a message on this report may carry pictures: the board takes them and
+ *  the report is still open. */
+function repliesTakePictures(item: ItemDetail): boolean {
+  return item.repository?.accepts_images === true && item.commentable !== false;
 }
 
 function wireVote(publicID: string, scope: ParentNode | null = root): void {
@@ -1736,11 +1798,26 @@ function wireTeamItem(publicID: string, item: ItemDetail, host: TeamItemHost = {
   });
 
   const reply = scope?.querySelector<HTMLFormElement>("form.team-reply");
+  const replyTray = wireTray(reply ?? null, { remove: i18n.t("pictures.remove") }, (key) => toastError(i18n.t(key)));
   reply?.addEventListener("submit", (event) => {
     event.preventDefault();
     const body = String(new FormData(reply).get("body") ?? "");
-    void act(() => api.post(`${base}/reply`, { body }), "toast.replied");
+    void act(async () => {
+      const posted = await api.post<{ id: number }>(`${base}/reply`, { body });
+      // The reply's pictures hang on it once it exists. One refused is said;
+      // the reply itself is already in.
+      const chosen = replyTray?.pictures() ?? [];
+      const refused = chosen.length > 0 ? await sendPictures(publicID, chosen, { comment: posted.id }) : "";
+      if (refused) toastError(i18n.t("pictures.someFailed", { reason: i18n.t(refused) }));
+    }, "toast.replied");
   });
+
+  scope?.querySelectorAll<HTMLButtonElement>("[data-remove-picture]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      if (!(await askConfirm(i18n.t("pictures.remove"), i18n.t("pictures.confirmRemove")))) return;
+      void act(() => removePicture(publicID, button.dataset.removePicture ?? ""), "pictures.removed");
+    }),
+  );
 
   // Typing narrows the list of reports to the titles that contain it. Hidden
   // options are what the house dropdown leaves out, so the picker shows the
@@ -2083,6 +2160,7 @@ async function showRepositoryWizard(orgSlug: string, step: 1 | 2): Promise<void>
           ...pendingRepository,
           accepts_bugs: data.get("accepts_bugs") !== null,
           accepts_ideas: data.get("accepts_ideas") !== null,
+          accepts_images: data.get("accepts_images") !== null,
         });
         go(`/panel/${orgSlug}`);
       } catch (err) {
@@ -2370,7 +2448,13 @@ async function wireReview(
     // Another row may have been chosen while this one loaded, or another read
     // of this one drew it first.
     if (view.chosen !== id || !team || (id === shown && !force)) return;
-    pane.innerHTML = `<div class="rev-team">${views.itemTeamView(team.item, team.allowed, team.others, text)}</div>`;
+    pane.innerHTML = `<div class="rev-team">${views.itemTeamView(
+      team.item,
+      team.allowed,
+      team.others,
+      text,
+      repliesTakePictures(team.item) ? PICTURES_ON_A_MESSAGE : 0,
+    )}</div>`;
     shown = id;
     wireVote(id, pane);
     const changed = async () => {
@@ -2910,6 +2994,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
       forge_repo: String(formData.get("forge_repo") ?? ""),
       accepts_bugs: formData.get("accepts_bugs") !== null,
       accepts_ideas: formData.get("accepts_ideas") !== null,
+      accepts_images: formData.get("accepts_images") !== null,
       icon: String(formData.get("icon") ?? ""),
     });
     await render();
@@ -3023,6 +3108,7 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
       forge_repo: String(data.get("forge_repo") ?? repo.forge_repo),
       accepts_bugs: data.get("accepts_bugs") !== null,
       accepts_ideas: data.get("accepts_ideas") !== null,
+      accepts_images: data.get("accepts_images") !== null,
       icon: String(data.get("icon") ?? ""),
     });
     toast(i18n.t("panel.saved"));

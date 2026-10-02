@@ -11,3 +11,13 @@
 error.images_full
 error.images_off
 error.too_many_images
+pictures.add
+pictures.alt
+pictures.confirmRemove
+pictures.hint
+pictures.open
+pictures.privacy
+pictures.remove
+pictures.removed
+pictures.someFailed
+repo.acceptsImages

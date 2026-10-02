@@ -154,6 +154,8 @@ export interface RepositorySummary {
   name: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  /** Whether reporters and the team may attach pictures. */
+  accepts_images?: boolean;
   /** A data URL, or absent for the initials of the name. */
   icon?: string;
   /** Whether a mail relay exists. Without one the form does not ask for an
@@ -193,7 +195,7 @@ export interface ItemDetail extends ItemSummary {
   mine: boolean;
   /** Where it was reported, so a link somebody was sent says what it is about
    *  and leads back to the board rather than nowhere. */
-  repository?: { slug: string; name: string; organization?: { slug: string; name: string } };
+  repository?: { slug: string; name: string; accepts_images?: boolean; organization?: { slug: string; name: string } };
   /** Whether it is on the board yet. Only the reporter is ever here before it
    *  is, and only they are told so. */
   moderation?: string;
@@ -202,8 +204,20 @@ export interface ItemDetail extends ItemSummary {
   merged_into?: string;
   issue?: { number: number; url: string };
   comments: Array<{ id?: number; author: string; name: string; body: string; created_at: number }>;
+  /** The pictures this reader may see, the report's and each message's. */
+  images?: ReportPicture[];
   /** What the reader may do to it, when they work on it; absent for anybody else. */
   team?: { current: string; statuses: string[]; can_delete?: boolean };
+}
+
+/** One picture on a report: on the report itself when comment_id is 0. */
+export interface ReportPicture {
+  id: string;
+  comment_id: number;
+  width: number;
+  height: number;
+  url: string;
+  thumb: string;
 }
 
 export interface Submitted {

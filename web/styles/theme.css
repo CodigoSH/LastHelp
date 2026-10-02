@@ -4094,6 +4094,120 @@ body > nav .brand {
 .comment-form { margin-block-start: 1rem; gap: 0.5rem; }
 .comment-form .hint { margin: 0; }
 
+/* ------------------------------------------------------------------ pictures */
+
+/* The tray a report or a message is given its pictures in: one row, the
+   previews beside a dashed tile, so a form that takes none looks as it did. */
+.tray { display: grid; gap: 0.5rem; position: relative; }
+.tray .hint { margin: 0; }
+
+.tray-thumbs,
+.pictures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tray-thumb,
+.picture { position: relative; }
+
+.tray-thumb img {
+  display: block;
+  inline-size: 4rem;
+  block-size: 4rem;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-dim);
+}
+
+.tray-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.tray-add:hover,
+.tray.dropping .tray-add {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-wash);
+}
+
+.tray:focus-within .tray-add { outline: 2px solid var(--ring); outline-offset: 2px; }
+.tray-add-label { font-weight: 600; color: var(--text-main); font-size: 0.875rem; }
+.tray-add-hint { font-size: 0.8rem; }
+
+/* Reached by its label, which is what is drawn; the control itself is kept
+   in the page so the keyboard and assistive technology still find it. */
+.tray-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The pictures on a report or a message: small squares, each opening the
+   picture at full size. Cut to the square so a row of them reads as a row,
+   whatever shape each one is. */
+.pictures { margin-block-start: 0.75rem; }
+
+.picture-open {
+  display: block;
+  inline-size: 5rem;
+  block-size: 5rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-dim);
+  transition: border-color 0.15s var(--ease);
+}
+
+.picture-open:hover,
+.picture-open:focus-visible { border-color: var(--accent); }
+
+.picture-open img {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+
+/* Taking one out: a small round button on the corner where a reading
+   direction ends. */
+.tray-remove,
+.picture-remove {
+  position: absolute;
+  inset-block-start: -0.4rem;
+  inset-inline-end: -0.4rem;
+  display: grid;
+  place-items: center;
+  inline-size: 1.35rem;
+  block-size: 1.35rem;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tray-remove:hover,
+.picture-remove:hover { border-color: rgba(var(--danger-rgb), 0.6); color: var(--danger-color); }
+
 .comment-actions {
   display: flex;
   align-items: center;
