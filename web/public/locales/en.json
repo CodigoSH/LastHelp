@@ -508,6 +508,8 @@
   "repo.addCollaborator": "Add collaborator",
   "repo.channelNow": "Current: {channel}. The stored URL and token are not shown; saving replaces them.",
   "repo.confirmRevoke": "Remove {name} from this repository? The account is kept.",
+  "repo.images": "Images",
+  "repo.imagesHelp": "They wait for the team's review with their report, and are erased 30 days after it closes.",
   "repo.revoke": "Remove from the repository",
   "repo.danger": "Danger zone",
   "repo.delete": "Delete repository",

@@ -1201,8 +1201,10 @@ export function repositoryFields(text: Text, forge: string, hasForge: boolean): 
   );
 }
 
-/** What a board takes. Both on by default: a board that accepts nothing is
- *  refused by the server, and defaulting to off makes that the common mistake. */
+/** What a board takes. Both kinds on by default: a board that accepts nothing is
+ *  refused by the server, and defaulting to off makes that the common mistake.
+ *  Pictures are a field of their own: they are not a kind of report, and the
+ *  "at least one" under the kinds is not about them. */
 export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean; images?: boolean }): string {
   // Two checkboxes that say what they turn on, not two pills reading "Bug" and
   // "Idea". This is a settings form: the control people know here is a
@@ -1219,9 +1221,15 @@ export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: bool
     <div class="checks">
       ${box("accepts_bugs", text.t("repo.acceptsBugs"), current?.bugs ?? true)}
       ${box("accepts_ideas", text.t("repo.acceptsIdeas"), current?.ideas ?? true)}
-      ${box("accepts_images", text.t("repo.acceptsImages"), current?.images ?? true)}
     </div>
     <p class="hint">${escapeHTML(text.t("repo.acceptsHelp"))}</p>
+  </div>
+  <div class="field">
+    <label>${escapeHTML(text.t("repo.images"))}</label>
+    <div class="checks">
+      ${box("accepts_images", text.t("repo.acceptsImages"), current?.images ?? true)}
+    </div>
+    <p class="hint">${escapeHTML(text.t("repo.imagesHelp"))}</p>
   </div>`;
 }
 

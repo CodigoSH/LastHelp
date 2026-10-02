@@ -8,19 +8,3 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
-error.images_full
-error.images_off
-error.too_many_images
-pictures.add
-pictures.alt
-pictures.confirmRemove
-pictures.hint
-pictures.next
-pictures.open
-pictures.previous
-pictures.privacy
-pictures.remove
-pictures.removed
-pictures.someFailed
-pictures.viewer
-repo.acceptsImages
