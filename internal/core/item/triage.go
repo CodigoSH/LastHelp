@@ -42,6 +42,11 @@ func (s Store) setModeration(id int64, state Moderation, now time.Time) error {
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
 		return ErrNotFound
 	}
+	// A report turned down is on no page, so neither are its pictures, and
+	// nothing waits for an hourly sweep to make that true.
+	if state == Rejected || state == Spam {
+		return s.forgetImagesOf(id)
+	}
 	return nil
 }
 
@@ -89,6 +94,15 @@ func (s Store) Merge(duplicateID, survivorID int64, now time.Time) error {
 		(SELECT count(*) FROM vote WHERE item_id = ?) WHERE id = ?`,
 		survivorID, survivorID); err != nil {
 		return fmt.Errorf("recounting: %w", err)
+	}
+	// The pictures on the duplicate itself go with its votes, after the ones
+	// the survivor already has: the duplicate is about to be turned down, and a
+	// turned-down report keeps nothing. Pictures on its messages stay with
+	// those messages, which stay with the duplicate.
+	if _, err := s.DB.Exec(`UPDATE item_image SET item_id = ?, position = position +
+			(SELECT count(*) FROM item_image WHERE item_id = ? AND comment_id IS NULL)
+		WHERE item_id = ? AND comment_id IS NULL`, survivorID, survivorID, duplicateID); err != nil {
+		return fmt.Errorf("moving the pictures: %w", err)
 	}
 	res, err := s.DB.Exec(`UPDATE item SET merged_into = ?, moderation_state = ?, closed_at = ?
 		WHERE id = ?`, survivorID, string(Rejected), now.Unix(), duplicateID)

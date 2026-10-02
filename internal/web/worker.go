@@ -40,7 +40,7 @@ func (s *Server) Work(ctx context.Context) {
 		}
 
 		// Hourly, and only the parts that grow: spent form tokens, expired
-		// sessions and old delivery ids. Each is a table indexed by something a
+		// sessions, old delivery ids and the pictures of closed reports. Each is a table indexed by something a
 		// caller supplies, which is the definition of a table that needs a
 		// ceiling.
 		if now.Sub(sweptAt) < time.Hour {
@@ -56,6 +56,11 @@ func (s *Server) Work(ctx context.Context) {
 		}
 		if err := s.bridge().PurgeDeliveries(now, 30*24*time.Hour); err != nil {
 			slog.Error("sweeping deliveries", "error", err)
+		}
+		if n, err := s.items().PurgeImages(now); err != nil {
+			slog.Error("sweeping pictures", "error", err)
+		} else if n > 0 {
+			slog.Info("pictures swept", "count", n)
 		}
 	}
 }
