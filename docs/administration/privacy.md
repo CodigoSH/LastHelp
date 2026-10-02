@@ -13,6 +13,7 @@ advice.
 | The reporter's **email** — *only if you configured a mail relay* | The database | Until the report closes, and the reporter has been told so. Then it is erased. |
 | A hash of the secret link the reporter keeps | The database | As long as the report exists. It is a hash, so a copy of the database cannot be used to reply as the reporter. |
 | A vote | The database, against a random identity, never an address | As long as the report exists. |
+| A **picture** the reporter attached | The database, drawn again from its pixels, so the place and the camera a photo carries are not kept | Seen only by your team and the reporter until approved. Erased thirty days after the report closes, or at once if it is rejected, marked as spam or deleted. |
 
 Without a mail relay (`LASTHELP_SMTP_HOST`) the "tell me when this changes"
 option is not even offered, so **no email address is stored at all**.
@@ -48,6 +49,7 @@ not LastHelp's. Look at how long it lives, and turn it off or shorten it if you
 do not use it.
 
 If your proxy does log, or you run a mail relay, say so to your visitors in one
-sentence on your own page. For example: *"Reports are public once approved. If you
+sentence on your own page. For example: *"Reports are public once approved, with
+their pictures, which are erased thirty days after the report closes. If you
 leave an email it is used only to tell you when the report closes, and erased
 then. Our server may record your address for a few days for security."*
