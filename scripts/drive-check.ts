@@ -554,6 +554,71 @@ async function main() {
     JSON.stringify(viewed),
   );
 
+  // 5d. What a stranger typed stays inside the box it is drawn in. A URL, a path
+  //     or a log pasted whole has no spaces to break at, and it ran out of the
+  //     card, widened the page to tens of thousands of pixels and was cut off at
+  //     the edge — on a phone most of all. Measured on the page rather than read
+  //     from the stylesheet, and at both sizes: it is the narrow one that shows it.
+  const largo = await evaluate(`
+    const base = "/api/orgs/codigosh/repos/lastboard";
+    const csrf = document.cookie.split("; ").find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1] ?? "";
+    const form = await fetch(base + "/form", { credentials: "same-origin" }).then(r => r.json());
+    await new Promise(r => setTimeout(r, 2600));
+    const sent = await fetch(base + "/items", {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+      body: JSON.stringify({
+        kind: "bug", token: form.token, website: "", email: "",
+        title: "Unbroken" + "W".repeat(150),
+        body: "Words that wrap.\\n\\nhttps://example.com/" + "segment/".repeat(80) + "?query=" + "x".repeat(200),
+        fields: { version: "V".repeat(120), steps: "S".repeat(1500) },
+      }),
+    }).then(r => r.json());
+    if (!sent.public_id) return { id: "", error: sent.error ?? "" };
+    const headers = { "Content-Type": "application/json", "X-CSRF-Token": csrf };
+    await fetch("/api/items/" + sent.public_id + "/moderation", { method: "POST", headers, body: JSON.stringify({ state: "published" }) });
+    await fetch("/api/items/" + sent.public_id + "/reply", { method: "POST", headers, body: JSON.stringify({ body: "R".repeat(900) + " https://example.com/" + "p/".repeat(150) }) });
+    return { id: sent.public_id };
+  `);
+  const medirLargo = () => evaluate(`
+    const card = document.querySelector(".detail")?.getBoundingClientRect();
+    const rights = (sel) => [...document.querySelectorAll(sel)].map(e => Math.round(e.getBoundingClientRect().right));
+    const fuera = (list) => card ? list.filter(r => r > card.right + 1).length : list.length;
+    const title = rights(".detail h1"), body = rights(".detail .body p"),
+          answers = rights(".detail .answers dd"), reply = rights(".comments .comment .what");
+    return {
+      card: card ? Math.round(card.right) : 0, screen: innerWidth,
+      title: [title.length, fuera(title)], body: [body.length, fuera(body)],
+      answers: [answers.length, fuera(answers)], reply: [reply.length, fuera(reply)],
+    };
+  `);
+  const dentro = (m: any) =>
+    m.card > 0 && m.card <= m.screen &&
+    m.title[0] === 1 && m.body[0] >= 1 && m.answers[0] === 2 && m.reply[0] === 1 &&
+    m.title[1] === 0 && m.body[1] === 0 && m.answers[1] === 0 && m.reply[1] === 0;
+  if (largo.id) {
+    await goTo("/i/" + largo.id, ".detail .answers");
+    await sleep(700);
+    const grande = await medirLargo();
+    check("long words with no spaces stay inside the card on a desktop", dentro(grande), JSON.stringify(grande));
+
+    await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
+    await goTo("/i/" + largo.id, ".detail .answers");
+    await sleep(700);
+    const telefono = await medirLargo();
+    await page.send("Emulation.clearDeviceMetricsOverride", {});
+    check("and on a phone", dentro(telefono), JSON.stringify(telefono));
+    // Taken down again: every later check counts what is on the board and in the
+    // queue, and a report left behind is a number that changes under them.
+    const borrado = await evaluate(`
+      const csrf = document.cookie.split("; ").find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1] ?? "";
+      return (await fetch("/api/items/${largo.id}", { method: "DELETE", headers: { "X-CSRF-Token": csrf }, credentials: "same-origin" })).status;
+    `);
+    check("the report made to measure is taken down again", borrado === 204 || borrado === 200, String(borrado));
+  } else {
+    check("a report with long unbroken text could be made to measure", false, JSON.stringify(largo));
+  }
+
   // 6. Nothing waiting is on the public board.
   await goTo("/codigosh/lastboard", ".items, .empty");
   const beforeApproval = await evaluate(`return document.querySelectorAll(".items li").length`);
