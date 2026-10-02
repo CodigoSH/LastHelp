@@ -42,3 +42,21 @@ describe("the one that is sent", () => {
     expect(lightest([])).toBeUndefined();
   });
 });
+
+describe("the ceilings the page keeps", () => {
+  // Written twice — here, so the page stops before sending, and in the server,
+  // which decides. Two copies of a number drift apart; this reads the other.
+  test("match the server's", async () => {
+    const { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, REPORT_PICTURE } = await import("./reportPictures");
+    const go = await Bun.file(new URL("../../../internal/core/item/images.go", import.meta.url)).text();
+    const constant = (name: string) => {
+      const found = go.match(new RegExp(`\\b${name}\\s*=\\s*([0-9<]+(?:\\s*<<\\s*[0-9]+)?)`));
+      if (!found) throw new Error(`${name} is not in images.go any more; this test is reading the wrong file`);
+      const raw = found[1] ?? "";
+      return raw.includes("<<") ? raw.split("<<").map(Number).reduce((a, b) => a * 2 ** b) : Number(raw);
+    };
+    expect(PICTURES_ON_A_REPORT).toBe(constant("MaxImagesPerReport"));
+    expect(PICTURES_ON_A_MESSAGE).toBe(constant("MaxImagesPerComment"));
+    expect(REPORT_PICTURE.cap).toBe(constant("MaxImageUpload"));
+  });
+});

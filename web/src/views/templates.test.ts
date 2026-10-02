@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, itemTeamView, itemView, type Text, updateZone } from "./templates";
+import { accountRole, itemTeamView, itemView, reportForm, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -174,5 +174,62 @@ describe("the conversation", () => {
       expect(html).not.toContain("<form class=\"comment-form");
       expect(html).not.toContain("<form class=\"team-reply");
     }
+  });
+});
+
+describe("pictures", () => {
+  const shot = (id: string, comment = 0) => ({
+    id,
+    comment_id: comment,
+    width: 1600,
+    height: 900,
+    url: `/api/items/abc/images/${id}`,
+    thumb: `/api/items/abc/images/${id}?size=thumb`,
+  });
+
+  test("a board that takes pictures offers a tray with its ceiling, and one that does not, none", () => {
+    const repo = { slug: "atlas", name: "Atlas", accepts_bugs: true, accepts_ideas: true, can_notify: false };
+    const org = { slug: "acme", name: "Acme" };
+    const on = reportForm(org, repo, "bug", text, 5);
+    expect(on).toContain("data-tray");
+    expect(on).toContain('data-max="5"');
+    expect(reportForm(org, repo, "bug", text, 0)).not.toContain("data-tray");
+  });
+
+  test("the report shows its own pictures and each message its own", () => {
+    const html = itemView(
+      report({
+        images: [shot("a"), shot("b", 7)],
+        comments: [{ id: 7, author: "team", name: "alex", body: "this?", created_at: 0 }],
+      }),
+      text,
+    );
+    expect(html.match(/class="picture"/g)?.length).toBe(2);
+    // The message's picture sits after its words, not on the report.
+    expect(html.indexOf("images/b?size=thumb")).toBeGreaterThan(html.indexOf("this?"));
+  });
+
+  test("a stranger is offered no bin; the reporter only on their own", () => {
+    const item = report({
+      images: [shot("mine"), shot("team", 7)],
+      comments: [{ id: 7, author: "team", name: "alex", body: "ours", created_at: 0 }],
+    });
+    expect(itemView(item, text)).not.toContain("data-remove-picture");
+    const theirs = itemView(item, text, { remove: "reporter", token: "t0k" });
+    expect(theirs).toContain('data-remove-picture="mine"');
+    expect(theirs).not.toContain('data-remove-picture="team"');
+    // Their own picture is reached with their follow link: it may not be public yet.
+    expect(theirs).toContain("images/mine?size=thumb&amp;k=t0k");
+  });
+
+  test("the team may take out any of them", () => {
+    const item = report({
+      images: [shot("mine"), shot("team", 7)],
+      comments: [{ id: 7, author: "team", name: "alex", body: "ours", created_at: 0 }],
+    });
+    const html = itemTeamView(item, { current: "new", statuses: ["new"] }, [], text, 3);
+    expect(html).toContain('data-remove-picture="mine"');
+    expect(html).toContain('data-remove-picture="team"');
+    expect(html).toContain("team-reply-pictures");
   });
 });
