@@ -436,6 +436,7 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	body["body"] = it.Body
 	body["fields"] = describeFields(it.Fields)
 	body["comments"] = thread
+	body["images"] = s.visiblePictures(r, it)
 	body["mine"] = mine
 	// Where this came from. A report is the one page of this product that
 	// travels: it is pasted into a chat, mailed to a colleague, linked from an
@@ -443,7 +444,9 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	// tell which project it belongs to and no way onward — the page named
 	// nothing and led nowhere.
 	if repo, err := s.orgs().RepositoryByID(it.RepoID); err == nil {
-		board := map[string]any{"slug": repo.Slug, "name": repo.Name}
+		// accepts_images: whether the reporter's follow-up and the team's reply
+		// offer pictures on this page.
+		board := map[string]any{"slug": repo.Slug, "name": repo.Name, "accepts_images": repo.AcceptsImages}
 		if o, err := s.orgs().OrganizationByID(repo.OrgID); err == nil {
 			board["organization"] = map[string]any{"slug": o.Slug, "name": o.Name}
 		}
@@ -565,11 +568,13 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if _, err := s.items().Comment(it.ID, author, "", in.Body, s.now()); err != nil {
+	c, err := s.items().Comment(it.ID, author, "", in.Body, s.now())
+	if err != nil {
 		writeCommentError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"moderation": string(item.Pending)})
+	// The id lets the reporter's page hang their pictures on this message.
+	writeJSON(w, http.StatusAccepted, map[string]any{"id": c.ID, "moderation": string(item.Pending)})
 }
 
 // writeCommentError says why a comment or a reply was refused. Shared by the
@@ -624,7 +629,9 @@ func describeRepository(r org.Repository, mailConfigured bool) map[string]any {
 		"name":          r.Name,
 		"accepts_bugs":  r.AcceptsBugs,
 		"accepts_ideas": r.AcceptsIdeas,
-		"icon":          r.Icon,
+		// Whether the form offers pictures: the board's switch.
+		"accepts_images": r.AcceptsImages,
+		"icon":           r.Icon,
 		// With no relay there is nothing to notify anybody with, so the form
 		// does not ask for an address rather than collecting one it cannot use.
 		"can_notify": mailConfigured,

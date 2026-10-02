@@ -95,6 +95,8 @@ type newRepository struct {
 	ForgeRepo    string `json:"forge_repo"`
 	AcceptsBugs  *bool  `json:"accepts_bugs"`
 	AcceptsIdeas *bool  `json:"accepts_ideas"`
+	// AcceptsImages is on unless it is sent off.
+	AcceptsImages *bool `json:"accepts_images"`
 	// Icon is a data URL, or empty for the initials of the name.
 	Icon string `json:"icon"`
 }
@@ -153,6 +155,13 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		writeError(w, statusForOrgError(err), keyForOrgError(err))
 		return
+	}
+	if !accepts(in.AcceptsImages) {
+		if err := s.orgs().SetAcceptsImages(created.ID, false); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		created.AcceptsImages = false
 	}
 	writeJSON(w, http.StatusCreated, describeRepository(created, s.mailConfigured()))
 }
@@ -566,11 +575,13 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("reading the username a reply is signed with", "error", err)
 	}
-	if _, err := s.items().Comment(it.ID, item.AuthorTeam, name, in.Body, s.now()); err != nil {
+	c, err := s.items().Comment(it.ID, item.AuthorTeam, name, in.Body, s.now())
+	if err != nil {
 		writeCommentError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
+	// The id lets the pane hang the reply's pictures on it.
+	writeJSON(w, http.StatusCreated, map[string]any{"id": c.ID})
 }
 
 // username is what a team reply is signed with: an account has one name, and

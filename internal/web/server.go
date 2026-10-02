@@ -216,6 +216,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/items/{id}/votes", s.handleVote)
 	s.mux.HandleFunc("DELETE /api/items/{id}/votes", s.handleUnvote)
 	s.mux.HandleFunc("POST /api/items/{id}/comments", s.handleComment)
+	// Pictures on a report and its messages. Public routes, because the
+	// reporter has no session: who may do what is decided inside, by the
+	// follow link or the team's role — see pictures.go.
+	s.mux.HandleFunc("POST /api/items/{id}/images", s.handleAddPicture)
+	s.mux.HandleFunc("GET /api/items/{id}/images/{image}", s.handlePicture)
+	s.mux.HandleFunc("DELETE /api/items/{id}/images/{image}", s.handleRemovePicture)
 
 	// --- Private ------------------------------------------------------------
 	//

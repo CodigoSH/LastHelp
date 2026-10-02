@@ -102,6 +102,9 @@ type Repository struct {
 	ForgeRepo    string
 	AcceptsBugs  bool
 	AcceptsIdeas bool
+	// AcceptsImages is whether reporters and the team may attach pictures.
+	// On unless the team turned it off.
+	AcceptsImages bool
 
 	// NotifyConfig is the channel this board's team reads, stored as JSON. It
 	// is opaque here on purpose: the domain has no business knowing what a
@@ -231,6 +234,9 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 	// moderation_mode is not written: nothing reads it, and the column carries
 	// its own default. Named here so that the next person to see it in the
 	// schema does not go looking for the code that fills it.
+	// Pictures are on for a new board: the column's default, said here too so
+	// what is returned matches what was stored.
+	r.AcceptsImages = true
 	res, err := s.DB.Exec(`INSERT INTO repository
 		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, icon, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -256,7 +262,7 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.icon, r.created_at
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.created_at
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
 		WHERE o.slug = ? AND r.slug = ?`, NormaliseSlug(orgSlug), NormaliseSlug(repoSlug)))
@@ -265,14 +271,14 @@ func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 func (s Store) RepositoryByID(id int64) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, notify_config, icon, created_at
+		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, created_at
 		FROM repository WHERE id = ?`, id))
 }
 
 func (s Store) ListRepositories(orgID int64) ([]Repository, error) {
 	rows, err := s.DB.Query(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, notify_config, icon, created_at
+		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, created_at
 		FROM repository WHERE org_id = ? ORDER BY name COLLATE NOCASE, id`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("listing repositories: %w", err)
@@ -323,7 +329,7 @@ func scanRepositoryRow(row scanner) (Repository, error) {
 	var r Repository
 	var created int64
 	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.ForgeRepo,
-		&r.AcceptsBugs, &r.AcceptsIdeas, &r.NotifyConfig, &r.Icon, &created)
+		&r.AcceptsBugs, &r.AcceptsIdeas, &r.AcceptsImages, &r.NotifyConfig, &r.Icon, &created)
 	if err != nil {
 		return Repository{}, err
 	}
@@ -397,6 +403,15 @@ func (s Store) UpdateRepository(id int64, name, forgeRepo string, bugs, ideas bo
 	return nil
 }
 
+// SetAcceptsImages turns pictures on or off for one board. Apart from
+// UpdateRepository so that an edit which does not mention it leaves it alone.
+func (s Store) SetAcceptsImages(id int64, on bool) error {
+	if _, err := s.DB.Exec(`UPDATE repository SET accepts_images = ? WHERE id = ?`, on, id); err != nil {
+		return fmt.Errorf("setting pictures on the repository: %w", err)
+	}
+	return nil
+}
+
 // SetOrganizationIcon replaces an organisation's icon; empty goes back to the
 // initials. Apart from the rename, so that one that does not mention the icon
 // leaves it alone.
@@ -453,7 +468,7 @@ type Board struct {
 func (s Store) ListBoards() ([]Board, error) {
 	rows, err := s.DB.Query(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.notify_config, r.icon, r.created_at,
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.created_at,
 		       o.slug, o.name
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
@@ -468,7 +483,7 @@ func (s Store) ListBoards() ([]Board, error) {
 		var b Board
 		var created int64
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Slug, &b.Name, &b.ForgeRepo,
-			&b.AcceptsBugs, &b.AcceptsIdeas, &b.NotifyConfig, &b.Icon, &created,
+			&b.AcceptsBugs, &b.AcceptsIdeas, &b.AcceptsImages, &b.NotifyConfig, &b.Icon, &created,
 			&b.OrgSlug, &b.OrgName)
 		if err != nil {
 			return nil, fmt.Errorf("listing boards: %w", err)

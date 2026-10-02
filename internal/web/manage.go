@@ -90,6 +90,8 @@ type repositoryChange struct {
 	// icons does not mention it, and must not wipe the one somebody chose.
 	// An empty string goes back to the initials.
 	Icon *string `json:"icon"`
+	// AcceptsImages likewise: absent leaves it as it was.
+	AcceptsImages *bool `json:"accepts_images"`
 }
 
 func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +132,12 @@ func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) 
 	}
 	if in.Icon != nil {
 		if err := s.orgs().SetRepositoryIcon(repo.ID, icon); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+	}
+	if in.AcceptsImages != nil {
+		if err := s.orgs().SetAcceptsImages(repo.ID, *in.AcceptsImages); err != nil {
 			writeError(w, http.StatusInternalServerError, "error.internal")
 			return
 		}
