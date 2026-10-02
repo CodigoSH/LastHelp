@@ -24,6 +24,7 @@ import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
+import { attachPictureViewer } from "./services/pictureViewer";
 import { attachChartHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
 import { watchSelects } from "./services/select";
@@ -102,6 +103,12 @@ document.addEventListener("click", (event) => {
 });
 
 window.addEventListener("popstate", () => void render());
+
+// A picture on a report opens large over the page; see pictureViewer.ts.
+attachPictureViewer({
+  markup: () => views.pictureViewer(text),
+  count: (n, of) => text.t("pictures.alt", { n: text.number(n), count: text.number(of) }),
+});
 
 // --- the shell -------------------------------------------------------------
 

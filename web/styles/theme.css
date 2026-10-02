@@ -4208,6 +4208,103 @@ body > nav .brand {
 .tray-remove:hover,
 .picture-remove:hover { border-color: rgba(var(--danger-rgb), 0.6); color: var(--danger-color); }
 
+/* The viewer: the picture as large as the screen allows, on a dark ground
+   whichever theme the page is in — a picture is judged against black, and a
+   white sheet around a screenshot of a white page loses its edges. */
+.viewer {
+  inline-size: 100vw;
+  block-size: 100dvh;
+  max-inline-size: none;
+  max-block-size: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+}
+
+.viewer::backdrop {
+  background: rgba(8, 8, 10, 0.92);
+}
+
+.viewer-figure {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  inline-size: 100%;
+  block-size: 100%;
+  margin: 0;
+  padding: 3.5rem 4.5rem;
+  box-sizing: border-box;
+}
+
+.viewer-picture {
+  display: block;
+  max-inline-size: 100%;
+  max-block-size: calc(100dvh - 9rem);
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+}
+
+.viewer-count {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The way back: the square bordered close every dialog of the product has,
+   in the corner where reading starts its line ends. */
+.viewer-close,
+.viewer-step {
+  position: fixed;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.viewer-close {
+  inset-block-start: 1rem;
+  inset-inline-end: 1rem;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: 12px;
+}
+
+.viewer-step {
+  inset-block-start: 50%;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  margin-block-start: -1.375rem;
+  border-radius: 50%;
+}
+
+.viewer-prev { inset-inline-start: 1rem; }
+.viewer-next { inset-inline-end: 1rem; }
+
+/* The chevron points to the end of a line, so the one going back is turned
+   round — and both follow the reading direction. */
+.viewer-prev svg { transform: scaleX(calc(-1 * var(--rtl-flip))); }
+.viewer-next svg { transform: scaleX(var(--rtl-flip)); }
+
+.viewer-close:hover,
+.viewer-step:hover { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.4); }
+
+.viewer-close:focus-visible,
+.viewer-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .viewer-figure { padding: 3.5rem 0.5rem 4.5rem; }
+  /* On a phone the steps go under the picture, where a thumb reaches them. */
+  .viewer-step { inset-block-start: auto; inset-block-end: 1rem; margin-block-start: 0; }
+}
+
 .comment-actions {
   display: flex;
   align-items: center;

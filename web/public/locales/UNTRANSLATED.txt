@@ -15,9 +15,12 @@ pictures.add
 pictures.alt
 pictures.confirmRemove
 pictures.hint
+pictures.next
 pictures.open
+pictures.previous
 pictures.privacy
 pictures.remove
 pictures.removed
 pictures.someFailed
+pictures.viewer
 repo.acceptsImages
