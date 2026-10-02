@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "Repositori ini tidak menerima jenis laporan ini.",
   "error.last_administrator": "Ini satu-satunya administrator. Tetapkan yang lain terlebih dahulu.",
   "error.no_forge": "Tidak ada forge yang terhubung ke organisasi ini.",
-  "error.no_webp": "Browser ini tidak dapat mengodekan gambar WebP. Gunakan versi terbaru Firefox, Chrome, atau Safari.",
   "error.not_a_backup": "Bukan cadangan LastHelp yang kompatibel dengan versi ini.",
   "error.not_an_image": "File gambar tidak didukung.",
   "error.not_found": "Tidak ditemukan.",

@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "এই রিপোজিটরি এই ধরনের রিপোর্ট গ্রহণ করে না।",
   "error.last_administrator": "এটিই একমাত্র প্রশাসক। আগে অন্য কাউকে নিযুক্ত করুন।",
   "error.no_forge": "এই সংস্থার সঙ্গে কোনো ফোর্জ যুক্ত নেই।",
-  "error.no_webp": "এই ব্রাউজার WebP ছবি এনকোড করতে পারে না। Firefox, Chrome বা Safari-এর সাম্প্রতিক সংস্করণ ব্যবহার করুন।",
   "error.not_a_backup": "এটি এই সংস্করণের সঙ্গে সামঞ্জস্যপূর্ণ LastHelp ব্যাকআপ নয়।",
   "error.not_an_image": "অসমর্থিত ছবির ফাইল।",
   "error.not_found": "পাওয়া যায়নি।",

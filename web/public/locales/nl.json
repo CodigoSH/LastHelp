@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "Deze repository accepteert dit meldingstype niet.",
   "error.last_administrator": "Dit is de enige beheerder. Wijs eerst een andere aan.",
   "error.no_forge": "Geen forge gekoppeld aan deze organisatie.",
-  "error.no_webp": "Deze browser kan geen WebP-afbeeldingen coderen. Gebruik een recente versie van Firefox, Chrome of Safari.",
   "error.not_a_backup": "Geen LastHelp-back-up die compatibel is met deze versie.",
   "error.not_an_image": "Afbeeldingsbestand niet ondersteund.",
   "error.not_found": "Niet gevonden.",

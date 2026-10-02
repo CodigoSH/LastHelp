@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "This repository does not accept this report type.",
   "error.last_administrator": "This is the only administrator. Assign another one first.",
   "error.no_forge": "No forge connected to this organisation.",
-  "error.no_webp": "This browser cannot encode WebP images. Use a current version of Firefox, Chrome or Safari.",
   "error.not_a_backup": "Not a LastHelp backup compatible with this version.",
   "error.not_an_image": "Unsupported image file.",
   "error.not_found": "Not found.",

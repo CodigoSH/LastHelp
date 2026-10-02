@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "Dieses Repository nimmt diesen Meldungstyp nicht an.",
   "error.last_administrator": "Dies ist der einzige Administrator. Zuerst einen weiteren festlegen.",
   "error.no_forge": "Mit dieser Organisation ist keine Forge verbunden.",
-  "error.no_webp": "Dieser Browser kann keine WebP-Bilder kodieren. Aktuelles Firefox, Chrome oder Safari verwenden.",
   "error.not_a_backup": "Keine mit dieser Version kompatible LastHelp-Sicherung.",
   "error.not_an_image": "Bilddatei nicht unterstützt.",
   "error.not_found": "Nicht gefunden.",

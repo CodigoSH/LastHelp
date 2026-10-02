@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "لا يقبل هذا المستودع هذا النوع من البلاغات.",
   "error.last_administrator": "هذا هو المسؤول الوحيد. عيّن مسؤولًا آخر أولًا.",
   "error.no_forge": "لا توجد منصة مرتبطة بهذه المؤسسة.",
-  "error.no_webp": "لا يستطيع هذا المتصفح ترميز صور WebP. استخدم إصدارًا حديثًا من Firefox أو Chrome أو Safari.",
   "error.not_a_backup": "ليست نسخة LastHelp متوافقة مع هذا الإصدار.",
   "error.not_an_image": "ملف صورة غير مدعوم.",
   "error.not_found": "غير موجود.",

@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "یہ ریپوزٹری اس قسم کی رپورٹ قبول نہیں کرتی۔",
   "error.last_administrator": "یہ واحد منتظم ہے۔ پہلے کسی اور کو مقرر کریں۔",
   "error.no_forge": "اس تنظیم سے کوئی فورج منسلک نہیں۔",
-  "error.no_webp": "یہ براؤزر WebP تصاویر انکوڈ نہیں کر سکتا۔ Firefox، Chrome یا Safari کا نیا ورژن استعمال کریں۔",
   "error.not_a_backup": "یہ اس ورژن سے ہم آہنگ LastHelp بیک اپ نہیں ہے۔",
   "error.not_an_image": "غیر معاون تصویری فائل۔",
   "error.not_found": "نہیں ملا۔",

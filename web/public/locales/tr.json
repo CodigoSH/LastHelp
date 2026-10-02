@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "Bu depo bu bildirim türünü kabul etmiyor.",
   "error.last_administrator": "Bu tek yönetici. Önce başka birini atayın.",
   "error.no_forge": "Bu kuruluşa bağlı forge yok.",
-  "error.no_webp": "Bu tarayıcı WebP görselleri kodlayamıyor. Firefox, Chrome veya Safari'nin güncel bir sürümünü kullanın.",
   "error.not_a_backup": "Bu sürümle uyumlu bir LastHelp yedeği değil.",
   "error.not_an_image": "Desteklenmeyen görsel dosyası.",
   "error.not_found": "Bulunamadı.",

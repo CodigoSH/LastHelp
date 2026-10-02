@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "To repozytorium nie przyjmuje tego typu zgłoszeń.",
   "error.last_administrator": "To jedyny administrator. Najpierw wyznacz innego.",
   "error.no_forge": "Z tą organizacją nie połączono żadnego forge.",
-  "error.no_webp": "Ta przeglądarka nie potrafi kodować obrazów WebP. Użyj aktualnej wersji Firefoksa, Chrome lub Safari.",
   "error.not_a_backup": "To nie jest kopia LastHelp zgodna z tą wersją.",
   "error.not_an_image": "Nieobsługiwany plik obrazu.",
   "error.not_found": "Nie znaleziono.",

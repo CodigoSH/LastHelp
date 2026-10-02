@@ -9,10 +9,10 @@
  * Kept out of main.ts because it is a small program of its own — a model, a
  * history, a save queue and a keyboard — and main.ts is the router.
  */
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { askConfirm } from "./confirm";
 import { escapeHTML } from "./escape";
-import { NoWebP, putImage } from "./services/landingImage";
+import { putImage, TooLarge } from "./services/landingImage";
 import { wireWords } from "./services/words";
 import * as landingViews from "./views/landing";
 import { FOOTER_ID } from "./views/landing";
@@ -482,8 +482,7 @@ export class LandingEditor {
       image: {
         pick: pickImageFile,
         upload: putImage,
-        failed: (err) =>
-          err instanceof NoWebP ? this.host.toastError(this.text.t("error.no_webp")) : this.host.report(err),
+        failed: (err) => this.pictureFailed(err),
       },
       onChange: (id, html) => {
         const found = this.find(id);
@@ -1001,9 +1000,19 @@ export class LandingEditor {
       const path = await putImage(file);
       this.change(() => put(path));
     } catch (err) {
-      if (err instanceof NoWebP) this.host.toastError(this.text.t("error.no_webp"));
-      else this.host.report(err);
+      this.pictureFailed(err);
     }
+  }
+
+  /**
+   * Why a picture did not go in, said in words: too large even after scaling,
+   * or a file this browser cannot read as a picture. What the server refused
+   * says its own reason.
+   */
+  private pictureFailed(err: unknown): void {
+    if (err instanceof ApiError) this.host.report(err);
+    else if (err instanceof TooLarge) this.host.toastError(this.text.t("error.image_too_large"));
+    else this.host.toastError(this.text.t("error.not_an_image"));
   }
 
   /**

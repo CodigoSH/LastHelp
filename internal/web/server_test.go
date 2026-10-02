@@ -131,6 +131,25 @@ func (i *instance) do(method, path string, body any) *http.Response {
 	return resp
 }
 
+// doBytes sends a body as it is, the way the page sends a picture.
+func (i *instance) doBytes(method, path string, body []byte) *http.Response {
+	i.t.Helper()
+	req, err := http.NewRequest(method, i.server.URL+path, bytes.NewReader(body))
+	if err != nil {
+		i.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	if token := i.csrf(); token != "" {
+		req.Header.Set(middleware.CSRFHeader, token)
+	}
+	resp, err := i.client.Do(req)
+	if err != nil {
+		i.t.Fatal(err)
+	}
+	return resp
+}
+
 func (i *instance) csrf() string {
 	u, _ := http.NewRequest(http.MethodGet, i.server.URL, nil)
 	for _, c := range i.client.Jar.Cookies(u.URL) {

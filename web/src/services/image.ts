@@ -26,7 +26,7 @@ const MAX_BYTES = 96 * 1024;
 /** Enough for an avatar at twice the size it is ever drawn. */
 const MAX_SIDE = 256;
 
-async function decode(file: File): Promise<{ width: number; height: number; draw: CanvasImageSource }> {
+export async function decode(file: File): Promise<{ width: number; height: number; draw: CanvasImageSource }> {
   // createImageBitmap applies the EXIF rotation, which is why a photograph
   // taken in portrait does not arrive on its side.
   if (typeof createImageBitmap === "function") {

@@ -88,7 +88,6 @@
   "error.kind_not_accepted": "Ce dépôt n'accepte pas ce type de signalement.",
   "error.last_administrator": "C'est le seul administrateur. Désignez-en un autre d'abord.",
   "error.no_forge": "Aucune forge connectée à cette organisation.",
-  "error.no_webp": "Ce navigateur ne peut pas encoder d'images WebP. Utilisez une version récente de Firefox, Chrome ou Safari.",
   "error.not_a_backup": "Sauvegarde LastHelp non compatible avec cette version.",
   "error.not_an_image": "Fichier image non pris en charge.",
   "error.not_found": "Introuvable.",
