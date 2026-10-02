@@ -329,6 +329,7 @@ func TestOnlyTheAdministratorSeesUpdates(t *testing.T) {
 // first signing key was added it failed — not because the behaviour broke, but
 // because the test was reading the state of the world instead of setting it.
 func TestABuildWithNoKeysSaysSoRatherThanLookingUpToDate(t *testing.T) {
+	pinNotInAContainer(t)
 	keys := version.ReleaseKeys
 	version.ReleaseKeys = nil
 	t.Cleanup(func() { version.ReleaseKeys = keys })
@@ -356,6 +357,7 @@ func TestABuildWithNoKeysSaysSoRatherThanLookingUpToDate(t *testing.T) {
 //
 // No key does not mean accept anything.
 func TestAnUpdateIsRefusedWhenItCannotBeVerified(t *testing.T) {
+	pinNotInAContainer(t)
 	keys := version.ReleaseKeys
 	version.ReleaseKeys = nil
 	t.Cleanup(func() { version.ReleaseKeys = keys })
@@ -368,4 +370,17 @@ func TestAnUpdateIsRefusedWhenItCannotBeVerified(t *testing.T) {
 	if resp.StatusCode < 400 {
 		t.Fatalf("an unverifiable update returned %d %v", resp.StatusCode, body)
 	}
+}
+
+// pinNotInAContainer makes the test run as a build on a plain machine, whatever
+// it is really running in. Inside a container the status handler still asks the
+// forge, so as to say a newer image exists, and that is right there but is not
+// what these tests are about: they passed on every laptop and failed in the CI
+// job, which runs in a container, because they were reading the machine instead
+// of setting it.
+func pinNotInAContainer(t *testing.T) {
+	t.Helper()
+	was := inContainer
+	inContainer = func() bool { return false }
+	t.Cleanup(func() { inContainer = was })
 }

@@ -49,7 +49,11 @@ func (s *Server) updater() updater.Updater {
 // container and then silently reverts. Telling somebody to pull a new image is
 // the honest answer; letting them press a button that appears to work and
 // quietly undoes itself is not.
-func inContainer() bool { return inContainerUnder("/") }
+//
+// A variable so a test can say which it is: the answer is a fact about the
+// machine the tests run on, and a CI job that runs inside a container reaches
+// the other branch of the status handler than a laptop does.
+var inContainer = func() bool { return inContainerUnder("/") }
 
 // inContainerUnder is inContainer against a root that a test can build.
 //
