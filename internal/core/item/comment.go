@@ -282,6 +282,11 @@ func (s Store) RejectComment(id int64) error {
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
 		return ErrNotFound
 	}
+	// The words are kept for audit; the pictures are not — a picture is the
+	// thing most likely to be why a message was turned down.
+	if _, err := s.DB.Exec(`DELETE FROM item_image WHERE comment_id = ?`, id); err != nil {
+		return fmt.Errorf("removing the message's pictures: %w", err)
+	}
 	return nil
 }
 

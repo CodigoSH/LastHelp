@@ -406,6 +406,46 @@ var migrations = []migration{
 			return addColumn(tx, "organization", "icon", "TEXT NOT NULL DEFAULT ''")
 		},
 	},
+	{
+		version: 12,
+		name:    "a report and its replies can carry pictures",
+		// One row per picture, at the two sizes the pages use: a thumbnail the
+		// report shows and the full one somebody opens. A picture belongs to a
+		// report, or to one message on it when comment_id is set, and goes with
+		// it: deleting either deletes the picture.
+		//
+		// Whether a picture may be seen is not stored here. It follows what it
+		// belongs to — a report waiting for review has pictures waiting with
+		// it — so there is no second state that could disagree with the first.
+		//
+		// accepts_images is the switch a team turns off when pictures give it
+		// trouble. On by default, so every board has them once this ships.
+		fn: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`CREATE TABLE IF NOT EXISTS item_image (
+					id         TEXT    PRIMARY KEY,
+					item_id    INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
+					comment_id INTEGER REFERENCES comment(id) ON DELETE CASCADE,
+					position   INTEGER NOT NULL,
+					full       BLOB    NOT NULL,
+					full_type  TEXT    NOT NULL,
+					width      INTEGER NOT NULL,
+					height     INTEGER NOT NULL,
+					thumb      BLOB    NOT NULL,
+					thumb_type TEXT    NOT NULL,
+					bytes      INTEGER NOT NULL,
+					created_at INTEGER NOT NULL
+				)`,
+				`CREATE INDEX IF NOT EXISTS item_image_by_item ON item_image (item_id, comment_id, position)`,
+				`CREATE INDEX IF NOT EXISTS item_image_by_comment ON item_image (comment_id)`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil {
+					return err
+				}
+			}
+			return addColumn(tx, "repository", "accepts_images", "INTEGER NOT NULL DEFAULT 1")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.
