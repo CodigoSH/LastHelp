@@ -595,3 +595,83 @@ func TestTallyCountsWhatListWouldShowWithoutItsLimit(t *testing.T) {
 		t.Errorf("closed: %d, want 3", n)
 	}
 }
+
+// TestAnAnsweredReportTakesNoMoreComments.
+//
+// The conversation closes at the moment voting does, for an idea and for a bug,
+// and for the team as much as for a visitor: a reply is a comment written by
+// someone else, and one door decides both.
+func TestAnAnsweredReportTakesNoMoreComments(t *testing.T) {
+	for _, tc := range []struct {
+		kind   Kind
+		answer Status
+	}{
+		{Idea, StatusDone}, {Idea, StatusDeclined},
+		{Bug, StatusClosed}, {Bug, StatusNotReproducible},
+	} {
+		t.Run(string(tc.kind)+"/"+string(tc.answer), func(t *testing.T) {
+			s := store(t)
+			it, _ := report(t, s, tc.kind, "something", "")
+			if _, err := s.Comment(it.ID, AuthorVisitor, "", "before", epoch); err != nil {
+				t.Fatalf("an open report refused a comment: %v", err)
+			}
+			if err := s.SetStatus(it.ID, tc.answer, epoch); err != nil {
+				t.Fatal(err)
+			}
+			for _, author := range []Author{AuthorVisitor, AuthorReporter, AuthorTeam} {
+				if _, err := s.Comment(it.ID, author, "x", "after", epoch); !errors.Is(err, ErrConversationClosed) {
+					t.Errorf("%s writing on an answered report gave %v, want ErrConversationClosed", author, err)
+				}
+			}
+			all, err := s.Comments(it.ID, Pending)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(all) != 1 {
+				t.Errorf("%d comments waiting after the answer, want the 1 from before", len(all))
+			}
+		})
+	}
+}
+
+func TestAReopenedReportTakesCommentsAgain(t *testing.T) {
+	s := store(t)
+	it, _ := report(t, s, Bug, "crash", "")
+	if err := s.SetStatus(it.ID, StatusClosed, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetStatus(it.ID, StatusConfirmed, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Comment(it.ID, AuthorTeam, "x", "back", epoch); err != nil {
+		t.Errorf("a reopened report refused a reply: %v", err)
+	}
+}
+
+// TestNothingIsAddedToAReportThatIsNotOnAPage: a duplicate folded into another,
+// or a report turned down, is on no public page. A vote or a comment given to it
+// would be accepted and lost, which reads as having worked.
+func TestNothingIsAddedToAReportThatIsNotOnAPage(t *testing.T) {
+	s := store(t)
+	rejected, _ := report(t, s, Idea, "a", "")
+	survivor, _ := report(t, s, Idea, "b", "")
+	duplicate, _ := report(t, s, Idea, "c", "")
+	if err := s.Reject(rejected.ID, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Merge(duplicate.ID, survivor.ID, epoch); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, id := range map[string]int64{"rejected": rejected.ID, "merged": duplicate.ID} {
+		if err := s.Vote(id, "voter-1", epoch); !errors.Is(err, ErrNotFound) {
+			t.Errorf("a vote on a %s report gave %v, want ErrNotFound", name, err)
+		}
+		if _, err := s.Comment(id, AuthorVisitor, "", "hello", epoch); !errors.Is(err, ErrNotFound) {
+			t.Errorf("a comment on a %s report gave %v, want ErrNotFound", name, err)
+		}
+	}
+	if got, _ := s.ByID(survivor.ID); got.VoteCount != 0 {
+		t.Errorf("the survivor's count moved to %d", got.VoteCount)
+	}
+}

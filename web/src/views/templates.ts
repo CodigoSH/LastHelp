@@ -780,7 +780,10 @@ export function itemView(item: ItemDetail, text: Text): string {
       <h2>${escapeHTML(text.t("item.comments"))}
         <span class="count-chip">${escapeHTML(text.number(item.comments.length))}</span></h2>
       ${thread}
-      <form class="comment-form bento-card">
+      ${
+        item.commentable === false
+          ? `<p class="hint comment-closed">${escapeHTML(text.t("item.commentsClosed"))}</p>`
+          : `<form class="comment-form bento-card">
         <label for="comment-body">${escapeHTML(text.t("item.addComment"))}</label>
         <textarea id="comment-body" name="body" rows="3"
                   placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
@@ -789,7 +792,8 @@ export function itemView(item: ItemDetail, text: Text): string {
           <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button>
           <p class="comment-sent" role="status" hidden>${escapeHTML(text.t("item.commentWaiting"))}</p>
         </div>
-      </form>
+      </form>`
+      }
     </section>
   </div>`;
 }
@@ -3123,7 +3127,10 @@ export function itemTeamView(
   const conversation = settingsCard(
     text.t("item.comments"),
     `${thread}
-    <form class="team-reply">
+    ${
+      item.commentable === false
+        ? `<p class="hint comment-closed">${escapeHTML(text.t("item.commentsClosed"))}</p>`
+        : `<form class="team-reply">
       <div class="field">
         <label for="team-reply-body">${escapeHTML(text.t("panel.reply"))}</label>
         <textarea id="team-reply-body" name="body" rows="3" required
@@ -3132,7 +3139,8 @@ export function itemTeamView(
       </div>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("form.send"))}</button></div>
-    </form>`,
+    </form>`
+    }`,
     { action: `<span class="count-chip">${escapeHTML(text.number(item.comments.length))}</span>` },
   );
 

@@ -174,6 +174,9 @@ export interface ItemSummary {
   /** False once the team has answered an idea: the count stays, the button goes.
    *  Absent means votable, which is what the team's own views carry. */
   votable?: boolean;
+  /** False once the team has answered: the thread stays and the form goes.
+   *  Absent means open. */
+  commentable?: boolean;
   created_at: number;
 }
 

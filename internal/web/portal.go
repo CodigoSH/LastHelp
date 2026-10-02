@@ -566,10 +566,23 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := s.items().Comment(it.ID, author, "", in.Body, s.now()); err != nil {
-		writeError(w, http.StatusBadRequest, "error.invalid_comment")
+		writeCommentError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"moderation": string(item.Pending)})
+}
+
+// writeCommentError says why a comment or a reply was refused. Shared by the
+// public form and the team's reply, so the two cannot answer differently.
+func writeCommentError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, item.ErrConversationClosed):
+		writeError(w, http.StatusConflict, "error.conversation_closed")
+	case errors.Is(err, item.ErrNotFound):
+		writeError(w, http.StatusNotFound, "error.not_found")
+	default:
+		writeError(w, http.StatusBadRequest, "error.invalid_comment")
+	}
 }
 
 // --- shared lookups --------------------------------------------------------
@@ -636,14 +649,16 @@ func (s *Server) describeItem(it item.Item, voter string) map[string]any {
 		voted, _ = s.items().HasVoted(it.ID, voter)
 	}
 	return map[string]any{
-		"public_id":  it.PublicID,
-		"kind":       string(it.Kind),
-		"title":      it.Title,
-		"status":     string(it.Status),
-		"votes":      it.VoteCount,
-		"voted":      voted,
-		"votable":    it.Votable(),
-		"created_at": it.CreatedAt.Unix(),
+		"public_id": it.PublicID,
+		"kind":      string(it.Kind),
+		"title":     it.Title,
+		"status":    string(it.Status),
+		"votes":     it.VoteCount,
+		"voted":     voted,
+		"votable":   it.Votable(),
+		// False once the team has answered: the thread stays, the form goes.
+		"commentable": it.TakesComments(),
+		"created_at":  it.CreatedAt.Unix(),
 	}
 }
 

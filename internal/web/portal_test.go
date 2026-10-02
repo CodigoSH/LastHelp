@@ -1392,3 +1392,49 @@ func TestTheTeamCanRewriteAReportAndOnlyOnTheirOwnBoard(t *testing.T) {
 		t.Errorf("a stranger rewrote a report: %d", resp.StatusCode)
 	}
 }
+
+// TestAnAnsweredReportClosesItsConversation: the team's reply and a visitor's
+// comment are refused with the same answer once the report is answered, a bug as
+// much as an idea, and the page is told so it can take the form away.
+func TestAnAnsweredReportClosesItsConversation(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	for _, tc := range []struct{ kind, answer string }{
+		{"idea", string(item.StatusDone)},
+		{"bug", string(item.StatusClosed)},
+	} {
+		id, _ := public.submit("codigosh", "lastboard", tc.kind, "something "+tc.kind)
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+
+		if open := decode(t, public.do(http.MethodGet, "/api/items/"+id, nil)); open["commentable"] != true {
+			t.Errorf("an open %s says commentable=%v", tc.kind, open["commentable"])
+		}
+		resp = public.do(http.MethodPost, "/api/items/"+id+"/comments", map[string]string{"body": "me too"})
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("a comment on an open %s returned %d", tc.kind, resp.StatusCode)
+		}
+
+		resp = team.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": tc.answer})
+		_ = resp.Body.Close()
+
+		if closed := decode(t, public.do(http.MethodGet, "/api/items/"+id, nil)); closed["commentable"] != false {
+			t.Errorf("an answered %s says commentable=%v", tc.kind, closed["commentable"])
+		}
+		resp = public.do(http.MethodPost, "/api/items/"+id+"/comments", map[string]string{"body": "still happens"})
+		body := decode(t, resp)
+		if resp.StatusCode != http.StatusConflict || body["error"] != "error.conversation_closed" {
+			t.Errorf("a visitor's comment on an answered %s returned %d %v", tc.kind, resp.StatusCode, body)
+		}
+		resp = team.do(http.MethodPost, "/api/items/"+id+"/reply", map[string]string{"body": "one more thing"})
+		body = decode(t, resp)
+		if resp.StatusCode != http.StatusConflict || body["error"] != "error.conversation_closed" {
+			t.Errorf("the team's reply on an answered %s returned %d %v", tc.kind, resp.StatusCode, body)
+		}
+	}
+}

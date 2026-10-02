@@ -1550,15 +1550,21 @@ async function showItem(publicID: string): Promise<void> {
   commentForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(commentForm);
-    await api
+    const sent = commentForm.querySelector<HTMLParagraphElement>(".comment-sent");
+    // Said as it was, not as "sent": a page opened before the team answered
+    // would otherwise promise a review that is never going to happen.
+    const failure = await api
       .post(`/api/items/${encodeURIComponent(publicID)}/comments`, {
         body: String(data.get("body") ?? ""),
         token: token ?? "",
       })
-      .catch(() => undefined);
-    commentForm.reset();
-    const sent = commentForm.querySelector<HTMLParagraphElement>(".comment-sent");
-    if (sent) sent.hidden = false;
+      .then(() => "")
+      .catch((err: unknown) => i18n.t(err instanceof ApiError ? err.key : "error.internal"));
+    if (failure === "") commentForm.reset();
+    if (sent) {
+      sent.textContent = failure === "" ? i18n.t("item.commentWaiting") : failure;
+      sent.hidden = false;
+    }
   });
 }
 

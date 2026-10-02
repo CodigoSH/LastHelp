@@ -42,6 +42,11 @@ var (
 	// wanted it when it was answered, and it stops moving.
 	ErrVotingClosed = errors.New("voting is closed on an answered idea")
 
+	// ErrConversationClosed is returned for a comment or a reply on a report the
+	// team has answered. Like the count of votes, what was said by then is the
+	// record, and it stops moving. Reopening the report opens it again.
+	ErrConversationClosed = errors.New("the conversation is closed on an answered report")
+
 	// ErrAlreadyVoted is not an error the page shows as a failure: it means the
 	// vote is already there, which is what the person wanted.
 	ErrAlreadyVoted = errors.New("already voted")
@@ -95,6 +100,13 @@ func StatusesFor(k Kind) []Status {
 // not answered. A bug is never voted, and an answered idea keeps its count.
 func (i Item) Votable() bool {
 	return i.Kind == Idea && !i.Status.Closes()
+}
+
+// TakesComments says whether somebody can still write on this: anything the
+// team has not answered, idea or bug. The same moment voting closes, and read
+// from the same place.
+func (i Item) TakesComments() bool {
+	return !i.Status.Closes()
 }
 
 // Closes says whether a status is an answer: fixed, shipped, not planned, not
@@ -374,18 +386,14 @@ func (s Store) Vote(itemID int64, voterID string, now time.Time) error {
 		return errors.New("a vote needs a voter")
 	}
 
-	var kind, status string
-	err := s.DB.QueryRow(`SELECT kind, status FROM item WHERE id = ?`, itemID).Scan(&kind, &status)
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		return ErrNotFound
-	case err != nil:
-		return fmt.Errorf("looking up the item: %w", err)
+	kind, status, err := s.standing(itemID)
+	if err != nil {
+		return err
 	}
-	if Kind(kind) != Idea {
+	if kind != Idea {
 		return ErrNotVotable
 	}
-	if Status(status).Closes() {
+	if status.Closes() {
 		return ErrVotingClosed
 	}
 
@@ -410,6 +418,29 @@ func (s Store) Vote(itemID int64, voterID string, now time.Time) error {
 		return fmt.Errorf("updating the count: %w", err)
 	}
 	return nil
+}
+
+// standing reads what decides whether something may still be added to a report.
+//
+// One door for votes and comments, so a new way of adding to a report inherits
+// the rule without knowing it exists. A report the team turned down takes
+// nothing, and a duplicate folded into another is one of those (Merge rejects
+// it): it is on no public page, so a vote or a comment given to it would be
+// accepted and then lost, which reads as having worked.
+func (s Store) standing(itemID int64) (Kind, Status, error) {
+	var kind, status, moderation string
+	err := s.DB.QueryRow(`SELECT kind, status, moderation_state
+		FROM item WHERE id = ?`, itemID).Scan(&kind, &status, &moderation)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", "", ErrNotFound
+	case err != nil:
+		return "", "", fmt.Errorf("looking up the item: %w", err)
+	}
+	if Moderation(moderation) == Rejected || Moderation(moderation) == Spam {
+		return "", "", ErrNotFound
+	}
+	return Kind(kind), Status(status), nil
 }
 
 // Unvote takes a vote back.

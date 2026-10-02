@@ -180,25 +180,6 @@ async function main() {
   );
   await shoot("2-archive-pane");
 
-  const statusChange = await evaluate(`
-    const id = ${JSON.stringify(before.id)};
-    const pick = document.querySelector(".rev-detail #status-select");
-    pick.value = "closed";
-    pick.dispatchEvent(new Event("change", { bubbles: true }));
-    for (let i = 0; i < 40; i++) {
-      await new Promise(r => setTimeout(r, 100));
-      const s = await fetch("/api/items/" + id).then(r => r.json());
-      if (s.status === "closed") break;
-    }
-    const after = await fetch("/api/items/" + id).then(r => r.json());
-    return { server: after.status, stillChosen: document.querySelector(".rev-row.on")?.dataset.pick === id };
-  `);
-  check(
-    "changing the status from the pane reaches the server, and the row stays chosen",
-    statusChange.server === "closed" && statusChange.stillChosen === true,
-    JSON.stringify(statusChange),
-  );
-
   const reply = await evaluate(`
     const id = ${JSON.stringify(before.id)};
     const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
@@ -266,6 +247,38 @@ async function main() {
     "and deleting it, asked in the product's dialog, takes it off the pane and the server",
     unsaid.thread === 1 && unsaid.server === 1 && unsaid.gone === true,
     JSON.stringify(unsaid),
+  );
+
+  // Answering it is the last thing done to it here: the conversation closes with
+  // the status, so the reply and the edits above have to come first.
+  const statusChange = await evaluate(`
+    const id = ${JSON.stringify(before.id)};
+    const pick = document.querySelector(".rev-detail #status-select");
+    pick.value = "closed";
+    pick.dispatchEvent(new Event("change", { bubbles: true }));
+    for (let i = 0; i < 40; i++) {
+      await new Promise(r => setTimeout(r, 100));
+      const s = await fetch("/api/items/" + id).then(r => r.json());
+      if (s.status === "closed") break;
+    }
+    const after = await fetch("/api/items/" + id).then(r => r.json());
+    return { server: after.status, stillChosen: document.querySelector(".rev-row.on")?.dataset.pick === id };
+  `);
+  check(
+    "changing the status from the pane reaches the server, and the row stays chosen",
+    statusChange.server === "closed" && statusChange.stillChosen === true,
+    JSON.stringify(statusChange),
+  );
+
+  const closedPane = await evaluate(`
+    const pane = document.querySelector(".rev-detail");
+    return { form: !!pane.querySelector("form.team-reply"), said: (pane.textContent ?? "").length > 0,
+             thread: pane.querySelectorAll(".comments .comment").length };
+  `);
+  check(
+    "an answered report keeps its conversation in the pane and loses the reply box",
+    closedPane.form === false && closedPane.thread === 1,
+    JSON.stringify(closedPane),
   );
 
   // A half-written edit survives choosing the same row again: drawing the

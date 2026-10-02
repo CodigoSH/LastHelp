@@ -567,7 +567,7 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		slog.Error("reading the username a reply is signed with", "error", err)
 	}
 	if _, err := s.items().Comment(it.ID, item.AuthorTeam, name, in.Body, s.now()); err != nil {
-		writeError(w, http.StatusBadRequest, "error.invalid_comment")
+		writeCommentError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
