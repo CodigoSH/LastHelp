@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Email **admin@codigosh.com**. We acknowledge within 48 hours.
+Email **admin@codigosh.com**.
 
 Please include what you did, what happened, and what you expected. If you have a
 proof of concept, keep it to a test instance of your own — never against someone
