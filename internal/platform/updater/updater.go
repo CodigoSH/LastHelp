@@ -39,6 +39,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -430,7 +431,15 @@ func (u Updater) fetch(ctx context.Context, url string, limit int64) ([]byte, er
 // That second half was missing: with the same numbers, a pre-release never
 // beat another pre-release, so an installation on Beta.03 was told Beta.04 was
 // not newer and every beta stayed on the one it was installed from.
+//
+// A build made between two tags is named by `git describe` as the last tag, the
+// number of commits since and the commit: v1.0.0-7-g0725c10. Read as a
+// pre-release it would sit below v1.0.0 itself, and a tree seven commits past
+// the release would be offered that release as an update. It is the tag plus
+// some work, so it is compared as the tag: never behind it, never ahead of the
+// next one.
 func newer(candidate, current string) bool {
+	current = describedFrom.ReplaceAllString(current, "")
 	c, cPre := splitVersion(candidate)
 	r, rPre := splitVersion(current)
 
@@ -447,6 +456,10 @@ func newer(candidate, current string) bool {
 		return comparePre(cPre, rPre) > 0
 	}
 }
+
+// describedFrom is what `git describe --tags --always --dirty` adds to a tag
+// when the tree is past it: commits since, the commit, and -dirty.
+var describedFrom = regexp.MustCompile(`-\d+-g[0-9a-f]+(-dirty)?$`)
 
 // comparePre orders two pre-release labels by the Semantic Versioning rules:
 // dot-separated identifiers left to right, numbers as numbers ("Beta.10" after
