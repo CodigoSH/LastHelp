@@ -2,6 +2,7 @@ package item
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -224,6 +225,24 @@ func (s Store) CommentItem(commentID int64) (Item, error) {
 		return Item{}, ErrNotFound
 	}
 	return s.ByID(itemID)
+}
+
+// CommentByID is one message, whatever its state: who wrote it decides who may
+// add a picture to it, and its state whether the picture may be seen.
+func (s Store) CommentByID(id int64) (Comment, error) {
+	var c Comment
+	var author, moderation string
+	var created int64
+	err := s.DB.QueryRow(`SELECT id, item_id, author_kind, author_ref, body, moderation_state, created_at
+		FROM comment WHERE id = ?`, id).Scan(&c.ID, &c.ItemID, &author, &c.AuthorRef, &c.Body, &moderation, &created)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Comment{}, ErrNotFound
+	}
+	if err != nil {
+		return Comment{}, fmt.Errorf("reading the comment: %w", err)
+	}
+	c.Author, c.Moderation, c.CreatedAt = Author(author), Moderation(moderation), time.Unix(created, 0)
+	return c, nil
 }
 
 // DeleteComment removes a comment or a team reply for good. Rejecting hides

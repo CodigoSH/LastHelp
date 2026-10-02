@@ -45,12 +45,13 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"slug":          repo.Slug,
-		"name":          repo.Name,
-		"forge_repo":    repo.ForgeRepo,
-		"accepts_bugs":  repo.AcceptsBugs,
-		"accepts_ideas": repo.AcceptsIdeas,
-		"icon":          repo.Icon,
+		"slug":           repo.Slug,
+		"name":           repo.Name,
+		"forge_repo":     repo.ForgeRepo,
+		"accepts_bugs":   repo.AcceptsBugs,
+		"accepts_ideas":  repo.AcceptsIdeas,
+		"accepts_images": repo.AcceptsImages,
+		"icon":           repo.Icon,
 		// Which channel, and never what is in it: an endpoint that returns a
 		// stored token is a way to read one.
 		"channel":      channelKind(repo.NotifyConfig),
@@ -95,12 +96,13 @@ func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		rows = append(rows, map[string]any{
-			"slug":          repo.Slug,
-			"name":          repo.Name,
-			"accepts_bugs":  repo.AcceptsBugs,
-			"accepts_ideas": repo.AcceptsIdeas,
-			"icon":          repo.Icon,
-			"pending":       counts[string(item.Pending)],
+			"slug":           repo.Slug,
+			"name":           repo.Name,
+			"accepts_bugs":   repo.AcceptsBugs,
+			"accepts_ideas":  repo.AcceptsIdeas,
+			"accepts_images": repo.AcceptsImages,
+			"icon":           repo.Icon,
+			"pending":        counts[string(item.Pending)],
 		})
 	}
 	if !manage && len(rows) == 0 {
