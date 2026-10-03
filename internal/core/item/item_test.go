@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
 )
@@ -673,5 +674,73 @@ func TestNothingIsAddedToAReportThatIsNotOnAPage(t *testing.T) {
 	}
 	if got, _ := s.ByID(survivor.ID); got.VoteCount != 0 {
 		t.Errorf("the survivor's count moved to %d", got.VoteCount)
+	}
+}
+
+// TestTheLimitsCountCharactersNotBytes.
+//
+// They counted len(), which is bytes: a Japanese letter is three, so 20,000
+// characters of English were accepted and about 6,600 of Japanese refused. The
+// text here is not Latin, or the test passes with the bytes and with the
+// characters alike.
+func TestTheLimitsCountCharactersNotBytes(t *testing.T) {
+	s := store(t)
+	ja := func(n int) string { return strings.Repeat("ぜ", n) }
+
+	if _, _, err := s.Create(New{RepoID: 1, Kind: Bug, Title: ja(maxTitle), Body: ja(maxBody)}, Pending, epoch); err != nil {
+		t.Errorf("a title and description at their limits, in Japanese, were refused: %v", err)
+	}
+	if _, _, err := s.Create(New{RepoID: 1, Kind: Bug, Title: ja(maxTitle + 1), Body: "x"}, Pending, epoch); err == nil {
+		t.Error("a title one character over its limit was accepted")
+	}
+	if _, _, err := s.Create(New{RepoID: 1, Kind: Bug, Title: "x", Body: ja(maxBody + 1)}, Pending, epoch); err == nil {
+		t.Error("a description one character over its limit was accepted")
+	}
+
+	it, _ := report(t, s, Bug, "crash", "")
+	if err := s.Edit(it.ID, ja(maxTitle), ja(maxBody), epoch); err != nil {
+		t.Errorf("an edit at the limits, in Japanese, was refused: %v", err)
+	}
+	if err := s.Edit(it.ID, ja(maxTitle+1), "x", epoch); err == nil {
+		t.Error("an edited title over its limit was accepted")
+	}
+
+	c, err := s.Comment(it.ID, AuthorTeam, "alex", ja(maxComment), epoch)
+	if err != nil {
+		t.Fatalf("a comment at its limit, in Japanese, was refused: %v", err)
+	}
+	if _, err := s.Comment(it.ID, AuthorTeam, "alex", ja(maxComment+1), epoch); err == nil {
+		t.Error("a comment over its limit was accepted")
+	}
+	if err := s.EditComment(c.ID, ja(maxComment)); err != nil {
+		t.Errorf("an edited comment at its limit was refused: %v", err)
+	}
+	if err := s.EditComment(c.ID, ja(maxComment+1)); err == nil {
+		t.Error("an edited comment over its limit was accepted")
+	}
+}
+
+// TestAnAnswerTooLongIsCutBetweenLettersNotThroughOne: cutting bytes at the
+// limit left a third of a letter at the end of the stored text.
+func TestAnAnswerTooLongIsCutBetweenLettersNotThroughOne(t *testing.T) {
+	s := store(t)
+	it, _, err := s.Create(New{RepoID: 1, Kind: Bug, Title: "crash", Body: "it closes",
+		Fields: []Field{{Key: "steps", Label: "Steps", Value: strings.Repeat("ぜ", maxValue+500)}}}, Pending, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.ByID(it.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Fields) != 1 {
+		t.Fatalf("%d answers stored", len(got.Fields))
+	}
+	v := got.Fields[0].Value
+	if !utf8.ValidString(v) {
+		t.Error("the stored answer is not valid text: a letter was cut through the middle")
+	}
+	if n := utf8.RuneCountInString(v); n != maxValue {
+		t.Errorf("the stored answer is %d characters, want %d", n, maxValue)
 	}
 }

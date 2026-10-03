@@ -42,7 +42,7 @@ func (s Store) Comment(itemID int64, author Author, authorRef, body string, now 
 	if body == "" {
 		return Comment{}, fmt.Errorf("a comment needs something in it")
 	}
-	if len(body) > maxComment {
+	if tooLong(body, maxComment) {
 		return Comment{}, fmt.Errorf("the comment is longer than %d characters", maxComment)
 	}
 
@@ -266,7 +266,7 @@ func (s Store) EditComment(id int64, body string) error {
 	if body == "" {
 		return fmt.Errorf("a comment needs something in it")
 	}
-	if len(body) > maxComment {
+	if tooLong(body, maxComment) {
 		return fmt.Errorf("the comment is longer than %d characters", maxComment)
 	}
 	res, err := s.DB.Exec(`UPDATE comment SET body = ? WHERE id = ?`, body, id)

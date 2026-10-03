@@ -1491,3 +1491,32 @@ func TestTheFrontPageCardCountsWhatTheBoardPageCounts(t *testing.T) {
 		}
 	}
 }
+
+// TestAReportAtEveryLimitInJapaneseIsTaken.
+//
+// The limits on the words are in characters and the body of a request is in
+// bytes, and a language that takes three or four bytes a letter put a report
+// at its limits well past 64 KiB: it was refused as a malformed request, with
+// nothing to say why. Sent through the real handler with every field at its
+// limit, because the model alone passing says nothing about the wire.
+func TestAReportAtEveryLimitInJapaneseIsTaken(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	ja := func(n int) string { return strings.Repeat("ぜ", n) }
+	base := "/api/orgs/codigosh/repos/lastboard"
+	form := decode(t, public.do(http.MethodGet, base+"/form", nil))
+	public.tick.advance(5 * time.Second)
+
+	resp := public.do(http.MethodPost, base+"/items", map[string]any{
+		"kind": "bug", "title": ja(200), "body": ja(20_000), "token": form["token"],
+		"fields": map[string]string{"version": ja(4_000), "steps": ja(4_000)},
+	})
+	body := decode(t, resp)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("a Japanese report at every limit answered %d %v", resp.StatusCode, body)
+	}
+}

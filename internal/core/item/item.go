@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
 )
@@ -240,11 +241,30 @@ type Store struct {
 	DB database.Execer
 }
 
+// What a person may write, counted in characters. It was counted with len(),
+// which is bytes: a letter in Japanese or Chinese is three, so the same limit
+// let in 20,000 characters of English and about 6,600 of Japanese, and refused
+// somebody for writing in their own language with no way to tell why. What the
+// limits protect is the page the text is drawn on and the queue it is read in,
+// and both are measured in what a reader sees.
 const (
 	maxTitle = 200
 	maxBody  = 20_000
 	maxValue = 4_000
 )
+
+// tooLong says whether text is past a limit in characters.
+func tooLong(text string, limit int) bool { return utf8.RuneCountInString(text) > limit }
+
+// clipped cuts text to a limit in characters, never through the middle of one:
+// slicing bytes at a limit can leave half of a three-byte letter at the end,
+// and that is not text any more.
+func clipped(text string, limit int) string {
+	if !tooLong(text, limit) {
+		return text
+	}
+	return string([]rune(text)[:limit])
+}
 
 // Create stores a submission and returns it along with the follow token, which
 // is shown once and never again.
@@ -260,10 +280,10 @@ func (s Store) Create(in New, moderation Moderation, now time.Time) (Item, strin
 	if in.Title == "" {
 		return Item{}, "", errors.New("a report needs a title")
 	}
-	if len(in.Title) > maxTitle {
+	if tooLong(in.Title, maxTitle) {
 		return Item{}, "", fmt.Errorf("the title is longer than %d characters", maxTitle)
 	}
-	if len(in.Body) > maxBody {
+	if tooLong(in.Body, maxBody) {
 		return Item{}, "", fmt.Errorf("the description is longer than %d characters", maxBody)
 	}
 
@@ -301,9 +321,7 @@ func (s Store) Create(in New, moderation Moderation, now time.Time) (Item, strin
 	}
 
 	for i, f := range in.Fields {
-		if len(f.Value) > maxValue {
-			f.Value = f.Value[:maxValue]
-		}
+		f.Value = clipped(f.Value, maxValue)
 		if _, err := s.DB.Exec(`INSERT INTO item_field (item_id, key, label, value, position)
 			VALUES (?, ?, ?, ?, ?)`, id, f.Key, f.Label, f.Value, i); err != nil {
 			return Item{}, "", fmt.Errorf("storing the answers: %w", err)
@@ -687,10 +705,10 @@ func (s Store) Edit(id int64, title, body string, now time.Time) error {
 	if title == "" {
 		return errors.New("a report needs a title")
 	}
-	if len(title) > maxTitle {
+	if tooLong(title, maxTitle) {
 		return fmt.Errorf("the title is longer than %d characters", maxTitle)
 	}
-	if len(body) > maxBody {
+	if tooLong(body, maxBody) {
 		return fmt.Errorf("the description is longer than %d characters", maxBody)
 	}
 
