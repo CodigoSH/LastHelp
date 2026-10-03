@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, itemTeamView, itemView, reportForm, type Text, updateZone } from "./templates";
+import { accountRole, commentEditForm, itemTeamView, itemView, reportForm, rewriteForm, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -231,5 +231,28 @@ describe("pictures", () => {
     expect(html).toContain('data-remove-picture="mine"');
     expect(html).toContain('data-remove-picture="team"');
     expect(html).toContain("team-reply-pictures");
+  });
+});
+
+describe("the limits the editing forms keep", () => {
+  // Written twice: here, so the browser stops before sending, and in the
+  // server, which decides. Two copies of a number drift apart without a sound,
+  // so this reads the other one.
+  const limit = async (name: string) => {
+    const go = await Bun.file(new URL("../../../internal/core/item/item.go", import.meta.url)).text();
+    const comment = await Bun.file(new URL("../../../internal/core/item/comment.go", import.meta.url)).text();
+    const found = (go + comment).match(new RegExp(`\\b${name}\\s*=\\s*([0-9_]+)`));
+    if (!found) throw new Error(`${name} is not in the item package any more; this test is reading the wrong file`);
+    return Number((found[1] ?? "").replaceAll("_", ""));
+  };
+
+  test("the title of a rewrite is as long as the server allows", async () => {
+    const attribute = rewriteForm({ title: "t", body: "b" }, text).match(/name="title"[^>]*maxlength="(\d+)"/)?.[1];
+    expect(Number(attribute)).toBe(await limit("maxTitle"));
+  });
+
+  test("an edited message is as long as the server allows", async () => {
+    const attribute = commentEditForm("hello", text).match(/maxlength="(\d+)"/)?.[1];
+    expect(Number(attribute)).toBe(await limit("maxComment"));
   });
 });
