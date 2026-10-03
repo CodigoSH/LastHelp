@@ -18,7 +18,12 @@ import (
 // reportBodyLimit is what a submission may be. Generous enough for a stack
 // trace pasted into the description, small enough that a flood costs the
 // sender something.
-const reportBodyLimit = 64 << 10
+//
+// It is in bytes, because it bounds what is read off the wire, and the limits
+// on the words are in characters: a report at every one of them in a language
+// that takes four bytes a letter is (200 + 20,000 + two answers of 4,000) times
+// four, about 113 KB. 64 KiB refused that as a malformed request.
+const reportBodyLimit = 128 << 10
 
 // handleOrganizations lists what this instance serves. Public: it is the front
 // page of the portal.
