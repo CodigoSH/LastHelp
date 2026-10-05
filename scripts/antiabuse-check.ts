@@ -146,6 +146,20 @@ async function main() {
     JSON.stringify(paged),
   );
 
+  // The search is narrow and sits at the end of its line, under the form, in the
+  // house's search box; not a bar across the whole card.
+  const box = await evaluate(`
+    const b = document.querySelector(".word-search").getBoundingClientRect();
+    const rows = document.querySelector(".word-add").getBoundingClientRect();
+    return { width: Math.round(b.width), card: Math.round(rows.width), atEnd: Math.abs(b.right - rows.right) <= 1,
+      house: getComputedStyle(document.querySelector(".word-search")).borderRadius };
+  `);
+  check(
+    "the search is a narrow box at the end of its line, not a bar across the card",
+    box.width <= 290 && box.width < box.card / 2 && box.atEnd === true && box.house === "12px",
+    JSON.stringify(box),
+  );
+
   // Ctrl+K goes to the search box, from the page and from another plain field.
   const ctrlK = async () => {
     for (const type of ["rawKeyDown", "keyUp"]) {

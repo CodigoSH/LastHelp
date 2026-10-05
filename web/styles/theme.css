@@ -728,33 +728,10 @@ ul { list-style: none; margin: 0; padding: 0; }
   box-shadow: var(--shadow-sm);
 }
 
-/* The search, with its mark inside the field. A magnifier standing outside the
-   box is a second element to align; inside, it is part of the control. */
-.search-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1 1 14rem;
-  min-inline-size: 10rem;
-}
-
-.search-wrap .icon {
-  position: absolute;
-  inset-inline-start: 0.7rem;
-  color: var(--text-dim);
-  pointer-events: none;
-}
-
-.search {
-  inline-size: 100%;
-  padding: 0.5rem 0.8rem;
-  padding-inline-start: 2.2rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--panel);
-  color: inherit;
-  font: inherit;
-}
+/* The search of a board's page, in the toolbar beside the tabs and the sorts: the
+   box of the house, which it shares with the reports screen. */
+.board-search { flex: 1 1 14rem; min-inline-size: 10rem; min-block-size: 40px; padding-inline: 14px; }
+.board-search input { font-size: 13px; }
 
 /* ------------------------------------------------------------------- rows */
 
@@ -1171,8 +1148,7 @@ textarea { resize: vertical; }
    anything this rule does not reach. */
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible,
-.search:focus-visible {
+select:focus-visible {
   outline: none;
   border-color: var(--accent);
   box-shadow: var(--ring);
@@ -6965,8 +6941,13 @@ a.stat:hover .stat-go {
 .settings-card .word-help + .settings-list { margin-block-start: 16px; }
 .word-edit { display: flex; align-items: center; gap: 6px; flex: 1; min-inline-size: 0; }
 .word-edit input { flex: 1; min-inline-size: 0; }
+/* The decision row wraps: in the reports pane the buttons do not fit beside the
+   sentence, and the sentence was squeezed into a column of a few letters. */
+.settings-row.decide { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 32px; }
+.settings-row.decide .settings-info { flex: 1 1 14rem; }
 .settings-card .settings-row + .add-word { margin-block-start: 16px; padding-block-start: 16px; border-block-start: 1px solid var(--border); }
-.word-search { flex: 0 0 auto; margin-block-start: 16px; max-inline-size: none; }
+/* Narrow and at the end of the line: it narrows a list, it is not the card's main act. */
+.word-search { flex: 0 0 auto; align-self: flex-end; inline-size: min(100%, 18rem); margin-block-start: 16px; }
 .word-results { margin-block-start: 4px; }
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-block-start: 12px; }
 .pager-range { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }

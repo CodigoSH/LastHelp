@@ -608,7 +608,7 @@ async function main() {
   const nothing = await evaluate(`
     ${wait}
     const words = await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json());
-    const box = document.querySelector(".search");
+    const box = document.querySelector(".board-search input");
     box.value = "zzzz-nothing-says-this";
     box.dispatchEvent(new Event("input", { bubbles: true }));
     await wait(() => new URLSearchParams(location.search).get("q") && document.querySelector(".empty"));
