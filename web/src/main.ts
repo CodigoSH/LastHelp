@@ -35,7 +35,8 @@ import { LandingEditor } from "./landingEditor";
 import { openUpdateDialog, type UpdateInfo } from "./updateModal";
 import { icons } from "./views/icons";
 import { installSearchShortcut } from "./services/searchShortcut";
-import { MASK, secretIntent } from "./services/secretField";
+import { SECRET_MASK, secretChange } from "./services/secretField";
+import { channelPayload, credentialsPayload } from "./services/secretPayload";
 
 const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
@@ -1874,16 +1875,23 @@ function wireCredentials(orgSlug: string): void {
   if (!form) return;
 
   const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
+  // A saved secret is dots: entering the field selects them, so the first key
+  // replaces them and Delete empties them.
+  form.querySelectorAll<HTMLInputElement>("input[type=password]").forEach((field) =>
+    field.addEventListener("focus", () => field.select()),
+  );
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(form);
     try {
-      await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/credentials`, {
-        token: String(data.get("token") ?? ""),
-        webhook_secret: String(data.get("webhook_secret") ?? ""),
-      });
-      form.reset();
+      await api.post(
+        `/api/orgs/${encodeURIComponent(orgSlug)}/credentials`,
+        credentialsPayload(
+          { token: String(data.get("token") ?? ""), webhook_secret: String(data.get("webhook_secret") ?? "") },
+          { token: form.hasAttribute("data-has-token"), secret: form.hasAttribute("data-has-secret") },
+        ),
+      );
       // The address has a card of its own, and re-rendering fills it in. It
       // used to be printed at the foot of this form as well, which meant the
       // same value in two places on one screen.
@@ -1932,8 +1940,8 @@ function wireChannel(
   const tokenField = form.querySelector<HTMLInputElement>("#chan-token");
   const hadToken = () => form.hasAttribute("data-has-token") && (kind?.value ?? "") === savedKind;
   kind?.addEventListener("change", () => {
-    if (tokenField && !hadToken() && secretIntent(tokenField.value, true).kind === "keep") tokenField.value = "";
-    else if (tokenField && hadToken() && tokenField.value === "") tokenField.value = MASK;
+    if (tokenField && !hadToken() && secretChange(tokenField.value, true).action === "keep") tokenField.value = "";
+    else if (tokenField && hadToken() && tokenField.value === "") tokenField.value = SECRET_MASK;
   });
   // Entering the field selects everything: the first key replaces the dots and
   // Delete empties them.
@@ -1941,16 +1949,15 @@ function wireChannel(
 
   const read = (): Record<string, unknown> => {
     const data = new FormData(form);
-    const intent = secretIntent(String(data.get("token") ?? ""), hadToken());
-    return {
-      kind: String(data.get("kind") ?? ""),
-      url: String(data.get("url") ?? ""),
-      // Empty means "keep": a browser that has not reloaded sends the form without
-      // this field, and the removal travels as its own mark.
-      token: intent.kind === "set" ? intent.secret : "",
-      to: String(data.get("to") ?? ""),
-      clear_token: intent.kind === "clear",
-    };
+    return channelPayload(
+      {
+        kind: String(data.get("kind") ?? ""),
+        url: String(data.get("url") ?? ""),
+        token: String(data.get("token") ?? ""),
+        to: String(data.get("to") ?? ""),
+      },
+      hadToken(),
+    );
   };
   // The failure stays beside the form as well as toasting: it is about what was
   // typed, and the fix is in the fields somebody is looking at.

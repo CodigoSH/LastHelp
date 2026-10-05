@@ -37,6 +37,42 @@ func (s Store) SetCredentials(orgID int64, token, webhookSecret string) error {
 	return nil
 }
 
+// CredentialsChange is what an organisation's form says to do with each secret:
+// replace it with what was typed, remove it, or — by saying nothing — keep it.
+// Empty means keep, and removal is its own mark, so a form that did not carry the
+// field (a browser that has not reloaded) cannot take a secret away by omission.
+type CredentialsChange struct {
+	Token              string
+	WebhookSecret      string
+	ClearToken         bool
+	ClearWebhookSecret bool
+}
+
+// ChangeCredentials applies a change to what is stored, one secret at a time.
+func (s Store) ChangeCredentials(orgID int64, change CredentialsChange) error {
+	var token, secret string
+	err := s.DB.QueryRow(`SELECT token, webhook_secret FROM organization WHERE id = ?`, orgID).Scan(&token, &secret)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("reading the credentials: %w", err)
+	}
+	switch {
+	case change.Token != "":
+		token = change.Token
+	case change.ClearToken:
+		token = ""
+	}
+	switch {
+	case change.WebhookSecret != "":
+		secret = change.WebhookSecret
+	case change.ClearWebhookSecret:
+		secret = ""
+	}
+	return s.SetCredentials(orgID, token, secret)
+}
+
 // Credentials returns the token and the webhook secret.
 func (s Store) Credentials(orgID int64) (token, webhookSecret string, err error) {
 	err = s.DB.QueryRow(`SELECT token, webhook_secret FROM organization WHERE id = ?`, orgID).

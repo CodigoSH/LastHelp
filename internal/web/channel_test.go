@@ -183,3 +183,61 @@ func TestAReporterAddressIsOneBareMailbox(t *testing.T) {
 		}
 	}
 }
+
+// TestAnOrganisationsSecretsAreChangedOneAtATime, and the base says so: replacing
+// one leaves the other, an empty field keeps, and removal is its own mark. The
+// check reads the column, not the answer, because a save that says "ok" and leaves
+// the secret in place is exactly the failure this is here for.
+func TestAnOrganisationsSecretsAreChangedOneAtATime(t *testing.T) {
+	admin, owner, collaborator := teamSetup(t)
+	const path = "/api/orgs/acme/credentials"
+	stored := func() (token, secret string) {
+		t.Helper()
+		if err := admin.db().QueryRow(`SELECT token, webhook_secret FROM organization WHERE slug = 'acme'`).Scan(&token, &secret); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	post := func(who *instance, body map[string]any) int { return status(t, who.do(http.MethodPost, path, body)) }
+
+	if got := post(owner, map[string]any{"token": "tk_one", "webhook_secret": "ws_one"}); got != http.StatusOK {
+		t.Fatalf("storing both: %d", got)
+	}
+	if token, secret := stored(); token != "tk_one" || secret != "ws_one" {
+		t.Fatalf("stored %q and %q", token, secret)
+	}
+
+	// Replacing one leaves the other; saying nothing keeps both.
+	post(owner, map[string]any{"token": "tk_two"})
+	if token, secret := stored(); token != "tk_two" || secret != "ws_one" {
+		t.Errorf("replacing the token left %q and %q, want tk_two and ws_one", token, secret)
+	}
+	post(owner, map[string]any{})
+	if token, secret := stored(); token != "tk_two" || secret != "ws_one" {
+		t.Errorf("an empty form changed what was stored: %q and %q", token, secret)
+	}
+
+	// Removal is its own mark, and takes only what it names.
+	post(owner, map[string]any{"clear_webhook_secret": true})
+	if token, secret := stored(); token != "tk_two" || secret != "" {
+		t.Errorf("removing the secret left %q and %q, want tk_two and nothing", token, secret)
+	}
+	post(owner, map[string]any{"clear_token": true})
+	if token, _ := stored(); token != "" {
+		t.Errorf("removing the token left %q", token)
+	}
+
+	// Typed text wins over a removal mark sent beside it.
+	post(owner, map[string]any{"token": "tk_three", "clear_token": true})
+	if token, _ := stored(); token != "tk_three" {
+		t.Errorf("a token typed beside a removal was lost: %q", token)
+	}
+
+	// And a collaborator changes none of it.
+	if got := post(collaborator, map[string]any{"clear_token": true}); got != http.StatusForbidden {
+		t.Errorf("a collaborator removed a credential: %d", got)
+	}
+	if token, _ := stored(); token != "tk_three" {
+		t.Errorf("a refused removal still happened: %q", token)
+	}
+}

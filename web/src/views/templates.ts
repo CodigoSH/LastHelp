@@ -18,7 +18,7 @@ import { escapeAttr, escapeHTML } from "../escape";
 import { areaChart, donut } from "./charts";
 import { icons } from "./icons";
 import { modKey } from "../services/searchShortcut";
-import { MASK } from "../services/secretField";
+import { SECRET_MASK } from "../services/secretField";
 import { actionButton, iconButton } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
@@ -1376,6 +1376,7 @@ export function organizationWizard(step: number, text: Text, forge = "none", ico
               label: text.t("panel.token"),
               hint: text.t("panel.tokenHelp") + " " + text.t("org.tokenWhere", { where: example.where, scope: example.scope }),
               type: "password",
+              secret: true,
               example: "glpat-… / ghp_… / " + example.scope,
             }, text),
       submit: text.t("wizard.finish"),
@@ -2521,9 +2522,10 @@ function channelForm(
           name: "token",
           label: text.t("panel.token"),
           type: "password",
+          secret: true,
           autocomplete: "new-password",
           // A saved token is dots: it is there, and which one it is cannot be seen.
-          value: spec.hasToken ? MASK : undefined,
+          value: spec.hasToken ? SECRET_MASK : undefined,
           hint: spec.hasToken ? text.t("panel.tokenSaved") : undefined,
         },
         text,
@@ -3129,9 +3131,9 @@ function organizationForge(data: OrganizationPanel, origin: string, text: Text):
       </div>
       <span class="mono-tag${connected ? " accent" : ""}" data-connected="${connected}">${escapeHTML(text.t(connected ? "org.connected" : "org.notConnected"))}</span>
     </div>
-    <form class="credentials">
-      ${field({ id: "cred-token", name: "token", label: text.t("panel.token"), type: "password", required: true, hint: text.t("panel.tokenHelp") }, text)}
-      ${field({ id: "cred-secret", name: "webhook_secret", label: text.t("panel.webhookSecret"), type: "password", required: true, hint: text.t("panel.secretHelp") }, text)}
+    <form class="credentials" ${data.connection?.token ? "data-has-token " : ""}${data.connection?.secret ? "data-has-secret" : ""}>
+      ${field({ id: "cred-token", name: "token", label: text.t("panel.token"), type: "password", secret: true, autocomplete: "new-password", value: data.connection?.token ? SECRET_MASK : undefined, hint: text.t("panel.tokenHelp") }, text)}
+      ${field({ id: "cred-secret", name: "webhook_secret", label: text.t("panel.webhookSecret"), type: "password", secret: true, autocomplete: "new-password", value: data.connection?.secret ? SECRET_MASK : undefined, hint: text.t("panel.secretHelp") }, text)}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>

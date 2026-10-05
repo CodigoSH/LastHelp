@@ -1,5 +1,6 @@
 /**
- * The eye on a password field, on every password field.
+ * The eye on a password field, on every password field somebody types to sign in or
+ * to choose one; a stored secret (`data-secret`) has none.
  *
  * Applied to whatever has just been drawn rather than written into each form:
  * there are five of them — signing in, the wizard, the profile, adding a
@@ -26,6 +27,9 @@ export function attachPasswordToggles(root: ParentNode | null): void {
 
   for (const input of root.querySelectorAll<HTMLInputElement>('input[type="password"]')) {
     if (input.parentElement?.classList.contains("pw-wrap")) continue;
+    // A secret the product stores is shown as dots and never revealed: the
+    // administrator can see that it is there and not which one it is.
+    if (input.hasAttribute("data-secret")) continue;
 
     const wrap = document.createElement("div");
     wrap.className = "pw-wrap";
