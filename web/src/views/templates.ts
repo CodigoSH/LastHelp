@@ -1538,6 +1538,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
             ? item("/panel/people", text.t("shell.people"), icons.people()) +
                 item("/panel/personalization", text.t("shell.personalization"), icons.brush()) +
                 item("/panel/notifications", text.t("shell.notifications"), icons.bell()) +
+                item("/panel/antiabuse", text.t("shell.antiabuse"), icons.shield()) +
                 item("/panel/backups", text.t("shell.backups"), icons.backup()) +
                 // Updates live inside About: what is running
                 // and whether it is the one to run are one question.
@@ -2549,6 +2550,75 @@ function commentWindow(item: { comment_until?: number }, text: Text): string {
   return `<p class="hint comment-window">${escapeHTML(text.t("item.commentsUntil", { date: text.dateTime(item.comment_until) }))}</p>`;
 }
 
+/** The word list and the refusals, as the anti-abuse endpoint returns them. */
+export interface AntiabuseData {
+  words: { word: string; count: number }[];
+  layers: { org: string; org_name: string; repo: string; repo_name: string; layer: string; count: number }[];
+  max_words: number;
+  max_length: number;
+}
+
+/**
+ * The server's word list and what each layer of the anti-abuse checks turned
+ * away. One list for the whole server and no language on it: it is the
+ * operator's notebook of what turns up in their own queue.
+ */
+export function antiabuseScreen(data: AntiabuseData, text: Text): string {
+  const counts = data.words.length
+    ? `<ul class="settings-list words">${data.words
+        .map((w) =>
+          settingsItem({
+            lead: "",
+            name: w.word,
+            tags: `<span class="chip" title="${escapeAttr(text.t("antiabuse.refused"))}">${escapeHTML(text.number(w.count))}</span>`,
+          }),
+        )
+        .join("")}</ul>`
+    : `<p class="hint">${escapeHTML(text.t("antiabuse.noWords"))}</p>`;
+
+  const layerName = (layer: string) => {
+    const key = `antiabuse.layer.${layer}`;
+    const named = text.t(key);
+    return named === key ? layer : named;
+  };
+  const layers = data.layers.length
+    ? `<ul class="settings-list layers">${data.layers
+        .map((l) =>
+          settingsItem({
+            lead: "",
+            name: l.repo_name,
+            sub: `${l.org_name} · ${layerName(l.layer)}`,
+            tags: `<span class="chip">${escapeHTML(text.number(l.count))}</span>`,
+          }),
+        )
+        .join("")}</ul>`
+    : `<p class="hint">${escapeHTML(text.t("antiabuse.layersNone"))}</p>`;
+
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.antiabuse"))}</h1>
+    ${settingsCard(
+      text.t("antiabuse.wordsTitle"),
+      `<form class="word-list">
+        ${areaField(
+          {
+            id: "words",
+            name: "words",
+            label: text.t("antiabuse.wordsLabel"),
+            hint: text.t("antiabuse.wordsHelp", { max: data.max_words, length: data.max_length }),
+            rows: 8,
+            value: data.words.map((w) => w.word).join("\n"),
+          },
+          text,
+        )}
+        <p class="form-error" role="alert" hidden></p>
+        <div class="settings-actions">
+          <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+      </form>
+      ${counts}`,
+      { lead: text.t("antiabuse.lead") },
+    )}
+    ${settingsCard(text.t("antiabuse.layersTitle"), layers, { lead: text.t("antiabuse.layersLead") })}`;
+}
+
 /** The channel every repository can choose, set once by whoever runs the server. */
 export function notificationsScreen(
   channel: { kind: string; channel_url: string; channel_to: string; channel_has_token: boolean },
@@ -3248,6 +3318,15 @@ export function itemTeamView(
           text.t("item.waiting"),
           `<div class="settings-row">
             <div class="settings-info"><p>${escapeHTML(text.t("item.waitingHelp"))}</p></div>
+            ${
+              item.team?.can_add_words
+                ? `<div class="field add-word">
+                    <label for="add-word">${escapeHTML(text.t("item.addWordLabel"))}</label>
+                    <input type="text" id="add-word" name="add_word" autocomplete="off" maxlength="60" />
+                    <p class="hint">${escapeHTML(text.t("item.addWordHelp"))}</p>
+                  </div>`
+                : ""
+            }
             <div class="decide-actions">
               <button class="button primary with-icon" data-moderate="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
               <button class="button ghost with-icon" data-moderate="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>

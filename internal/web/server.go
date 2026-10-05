@@ -305,6 +305,8 @@ func (s *Server) routes() {
 
 	// The channel the administrator sets once for the whole installation, which a
 	// repository chooses in its own settings.
+	private("GET /api/antiabuse", s.handleGetAntiabuse)
+	private("PUT /api/antiabuse/words", s.handleSetWords)
 	private("GET /api/notifications", s.handleGetServerChannel)
 	private("PUT /api/notifications", s.handleSetServerChannel)
 	private("POST /api/notifications/test", s.handleTestServerChannel)

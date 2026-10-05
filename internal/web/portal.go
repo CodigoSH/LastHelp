@@ -341,6 +341,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	if !verdict.OK {
 		s.refused(repo.ID, verdict.Layer)
+		s.refusedWord(verdict.Word)
 		writeError(w, http.StatusBadRequest, verdict.Reason)
 		return
 	}

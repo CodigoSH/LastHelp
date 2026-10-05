@@ -109,7 +109,6 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 Not there yet, and said here rather than discovered:
 
 - **Bitbucket** is not bridged.
-- **The anti-abuse word list and the refusal counts have no screen in the panel.** Both work and are kept in the database; the [guide](https://codigosh.com/docs/lasthelp/administration/anti-abuse/) shows how to read and set them.
 
 ---
 

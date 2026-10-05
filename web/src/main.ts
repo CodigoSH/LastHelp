@@ -1231,6 +1231,7 @@ async function render(): Promise<void> {
     if (path === "/panel/organizations") return await showOrganizationsPanel();
     if (path === "/panel/personalization") return await showPersonalization();
     if (path === "/panel/notifications") return await showNotifications();
+    if (path === "/panel/antiabuse") return await showAntiabuse();
     if (path === "/panel/backups") return await showBackups();
     if (path === "/panel/about") return await showAbout();
     // Before the generic /panel/{org}: "new" is a screen, not an organisation
@@ -1702,7 +1703,12 @@ function wireTeamItem(publicID: string, item: ItemDetail, host: TeamItemHost = {
     button.addEventListener("click", () =>
       host.moderate
         ? host.moderate(button.dataset.moderate ?? "")
-        : act(() => api.post(`${base}/moderation`, { state: button.dataset.moderate })),
+        : act(() =>
+            api.post(`${base}/moderation`, {
+              state: button.dataset.moderate,
+              ...wordToAdd(scope, button.dataset.moderate ?? "", false),
+            }),
+          ),
     ),
   );
 
@@ -2656,7 +2662,10 @@ async function wireReview(
         comment
           ? `/api/comments/${encodeURIComponent(id.slice(2))}/moderation`
           : `/api/items/${encodeURIComponent(id)}/moderation`,
-        { state: comment && state === "spam" ? "rejected" : state },
+        {
+          state: comment && state === "spam" ? "rejected" : state,
+          ...wordToAdd(root?.querySelector(".rev-detail"), state, comment),
+        },
       );
     } catch (err) {
       report(err);
@@ -2901,6 +2910,24 @@ async function showOrganizationsPanel(): Promise<void> {
   };
   select?.addEventListener("change", sync);
   sync();
+}
+
+/** The server's word list and what each check turned away. */
+async function showAntiabuse(): Promise<void> {
+  if (!(await requireAdministrator())) return;
+  const data = (await api.get<views.AntiabuseData>("/api/antiabuse").catch(() => null)) ?? {
+    words: [],
+    layers: [],
+    max_words: 500,
+    max_length: 60,
+  };
+  await showInShell(views.antiabuseScreen(data, text), "/panel/antiabuse");
+  onSubmit("form.word-list", async (form) => {
+    const words = String(form.get("words") ?? "").split("\n");
+    await api.put("/api/antiabuse/words", { words });
+    toast(i18n.t("panel.saved"));
+    await showAntiabuse();
+  });
 }
 
 /** The channel every repository may choose, set once by whoever runs the server. */
@@ -3219,6 +3246,17 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
 }
 
 // --- odds and ends ---------------------------------------------------------
+
+/**
+ * The word the administrator typed beside a rejection, as the part of the request
+ * that carries it. Only a report turned down takes one: it is the word that gave
+ * the report away, and approving or answering has nothing to add.
+ */
+function wordToAdd(scope: ParentNode | null | undefined, state: string, comment: boolean): { add_word?: string } {
+  if (comment || (state !== "rejected" && state !== "spam")) return {};
+  const word = scope?.querySelector<HTMLInputElement>("[name=add_word]")?.value.trim() ?? "";
+  return word ? { add_word: word } : {};
+}
 
 function debounce<T extends (...args: never[]) => void>(fn: T, ms: number): T {
   let timer: ReturnType<typeof setTimeout> | undefined;

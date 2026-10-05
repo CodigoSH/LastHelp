@@ -1183,6 +1183,31 @@ async function main() {
     JSON.stringify(servidor),
   );
 
+  // 11d'. The word list, written one per line and read back with its counts, and
+  //       the refusals by layer under it. It is the administrator's, and not part
+  //       of the lists of screens above: one more screen there is one more burst
+  //       against the per-address ceiling this pass already sits near.
+  await goTo("/panel/antiabuse", "form.word-list");
+  const palabras = await evaluate(`
+    const f = document.querySelector("form.word-list");
+    f.querySelector("#words").value = " Casino \n\ncasiño\ncrypto ";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    for (let i = 0; i < 40 && document.querySelectorAll(".settings-list.words .settings-item").length !== 2; i++)
+      await new Promise(r => setTimeout(r, 100));
+    const g = document.querySelector("form.word-list");
+    const res = { area: g.querySelector("#words").value, filas: document.querySelectorAll(".settings-list.words .settings-item").length,
+      capas: !!document.querySelector(".settings-list.layers, .hint") };
+    const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/antiabuse/words", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify({ words: [] }) });
+    return res;
+  `);
+  check(
+    "the word list is saved one per line, without blanks or repeats, and read back with a row each",
+    palabras.area === "Casino\ncrypto" && palabras.filas === 2 && palabras.capas === true,
+    JSON.stringify(palabras),
+  );
+
   // 11e. The accent is chosen from seven swatches and an eighth
   //      for any colour. A swatch writes the form's field and is the only one
   //      ringed; a colour of one's own paints the eighth; and its palette sits

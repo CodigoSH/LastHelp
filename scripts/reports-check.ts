@@ -620,6 +620,43 @@ async function main() {
   const nextBoard = await evaluate(`return { on: document.querySelector("[data-state].on")?.dataset.state, q: document.querySelector(".search")?.value ?? "", address: location.search }`);
   check("another board starts afresh, not with the last one's filters", nextBoard.on === "open" && nextBoard.q === "" && nextBoard.address === "", JSON.stringify(nextBoard));
 
+  // 11. Last, because it turns a report down: the administrator is offered a field
+  //     for the word that gave it away, the word reaches the server's list, and
+  //     an owner or collaborator is not offered the field at all.
+  await signIn("alex");
+  await goTo("/review?mode=pending", ".rev-row");
+  const palabra = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    document.querySelector('[data-what="report"]').click();
+    await wait(() => document.querySelector(".rev-detail [data-moderate='rejected']"));
+    const field = document.querySelector(".rev-detail [name=add_word]");
+    if (!field) return { field: false };
+    const rows = document.querySelectorAll("[data-pick]").length;
+    field.value = "Zzgiveaway";
+    document.querySelector(".rev-detail [data-moderate='rejected']").click();
+    await wait(() => document.querySelectorAll("[data-pick]").length === rows - 1);
+    const listed = await fetch("/api/antiabuse").then(r => r.json());
+    const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/antiabuse/words", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify({ words: [] }) });
+    return { field: true, gone: document.querySelectorAll("[data-pick]").length === rows - 1,
+      listed: listed.words.map(w => w.word) };
+  `);
+  check(
+    "rejecting from the pane with a word adds it to the server's list, for the administrator",
+    palabra.field === true && palabra.gone === true && palabra.listed.length === 1 && palabra.listed[0] === "Zzgiveaway",
+    JSON.stringify(palabra),
+  );
+  await signIn("olga");
+  await goTo("/review?mode=pending", ".rev-row, .empty");
+  const sinCampo = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    document.querySelector('[data-what="report"]')?.click();
+    await wait(() => document.querySelector(".rev-detail [data-moderate='rejected']") || !document.querySelector('[data-what="report"]'));
+    return { pane: !!document.querySelector(".rev-detail [data-moderate='rejected']"), field: !!document.querySelector("[name=add_word]") };
+  `);
+  check("and an owner, who triages the board, is not offered the field", sinCampo.field === false, JSON.stringify(sinCampo));
+
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
   check("and the content policy refused nothing", refusedByPolicy.length === 0, refusedByPolicy.slice(0, 3).join(" | "));
   await close();

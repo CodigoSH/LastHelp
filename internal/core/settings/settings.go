@@ -91,6 +91,36 @@ func (s Store) Set(key, value string) error {
 	return nil
 }
 
+// Delete removes a setting. Removing one that is not there is not an error: the
+// caller wanted it gone.
+func (s Store) Delete(key string) error {
+	if _, err := s.DB.Exec(`DELETE FROM settings WHERE key = ?`, key); err != nil {
+		return fmt.Errorf("deleting setting %s: %w", key, err)
+	}
+	return nil
+}
+
+// WithPrefix reads every setting whose key starts with prefix, keyed by what
+// comes after it. LIKE is not used: a prefix may carry % or _, and the range
+// test says exactly what is meant.
+func (s Store) WithPrefix(prefix string) (map[string]string, error) {
+	rows, err := s.DB.Query(`SELECT key, value FROM settings WHERE substr(key, 1, ?) = ?`,
+		len(prefix), prefix)
+	if err != nil {
+		return nil, fmt.Errorf("reading settings %s*: %w", prefix, err)
+	}
+	defer func() { _ = rows.Close() }()
+	out := map[string]string{}
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		out[key[len(prefix):]] = value
+	}
+	return out, rows.Err()
+}
+
 // Secret returns a stored random key, generating it the first time.
 //
 // The write is ON CONFLICT DO NOTHING and then re-read, so two servers starting
