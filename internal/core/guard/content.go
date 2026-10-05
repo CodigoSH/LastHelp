@@ -19,6 +19,9 @@ type Verdict struct {
 	// layer that never refuses anything is a layer to delete; one that refuses
 	// nearly everything is biting people who did nothing wrong.
 	Layer string
+	// Word is which listed word refused, in its folded form, for the count the
+	// operator reads beside each word. Empty for every other layer.
+	Word string
 }
 
 var accepted = Verdict{OK: true}
@@ -68,15 +71,8 @@ func (g Guard) Inspect(repoID int64, title, body, answers string, stoplist []str
 		return Verdict{Reason: "error.too_many_links", Layer: "links"}, nil
 	}
 
-	haystack := strings.ToLower(written)
-	for _, word := range stoplist {
-		word = strings.TrimSpace(strings.ToLower(word))
-		if word == "" {
-			continue
-		}
-		if strings.Contains(haystack, word) {
-			return Verdict{Reason: "error.rejected", Layer: "stoplist"}, nil
-		}
+	if word, found := FindWord(stoplist, written); found {
+		return Verdict{Reason: "error.rejected", Layer: "stoplist", Word: word}, nil
 	}
 
 	_ = repoID
