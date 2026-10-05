@@ -1383,10 +1383,10 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
       b.addEventListener("click", () => void change({ sort: b.dataset.sort ?? "new" })),
     );
     root?.querySelector<HTMLButtonElement>("[data-more]")?.addEventListener("click", () => void more());
-    const search = root?.querySelector<HTMLInputElement>(".search");
+    const search = root?.querySelector<HTMLInputElement>(".board-search input");
     search?.addEventListener("input", debounce(() => {
       void change({ query: search.value }).then(() => {
-        const box = root?.querySelector<HTMLInputElement>(".search");
+        const box = root?.querySelector<HTMLInputElement>(".board-search input");
         box?.focus();
         box?.setSelectionRange(box.value.length, box.value.length);
       });

@@ -283,9 +283,9 @@ export function board(
       <div class="tabs states">${states}</div>
       <div class="tabs">${tabs}</div>
       <div class="sorts">${sorts}</div>
-      <label class="search-wrap">
-        ${icons.search(16)}
-        <input class="search" type="search" value="${escapeAttr(filters.query)}"
+      <label class="search-box board-search">
+        ${icons.search(14)}
+        <input type="search" value="${escapeAttr(filters.query)}"
                placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
       </label>
     </div>
@@ -3399,7 +3399,7 @@ export function itemTeamView(
     item.moderation && item.moderation !== "published"
       ? settingsCard(
           text.t("item.waiting"),
-          `<div class="settings-row">
+          `<div class="settings-row decide">
             <div class="settings-info"><p>${escapeHTML(text.t("item.waitingHelp"))}</p></div>
             <div class="decide-actions">
               <button class="button primary with-icon" data-moderate="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
