@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,11 +16,13 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/bridge"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/forge"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/gitea"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/github"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/forge/gitlab"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/mail"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/notify"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/outbound"
 )
 
 // webhookBodyLimit is what a delivery may be. Generous — an issue payload with
@@ -281,38 +284,106 @@ func (s *Server) handleSetCredentials(w http.ResponseWriter, r *http.Request) {
 // repository has configured.
 //
 // Per repository, so a group can send one board to one room and another
-// somewhere else. One global channel is a channel everybody eventually
-// silences, and a silenced channel is the same as no channel with extra steps.
+// somewhere else. The server's own channel is a choice a board makes in its
+// settings, not something that applies to every board by itself: one channel
+// for everything is one everybody eventually silences, and a silenced channel is
+// the same as no channel with extra steps.
 func (s *Server) announce(ctx context.Context, repoID int64, title, kind, link string) error {
 	repo, err := s.orgs().RepositoryByID(repoID)
 	if err != nil {
 		return err
 	}
 
-	cfg := notify.Parse(repo.NotifyConfig)
+	cfg := s.channelFor(repo.NotifyConfig)
 	if !cfg.Active() {
 		return nil
 	}
-
-	notifier := notify.Notifier{
-		Out: s.out,
-		Mail: mail.Sender{
-			Config:  s.cfg.Mail,
-			Offline: s.cfg.Offline,
-		},
-	}
-	return notifier.Send(ctx, cfg, notify.Message{
+	return s.notifier().Send(ctx, cfg, notify.Message{
 		Title: repo.Name + ": " + kind,
 		Body:  title,
 		URL:   link,
 	})
 }
 
+func (s *Server) notifier() notify.Notifier {
+	return notify.Notifier{
+		Out: s.out,
+		Mail: mail.Sender{
+			Config:  s.cfg.Mail,
+			Offline: s.cfg.Offline,
+		},
+	}
+}
+
+// channelFor is the channel a message really goes out on: the board's own, or the
+// server's when the board chose it. An unreadable or missing server channel
+// resolves to nothing rather than to an error, for the same reason a bad JSON
+// blob on a repository does: a report must be accepted whatever state the
+// notifications are in.
+func (s *Server) channelFor(stored string) notify.Config {
+	cfg := notify.Parse(stored)
+	if cfg.Kind != notify.Server {
+		return cfg
+	}
+	return s.serverChannel()
+}
+
+// serverChannel is the channel set for the whole installation, or none.
+func (s *Server) serverChannel() notify.Config {
+	raw, err := s.settings().Get(settings.NotifyChannel)
+	if err != nil {
+		slog.Error("reading the server's notification channel", "error", err)
+		return notify.Config{}
+	}
+	cfg := notify.Parse(raw)
+	if cfg.Kind == notify.Server {
+		// A server channel that points at itself is nothing, not a loop.
+		return notify.Config{}
+	}
+	return cfg
+}
+
+// notifyChannel is what the channel form sends.
+//
+// A token is never sent back to the page, so an empty one means "leave it as it
+// is", and removing it is its own explicit flag: the alternative is a form that
+// erases a credential every time somebody corrects the address next to it.
 type notifyChannel struct {
-	Kind  string `json:"kind"`
-	URL   string `json:"url"`
-	Token string `json:"token"`
-	To    string `json:"to"`
+	Kind       string `json:"kind"`
+	URL        string `json:"url"`
+	Token      string `json:"token"`
+	To         string `json:"to"`
+	ClearToken bool   `json:"clear_token"`
+}
+
+// build turns what the form sent into the channel to store, given what is stored.
+func (in notifyChannel) build(previous notify.Config, mayChooseServer bool) (notify.Config, string) {
+	kind := notify.Kind(in.Kind)
+	if kind == notify.Server && !mayChooseServer {
+		return notify.Config{}, "error.channel_incomplete"
+	}
+	cfg := notify.Config{
+		Kind: kind, URL: strings.TrimSpace(in.URL), Token: in.Token, To: strings.TrimSpace(in.To),
+	}
+	if kind == notify.Server {
+		cfg.URL, cfg.Token, cfg.To = "", "", ""
+		return cfg, ""
+	}
+	if cfg.Token == "" && !in.ClearToken && previous.Kind == kind {
+		cfg.Token = previous.Token
+	}
+	if kind != "" && !cfg.Active() {
+		return notify.Config{}, "error.channel_incomplete"
+	}
+	switch kind {
+	case notify.Ntfy, notify.Gotify, notify.Webhook:
+		// An address with no scheme is the common mistake, and the test message
+		// would otherwise report it as the service being unreachable.
+		if u, err := url.Parse(cfg.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return notify.Config{}, "error.channel_bad_url"
+		}
+	}
+	return cfg, ""
 }
 
 // handleSetNotifyChannel stores where a board's team wants to be told.
@@ -336,11 +407,9 @@ func (s *Server) handleSetNotifyChannel(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	cfg := notify.Config{
-		Kind: notify.Kind(in.Kind), URL: in.URL, Token: in.Token, To: in.To,
-	}
-	if in.Kind != "" && !cfg.Active() {
-		writeError(w, http.StatusBadRequest, "error.channel_incomplete")
+	cfg, failure := in.build(notify.Parse(repo.NotifyConfig), true)
+	if failure != "" {
+		writeError(w, http.StatusBadRequest, failure)
 		return
 	}
 
@@ -358,6 +427,90 @@ func (s *Server) handleSetNotifyChannel(w http.ResponseWriter, r *http.Request) 
 	// The token is not echoed back, for the same reason the forge token is not:
 	// an endpoint that returns what it stored is a way to read a credential.
 	writeJSON(w, http.StatusOK, map[string]any{"kind": in.Kind, "active": cfg.Active()})
+}
+
+// handleTestNotifyChannel sends one message down the channel as the form has it,
+// before anything is saved, so a mistake shows up now and not at the first
+// report. A token left empty is the stored one, which the form cannot show.
+func (s *Server) handleTestNotifyChannel(w http.ResponseWriter, r *http.Request) {
+	repo, organisation, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+	if !s.may(w, r, authz.ManageOrganization, authz.Organization(organisation.ID)) {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	var in notifyChannel
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	cfg, failure := in.build(notify.Parse(repo.NotifyConfig), true)
+	if failure != "" || cfg.Kind == notify.None {
+		if failure == "" {
+			failure = "error.channel_incomplete"
+		}
+		writeError(w, http.StatusBadRequest, failure)
+		return
+	}
+	if cfg.Kind == notify.Server {
+		cfg = s.serverChannel()
+		if !cfg.Active() {
+			writeError(w, http.StatusUnprocessableEntity, "error.channel_server_unset")
+			return
+		}
+	}
+	s.finishChannelTest(w, r.Context(), cfg, repo.Name)
+}
+
+// finishChannelTest sends the test message and answers with the reason it did not
+// arrive, in a form a person can act on.
+func (s *Server) finishChannelTest(w http.ResponseWriter, ctx context.Context, cfg notify.Config, name string) {
+	link := ""
+	if base := strings.TrimSuffix(s.cfg.PublicURL, "/"); base != "" {
+		link = base
+	}
+	// A short deadline of its own: the person is waiting on the button, and a
+	// service that does not answer is the answer.
+	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+
+	err := s.notifier().Send(ctx, cfg, notify.Message{
+		Title: "LastHelp: test",
+		Body:  "This is a test from " + name + ". If you can read it, this channel works.",
+		URL:   link,
+	})
+	if err == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
+	key := channelFailure(err, cfg.Kind)
+	// The reason class only, never the error text: it carries the address, and an
+	// address is half of a credential for a service that is addressed by a topic.
+	slog.Warn("a notification channel test failed", "kind", string(cfg.Kind), "reason", key)
+	writeError(w, http.StatusUnprocessableEntity, key)
+}
+
+// channelFailure names why a message did not go, as a key a person can read.
+func channelFailure(err error, kind notify.Kind) string {
+	var refused notify.StatusError
+	switch {
+	case errors.Is(err, mail.ErrNotConfigured):
+		return "error.channel_no_relay"
+	case errors.Is(err, mail.ErrOffline), errors.Is(err, outbound.ErrOffline):
+		return "error.channel_offline"
+	case errors.As(err, &refused):
+		switch refused.Code {
+		case http.StatusUnauthorized, http.StatusForbidden:
+			return "error.channel_denied"
+		case http.StatusNotFound:
+			return "error.channel_not_found"
+		}
+		return "error.channel_rejected"
+	}
+	return "error.channel_unreachable"
 }
 
 // tellReporter delivers to the person who reported, opening the address only

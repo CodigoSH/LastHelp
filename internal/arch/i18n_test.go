@@ -365,9 +365,10 @@ func TestEveryErrorTheServerSendsHasWords(t *testing.T) {
 // one is a decision somebody writes down.
 func TestNothingSaysEmailWhereItMeansUsername(t *testing.T) {
 	aboutMail := map[string]bool{
-		"form.email":     true, // the reporter's optional address
-		"form.emailHelp": true,
-		"panel.mailTo":   true, // where a mail channel delivers
+		"form.email":             true, // the reporter's optional address
+		"form.emailHelp":         true,
+		"panel.mailTo":           true, // where a mail channel delivers
+		"error.channel_no_relay": true, // a test of the mail channel, saying why no mail went
 	}
 
 	master, ok := catalogues(t)["en"]

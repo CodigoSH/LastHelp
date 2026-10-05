@@ -268,6 +268,7 @@ func (s *Server) routes() {
 	private("POST /api/items/{id}/attach", s.handleAttachIssue)
 	private("POST /api/orgs/{org}/credentials", s.handleSetCredentials)
 	private("POST /api/orgs/{org}/repos/{repo}/channel", s.handleSetNotifyChannel)
+	private("POST /api/orgs/{org}/repos/{repo}/channel/test", s.handleTestNotifyChannel)
 
 	private("POST /api/me/password", s.handleChangePassword)
 	private("POST /api/me/profile", s.handleChangeProfile)
@@ -301,6 +302,12 @@ func (s *Server) routes() {
 	private("GET /api/backup", s.handleBackup)
 
 	private("POST /api/instance", s.handleSetInstance)
+
+	// The channel the administrator sets once for the whole installation, which a
+	// repository chooses in its own settings.
+	private("GET /api/notifications", s.handleGetServerChannel)
+	private("PUT /api/notifications", s.handleSetServerChannel)
+	private("POST /api/notifications/test", s.handleTestServerChannel)
 
 	private("GET /api/update", s.handleUpdateStatus)
 	private("POST /api/update", s.handleUpdatePerform)

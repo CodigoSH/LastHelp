@@ -1152,6 +1152,37 @@ async function main() {
     JSON.stringify({ piezas, receta: receta.slice(0, 6) }),
   );
 
+  // 11d. The server's channel, set once by the administrator: it is read back
+  //      with its address and without its token, and what it points at is
+  //      what a repository's picker offers.
+  await goTo("/panel/notifications", "form.channel");
+  const servidor = await evaluate(`
+    const f = document.querySelector("form.channel");
+    const kind = f.querySelector("#chan-kind");
+    kind.value = "ntfy";
+    kind.dispatchEvent(new Event("change"));
+    f.querySelector("#chan-url").value = "https://ntfy.example/server-topic";
+    f.querySelector("#chan-token").value = "tk_server_drive";
+    f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await new Promise(r => setTimeout(r, 1100));
+    const g = document.querySelector("form.channel");
+    const res = { url: g.querySelector("#chan-url")?.value ?? "", token: g.querySelector("#chan-token")?.value ?? "",
+      guardado: !!g.querySelector("input[name=clear_token]"),
+      sinServidor: ![...g.querySelectorAll("#chan-kind option")].some(o => o.value === "server") };
+    // Off again, so nothing afterwards delivers anywhere.
+    const csrf = document.cookie.split(";").map(c => c.trim())
+      .find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/notifications", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+      body: JSON.stringify({ kind: "" }) });
+    return res;
+  `);
+  check(
+    "the server's channel is saved from its own screen, read back with its address and not its token",
+    servidor.url === "https://ntfy.example/server-topic" && servidor.token === "" && servidor.guardado && servidor.sinServidor,
+    JSON.stringify(servidor),
+  );
+
   // 11e. The accent is chosen from seven swatches and an eighth
   //      for any colour. A swatch writes the form's field and is the only one
   //      ringed; a colour of one's own paints the eighth; and its palette sits
@@ -3363,7 +3394,6 @@ async function main() {
     f.querySelector("#chan-token").value = "tk_drive";
     f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     await new Promise(r => setTimeout(r, 1100));
-    const ahora = document.querySelector("[data-channel-now]")?.textContent ?? "";
     const elegido = document.querySelector("#chan-kind")?.value ?? "";
     const url = document.querySelector("#chan-url")?.value ?? "";
     // Back to none, so nothing afterwards tries to deliver anywhere.
@@ -3372,11 +3402,15 @@ async function main() {
     await fetch("/api/orgs/codigosh/repos/lastboard/channel", { method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
       body: JSON.stringify({ kind: "" }) });
-    return { ahora, elegido, url };
+    const quitar = !!document.querySelector("input[name=clear_token]");
+    const prueba = !!document.querySelector("[data-channel-test]");
+    const token = document.querySelector("#chan-token")?.value ?? "";
+    return { elegido, url, quitar, prueba, token };
   `);
   check(
-    "the channel is set from the repository's page and said back without what it stores",
-    canal.ahora.includes("ntfy") && canal.elegido === "ntfy" && canal.url === "",
+    "the channel is set from the repository's page and said back with its address, never its token",
+    canal.elegido === "ntfy" && canal.url === "https://ntfy.example/drive-topic" && canal.token === "" &&
+      canal.quitar && canal.prueba && !JSON.stringify(canal).includes("tk_drive"),
     JSON.stringify(canal),
   );
 
@@ -3411,7 +3445,11 @@ async function main() {
     await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
     location.href = ${JSON.stringify(String(href))};
   `);
-  await sleep(2000);
+  // The page, not a number of seconds: a fixed wait is a bet on the machine.
+  for (let i = 0; i < 40; i++) {
+    if (await evaluate(`return !!document.querySelector("article.detail")`)) break;
+    await sleep(250);
+  }
   const visitor = await evaluate(`
     return {
       sidebar: !!document.querySelector(".side"),

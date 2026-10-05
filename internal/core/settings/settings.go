@@ -26,6 +26,11 @@ const VoterSigningKey = "voter_signing_key"
 // the other, and they have very different lifetimes.
 const FormSigningKey = "form_signing_key"
 
+// NotifyChannel is the channel the administrator sets once for the whole
+// installation, as JSON in the shape a repository's own uses. A repository
+// reaches it only by choosing "the server's" in its own settings.
+const NotifyChannel = "notify_channel"
+
 // InstanceName is what this installation calls itself: the title in the tab,
 // the name in the header, the word a reporter sees before anything else.
 //
