@@ -16,8 +16,9 @@ signed up to without choosing it is a channel everybody eventually silences.
 Choose it in the panel, on the repository's page (**Organisations**, the
 organisation, then the repository): pick a channel, and it asks only for what
 that channel needs. The address and the recipient are shown again once saved,
-so you can check them; the token is not. Leave the token empty when saving and
-the stored one is kept, or tick **Remove the saved token** to drop it.
+so you can check them. A saved token is shown as dots: it is there, and which one
+it is cannot be seen. Type a new token over the dots to replace it, or empty the
+field to remove it; leave the dots as they are and the stored one is kept.
 
 **Send a test** sends a message through what is on the form, using the stored
 token if you left that field empty, and says why when it does not arrive: the

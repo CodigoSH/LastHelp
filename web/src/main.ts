@@ -35,6 +35,7 @@ import { LandingEditor } from "./landingEditor";
 import { openUpdateDialog, type UpdateInfo } from "./updateModal";
 import { icons } from "./views/icons";
 import { installSearchShortcut } from "./services/searchShortcut";
+import { MASK, secretIntent } from "./services/secretField";
 
 const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
@@ -1925,14 +1926,30 @@ function wireChannel(
   kind?.addEventListener("change", sync);
   sync();
 
+  // The saved token is only the saved token of the kind of channel it was saved
+  // for: another kind starts with none, so the dots go when the kind changes.
+  const savedKind = form.dataset.kind ?? "";
+  const tokenField = form.querySelector<HTMLInputElement>("#chan-token");
+  const hadToken = () => form.hasAttribute("data-has-token") && (kind?.value ?? "") === savedKind;
+  kind?.addEventListener("change", () => {
+    if (tokenField && !hadToken() && secretIntent(tokenField.value, true).kind === "keep") tokenField.value = "";
+    else if (tokenField && hadToken() && tokenField.value === "") tokenField.value = MASK;
+  });
+  // Entering the field selects everything: the first key replaces the dots and
+  // Delete empties them.
+  tokenField?.addEventListener("focus", () => tokenField.select());
+
   const read = (): Record<string, unknown> => {
     const data = new FormData(form);
+    const intent = secretIntent(String(data.get("token") ?? ""), hadToken());
     return {
       kind: String(data.get("kind") ?? ""),
       url: String(data.get("url") ?? ""),
-      token: String(data.get("token") ?? ""),
+      // Empty means "keep": a browser that has not reloaded sends the form without
+      // this field, and the removal travels as its own mark.
+      token: intent.kind === "set" ? intent.secret : "",
       to: String(data.get("to") ?? ""),
-      clear_token: data.get("clear_token") !== null,
+      clear_token: intent.kind === "clear",
     };
   };
   // The failure stays beside the form as well as toasting: it is about what was
