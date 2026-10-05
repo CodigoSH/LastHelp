@@ -39,6 +39,7 @@ const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
   markup: (key, markup) => i18n.markup(key, markup),
   date: (value) => i18n.date(value),
+  dateTime: (value) => i18n.dateTime(value),
   number: (value) => i18n.number(value),
   bytes: (value) => i18n.bytes(value),
   since: (seconds) => i18n.since(seconds),

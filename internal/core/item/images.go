@@ -70,17 +70,14 @@ type Image struct {
 // It goes through the same door as a vote and a comment: a report that is
 // answered, turned down or folded into another takes nothing more. On top of
 // that, the board has to take pictures, the message and the thread have to
-// have room, and so does the installation.
-func (s Store) AddImage(itemID, commentID int64, data []byte, now time.Time) (Image, error) {
+// have room, and so does the installation. `author` is who the picture is from,
+// which is who the message it hangs on is from, or the reporter for the report.
+func (s Store) AddImage(itemID, commentID int64, author Author, data []byte, now time.Time) (Image, error) {
 	if len(data) > MaxImageUpload {
 		return Image{}, ErrImageTooLarge
 	}
-	_, status, err := s.standing(itemID)
-	if err != nil {
+	if err := s.mayWriteOn(itemID, author, now); err != nil {
 		return Image{}, err
-	}
-	if status.Closes() {
-		return Image{}, ErrConversationClosed
 	}
 
 	var accepts bool

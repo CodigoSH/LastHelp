@@ -159,6 +159,7 @@
   "item.commentWaiting": "Gönderildi. İncelemeden sonra görünecek.",
   "item.comments": "Yorumlar",
   "item.commentsClosed": "Bu bildirim kapatıldı ve artık yorum kabul etmiyor.",
+  "item.commentsUntil": "Bu bildirim kapatıldı. {date} tarihine kadar buraya yazabilirsiniz, sonrasında görüşme kapanır.",
   "item.confirmDelete": "“{title}” silinsin mi? Oyları, yorumları ve yanıtları silinecek. Bu geri alınamaz.",
   "item.confirmDeleteComment": "Bu yorum silinsin mi? Bu geri alınamaz.",
   "item.delete": "Bildirimi sil",

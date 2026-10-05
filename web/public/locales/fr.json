@@ -159,6 +159,7 @@
   "item.commentWaiting": "Envoyé. Il apparaîtra après validation.",
   "item.comments": "Commentaires",
   "item.commentsClosed": "Ce rapport est clos et n’accepte plus de commentaires.",
+  "item.commentsUntil": "Ce rapport est clos. Vous pouvez encore écrire ici jusqu’au {date}, puis la conversation sera close.",
   "item.confirmDelete": "Supprimer « {title} » ? Ses votes, commentaires et réponses seront supprimés. C'est irréversible.",
   "item.confirmDeleteComment": "Supprimer ce commentaire ? C'est irréversible.",
   "item.delete": "Supprimer le signalement",

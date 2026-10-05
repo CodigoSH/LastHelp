@@ -119,7 +119,13 @@ func (s *Server) handleAddPicture(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusRequestEntityTooLarge, "error.image_too_large")
 		return
 	}
-	img, err := s.items().AddImage(it.ID, commentID, data, s.now())
+	// A picture is from whoever wrote what it hangs on: the reporter for the report,
+	// the author of the message for a message.
+	from := item.AuthorReporter
+	if on != nil {
+		from = on.Author
+	}
+	img, err := s.items().AddImage(it.ID, commentID, from, data, s.now())
 	if err != nil {
 		writePictureError(w, err)
 		return

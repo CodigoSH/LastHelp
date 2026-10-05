@@ -159,6 +159,7 @@
   "item.commentWaiting": "Enviado. Aparecerá após revisão.",
   "item.comments": "Comentários",
   "item.commentsClosed": "Este relatório está encerrado e já não aceita comentários.",
+  "item.commentsUntil": "Este relatório está encerrado. Ainda pode escrever aqui até {date}; depois a conversa fecha.",
   "item.confirmDelete": "Eliminar «{title}»? Os seus votos, comentários e respostas serão eliminados. Isto não pode ser desfeito.",
   "item.confirmDeleteComment": "Eliminar este comentário? Isto não pode ser desfeito.",
   "item.delete": "Eliminar relato",

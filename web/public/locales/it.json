@@ -159,6 +159,7 @@
   "item.commentWaiting": "Inviato. Comparirà dopo la revisione.",
   "item.comments": "Commenti",
   "item.commentsClosed": "Questa segnalazione è chiusa e non accetta più commenti.",
+  "item.commentsUntil": "Questa segnalazione è chiusa. Puoi ancora scrivere qui fino al {date}, poi la conversazione si chiude.",
   "item.confirmDelete": "Eliminare «{title}»? I suoi voti, commenti e risposte verranno eliminati. L'operazione non è reversibile.",
   "item.confirmDeleteComment": "Eliminare questo commento? L'operazione non è reversibile.",
   "item.delete": "Elimina segnalazione",

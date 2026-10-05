@@ -179,6 +179,8 @@ export interface ItemSummary {
   /** False once the team has answered: the thread stays and the form goes.
    *  Absent means open. */
   commentable?: boolean;
+  /** When an answered report stops taking words from this reader, in seconds; absent when it is not answered or is shut to them. */
+  comment_until?: number;
   created_at: number;
 }
 

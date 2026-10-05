@@ -159,6 +159,7 @@
   "item.commentWaiting": "Verzonden. Wordt na beoordeling getoond.",
   "item.comments": "Reacties",
   "item.commentsClosed": "Dit rapport is gesloten en neemt geen reacties meer aan.",
+  "item.commentsUntil": "Dit rapport is gesloten. Je kunt hier nog schrijven tot {date}, daarna wordt het gesprek gesloten.",
   "item.confirmDelete": "“{title}” verwijderen? De stemmen, reacties en antwoorden worden verwijderd. Dit kan niet ongedaan worden gemaakt.",
   "item.confirmDeleteComment": "Deze reactie verwijderen? Dit kan niet ongedaan worden gemaakt.",
   "item.delete": "Melding verwijderen",

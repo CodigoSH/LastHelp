@@ -159,6 +159,7 @@
   "item.commentWaiting": "Terkirim. Akan muncul setelah ditinjau.",
   "item.comments": "Komentar",
   "item.commentsClosed": "Laporan ini sudah ditutup, sehingga tidak menerima komentar lagi.",
+  "item.commentsUntil": "Laporan ini sudah ditutup. Anda masih dapat menulis di sini sampai {date}, setelah itu percakapan ditutup.",
   "item.confirmDelete": "Hapus “{title}”? Suara, komentar, dan balasannya akan dihapus. Ini tidak bisa dibatalkan.",
   "item.confirmDeleteComment": "Hapus komentar ini? Ini tidak bisa dibatalkan.",
   "item.delete": "Hapus laporan",

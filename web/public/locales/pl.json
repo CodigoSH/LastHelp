@@ -159,6 +159,7 @@
   "item.commentWaiting": "Wysłano. Pojawi się po przeglądzie.",
   "item.comments": "Komentarze",
   "item.commentsClosed": "To zgłoszenie jest zamknięte i nie przyjmuje już komentarzy.",
+  "item.commentsUntil": "To zgłoszenie jest zamknięte. Możesz tu jeszcze pisać do {date}, potem rozmowa zostanie zamknięta.",
   "item.confirmDelete": "Usunąć „{title}”? Jego głosy, komentarze i odpowiedzi zostaną usunięte. Tego nie da się cofnąć.",
   "item.confirmDeleteComment": "Usunąć ten komentarz? Tego nie da się cofnąć.",
   "item.delete": "Usuń zgłoszenie",

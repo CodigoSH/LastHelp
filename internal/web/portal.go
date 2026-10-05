@@ -443,6 +443,20 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	body["comments"] = thread
 	body["images"] = s.visiblePictures(r, it)
 	body["mine"] = mine
+	// Whether the form is shown to this reader. An answered report keeps taking
+	// words from the reporter and the team for a while, and `comment_until` says
+	// when that ends so the page can tell them; a visitor's form goes at once.
+	reader := item.AuthorVisitor
+	switch {
+	case s.mayTriageItem(r, it):
+		reader = item.AuthorTeam
+	case mine:
+		reader = item.AuthorReporter
+	}
+	body["commentable"] = it.TakesCommentsFrom(reader, s.now())
+	if it.Status.Closes() && it.TakesCommentsFrom(reader, s.now()) {
+		body["comment_until"] = it.ClosedAt.Add(item.GraceAfterClosing).Unix()
+	}
 	// Where this came from. A report is the one page of this product that
 	// travels: it is pasted into a chat, mailed to a colleague, linked from an
 	// issue. Whoever arrives that way used to land on a title with no way to

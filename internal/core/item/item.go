@@ -44,8 +44,9 @@ var (
 	ErrVotingClosed = errors.New("voting is closed on an answered idea")
 
 	// ErrConversationClosed is returned for a comment or a reply on a report the
-	// team has answered. Like the count of votes, what was said by then is the
-	// record, and it stops moving. Reopening the report opens it again.
+	// team has answered, once the time after the answer is over. Like the count
+	// of votes, what was said by then is the record, and it stops moving.
+	// Reopening the report opens it again.
 	ErrConversationClosed = errors.New("the conversation is closed on an answered report")
 
 	// ErrAlreadyVoted is not an error the page shows as a failure: it means the
@@ -103,11 +104,32 @@ func (i Item) Votable() bool {
 	return i.Kind == Idea && !i.Status.Closes()
 }
 
-// TakesComments says whether somebody can still write on this: anything the
-// team has not answered, idea or bug. The same moment voting closes, and read
-// from the same place.
+// GraceAfterClosing is how long the reporter and the team may keep writing on a
+// report after it was answered. An answer is rarely the end of the exchange: the
+// reporter confirms the fix or says it did not work, and the team has a last word
+// to add. A visitor has no such thing to say, so for them the report closes at once.
+const GraceAfterClosing = 48 * time.Hour
+
+// TakesComments says whether somebody who is just reading can still write on
+// this: anything the team has not answered. It is the visitor's answer; the
+// reporter and the team have TakesCommentsFrom.
 func (i Item) TakesComments() bool {
 	return !i.Status.Closes()
+}
+
+// TakesCommentsFrom is the same question for one author at one moment. An
+// answered report stays open to the reporter and the team for GraceAfterClosing
+// after the answer, and to nobody else. One rule, asked by the store when
+// something is written and by the page when it decides to show the form, so the
+// two cannot disagree about whether the form should be there.
+func (i Item) TakesCommentsFrom(author Author, now time.Time) bool {
+	if !i.Status.Closes() {
+		return true
+	}
+	if author == AuthorVisitor || i.ClosedAt.IsZero() {
+		return false
+	}
+	return now.Before(i.ClosedAt.Add(GraceAfterClosing))
 }
 
 // Closes says whether a status is an answer: fixed, shipped, not planned, not
@@ -459,6 +481,30 @@ func (s Store) standing(itemID int64) (Kind, Status, error) {
 		return "", "", ErrNotFound
 	}
 	return Kind(kind), Status(status), nil
+}
+
+// mayWriteOn is the rule a comment, a reply and a picture on one share: whether
+// this author may still add to the report now.
+func (s Store) mayWriteOn(itemID int64, author Author, now time.Time) error {
+	_, status, err := s.standing(itemID)
+	if err != nil {
+		return err
+	}
+	if !status.Closes() {
+		return nil
+	}
+	var closed sql.NullInt64
+	if err := s.DB.QueryRow(`SELECT closed_at FROM item WHERE id = ?`, itemID).Scan(&closed); err != nil {
+		return fmt.Errorf("looking up when it was answered: %w", err)
+	}
+	it := Item{Status: status}
+	if closed.Valid {
+		it.ClosedAt = time.Unix(closed.Int64, 0)
+	}
+	if it.TakesCommentsFrom(author, now) {
+		return nil
+	}
+	return ErrConversationClosed
 }
 
 // Unvote takes a vote back.

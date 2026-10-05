@@ -29,6 +29,8 @@ export interface Text {
   /** A sentence, escaped, with ready-made markup in its placeholders. */
   markup(key: string, markup: Record<string, string>): string;
   date(value: number): string;
+  /** The same with the time of day. */
+  dateTime(value: number): string;
   number(value: number): string;
   /** A size, at a scale a person reads, with the unit named in their language. */
   bytes(value: number): string;
@@ -894,7 +896,7 @@ export function itemView(
       ${
         item.commentable === false
           ? `<p class="hint comment-closed">${escapeHTML(text.t("item.commentsClosed"))}</p>`
-          : `<form class="comment-form bento-card">
+          : `${commentWindow(item, text)}<form class="comment-form bento-card">
         <label for="comment-body">${escapeHTML(text.t("item.addComment"))}</label>
         <textarea id="comment-body" name="body" rows="3"
                   placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
@@ -2537,6 +2539,16 @@ function channelForm(
   </form>`;
 }
 
+/**
+ * What an answered report says above the form it still offers: until when. The
+ * reporter and the team keep writing for a while after the answer, and a form
+ * that was there and is suddenly not, with no word about it, reads as broken.
+ */
+function commentWindow(item: { comment_until?: number }, text: Text): string {
+  if (item.comment_until === undefined) return "";
+  return `<p class="hint comment-window">${escapeHTML(text.t("item.commentsUntil", { date: text.dateTime(item.comment_until) }))}</p>`;
+}
+
 /** The channel every repository can choose, set once by whoever runs the server. */
 export function notificationsScreen(
   channel: { kind: string; channel_url: string; channel_to: string; channel_has_token: boolean },
@@ -3337,7 +3349,7 @@ export function itemTeamView(
     ${
       item.commentable === false
         ? `<p class="hint comment-closed">${escapeHTML(text.t("item.commentsClosed"))}</p>`
-        : `<form class="team-reply">
+        : `${commentWindow(item, text)}<form class="team-reply">
       <div class="field">
         <label for="team-reply-body">${escapeHTML(text.t("panel.reply"))}</label>
         <textarea id="team-reply-body" name="body" rows="3" required
