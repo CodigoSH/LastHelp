@@ -114,6 +114,48 @@ async function main() {
     JSON.stringify(counted),
   );
 
+  // A long list is paged and searched: ten to a page, the range said, the last
+  // page shorter, a search that narrows and says when nothing matches.
+  await evaluate(`
+    const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const words = Array.from({ length: 23 }, (_, i) => "word" + String(i).padStart(2, "0"));
+    words.push("Casiño");
+    await fetch("/api/antiabuse/words", { method: "PUT",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify({ words }) });
+  `);
+  await page.send("Page.navigate", { url: BASE + "/panel/antiabuse" });
+  await waitFor("form.word-add");
+  const paged = await evaluate(`
+    const names = () => [...document.querySelectorAll(".settings-list.words .si-name")].map(e => e.textContent);
+    const out = { first: names().length, firstOfPrev: document.querySelector(".pager-prev")?.disabled };
+    document.querySelector(".pager-next").click();
+    out.second = names().length;
+    document.querySelector(".pager-next").click();
+    out.third = names().length; out.lastNext = document.querySelector(".pager-next").disabled;
+    const q = document.querySelector(".word-search input");
+    q.value = "CASINO"; q.dispatchEvent(new Event("input", { bubbles: true }));
+    out.found = names(); out.pagerGone = !document.querySelector(".pager");
+    q.value = "nothing-like-this"; q.dispatchEvent(new Event("input", { bubbles: true }));
+    out.empty = document.querySelectorAll(".settings-list.words").length === 0 && document.querySelector(".word-results").textContent.includes("nothing-like-this");
+    return out;
+  `);
+  check(
+    "a long list is shown ten to a page, searched without caring for capitals or accents, and says when nothing matches",
+    paged.first === 10 && paged.firstOfPrev === true && paged.second === 10 && paged.third === 4 && paged.lastNext === true &&
+      JSON.stringify(paged.found) === '["Casiño"]' && paged.pagerGone === true && paged.empty === true,
+    JSON.stringify(paged),
+  );
+
+  // The same card as every other screen of the panel, not a wider one.
+  const widthOf = async (path: string, marker: string) => {
+    await goTo(path, marker);
+    return evaluate(`return Math.round(document.querySelector(".settings-card").getBoundingClientRect().width)`);
+  };
+  const reference = await widthOf("/panel/personalization", "form.instance-settings");
+  const anti = await widthOf("/panel/antiabuse", "form.word-add");
+  const notif = await widthOf("/panel/notifications", "form.channel");
+  check("the anti-abuse and notifications cards are as wide as the rest of the panel's", anti === reference && notif === reference, JSON.stringify({ reference, anti, notif }));
+
   await evaluate(`
     const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
     await fetch("/api/antiabuse/words", { method: "PUT",

@@ -2563,29 +2563,88 @@ export interface AntiabuseData {
  * away. One list for the whole server and no language on it: it is the
  * operator's notebook of what turns up in their own queue.
  */
+/** How many words a page of the list shows. */
+export const WORDS_PER_PAGE = 10;
+
+/**
+ * The words as they are looked for: lower case and without accents, the way the
+ * server compares them, so what is typed in the search box finds what the list
+ * would refuse. Only used to narrow what is shown; the server decides what is
+ * refused.
+ */
+export function foldForSearch(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+}
+
+/** How many a word or a check has turned away: a label and a number, so it reads
+ *  the same in every language without a plural to get right, and in the accent
+ *  once it has done something. */
+function refusedTag(n: number, text: Text): string {
+  return `<span class="mono-tag${n > 0 ? " accent" : ""}">${escapeHTML(text.t("antiabuse.refused"))} ${escapeHTML(text.number(n))}</span>`;
+}
+
+/**
+ * The rows of the list for one page of one search, and the pager under them.
+ * Drawn on its own so a search or a page turn replaces this and nothing else on
+ * the screen.
+ */
+export function antiabuseWordRows(
+  words: { word: string; count: number }[],
+  view: { query: string; page: number },
+  text: Text,
+): string {
+  if (words.length === 0) return `<p class="card-sub">${escapeHTML(text.t("antiabuse.noWords"))}</p>`;
+  const wanted = foldForSearch(view.query);
+  const found = wanted === "" ? words : words.filter((w) => foldForSearch(w.word).includes(wanted));
+  if (found.length === 0) {
+    return `<p class="card-sub">${escapeHTML(text.t("antiabuse.noMatches", { query: view.query.trim() }))}</p>`;
+  }
+  const pages = Math.ceil(found.length / WORDS_PER_PAGE);
+  const page = Math.min(Math.max(view.page, 0), pages - 1);
+  const shown = found.slice(page * WORDS_PER_PAGE, (page + 1) * WORDS_PER_PAGE);
+
+  const rows = shown
+    .map((w) =>
+      settingsItem({
+        lead: "",
+        name: w.word,
+        tags: refusedTag(w.count, text),
+        attrs: `data-word="${escapeAttr(w.word)}"`,
+        actions:
+          iconButton("edit", text.t("action.edit"), `data-edit-word="${escapeAttr(w.word)}"`) +
+          iconButton("remove", text.t("action.remove"), `class="icon-button danger" data-remove-word="${escapeAttr(w.word)}"`),
+      }),
+    )
+    .join("");
+
+  const pager =
+    pages > 1
+      ? `<nav class="pager" aria-label="${escapeAttr(text.t("antiabuse.pages"))}">
+          <button type="button" class="icon-button pager-prev" data-page="${page - 1}"${page === 0 ? " disabled" : ""}
+            title="${escapeAttr(text.t("antiabuse.prev"))}" aria-label="${escapeAttr(text.t("antiabuse.prev"))}">${icons.chevron(16)}</button>
+          <span class="pager-range">${escapeHTML(
+            text.t("antiabuse.range", {
+              from: text.number(page * WORDS_PER_PAGE + 1),
+              to: text.number(page * WORDS_PER_PAGE + shown.length),
+              total: text.number(found.length),
+            }),
+          )}</span>
+          <button type="button" class="icon-button pager-next" data-page="${page + 1}"${page === pages - 1 ? " disabled" : ""}
+            title="${escapeAttr(text.t("antiabuse.next"))}" aria-label="${escapeAttr(text.t("antiabuse.next"))}">${icons.chevron(16)}</button>
+        </nav>`
+      : "";
+  return `<ul class="settings-list words">${rows}</ul>${pager}`;
+}
+
+/**
+ * The server's word list and what each layer of the anti-abuse checks turned
+ * away. One list for the whole server and no language on it: it is the
+ * operator's notebook of what turns up in their own queue.
+ *
+ * The search and the pages only appear once the list is longer than a page: a
+ * box that filters four words is a box in the way.
+ */
 export function antiabuseScreen(data: AntiabuseData, text: Text): string {
-  // How many a word or a check has turned away: a label and a number, so it reads
-  // the same in every language without a plural to get right, and in the accent
-  // once it has done something.
-  const refused = (n: number) =>
-    `<span class="mono-tag${n > 0 ? " accent" : ""}">${escapeHTML(text.t("antiabuse.refused"))} ${escapeHTML(text.number(n))}</span>`;
-
-  const words = data.words.length
-    ? `<ul class="settings-list words">${data.words
-        .map((w) =>
-          settingsItem({
-            lead: "",
-            name: w.word,
-            tags: refused(w.count),
-            attrs: `data-word="${escapeAttr(w.word)}"`,
-            actions:
-              iconButton("edit", text.t("action.edit"), `data-edit-word="${escapeAttr(w.word)}"`) +
-              iconButton("remove", text.t("action.remove"), `class="icon-button danger" data-remove-word="${escapeAttr(w.word)}"`),
-          }),
-        )
-        .join("")}</ul>`
-    : `<p class="card-sub">${escapeHTML(text.t("antiabuse.noWords"))}</p>`;
-
   const layerName = (layer: string) => {
     const key = `antiabuse.layer.${layer}`;
     const named = text.t(key);
@@ -2598,13 +2657,23 @@ export function antiabuseScreen(data: AntiabuseData, text: Text): string {
             lead: "",
             name: l.repo_name,
             sub: `${l.org_name} · ${layerName(l.layer)}`,
-            tags: refused(l.count),
+            tags: refusedTag(l.count, text),
           }),
         )
         .join("")}</ul>`
     : `<p class="card-sub">${escapeHTML(text.t("antiabuse.layersNone"))}</p>`;
 
+  const search =
+    data.words.length > WORDS_PER_PAGE
+      ? `<label class="search-wrap word-search">
+          ${icons.search(16)}
+          <input class="search" type="search" name="q" autocomplete="off"
+            placeholder="${escapeAttr(text.t("antiabuse.search"))}" aria-label="${escapeAttr(text.t("antiabuse.search"))}" />
+        </label>`
+      : "";
+
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.antiabuse"))}</h1>
+    <div class="settings">
     ${settingsCard(
       text.t("antiabuse.wordsTitle"),
       `<form class="word-add">
@@ -2621,13 +2690,15 @@ export function antiabuseScreen(data: AntiabuseData, text: Text): string {
       </form>
       <p class="hint word-help">${escapeHTML(text.t("antiabuse.wordsHelp", { max: data.max_words, length: data.max_length }))}</p>
       <p class="form-error" role="alert" hidden></p>
-      ${words}`,
+      ${search}
+      <div class="word-results">${antiabuseWordRows(data.words, { query: "", page: 0 }, text)}</div>`,
       {
         lead: text.t("antiabuse.lead"),
         action: `<span class="mono-tag">${escapeHTML(text.number(data.words.length))} / ${escapeHTML(text.number(data.max_words))}</span>`,
       },
     )}
-    ${settingsCard(text.t("antiabuse.layersTitle"), layers, { lead: text.t("antiabuse.layersLead") })}`;
+    ${settingsCard(text.t("antiabuse.layersTitle"), layers, { lead: text.t("antiabuse.layersLead") })}
+    </div>`;
 }
 
 /** The channel every repository can choose, set once by whoever runs the server. */
@@ -2636,7 +2707,7 @@ export function notificationsScreen(
   text: Text,
 ): string {
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.notifications"))}</h1>
-    ${settingsCard(
+    <div class="settings">${settingsCard(
       text.t("shell.notifications"),
       channelForm(text, {
         kind: channel.kind,
@@ -2645,7 +2716,7 @@ export function notificationsScreen(
         hasToken: channel.channel_has_token,
       }),
       { lead: text.t("notifications.lead") },
-    )}`;
+    )}</div>`;
 }
 
 /** Everything about this installation that an operator chose rather than typed. */
