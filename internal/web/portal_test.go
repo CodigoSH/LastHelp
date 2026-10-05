@@ -1480,7 +1480,7 @@ func TestAnAnsweredReportClosesItsConversation(t *testing.T) {
 }
 
 // TestTheFrontPageCardCountsWhatTheBoardPageCounts: the number beside each kind
-// on a board's card is the number on the open tab of the page behind it. Two
+// on a board's card is what the two tabs of the page behind it add up to. Two
 // paths computing one magnitude are how a screen ends up contradicting itself,
 // so what is asserted is the relation, not either figure.
 func TestTheFrontPageCardCountsWhatTheBoardPageCounts(t *testing.T) {
@@ -1518,16 +1518,18 @@ func TestTheFrontPageCardCountsWhatTheBoardPageCounts(t *testing.T) {
 			}
 		}
 	}
-	if card["open_ideas"] != float64(2) || card["open_bugs"] != float64(1) {
-		t.Fatalf("the card says %v ideas and %v bugs open, want 2 and 1 (an answered one and an unpublished one do not count)",
-			card["open_ideas"], card["open_bugs"])
+	if card["total_ideas"] != float64(3) || card["total_bugs"] != float64(2) {
+		t.Fatalf("the card says %v ideas and %v bugs, want 3 and 2 (the answered ones count; one that was never published does not)",
+			card["total_ideas"], card["total_bugs"])
 	}
 
-	for kind, key := range map[string]string{"idea": "open_ideas", "bug": "open_bugs"} {
+	for kind, key := range map[string]string{"idea": "total_ideas", "bug": "total_bugs"} {
 		page := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/items?kind="+kind, nil))
 		counts, _ := page["counts"].(map[string]any)
-		if counts["open"] != card[key] {
-			t.Errorf("the card says %v open %ss and the board's open tab says %v", card[key], kind, counts["open"])
+		open, _ := counts["open"].(float64)
+		closed, _ := counts["closed"].(float64)
+		if open+closed != card[key] {
+			t.Errorf("the card says %v %ss and the board's two tabs add up to %v", card[key], kind, open+closed)
 		}
 	}
 }

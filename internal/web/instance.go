@@ -238,11 +238,11 @@ func (s *Server) describeBoards(boards []org.Board) []map[string]any {
 	for _, b := range boards {
 		ids = append(ids, b.ID)
 	}
-	open, err := s.items().OpenByKind(ids)
+	total, err := s.items().TotalByKind(ids)
 	if err != nil {
 		// The cards are still worth drawing: they say what a board takes, and
 		// the numbers are the part that is missing.
-		slog.Error("counting open reports for the front page", "error", err)
+		slog.Error("counting reports for the front page", "error", err)
 	}
 
 	out := make([]map[string]any, 0, len(boards))
@@ -255,10 +255,11 @@ func (s *Server) describeBoards(boards []org.Board) []map[string]any {
 			"accepts_bugs":  b.AcceptsBugs,
 			"accepts_ideas": b.AcceptsIdeas,
 			"icon":          b.Icon,
-			// Open and published: what the board's own "open" tab shows. Only the
-			// kinds the board takes are drawn, so a missing one is not a zero.
-			"open_bugs":  open[b.ID][item.Bug],
-			"open_ideas": open[b.ID][item.Idea],
+			// Everything published, open or answered: the board's two tabs added
+			// together. Only the kinds the board takes are drawn, so a missing one
+			// is not a zero.
+			"total_bugs":  total[b.ID][item.Bug],
+			"total_ideas": total[b.ID][item.Idea],
 		})
 	}
 	return out

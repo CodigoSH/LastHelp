@@ -361,33 +361,33 @@ func (s Store) Counts(repoIDs []int64, column string) (map[string]int, error) {
 	return out, rows.Err()
 }
 
-// OpenByKind is how many reports of each kind are open on each board: published,
-// not folded into another, and not answered. It is the number the board's own
-// "open" tab shows, so the front page and the page behind it cannot disagree.
+// TotalByKind is how many reports of each kind each board has had: published
+// and not folded into another, answered or not. It is the open and the closed
+// tab of the board's own page added together, so the front page and the page
+// behind it cannot disagree.
+//
+// A total, not the open ones: on a team that answers what comes in, the open
+// count sits at zero, and a card saying zero reads as a board where nothing is
+// ever fixed or built.
 //
 // Counted in the database in one query for every board asked about, because the
 // front page is the one strangers load.
-func (s Store) OpenByKind(repoIDs []int64) (map[int64]map[Kind]int, error) {
+func (s Store) TotalByKind(repoIDs []int64) (map[int64]map[Kind]int, error) {
 	out := map[int64]map[Kind]int{}
 	if len(repoIDs) == 0 {
 		return out, nil
 	}
 
-	closed := ClosedStatuses()
-	args := make([]any, 0, len(repoIDs)+len(closed))
+	args := make([]any, 0, len(repoIDs))
 	for _, id := range repoIDs {
 		args = append(args, id)
-	}
-	for _, st := range closed {
-		args = append(args, string(st))
 	}
 	rows, err := s.DB.Query(`SELECT repo_id, kind, count(*) FROM item
 		WHERE merged_into IS NULL AND moderation_state = '`+string(Published)+`'
 		  AND repo_id IN (`+placeholders(len(repoIDs))+`)
-		  AND status NOT IN (`+placeholders(len(closed))+`)
 		GROUP BY repo_id, kind`, args...)
 	if err != nil {
-		return nil, fmt.Errorf("counting open reports: %w", err)
+		return nil, fmt.Errorf("counting reports: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
