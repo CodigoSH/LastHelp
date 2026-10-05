@@ -23,9 +23,8 @@ model — what people write in your portal reaches your database and nowhere els
    addresses, so limiting per exact address is limiting per attempt.
 5. **Content heuristics**: the same text again (a flood is one paragraph over
    and over), too many links, and a word list you control — a word that means
-   nothing on your repository is somebody else's daily traffic. The list has no
-   screen yet: it is the `stoplist` setting, comma separated, written straight
-   into the database (see below).
+   nothing on your repository is somebody else's daily traffic. It is edited on
+   the **Anti-abuse** screen (see below).
 6. **A circuit breaker.** Past sixty submissions in an hour a repository stops taking
    them for a while. Refusing for an hour beats handing you a queue you will not
    open.
@@ -64,23 +63,36 @@ occasionally:
 - A layer that refuses nearly everything is turning away people who did nothing
   wrong — and those people do not complain, they leave.
 
-The panel does not show them yet. They are kept in the database, one row per
-repository and layer — `refused.<repository id>.<layer>` — and can be read
-while the server runs:
+The **Anti-abuse** screen, under **This server** and for administrators, shows
+them: a row per repository and check, with how many submissions each turned away.
+The checks are the hidden field, the form token, the pause a repository takes
+after too many submissions in an hour, the same text again, too many links, and
+the word list.
 
-```sh
-sqlite3 /var/lib/lasthelp/lasthelp.db \
-  "SELECT key, value FROM settings WHERE key LIKE 'refused.%' ORDER BY key"
-```
+### The word list
 
-The word list lives in the same table, and takes effect on the next report
-without a restart:
+One list for the whole server, with no language on it. It is a notebook of the
+words that turn up in your own queue, not a dictionary: you do not need one per
+language, because the language something arrives in is not yours to choose.
 
-```sh
-sqlite3 /var/lib/lasthelp/lasthelp.db \
-  "INSERT INTO settings (key, value) VALUES ('stoplist', 'casino,crypto')
-   ON CONFLICT (key) DO UPDATE SET value = excluded.value"
-```
+- One word or phrase per line. Capitals and accents do not matter, so `Casino`
+  and `casiño` are one word. A domain or a phrase is a word too.
+- A word is matched **whole**: listing `ass` does not refuse `class`. Chinese,
+  Japanese, Korean and Thai have no spaces to bound a word, so a word written in
+  them is matched anywhere in a sentence.
+- It applies to what a stranger writes in a report: the title, the description
+  and the answers to the form. Comments are not checked against it.
+- Beside each word is how many reports it has refused. A word that stays at zero
+  is one to take off; take it off and its count goes with it, and a word added
+  again later starts from nothing.
+- It takes effect on the next report, without a restart. Up to 500 words of 60
+  characters, and no commas.
+
+A word that gets a report through to your queue can be added from there: the
+administrator sees a field beside **Reject** and **Spam**, **Word that gives it
+away**, and what is typed there is added to the list as the report is turned
+down. A report that the list already refuses never reaches the queue, so those
+are read from the counts instead.
 
 ## What this does not stop
 

@@ -231,6 +231,11 @@ func (s *Server) triageTarget(w http.ResponseWriter, r *http.Request) (item.Item
 
 type moderationChange struct {
 	State string `json:"state"`
+	// AddWord is a word to put on the server's list as this report is turned
+	// down. The list is the administrator's, so it is refused to anybody else
+	// before anything happens to the report: a decision half taken is worse than
+	// one refused.
+	AddWord string `json:"add_word"`
 }
 
 type textChange struct {
@@ -291,6 +296,21 @@ func (s *Server) handleModerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	word := strings.TrimSpace(in.AddWord)
+	if word != "" {
+		if state := item.Moderation(in.State); state != item.Rejected && state != item.Spam {
+			writeError(w, http.StatusBadRequest, "error.bad_request")
+			return
+		}
+		if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
+			return
+		}
+		if _, failure := cleanWords([]string{word}); failure != "" {
+			writeError(w, http.StatusBadRequest, failure)
+			return
+		}
+	}
+
 	var err error
 	switch item.Moderation(in.State) {
 	case item.Published:
@@ -307,6 +327,13 @@ func (s *Server) handleModerate(w http.ResponseWriter, r *http.Request) {
 		slog.Error("moderating", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
+	}
+
+	if word != "" {
+		if failure := s.addWord(word); failure != "" {
+			writeError(w, http.StatusInternalServerError, failure)
+			return
+		}
 	}
 
 	// Only when it is published. Somebody whose report was rejected is not
@@ -636,6 +663,9 @@ func teamWork(it item.Item, actor authz.Actor, scope authz.Scope) map[string]any
 		// collaborator can reject or mark as spam, which hides a report and
 		// loses nothing. Said here so the page does not work it out itself.
 		"can_delete": actor.Can(authz.ManageOrganization, authz.Organization(scope.OrgID)),
+		// The server's word list is the administrator's, so only they are offered
+		// the field that adds to it while turning a report down.
+		"can_add_words": actor.Can(authz.ManageServer, authz.Scope{}),
 	}
 }
 

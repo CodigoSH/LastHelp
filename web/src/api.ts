@@ -209,7 +209,7 @@ export interface ItemDetail extends ItemSummary {
   /** The pictures this reader may see, the report's and each message's. */
   images?: ReportPicture[];
   /** What the reader may do to it, when they work on it; absent for anybody else. */
-  team?: { current: string; statuses: string[]; can_delete?: boolean };
+  team?: { current: string; statuses: string[]; can_delete?: boolean; can_add_words?: boolean };
 }
 
 /** One picture on a report: on the report itself when comment_id is 0. */
