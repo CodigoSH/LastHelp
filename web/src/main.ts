@@ -34,6 +34,7 @@ import * as landingViews from "./views/landing";
 import { LandingEditor } from "./landingEditor";
 import { openUpdateDialog, type UpdateInfo } from "./updateModal";
 import { icons } from "./views/icons";
+import { installSearchShortcut } from "./services/searchShortcut";
 
 const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
@@ -2727,7 +2728,6 @@ async function wireReview(
     // thing in front, and leaving the whole screen from inside it would skip
     // a step the person can see.
     leave: () => (screen?.classList.contains("reading") ? reading(false) : leaveReview()),
-    find: () => search?.focus(),
   });
 }
 
@@ -2765,7 +2765,6 @@ function keyboardFor(on: {
   step: (by: number) => void;
   decide: (state: string) => Promise<void>;
   leave: () => void;
-  find: () => void;
 }): () => void {
   const handler = (event: KeyboardEvent) => {
     // Only on this screen. The listener is removed when the next one is drawn,
@@ -2810,10 +2809,6 @@ function keyboardFor(on: {
       case "s":
       case "S":
         void on.decide("spam");
-        break;
-      case "/":
-        event.preventDefault();
-        on.find();
         break;
       case "Escape":
         on.leave();
@@ -3377,5 +3372,7 @@ void (async () => {
   // And for every select: the house dropdown over each one, wherever it is
   // drawn, now or later.
   watchSelects();
+  // Ctrl+K, to whichever search box the screen has.
+  installSearchShortcut(document);
   await render();
 })();

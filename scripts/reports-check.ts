@@ -657,6 +657,30 @@ async function main() {
   `);
   check("and an owner, who triages the board, is not offered the field", sinCampo.field === false, JSON.stringify(sinCampo));
 
+  // The search is reached with Ctrl+K and not with "/", and the legend under the
+  // list says so.
+  await signIn("alex");
+  await goTo("/review?mode=all", ".rev-row");
+  const buscar = await evaluate(`
+    document.activeElement?.blur();
+    const foot = document.querySelector(".rev-foot")?.textContent ?? "";
+    return { foot };
+  `);
+  await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "/", code: "Slash", windowsVirtualKeyCode: 191, text: "/" });
+  await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "/", code: "Slash", windowsVirtualKeyCode: 191 });
+  await sleep(150);
+  const afterSlash = await evaluate(`return document.activeElement?.type === "search"`);
+  for (const type of ["rawKeyDown", "keyUp"]) {
+    await page.send("Input.dispatchKeyEvent", { type, modifiers: 2, key: "k", code: "KeyK", windowsVirtualKeyCode: 75 });
+  }
+  await sleep(150);
+  const afterCtrlK = await evaluate(`return document.activeElement?.type === "search" && !!document.activeElement.closest(".search-box")`);
+  check(
+    "Ctrl+K reaches the search of the reports screen, \"/\" no longer does, and the legend teaches Ctrl K",
+    afterCtrlK === true && afterSlash === false && /Ctrl|⌘/.test(buscar.foot) && !buscar.foot.includes("/"),
+    JSON.stringify({ afterCtrlK, afterSlash, foot: buscar.foot.replace(/\s+/g, " ").trim() }),
+  );
+
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
   check("and the content policy refused nothing", refusedByPolicy.length === 0, refusedByPolicy.slice(0, 3).join(" | "));
   await close();
