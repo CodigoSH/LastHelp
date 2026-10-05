@@ -6858,7 +6858,7 @@ a.stat:hover .stat-go {
 .input-row .button { flex: none; }
 
 /* What closes a form: aligned with the fields, as wide as its label. */
-.settings-actions { display: flex; margin-block-start: 24px; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-block-start: 24px; }
 .settings-actions .button { min-inline-size: 160px; }
 
 /* Buttons. */
@@ -6965,6 +6965,13 @@ a.stat:hover .stat-go {
 .settings-card .word-help + .settings-list { margin-block-start: 16px; }
 .word-edit { display: flex; align-items: center; gap: 6px; flex: 1; min-inline-size: 0; }
 .word-edit input { flex: 1; min-inline-size: 0; }
+.word-search { flex: 0 0 auto; margin-block-start: 16px; max-inline-size: none; }
+.word-results { margin-block-start: 4px; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-block-start: 12px; }
+.pager-range { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.pager-prev svg { transform: scaleX(calc(-1 * var(--rtl-flip))); }
+.pager-next svg { transform: scaleX(var(--rtl-flip)); }
+.pager .icon-button[disabled] { opacity: 0.35; cursor: default; pointer-events: none; }
 @media (max-width: 480px) { .word-add { flex-direction: column; align-items: stretch; } }
 
 .settings-item:hover { border-color: rgba(var(--accent-rgb), 0.4); background: rgba(var(--accent-rgb), 0.04); }
