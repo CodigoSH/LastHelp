@@ -75,7 +75,8 @@ One list for the whole server, with no language on it. It is a notebook of the
 words that turn up in your own queue, not a dictionary: you do not need one per
 language, because the language something arrives in is not yours to choose.
 
-- One word or phrase per line. Capitals and accents do not matter, so `Casino`
+- Add a word or phrase with the form at the top of the list; each one appears as
+  a row you can edit in place or remove. Capitals and accents do not matter, so `Casino`
   and `casiño` are one word. A domain or a phrase is a word too.
 - A word is matched **whole**: listing `ass` does not refuse `class`. Chinese,
   Japanese, Korean and Thai have no spaces to bound a word, so a word written in
