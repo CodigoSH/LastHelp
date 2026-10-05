@@ -2564,17 +2564,27 @@ export interface AntiabuseData {
  * operator's notebook of what turns up in their own queue.
  */
 export function antiabuseScreen(data: AntiabuseData, text: Text): string {
-  const counts = data.words.length
+  // How many a word or a check has turned away: a label and a number, so it reads
+  // the same in every language without a plural to get right, and in the accent
+  // once it has done something.
+  const refused = (n: number) =>
+    `<span class="mono-tag${n > 0 ? " accent" : ""}">${escapeHTML(text.t("antiabuse.refused"))} ${escapeHTML(text.number(n))}</span>`;
+
+  const words = data.words.length
     ? `<ul class="settings-list words">${data.words
         .map((w) =>
           settingsItem({
             lead: "",
             name: w.word,
-            tags: `<span class="chip" title="${escapeAttr(text.t("antiabuse.refused"))}">${escapeHTML(text.number(w.count))}</span>`,
+            tags: refused(w.count),
+            attrs: `data-word="${escapeAttr(w.word)}"`,
+            actions:
+              iconButton("edit", text.t("action.edit"), `data-edit-word="${escapeAttr(w.word)}"`) +
+              iconButton("remove", text.t("action.remove"), `class="icon-button danger" data-remove-word="${escapeAttr(w.word)}"`),
           }),
         )
         .join("")}</ul>`
-    : `<p class="hint">${escapeHTML(text.t("antiabuse.noWords"))}</p>`;
+    : `<p class="card-sub">${escapeHTML(text.t("antiabuse.noWords"))}</p>`;
 
   const layerName = (layer: string) => {
     const key = `antiabuse.layer.${layer}`;
@@ -2588,33 +2598,34 @@ export function antiabuseScreen(data: AntiabuseData, text: Text): string {
             lead: "",
             name: l.repo_name,
             sub: `${l.org_name} · ${layerName(l.layer)}`,
-            tags: `<span class="chip">${escapeHTML(text.number(l.count))}</span>`,
+            tags: refused(l.count),
           }),
         )
         .join("")}</ul>`
-    : `<p class="hint">${escapeHTML(text.t("antiabuse.layersNone"))}</p>`;
+    : `<p class="card-sub">${escapeHTML(text.t("antiabuse.layersNone"))}</p>`;
 
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.antiabuse"))}</h1>
     ${settingsCard(
       text.t("antiabuse.wordsTitle"),
-      `<form class="word-list">
-        ${areaField(
+      `<form class="word-add">
+        ${field(
           {
-            id: "words",
-            name: "words",
-            label: text.t("antiabuse.wordsLabel"),
-            hint: text.t("antiabuse.wordsHelp", { max: data.max_words, length: data.max_length }),
-            rows: 8,
-            value: data.words.map((w) => w.word).join("\n"),
+            id: "new-word",
+            name: "word",
+            label: text.t("antiabuse.addLabel"),
+            autocomplete: "off",
           },
           text,
         )}
-        <p class="form-error" role="alert" hidden></p>
-        <div class="settings-actions">
-          <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+        <button class="button primary" type="submit">${escapeHTML(text.t("antiabuse.add"))}</button>
       </form>
-      ${counts}`,
-      { lead: text.t("antiabuse.lead") },
+      <p class="hint word-help">${escapeHTML(text.t("antiabuse.wordsHelp", { max: data.max_words, length: data.max_length }))}</p>
+      <p class="form-error" role="alert" hidden></p>
+      ${words}`,
+      {
+        lead: text.t("antiabuse.lead"),
+        action: `<span class="mono-tag">${escapeHTML(text.number(data.words.length))} / ${escapeHTML(text.number(data.max_words))}</span>`,
+      },
     )}
     ${settingsCard(text.t("antiabuse.layersTitle"), layers, { lead: text.t("antiabuse.layersLead") })}`;
 }

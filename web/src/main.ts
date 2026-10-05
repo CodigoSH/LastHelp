@@ -2922,12 +2922,58 @@ async function showAntiabuse(): Promise<void> {
     max_length: 60,
   };
   await showInShell(views.antiabuseScreen(data, text), "/panel/antiabuse");
-  onSubmit("form.word-list", async (form) => {
-    const words = String(form.get("words") ?? "").split("\n");
+  const current = data.words.map((w) => w.word);
+  const save = async (words: string[]) => {
     await api.put("/api/antiabuse/words", { words });
-    toast(i18n.t("panel.saved"));
     await showAntiabuse();
+  };
+  const fail = (err: unknown) => showFormError(err);
+
+  onSubmit("form.word-add", async (form) => {
+    const word = String(form.get("word") ?? "").trim();
+    if (word === "") return;
+    await save([...current, word]);
   });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-remove-word]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const word = button.dataset.removeWord ?? "";
+      if (!(await askConfirm(i18n.t("action.remove"), i18n.t("antiabuse.confirmRemove", { word })))) return;
+      await save(current.filter((w) => w !== word)).catch(fail);
+    }),
+  );
+
+  // Editing happens in the row itself: the word becomes a field with a tick and a
+  // cross, and nothing else on the screen moves.
+  root?.querySelectorAll<HTMLButtonElement>("[data-edit-word]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const word = button.dataset.editWord ?? "";
+      const row = button.closest<HTMLElement>(".settings-item");
+      if (!row || row.querySelector("form.word-edit")) return;
+      row.innerHTML = `<form class="word-edit">
+          <input type="text" name="word" value="${escapeAttr(word)}" maxlength="${data.max_length}"
+            aria-label="${escapeAttr(i18n.t("action.edit"))}" autocomplete="off" />
+          <button class="icon-button" type="submit" title="${escapeAttr(i18n.t("action.save"))}"
+            aria-label="${escapeAttr(i18n.t("action.save"))}">${icons.check()}</button>
+          <button class="icon-button" type="button" data-cancel title="${escapeAttr(i18n.t("action.cancel"))}"
+            aria-label="${escapeAttr(i18n.t("action.cancel"))}">${icons.close()}</button>
+        </form>`;
+      const form = row.querySelector<HTMLFormElement>("form.word-edit");
+      const input = form?.querySelector<HTMLInputElement>("input");
+      input?.focus();
+      input?.select();
+      row.querySelector("[data-cancel]")?.addEventListener("click", () => void showAntiabuse());
+      input?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") void showAntiabuse();
+      });
+      form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const edited = (input?.value ?? "").trim();
+        if (edited === "" || edited === word) return void showAntiabuse();
+        await save(current.map((w) => (w === word ? edited : w))).catch(fail);
+      });
+    }),
+  );
 }
 
 /** The channel every repository may choose, set once by whoever runs the server. */

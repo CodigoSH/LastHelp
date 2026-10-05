@@ -2944,6 +2944,10 @@ body.admin-view > main {
     min-block-size: 0;
   }
   .admin-main { overflow-y: auto; }
+  /* The menu has grown by a screen at a time, and its foot — sign out — has to
+     stay on the window. Eight pixels above and below each row, on the sidebar
+     only: the strip a phone gets keeps the taller rows a thumb needs. */
+  .side .side-item { padding-block: 8px; }
   /* And the document never scrolls under it. Measured: with nothing to
      scroll, a fraction of a pixel of the bar's border was enough for the
      browser to draw a scrollbar and take its 10px anyway. */
@@ -6952,6 +6956,16 @@ a.stat:hover .stat-go {
   background: rgba(128, 128, 128, 0.04);
   transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease);
 }
+
+/* The word list: an add form on one line, the hint under it, and the rows. */
+.word-add { display: flex; align-items: flex-end; gap: 12px; margin-block-start: 12px; }
+.settings-card .word-add .field { flex: 1; min-inline-size: 0; margin: 0; }
+.word-add .button { flex: none; }
+.word-help { margin: 8px 0 4px; }
+.settings-card .word-help + .settings-list { margin-block-start: 16px; }
+.word-edit { display: flex; align-items: center; gap: 6px; flex: 1; min-inline-size: 0; }
+.word-edit input { flex: 1; min-inline-size: 0; }
+@media (max-width: 480px) { .word-add { flex-direction: column; align-items: stretch; } }
 
 .settings-item:hover { border-color: rgba(var(--accent-rgb), 0.4); background: rgba(var(--accent-rgb), 0.04); }
 

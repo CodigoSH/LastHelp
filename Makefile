@@ -76,6 +76,9 @@ drive: build ## Walk the whole journey in a real browser
 drive-reports: build ## Walk the reports screen on an installation with history
 	@SEED=1 CHECK=reports-check.ts scripts/drive.sh
 
+drive-antiabuse: build ## Walk the word list and the refusal counts as the administrator
+	@SEED=1 CHECK=antiabuse-check.ts scripts/drive.sh
+
 drive-xss: build ## Hang marked payloads on every field a stranger writes and look for what runs
 	@SEED=1 CHECK=xss-check.ts scripts/drive.sh
 
