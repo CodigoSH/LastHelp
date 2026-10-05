@@ -83,6 +83,8 @@ export interface FieldSpec {
   value?: string;
   pattern?: string;
   autocomplete?: string;
+  /** A secret the product stores, as opposed to a password somebody types to sign in: it has no eye. */
+  secret?: boolean;
 }
 
 /**
@@ -104,6 +106,7 @@ export function field(spec: FieldSpec, text?: Text): string {
     spec.pattern ? `pattern="${escapeAttr(spec.pattern)}"` : "",
     spec.example ? `placeholder="${escapeAttr(spec.example)}"` : "",
     spec.autocomplete ? `autocomplete="${escapeAttr(spec.autocomplete)}"` : "",
+    spec.secret ? "data-secret" : "",
   ]
     .filter(Boolean)
     .join(" ");

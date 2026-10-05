@@ -46,7 +46,14 @@ panel. It is stored in the database as you gave it — a key next to the databas
 would travel with every copy of it — so a copy of that file is a copy of this
 token. Keep it where the token would be safe.
 
-Over the API, which is what the panel calls:
+A saved token and a saved secret show as dots, so you can see that they are
+there and not which they are. Type over the dots to replace one, or empty the
+field to remove it; leave the dots and it is kept. Each is changed on its own:
+replacing the token does not touch the secret. Removing the token disconnects the
+organisation from its forge.
+
+Over the API, which is what the panel calls (an empty field keeps what is
+stored; `clear_token` and `clear_webhook_secret` remove it):
 
 ```sh
 curl -X POST "$BASE/api/orgs/acme/credentials" \

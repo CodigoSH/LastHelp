@@ -239,6 +239,10 @@ func issueNumber(raw string) (int64, error) {
 type forgeCredentials struct {
 	Token         string `json:"token"`
 	WebhookSecret string `json:"webhook_secret"`
+	// What emptying a field says. Empty alone means "keep", so a form that did
+	// not carry the field cannot remove a secret by leaving it out.
+	ClearToken         bool `json:"clear_token"`
+	ClearWebhookSecret bool `json:"clear_webhook_secret"`
 }
 
 // handleSetCredentials stores an organisation's forge credentials.
@@ -262,7 +266,10 @@ func (s *Server) handleSetCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.orgs().SetCredentials(o.ID, in.Token, in.WebhookSecret); err != nil {
+	if err := s.orgs().ChangeCredentials(o.ID, org.CredentialsChange{
+		Token: in.Token, WebhookSecret: in.WebhookSecret,
+		ClearToken: in.ClearToken, ClearWebhookSecret: in.ClearWebhookSecret,
+	}); err != nil {
 		slog.Error("storing credentials", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return

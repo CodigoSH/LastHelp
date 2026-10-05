@@ -1501,7 +1501,7 @@ async function main() {
       form: true,
       shown: path ? !path.hidden : false,
       text: (path?.textContent ?? "").trim(),
-      tokenCleared: form.querySelector("[name=token]").value === "",
+      tokenCleared: document.querySelector("form.credentials [name=token]")?.value === "••••••••",
       antes,
       despues: document.querySelector("[data-connected]")?.dataset.connected ?? "",
     };
@@ -1512,7 +1512,7 @@ async function main() {
     connected.shown === true && String(connected.text).includes("/hooks/"),
     String(connected.text).slice(0, 56),
   );
-  check("and does not leave the token in the field", connected.tokenCleared === true);
+  check("and shows the saved token as dots, not as itself", connected.tokenCleared === true);
   check(
     "and says whether it is connected, before and after the token is stored",
     connected.antes === "false" && connected.despues === "true",

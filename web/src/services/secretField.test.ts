@@ -1,23 +1,26 @@
 import { describe, expect, test } from "bun:test";
-import { MASK, secretIntent } from "./secretField";
+import { SECRET_MASK, secretChange } from "./secretField";
 
-describe("a stored secret in a form", () => {
-  test("the mask alone, or half of it, changes nothing", () => {
-    expect(secretIntent(MASK, true)).toEqual({ kind: "keep" });
-    expect(secretIntent(MASK.slice(0, 3), true)).toEqual({ kind: "keep" });
+describe("secretChange", () => {
+  test("leaves a saved secret alone when the dots are untouched", () => {
+    expect(secretChange(SECRET_MASK, true)).toEqual({ action: "keep" });
   });
-  test("what is typed over the mask, or beside it, is the new secret", () => {
-    expect(secretIntent("tk_new", true)).toEqual({ kind: "set", secret: "tk_new" });
-    expect(secretIntent(MASK + "tk_new", true)).toEqual({ kind: "set", secret: "tk_new" });
-    expect(secretIntent("tk" + MASK.slice(0, 2) + "_new", true)).toEqual({ kind: "set", secret: "tk_new" });
+
+  test("treats half-erased dots as the sign, not as an instruction", () => {
+    expect(secretChange("•••", true)).toEqual({ action: "keep" });
   });
-  test("an emptied field removes the secret, when there was one", () => {
-    expect(secretIntent("", true)).toEqual({ kind: "clear" });
+
+  test("replaces the secret with what is typed, over or beside the dots", () => {
+    expect(secretChange("tk_new", true)).toEqual({ action: "set", token: "tk_new" });
+    expect(secretChange(SECRET_MASK + "tk_new", true)).toEqual({ action: "set", token: "tk_new" });
+    expect(secretChange("  tk_new ", false)).toEqual({ action: "set", token: "tk_new" });
   });
-  test("an empty field with nothing saved is nothing", () => {
-    expect(secretIntent("", false)).toEqual({ kind: "keep" });
+
+  test("removes the secret when the box is emptied", () => {
+    expect(secretChange("", true)).toEqual({ action: "clear" });
   });
-  test("a secret is set whether or not one was saved", () => {
-    expect(secretIntent("tk_first", false)).toEqual({ kind: "set", secret: "tk_first" });
+
+  test("has nothing to do when there was none and none is typed", () => {
+    expect(secretChange("", false)).toEqual({ action: "keep" });
   });
 });
