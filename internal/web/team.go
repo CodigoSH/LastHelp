@@ -44,7 +44,8 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	canManage := actor.Can(authz.ManageOrganization, authz.Organization(organisation.ID))
+	body := map[string]any{
 		"slug":           repo.Slug,
 		"name":           repo.Name,
 		"forge_repo":     repo.ForgeRepo,
@@ -52,15 +53,37 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		"accepts_ideas":  repo.AcceptsIdeas,
 		"accepts_images": repo.AcceptsImages,
 		"icon":           repo.Icon,
-		// Which channel, and never what is in it: an endpoint that returns a
-		// stored token is a way to read one.
+		// Which channel. The address and the recipient go only to whoever may
+		// change them, and the token to nobody: an endpoint that returns a stored
+		// token is a way to read one.
 		"channel":      channelKind(repo.NotifyConfig),
 		"pending":      counts[string(item.Pending)],
 		"organization": map[string]any{"slug": organisation.Slug, "name": organisation.Name, "forge": organisation.Forge},
-		"can_manage":   actor.Can(authz.ManageOrganization, authz.Organization(organisation.ID)),
+		"can_manage":   canManage,
 		// A repository is deleted by whoever runs its organisation.
-		"can_delete": actor.Can(authz.ManageOrganization, authz.Organization(organisation.ID)),
-	})
+		"can_delete": canManage,
+	}
+	if canManage {
+		for key, value := range channelDetails(repo.NotifyConfig) {
+			body[key] = value
+		}
+		// Whether "the server's" channel can be chosen, and what it is, so the
+		// picker says so instead of offering something that would send nothing.
+		server := s.serverChannel()
+		body["server_channel"] = map[string]any{"configured": server.Active(), "kind": string(server.Kind)}
+	}
+	writeJSON(w, http.StatusOK, body)
+}
+
+// channelDetails is what a channel form needs to show itself again: where it
+// points and whether a token is saved, and never the token.
+func channelDetails(stored string) map[string]any {
+	cfg := notify.Parse(stored)
+	return map[string]any{
+		"channel_url":       cfg.URL,
+		"channel_to":        cfg.To,
+		"channel_has_token": cfg.Token != "",
+	}
 }
 
 // handleOrganizationPanel is everything the panel's page for one organisation

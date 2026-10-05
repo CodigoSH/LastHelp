@@ -1535,6 +1535,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
           spec.isAdmin
             ? item("/panel/people", text.t("shell.people"), icons.people()) +
                 item("/panel/personalization", text.t("shell.personalization"), icons.brush()) +
+                item("/panel/notifications", text.t("shell.notifications"), icons.bell()) +
                 item("/panel/backups", text.t("shell.backups"), icons.backup()) +
                 // Updates live inside About: what is running
                 // and whether it is the one to run are one question.
@@ -2464,6 +2465,96 @@ function themeChoice(theme: string, text: Text): string {
   </div>`;
 }
 
+/**
+ * The form that says where notifications go, for a repository and for the
+ * server alike.
+ *
+ * What it shows again is the address and the recipient, which are somebody's
+ * own to read; the token is only said to be there, and left empty it keeps what
+ * is stored. A form that hid the address too left nobody able to tell what they
+ * had saved, or to fix one character of it.
+ *
+ * `server` is the server's channel as the repository sees it, and its absence
+ * is the server's own form, which cannot choose itself.
+ */
+function channelForm(
+  text: Text,
+  spec: {
+    kind: string;
+    url: string;
+    to: string;
+    hasToken: boolean;
+    /** Set for a repository's form; the server's own has none. */
+    repo?: string;
+    server?: { configured: boolean; kind: string };
+  },
+): string {
+  const kinds: [string, string][] = [
+    ["", spec.repo === undefined ? text.t("notifications.off") : text.t("panel.channelNone")],
+    ["ntfy", "ntfy"],
+    ["gotify", "Gotify"],
+    ["webhook", "Webhook"],
+    ["smtp", "Email"],
+  ];
+  if (spec.server) kinds.push(["server", text.t("panel.channelServer")]);
+
+  const serverNote = spec.server
+    ? `<p class="hint" data-channel-server hidden>${escapeHTML(
+        spec.server.configured ? text.t("panel.channelServerSet") : text.t("panel.channelServerUnset"),
+      )}</p>`
+    : "";
+
+  return `<form class="channel"${spec.repo === undefined ? " data-server-channel" : ""}>
+    ${choiceField({ id: "chan-kind", name: "kind", label: text.t("panel.channel"), options: kinds, selected: spec.kind })}
+    <div class="channel-fields" hidden>
+      ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/acme-feedback", value: spec.url }, text)}
+      ${field(
+        {
+          id: "chan-token",
+          name: "token",
+          label: text.t("panel.token"),
+          type: "password",
+          autocomplete: "off",
+          hint: spec.hasToken ? text.t("panel.tokenSaved") : undefined,
+        },
+        text,
+      )}
+      ${
+        spec.hasToken
+          ? `<label class="check"><input type="checkbox" name="clear_token" /><span>${escapeHTML(text.t("panel.tokenRemove"))}</span></label>`
+          : ""
+      }
+    </div>
+    <div class="channel-mail" hidden>
+      ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "team@example.com", value: spec.to }, text)}
+    </div>
+    ${serverNote}
+    <p class="form-error" role="alert" hidden></p>
+    <p class="hint channel-result" role="status" hidden></p>
+    <div class="settings-actions">
+      <button class="button" type="button" data-channel-test>${escapeHTML(text.t("panel.channelTest"))}</button>
+      <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
+  </form>`;
+}
+
+/** The channel every repository can choose, set once by whoever runs the server. */
+export function notificationsScreen(
+  channel: { kind: string; channel_url: string; channel_to: string; channel_has_token: boolean },
+  text: Text,
+): string {
+  return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.notifications"))}</h1>
+    ${settingsCard(
+      text.t("shell.notifications"),
+      channelForm(text, {
+        kind: channel.kind,
+        url: channel.channel_url,
+        to: channel.channel_to,
+        hasToken: channel.channel_has_token,
+      }),
+      { lead: text.t("notifications.lead") },
+    )}`;
+}
+
 /** Everything about this installation that an operator chose rather than typed. */
 export function personalizationScreen(
   instance: { name: string; logo: string; accent: string },
@@ -2906,8 +2997,15 @@ export interface RepositoryPanel {
   accepts_images?: boolean;
   /** A data URL, or absent for the initials of the name. */
   icon?: string;
-  /** Which channel tells the team, never what it stores. Empty for none. */
+  /** Which channel tells the team. Empty for none. */
   channel: string;
+  /** Where the channel points and whom it writes to: a manager's, absent for anybody else. */
+  channel_url?: string;
+  channel_to?: string;
+  /** Whether a token is saved. The token itself never comes back. */
+  channel_has_token?: boolean;
+  /** What the server's own channel is, when somebody who may choose it asks. */
+  server_channel?: { configured: boolean; kind: string };
   pending: number;
   organization: { slug: string; name: string; forge: string };
   can_manage: boolean;
@@ -2995,33 +3093,16 @@ export function repositoryScreen(
     </form>`,
   );
 
-  const kinds: [string, string][] = [
-    ["", text.t("panel.channelNone")],
-    ["ntfy", "ntfy"],
-    ["gotify", "Gotify"],
-    ["webhook", "Webhook"],
-    ["smtp", "Email"],
-  ];
-  const now = kinds.find(([value]) => value === repo.channel)?.[1] ?? repo.channel;
-  // The channel chosen shows as chosen; what it stores never comes back, so
-  // the fields are empty and saving writes the whole channel again.
   const channel = settingsCard(
     text.t("panel.channel"),
-    `<form class="channel">
-      <input type="hidden" name="repo" value="${escapeAttr(repo.slug)}" />
-      ${choiceField({ id: "chan-kind", name: "kind", label: text.t("panel.channel"), options: kinds, selected: repo.channel })}
-      <div class="channel-fields" hidden>
-        ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/acme-feedback" }, text)}
-        ${field({ id: "chan-token", name: "token", label: text.t("panel.token"), type: "password" }, text)}
-      </div>
-      <div class="channel-mail" hidden>
-        ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "team@example.com" }, text)}
-      </div>
-      ${repo.channel ? `<p class="hint" data-channel-now>${escapeHTML(text.t("repo.channelNow", { channel: now }))}</p>` : ""}
-      <p class="form-error" role="alert" hidden></p>
-      <div class="settings-actions">
-        <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
-    </form>`,
+    channelForm(text, {
+      kind: repo.channel,
+      url: repo.channel_url ?? "",
+      to: repo.channel_to ?? "",
+      hasToken: repo.channel_has_token ?? false,
+      repo: repo.slug,
+      server: repo.server_channel ?? { configured: false, kind: "" },
+    }),
     { lead: text.t("panel.channelHelp") },
   );
 

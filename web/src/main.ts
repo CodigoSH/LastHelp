@@ -1229,6 +1229,7 @@ async function render(): Promise<void> {
     if (path === "/panel/people") return await showPeople();
     if (path === "/panel/organizations") return await showOrganizationsPanel();
     if (path === "/panel/personalization") return await showPersonalization();
+    if (path === "/panel/notifications") return await showNotifications();
     if (path === "/panel/backups") return await showBackups();
     if (path === "/panel/about") return await showAbout();
     // Before the generic /panel/{org}: "new" is a screen, not an organisation
@@ -1888,49 +1889,84 @@ function wireCredentials(orgSlug: string): void {
 }
 
 /** Choosing where a board's team is told something arrived. */
-function wireChannel(orgSlug: string, saved?: () => Promise<void>): void {
+function wireChannel(
+  where: { save: (data: Record<string, unknown>) => Promise<unknown>; test: (data: Record<string, unknown>) => Promise<unknown> },
+  saved?: () => Promise<void>,
+): void {
   const form = root?.querySelector<HTMLFormElement>("form.channel");
   if (!form) return;
 
   const kind = form.querySelector<HTMLSelectElement>("#chan-kind");
   const fields = form.querySelector<HTMLDivElement>(".channel-fields");
   const mail = form.querySelector<HTMLDivElement>(".channel-mail");
+  const serverNote = form.querySelector<HTMLParagraphElement>("[data-channel-server]");
   const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
+  const result = form.querySelector<HTMLParagraphElement>(".channel-result");
+  const testButton = form.querySelector<HTMLButtonElement>("[data-channel-test]");
 
   // Only the fields the chosen channel needs. Asking for a URL for an email
-  // channel is a form arguing with the person filling it in.
+  // channel is a form arguing with the person filling it in; and the server's
+  // channel has nothing to fill in here at all.
   const sync = () => {
     const value = kind?.value ?? "";
-    if (fields) fields.hidden = value === "" || value === "smtp";
+    if (fields) fields.hidden = value === "" || value === "smtp" || value === "server";
     if (mail) mail.hidden = value !== "smtp";
+    if (serverNote) serverNote.hidden = value !== "server";
+    if (testButton) testButton.hidden = value === "";
   };
   kind?.addEventListener("change", sync);
   sync();
 
+  const read = (): Record<string, unknown> => {
+    const data = new FormData(form);
+    return {
+      kind: String(data.get("kind") ?? ""),
+      url: String(data.get("url") ?? ""),
+      token: String(data.get("token") ?? ""),
+      to: String(data.get("to") ?? ""),
+      clear_token: data.get("clear_token") !== null,
+    };
+  };
+  // The failure stays beside the form as well as toasting: it is about what was
+  // typed, and the fix is in the fields somebody is looking at.
+  const fail = (err: unknown) => {
+    if (result) result.hidden = true;
+    if (errorLine) {
+      errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+      errorLine.hidden = false;
+    }
+    report(err);
+  };
+  const clear = () => {
+    if (errorLine) errorLine.hidden = true;
+    if (result) result.hidden = true;
+  };
+
+  testButton?.addEventListener("click", async () => {
+    clear();
+    testButton.disabled = true;
+    try {
+      await where.test(read());
+      if (result) {
+        result.textContent = i18n.t("panel.channelTestSent");
+        result.hidden = false;
+      }
+    } catch (err) {
+      fail(err);
+    } finally {
+      testButton.disabled = false;
+    }
+  });
+
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const data = new FormData(form);
-    const repo = String(data.get("repo") ?? "");
+    clear();
     try {
-      await api.post(
-        `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repo)}/channel`,
-        {
-          kind: String(data.get("kind") ?? ""),
-          url: String(data.get("url") ?? ""),
-          token: String(data.get("token") ?? ""),
-          to: String(data.get("to") ?? ""),
-        },
-      );
+      await where.save(read());
       toast(i18n.t("panel.saved"));
       await saved?.();
     } catch (err) {
-      // The failure stays beside the form as well as toasting: it is about
-      // what was typed, and the fix is in the fields somebody is looking at.
-      if (errorLine) {
-        errorLine.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
-        errorLine.hidden = false;
-      }
-      report(err);
+      fail(err);
     }
   });
 }
@@ -2866,6 +2902,23 @@ async function showOrganizationsPanel(): Promise<void> {
   sync();
 }
 
+/** The channel every repository may choose, set once by whoever runs the server. */
+async function showNotifications(): Promise<void> {
+  if (!(await requireAdministrator())) return;
+  const channel = (await api
+    .get<{ kind: string; channel_url: string; channel_to: string; channel_has_token: boolean }>("/api/notifications")
+    .catch(() => null)) ?? { kind: "", channel_url: "", channel_to: "", channel_has_token: false };
+
+  await showInShell(views.notificationsScreen(channel, text), "/panel/notifications");
+  wireChannel(
+    {
+      save: (data) => api.put("/api/notifications", data),
+      test: (data) => api.post("/api/notifications/test", data),
+    },
+    showNotifications,
+  );
+}
+
 /** The name, the logo and the accent of this installation. */
 async function showPersonalization(): Promise<void> {
   if (!(await requireAdministrator())) return;
@@ -3123,7 +3176,14 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
   });
   wireIconPicker();
 
-  wireChannel(orgSlug, render);
+  const channelURL = `${base}/channel`;
+  wireChannel(
+    {
+      save: (data) => api.post(channelURL, data),
+      test: (data) => api.post(`${channelURL}/test`, data),
+    },
+    render,
+  );
 
   const teamURL = `/api/orgs/${encodeURIComponent(orgSlug)}/team`;
   onSubmit("form.team-add", async (data) => {

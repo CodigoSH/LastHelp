@@ -10,13 +10,21 @@ on the chance that it has something in it, so it fills, and a portal full of
 people talking to nobody reads worse from outside than no portal at all.
 
 Configured **per repository**, so one repository can go to one room and another somewhere
-else. A single global channel is a channel everybody eventually silences.
+else. Nothing applies to every repository by itself: a channel everybody is
+signed up to without choosing it is a channel everybody eventually silences.
 
 Choose it in the panel, on the repository's page (**Organisations**, the
 organisation, then the repository): pick a channel, and it asks only for what
-that channel needs.
+that channel needs. The address and the recipient are shown again once saved,
+so you can check them; the token is not. Leave the token empty when saving and
+the stored one is kept, or tick **Remove the saved token** to drop it.
 
-Or over the API, which is what the panel calls:
+**Send a test** sends a message through what is on the form, using the stored
+token if you left that field empty, and says why when it does not arrive: the
+service refused the token, the address does not exist, it could not be reached,
+or the server has no mail relay or is set to work offline.
+
+Over the API, which is what the panel calls:
 
 ```sh
 curl -X POST "$BASE/api/orgs/acme/repos/atlas/channel" \
@@ -31,7 +39,21 @@ curl -X POST "$BASE/api/orgs/acme/repos/atlas/channel" \
 | `gotify` | `url`, `token` | The server address; `/message` is appended |
 | `webhook` | `url`, optional `token` | Posts `{"title","body","url"}` — point it at Matrix, a bridge, a script |
 | `smtp` | `to` | Uses the relay configured on the server |
+| `server` | — | A repository only: use the channel the administrator set for the server |
 | *(empty)* | — | No notifications |
+
+### One channel for the whole server
+
+An administrator can set a channel once, under **Notifications** in the **This server**
+group of the menu, and repositories that want it pick **The server's channel** in their own
+list. It is still opt-in: a repository that does not choose it is not touched,
+and one that does is told where its messages go. Change the server's channel
+and every repository that chose it follows; remove it and they send nothing
+until it is set again. A repository's own channel is never replaced by it.
+
+Over the API, administrators only: `GET` and `PUT /api/notifications` (same
+fields as above, and no `server` kind), and `POST /api/notifications/test`.
+A repository's test is `POST /api/orgs/{org}/repos/{repo}/channel/test`.
 
 The webhook shape is three fields and is meant to stay that way: it is somebody's
 script.

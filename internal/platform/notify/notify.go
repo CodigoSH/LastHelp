@@ -14,6 +14,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -31,13 +32,22 @@ const (
 	Gotify  Kind = "gotify"
 	Webhook Kind = "webhook"
 	SMTP    Kind = "smtp"
+
+	// Server is not a channel but a choice: "use the one the administrator set
+	// for the whole installation". It is stored on a repository like any other
+	// kind and resolved to the real one at the moment of sending, so changing
+	// the server's channel moves every board that chose it, and a board that
+	// never chose it is untouched.
+	Server Kind = "server"
 )
 
-// Config is one channel, as stored on a repository.
+// Config is one channel, as stored on a repository, or as the server's own.
 //
-// Per repository rather than per server, because that costs nothing here and is
-// what lets a group send one board to one room and another board somewhere
-// else. One global channel is a channel everybody eventually silences.
+// Per repository first, because that costs nothing here and is what lets a
+// group send one board to one room and another board somewhere else. A single
+// channel for everything is one everybody eventually silences, so the server's
+// is something a board chooses (Server), never something that applies by
+// itself.
 type Config struct {
 	Kind Kind `json:"kind"`
 
@@ -51,15 +61,27 @@ type Config struct {
 	To string `json:"to,omitempty"`
 }
 
-// Active says whether anything would be sent.
+// Active says whether this is a complete choice: a channel with what it needs,
+// or the server's, which is complete by itself and is resolved when sending.
 func (c Config) Active() bool {
 	switch c.Kind {
 	case Ntfy, Gotify, Webhook:
 		return c.URL != ""
 	case SMTP:
 		return c.To != ""
+	case Server:
+		return true
 	}
 	return false
+}
+
+// StatusError is a channel that was reached and said no. The code is what lets a
+// person be told something useful — a token refused is not an address that does
+// not exist — without the body of somebody else's error page coming along.
+type StatusError struct{ Code int }
+
+func (e StatusError) Error() string {
+	return fmt.Sprintf("the notification channel answered %d", e.Code)
 }
 
 // Parse reads a stored configuration. An unreadable one is treated as no
@@ -95,6 +117,12 @@ type Notifier struct {
 func (n Notifier) Send(ctx context.Context, cfg Config, msg Message) error {
 	if !cfg.Active() {
 		return nil
+	}
+	if cfg.Kind == Server {
+		// Resolved by the caller, who knows where the server's is kept. Reaching
+		// here means one was not, and sending nothing silently would be a
+		// channel that looks configured and never speaks.
+		return errors.New("the server's channel was not resolved before sending")
 	}
 	switch cfg.Kind {
 	case Ntfy:
@@ -189,7 +217,7 @@ func (n Notifier) do(req *http.Request) error {
 		// The body is not included: a misconfigured endpoint answering with a
 		// page of HTML would otherwise end up in a log line, and a log that
 		// swallows somebody else's error page is a log nobody reads.
-		return fmt.Errorf("the notification channel answered %d", resp.StatusCode)
+		return StatusError{Code: resp.StatusCode}
 	}
 	return nil
 }

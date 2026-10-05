@@ -155,8 +155,16 @@ func TestARepositoryPageSaysWhatEachRoleMayDo(t *testing.T) {
 			continue
 		}
 		text := string(raw)
-		if strings.Contains(text, "tk_very_secret") || strings.Contains(text, "secret-topic") {
-			t.Errorf("the repository's page returned what the channel stores, to %s: %s", name, text)
+		// The token goes to nobody. The address goes to whoever may change it, so
+		// the form can show it again, and to nobody who may not.
+		if strings.Contains(text, "tk_very_secret") {
+			t.Errorf("the repository's page returned the stored token, to %s: %s", name, text)
+		}
+		if sees := strings.Contains(text, "secret-topic"); sees != (name != "collaborator") {
+			t.Errorf("the channel's address reached the wrong readers, %s: %s", name, text)
+		}
+		if name != "collaborator" && !strings.Contains(text, `"channel_has_token":true`) {
+			t.Errorf("a manager is not told a token is saved: %s", text)
 		}
 		if !strings.Contains(text, `"channel":"ntfy"`) {
 			t.Errorf("the page does not say which channel is set, to %s: %s", name, text)
