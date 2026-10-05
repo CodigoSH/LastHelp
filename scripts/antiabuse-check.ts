@@ -190,6 +190,41 @@ async function main() {
     await fetch("/api/antiabuse/words", { method: "PUT",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify({ words: [] }) });
   `);
+  // The server's channel keeps its token as dots: saving the dots keeps it, writing
+  // over them replaces it, and emptying the field removes it. Here and not in the main
+  // journey, which already sits near the per-address ceiling.
+  await goTo("/panel/notifications", "form.channel");
+  const secret = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const submit = async (token) => {
+      const f = document.querySelector("form.channel");
+      f.querySelector("#chan-kind").value = "ntfy"; f.querySelector("#chan-kind").dispatchEvent(new Event("change"));
+      f.querySelector("#chan-url").value = "https://ntfy.example/secret-check";
+      if (token !== null) f.querySelector("#chan-token").value = token;
+      f.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+      await new Promise(r => setTimeout(r, 1200));
+      return fetch("/api/notifications").then(r => r.json());
+    };
+    const out = {};
+    out.set = (await submit("tk_first")).channel_has_token;
+    const mask = document.querySelector("#chan-token")?.value;
+    out.mask = mask;
+    out.focusSelects = (() => { const t = document.querySelector("#chan-token"); t.focus(); return t.selectionStart === 0 && t.selectionEnd === t.value.length; })();
+    out.keptByDots = (await submit(null)).channel_has_token;
+    out.replaced = (await submit("tk_second")).channel_has_token;
+    out.removed = (await submit("")).channel_has_token;
+    out.maskAfterRemoval = document.querySelector("#chan-token")?.value ?? "";
+    const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/notifications", { method: "PUT", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf }, body: JSON.stringify({ kind: "" }) });
+    return out;
+  `);
+  check(
+    "a saved token is dots that keep it, writing over them replaces it, and emptying the field removes it",
+    secret.set === true && secret.mask === "••••••••" && secret.focusSelects === true && secret.keptByDots === true &&
+      secret.replaced === true && secret.removed === false && secret.maskAfterRemoval === "",
+    JSON.stringify(secret),
+  );
+
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
   check("and the content policy refused nothing", refusedByPolicy.length === 0, refusedByPolicy.slice(0, 3).join(" | "));
   await close();

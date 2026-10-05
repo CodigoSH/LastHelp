@@ -1167,7 +1167,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 1100));
     const g = document.querySelector("form.channel");
     const res = { url: g.querySelector("#chan-url")?.value ?? "", token: g.querySelector("#chan-token")?.value ?? "",
-      guardado: !!g.querySelector("input[name=clear_token]"),
+      guardado: g.querySelector("#chan-token")?.value === "••••••••",
       sinServidor: ![...g.querySelectorAll("#chan-kind option")].some(o => o.value === "server") };
     // Off again, so nothing afterwards delivers anywhere.
     const csrf = document.cookie.split(";").map(c => c.trim())
@@ -1178,8 +1178,8 @@ async function main() {
     return res;
   `);
   check(
-    "the server's channel is saved from its own screen, read back with its address and not its token",
-    servidor.url === "https://ntfy.example/server-topic" && servidor.token === "" && servidor.guardado && servidor.sinServidor,
+    "the server's channel is saved from its own screen, read back with its address and its token as dots",
+    servidor.url === "https://ntfy.example/server-topic" && servidor.token === "••••••••" && servidor.guardado && servidor.sinServidor,
     JSON.stringify(servidor),
   );
 
@@ -3402,14 +3402,14 @@ async function main() {
     await fetch("/api/orgs/codigosh/repos/lastboard/channel", { method: "POST",
       headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
       body: JSON.stringify({ kind: "" }) });
-    const quitar = !!document.querySelector("input[name=clear_token]");
+    const quitar = document.querySelector("#chan-token")?.value === "••••••••";
     const prueba = !!document.querySelector("[data-channel-test]");
     const token = document.querySelector("#chan-token")?.value ?? "";
     return { elegido, url, quitar, prueba, token };
   `);
   check(
-    "the channel is set from the repository's page and said back with its address, never its token",
-    canal.elegido === "ntfy" && canal.url === "https://ntfy.example/drive-topic" && canal.token === "" &&
+    "the channel is set from the repository's page and said back with its address and its token as dots, never the token",
+    canal.elegido === "ntfy" && canal.url === "https://ntfy.example/drive-topic" && canal.token === "••••••••" &&
       canal.quitar && canal.prueba && !JSON.stringify(canal).includes("tk_drive"),
     JSON.stringify(canal),
   );

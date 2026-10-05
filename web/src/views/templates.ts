@@ -18,6 +18,7 @@ import { escapeAttr, escapeHTML } from "../escape";
 import { areaChart, donut } from "./charts";
 import { icons } from "./icons";
 import { modKey } from "../services/searchShortcut";
+import { MASK } from "../services/secretField";
 import { actionButton, iconButton } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
@@ -2508,7 +2509,9 @@ function channelForm(
       )}</p>`
     : "";
 
-  return `<form class="channel"${spec.repo === undefined ? " data-server-channel" : ""}>
+  return `<form class="channel"${spec.repo === undefined ? " data-server-channel" : ""} data-kind="${escapeAttr(spec.kind)}"${
+    spec.hasToken ? " data-has-token" : ""
+  }>
     ${choiceField({ id: "chan-kind", name: "kind", label: text.t("panel.channel"), options: kinds, selected: spec.kind })}
     <div class="channel-fields" hidden>
       ${field({ id: "chan-url", name: "url", label: text.t("panel.address2"), example: "https://ntfy.sh/acme-feedback", value: spec.url }, text)}
@@ -2518,16 +2521,13 @@ function channelForm(
           name: "token",
           label: text.t("panel.token"),
           type: "password",
-          autocomplete: "off",
+          autocomplete: "new-password",
+          // A saved token is dots: it is there, and which one it is cannot be seen.
+          value: spec.hasToken ? MASK : undefined,
           hint: spec.hasToken ? text.t("panel.tokenSaved") : undefined,
         },
         text,
       )}
-      ${
-        spec.hasToken
-          ? `<label class="check"><input type="checkbox" name="clear_token" /><span>${escapeHTML(text.t("panel.tokenRemove"))}</span></label>`
-          : ""
-      }
     </div>
     <div class="channel-mail" hidden>
       ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "team@example.com", value: spec.to }, text)}
