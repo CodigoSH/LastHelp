@@ -48,12 +48,8 @@ func (s Store) Comment(itemID int64, author Author, authorRef, body string, now 
 
 	// Before anything is written: a reply and a visitor's comment go through the
 	// same rule, because the conversation closes for both at once.
-	_, status, err := s.standing(itemID)
-	if err != nil {
+	if err := s.mayWriteOn(itemID, author, now); err != nil {
 		return Comment{}, err
-	}
-	if status.Closes() {
-		return Comment{}, ErrConversationClosed
 	}
 
 	moderation := Pending

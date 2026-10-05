@@ -159,6 +159,7 @@
   "item.commentWaiting": "送信しました。レビュー後に表示されます。",
   "item.comments": "コメント",
   "item.commentsClosed": "このレポートは終了しており、コメントは受け付けていません。",
+  "item.commentsUntil": "このレポートは終了しています。{date}まではここに書き込めます。その後、会話は終了します。",
   "item.confirmDelete": "「{title}」を削除しますか？ 投票、コメント、返信も削除されます。取り消せません。",
   "item.confirmDeleteComment": "このコメントを削除しますか？ 取り消せません。",
   "item.delete": "報告を削除",

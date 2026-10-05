@@ -159,6 +159,7 @@
   "item.commentWaiting": "Gesendet. Wird nach der Prüfung angezeigt.",
   "item.comments": "Kommentare",
   "item.commentsClosed": "Dieser Bericht ist geschlossen und nimmt keine Kommentare mehr an.",
+  "item.commentsUntil": "Dieser Bericht ist geschlossen. Du kannst hier noch bis {date} schreiben, danach wird die Unterhaltung geschlossen.",
   "item.confirmDelete": "„{title}“ löschen? Ihre Stimmen, Kommentare und Antworten werden gelöscht. Das lässt sich nicht rückgängig machen.",
   "item.confirmDeleteComment": "Diesen Kommentar löschen? Das lässt sich nicht rückgängig machen.",
   "item.delete": "Meldung löschen",

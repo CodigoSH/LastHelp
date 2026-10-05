@@ -115,12 +115,17 @@ closed, its page keeps the number and loses the button, and a vote can no longer
 be given or taken back, so the count is what people wanted when you answered.
 Reopen the idea and voting opens with it.
 
-**An answered report stops taking comments.** The same moment, for an idea and
-for a bug, and for you as much as for visitors: the thread stays on the page,
-the comment form and your reply box are replaced by a line saying it is closed,
-and a comment or reply sent from a page opened earlier is refused. You can still
-edit or delete what is already there. Reopen the report and the conversation
-opens with it.
+**An answered report stops taking comments, after a grace of 48 hours.** For
+visitors it is the same moment votes stop, for an idea and for a bug: the thread
+stays on the page, the comment form is replaced by a line saying it is closed,
+and a comment sent from a page opened earlier is refused. The person who
+reported it, holding their follow link, and you keep the form for 48 hours after
+the answer, with a line saying until when: an answer is rarely the end of the
+exchange, and the reporter is the one who can say whether the fix worked. After
+that the conversation closes for everybody. Answering again starts the 48 hours
+again; reopening the report opens the conversation at once. Pictures follow the
+same rule as the message they go on. You can still edit or delete what is
+already there.
 
 Votes are there to point you at what people want, not to decide it. Anybody can
 vote again by changing browser, clearing cookies or changing address, and that

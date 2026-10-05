@@ -597,12 +597,11 @@ func TestTallyCountsWhatListWouldShowWithoutItsLimit(t *testing.T) {
 	}
 }
 
-// TestAnAnsweredReportTakesNoMoreComments.
-//
-// The conversation closes at the moment voting does, for an idea and for a bug,
-// and for the team as much as for a visitor: a reply is a comment written by
-// someone else, and one door decides both.
-func TestAnAnsweredReportTakesNoMoreComments(t *testing.T) {
+// TestAnAnsweredReportTakesCommentsOnlyFromWhoAnsweredFor: a visitor's comment is
+// refused at once; the reporter and the team keep writing for GraceAfterClosing,
+// and then the conversation closes for everybody. It is the same for an idea and
+// for a bug, and for each way of answering.
+func TestAnAnsweredReportTakesCommentsOnlyFromWhoAnsweredFor(t *testing.T) {
 	for _, tc := range []struct {
 		kind   Kind
 		answer Status
@@ -619,19 +618,59 @@ func TestAnAnsweredReportTakesNoMoreComments(t *testing.T) {
 			if err := s.SetStatus(it.ID, tc.answer, epoch); err != nil {
 				t.Fatal(err)
 			}
-			for _, author := range []Author{AuthorVisitor, AuthorReporter, AuthorTeam} {
-				if _, err := s.Comment(it.ID, author, "x", "after", epoch); !errors.Is(err, ErrConversationClosed) {
-					t.Errorf("%s writing on an answered report gave %v, want ErrConversationClosed", author, err)
+
+			// A visitor, never. The others, inside the window.
+			if _, err := s.Comment(it.ID, AuthorVisitor, "", "after", epoch); !errors.Is(err, ErrConversationClosed) {
+				t.Errorf("a visitor writing on an answered report gave %v, want ErrConversationClosed", err)
+			}
+			inside := epoch.Add(GraceAfterClosing - time.Second)
+			for _, author := range []Author{AuthorReporter, AuthorTeam} {
+				if _, err := s.Comment(it.ID, author, "x", "within the window", inside); err != nil {
+					t.Errorf("the %s was refused inside the window: %v", author, err)
+				}
+			}
+			// Outside it, nobody.
+			for _, at := range []time.Time{epoch.Add(GraceAfterClosing), epoch.Add(GraceAfterClosing + time.Hour)} {
+				for _, author := range []Author{AuthorVisitor, AuthorReporter, AuthorTeam} {
+					if _, err := s.Comment(it.ID, author, "x", "late", at); !errors.Is(err, ErrConversationClosed) {
+						t.Errorf("%s writing at +%s gave %v, want ErrConversationClosed", author, at.Sub(epoch), err)
+					}
 				}
 			}
 			all, err := s.Comments(it.ID, Pending)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(all) != 1 {
-				t.Errorf("%d comments waiting after the answer, want the 1 from before", len(all))
+			// The one from before and the reporter's from inside the window; the
+			// team's is published and does not wait.
+			if len(all) != 2 {
+				t.Errorf("%d comments waiting, want 2: the one from before and the reporter's", len(all))
 			}
 		})
+	}
+}
+
+// TestTheWindowIsCountedFromTheLastAnswer: answering again starts it again, and
+// a report closed with no time on record has no window at all.
+func TestTheWindowIsCountedFromTheLastAnswer(t *testing.T) {
+	s := store(t)
+	it, _ := report(t, s, Bug, "crash", "")
+	if err := s.SetStatus(it.ID, StatusClosed, epoch); err != nil {
+		t.Fatal(err)
+	}
+	later := epoch.Add(40 * time.Hour)
+	if err := s.SetStatus(it.ID, StatusNotReproducible, later); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Comment(it.ID, AuthorReporter, "", "still here", later.Add(40*time.Hour)); err != nil {
+		t.Errorf("the window was not counted from the last answer: %v", err)
+	}
+
+	if _, err := s.DB.Exec(`UPDATE item SET closed_at = NULL WHERE id = ?`, it.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Comment(it.ID, AuthorTeam, "x", "no record", later); !errors.Is(err, ErrConversationClosed) {
+		t.Errorf("an answered report with no closing time gave %v, want ErrConversationClosed", err)
 	}
 }
 

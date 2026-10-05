@@ -39,7 +39,7 @@ func TestAReportTakesFivePicturesAndAMessageThree(t *testing.T) {
 	s := store(t)
 	it, _ := report(t, s, Bug, "crash", "")
 	for i := 0; i < MaxImagesPerReport; i++ {
-		img, err := s.AddImage(it.ID, 0, photo(t), epoch)
+		img, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch)
 		if err != nil {
 			t.Fatalf("picture %d on the report: %v", i+1, err)
 		}
@@ -47,7 +47,7 @@ func TestAReportTakesFivePicturesAndAMessageThree(t *testing.T) {
 			t.Errorf("picture %d has position %d", i+1, img.Position)
 		}
 	}
-	if _, err := s.AddImage(it.ID, 0, photo(t), epoch); !errors.Is(err, ErrTooManyImages) {
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch); !errors.Is(err, ErrTooManyImages) {
 		t.Errorf("a sixth picture on the report gave %v, want ErrTooManyImages", err)
 	}
 
@@ -56,11 +56,11 @@ func TestAReportTakesFivePicturesAndAMessageThree(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < MaxImagesPerComment; i++ {
-		if _, err := s.AddImage(it.ID, c.ID, photo(t), epoch); err != nil {
+		if _, err := s.AddImage(it.ID, c.ID, AuthorReporter, photo(t), epoch); err != nil {
 			t.Fatalf("picture %d on the message: %v", i+1, err)
 		}
 	}
-	if _, err := s.AddImage(it.ID, c.ID, photo(t), epoch); !errors.Is(err, ErrTooManyImages) {
+	if _, err := s.AddImage(it.ID, c.ID, AuthorReporter, photo(t), epoch); !errors.Is(err, ErrTooManyImages) {
 		t.Errorf("a fourth picture on the message gave %v, want ErrTooManyImages", err)
 	}
 	if got := countImages(t, s, it.ID); got != MaxImagesPerReport+MaxImagesPerComment {
@@ -78,14 +78,14 @@ func TestAThreadHasACeilingAcrossItsMessages(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i := 0; i < MaxImagesPerComment && added < MaxImagesPerThread; i++ {
-			if _, err := s.AddImage(it.ID, c.ID, photo(t), epoch); err != nil {
+			if _, err := s.AddImage(it.ID, c.ID, AuthorReporter, photo(t), epoch); err != nil {
 				t.Fatalf("picture %d: %v", added+1, err)
 			}
 			added++
 		}
 	}
 	c, _ := s.Comment(it.ID, AuthorTeam, "alex", "one more", epoch)
-	if _, err := s.AddImage(it.ID, c.ID, photo(t), epoch); !errors.Is(err, ErrTooManyImages) {
+	if _, err := s.AddImage(it.ID, c.ID, AuthorReporter, photo(t), epoch); !errors.Is(err, ErrTooManyImages) {
 		t.Errorf("picture %d in the thread gave %v, want ErrTooManyImages", MaxImagesPerThread+1, err)
 	}
 }
@@ -96,32 +96,40 @@ func TestAPictureGoesOnlyWhereItMayGo(t *testing.T) {
 	other, _ := report(t, s, Bug, "freeze", "")
 	elsewhere, _ := s.Comment(other.ID, AuthorTeam, "alex", "on another report", epoch)
 
-	if _, err := s.AddImage(it.ID, elsewhere.ID, photo(t), epoch); !errors.Is(err, ErrNotFound) {
+	if _, err := s.AddImage(it.ID, elsewhere.ID, AuthorReporter, photo(t), epoch); !errors.Is(err, ErrNotFound) {
 		t.Errorf("a picture for a message on another report gave %v, want ErrNotFound", err)
 	}
-	if _, err := s.AddImage(it.ID, 0, []byte("not a picture"), epoch); err == nil {
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, []byte("not a picture"), epoch); err == nil {
 		t.Error("something that is not a picture was stored")
 	}
-	if _, err := s.AddImage(it.ID, 0, make([]byte, MaxImageUpload+1), epoch); !errors.Is(err, ErrImageTooLarge) {
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, make([]byte, MaxImageUpload+1), epoch); !errors.Is(err, ErrImageTooLarge) {
 		t.Errorf("a picture over the upload size gave %v", err)
 	}
 
 	if _, err := s.DB.Exec(`UPDATE repository SET accepts_images = 0 WHERE id = 1`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddImage(it.ID, 0, photo(t), epoch); !errors.Is(err, ErrImagesOff) {
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch); !errors.Is(err, ErrImagesOff) {
 		t.Errorf("a board with pictures off gave %v, want ErrImagesOff", err)
 	}
 }
 
-func TestAnAnsweredReportTakesNoPictures(t *testing.T) {
+// TestAnAnsweredReportTakesPicturesLikeItTakesComments: the same window, from the
+// same rule, so a picture cannot be added where its message could not.
+func TestAnAnsweredReportTakesPicturesLikeItTakesComments(t *testing.T) {
 	s := store(t)
 	it, _ := report(t, s, Bug, "crash", "")
 	if err := s.SetStatus(it.ID, StatusClosed, epoch); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddImage(it.ID, 0, photo(t), epoch); !errors.Is(err, ErrConversationClosed) {
-		t.Errorf("a picture on a closed report gave %v, want ErrConversationClosed", err)
+	if _, err := s.AddImage(it.ID, 0, AuthorVisitor, photo(t), epoch); !errors.Is(err, ErrConversationClosed) {
+		t.Errorf("a visitor's picture on a closed report gave %v, want ErrConversationClosed", err)
+	}
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch.Add(time.Hour)); err != nil {
+		t.Errorf("the reporter's picture inside the window gave %v", err)
+	}
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch.Add(GraceAfterClosing)); !errors.Is(err, ErrConversationClosed) {
+		t.Errorf("a picture after the window gave %v, want ErrConversationClosed", err)
 	}
 }
 
@@ -133,7 +141,7 @@ func TestAClosedReportKeepsItsPicturesForTheGrace(t *testing.T) {
 	reopened, _ := report(t, s, Bug, "freeze", "")
 	open, _ := report(t, s, Idea, "dark mode", "")
 	for _, it := range []Item{closed, reopened, open} {
-		if _, err := s.AddImage(it.ID, 0, photo(t), epoch); err != nil {
+		if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -166,12 +174,12 @@ func TestATurnedDownReportOrMessageLosesItsPicturesAtOnce(t *testing.T) {
 	spam, _ := report(t, s, Bug, "buy now", "")
 	kept, _ := report(t, s, Idea, "dark mode", "")
 	for _, it := range []Item{rejected, spam, kept} {
-		if _, err := s.AddImage(it.ID, 0, photo(t), epoch); err != nil {
+		if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch); err != nil {
 			t.Fatal(err)
 		}
 	}
 	c, _ := s.Comment(kept.ID, AuthorReporter, "", "here is mine", epoch)
-	if _, err := s.AddImage(kept.ID, c.ID, photo(t), epoch); err != nil {
+	if _, err := s.AddImage(kept.ID, c.ID, AuthorReporter, photo(t), epoch); err != nil {
 		t.Fatal(err)
 	}
 
@@ -196,11 +204,11 @@ func TestMergingMovesTheDuplicatesPictures(t *testing.T) {
 	s := store(t)
 	survivor, _ := report(t, s, Bug, "crash on import", "")
 	duplicate, _ := report(t, s, Bug, "import crashes", "")
-	if _, err := s.AddImage(survivor.ID, 0, photo(t), epoch); err != nil {
+	if _, err := s.AddImage(survivor.ID, 0, AuthorReporter, photo(t), epoch); err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 2; i++ {
-		if _, err := s.AddImage(duplicate.ID, 0, photo(t), epoch); err != nil {
+		if _, err := s.AddImage(duplicate.ID, 0, AuthorReporter, photo(t), epoch); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -225,10 +233,10 @@ func TestDeletingAReportOrAMessageDeletesItsPictures(t *testing.T) {
 	s := store(t)
 	it, _ := report(t, s, Bug, "crash", "")
 	c, _ := s.Comment(it.ID, AuthorTeam, "alex", "look", epoch)
-	if _, err := s.AddImage(it.ID, c.ID, photo(t), epoch); err != nil {
+	if _, err := s.AddImage(it.ID, c.ID, AuthorReporter, photo(t), epoch); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddImage(it.ID, 0, photo(t), epoch); err != nil {
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.DeleteComment(c.ID); err != nil {
@@ -250,7 +258,7 @@ func TestDeletingAReportOrAMessageDeletesItsPictures(t *testing.T) {
 func TestBothSizesAreServedAndARemovedPictureIsGone(t *testing.T) {
 	s := store(t)
 	it, _ := report(t, s, Bug, "crash", "")
-	img, err := s.AddImage(it.ID, 0, photo(t), epoch)
+	img, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +289,7 @@ func TestAFullInstallationRefusesWithAReason(t *testing.T) {
 		other.ID, ImageQuota-100); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.AddImage(it.ID, 0, photo(t), epoch); !errors.Is(err, ErrImageQuota) {
+	if _, err := s.AddImage(it.ID, 0, AuthorReporter, photo(t), epoch); !errors.Is(err, ErrImageQuota) {
 		t.Errorf("a picture past the installation's space gave %v, want ErrImageQuota", err)
 	}
 }

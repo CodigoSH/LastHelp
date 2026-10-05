@@ -98,6 +98,12 @@ class I18n {
     return formatDate(this.language, date);
   }
 
+  /** A date with the time of day, for a deadline that falls inside a day. */
+  dateTime(value: Date | number): string {
+    const date = typeof value === "number" ? new Date(value * 1000) : value;
+    return formatDate(this.language, date, { dateStyle: "medium", timeStyle: "short" });
+  }
+
   number(value: number): string {
     return formatNumber(this.language, value);
   }

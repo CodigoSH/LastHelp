@@ -12,6 +12,7 @@ const text: Text = {
     params ? `[${key} ${JSON.stringify(params)}]` : `[${key}]`,
   markup: (key, markup) => `[${key} ${JSON.stringify(markup)}]`,
   date: () => "a date",
+  dateTime: () => "a date and time",
   number: (value) => String(value),
   bytes: (value) => `${value} bytes`,
   since: (seconds) => `${seconds}s ago`,
@@ -174,6 +175,23 @@ describe("the conversation", () => {
       expect(html).not.toContain("<form class=\"comment-form");
       expect(html).not.toContain("<form class=\"team-reply");
     }
+  });
+});
+
+describe("the window after an answer", () => {
+  const allowed = { current: "closed", statuses: ["new", "closed"] };
+
+  test("an answered report that still takes words from this reader says until when", () => {
+    const window = report({ status: "closed", commentable: true, comment_until: 1_700_000_000 });
+    const html = itemView(window, text);
+    expect(html).toContain("comment-form");
+    expect(html).toContain("item.commentsUntil");
+    expect(html).toContain("a date and time");
+    expect(itemTeamView(window, allowed, [], text)).toContain("item.commentsUntil");
+  });
+
+  test("a report that is open says nothing about a deadline", () => {
+    expect(itemView(report(), text)).not.toContain("item.commentsUntil");
   });
 });
 

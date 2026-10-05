@@ -250,7 +250,7 @@ async function main() {
   );
 
   // Answering it is the last thing done to it here: the conversation closes with
-  // the status, so the reply and the edits above have to come first.
+  // the status — for the team 48 hours later —, so the reply and the edits come first.
   const statusChange = await evaluate(`
     const id = ${JSON.stringify(before.id)};
     const pick = document.querySelector(".rev-detail #status-select");
@@ -273,11 +273,11 @@ async function main() {
   const closedPane = await evaluate(`
     const pane = document.querySelector(".rev-detail");
     return { form: !!pane.querySelector("form.team-reply"), said: (pane.textContent ?? "").length > 0,
-             thread: pane.querySelectorAll(".comments .comment").length };
+             until: !!pane.querySelector(".comment-window"), thread: pane.querySelectorAll(".comments .comment").length };
   `);
   check(
-    "an answered report keeps its conversation in the pane and loses the reply box",
-    closedPane.form === false && closedPane.thread === 1,
+    "an answered report keeps its conversation and, for the team, its reply box with the time it lasts until",
+    closedPane.form === true && closedPane.until === true && closedPane.thread === 1,
     JSON.stringify(closedPane),
   );
 

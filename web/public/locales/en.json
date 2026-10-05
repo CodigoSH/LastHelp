@@ -157,6 +157,7 @@
   "item.commentWaiting": "Sent. It will appear after review.",
   "item.comments": "Comments",
   "item.commentsClosed": "This report is closed, so it takes no more comments.",
+  "item.commentsUntil": "This report is closed. You can still write here until {date}, and then the conversation closes.",
   "item.confirmDelete": "Delete “{title}”? Its votes, comments and replies will be deleted. This cannot be undone.",
   "item.confirmDeleteComment": "Delete this comment? This cannot be undone.",
   "item.delete": "Delete report",
