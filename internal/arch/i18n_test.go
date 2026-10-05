@@ -369,6 +369,7 @@ func TestNothingSaysEmailWhereItMeansUsername(t *testing.T) {
 		"form.emailHelp":         true,
 		"panel.mailTo":           true, // where a mail channel delivers
 		"error.channel_no_relay": true, // a test of the mail channel, saying why no mail went
+		"error.invalid_email":    true, // the reporter's optional address
 	}
 
 	master, ok := catalogues(t)["en"]
