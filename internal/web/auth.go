@@ -80,6 +80,10 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, "error.username_taken")
 			return
 		}
+		if errors.Is(err, account.ErrBadUsername) {
+			writeError(w, http.StatusBadRequest, "error.username_chars")
+			return
+		}
 		slog.Error("creating the first account", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return

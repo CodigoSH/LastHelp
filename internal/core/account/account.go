@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
@@ -27,6 +28,10 @@ var ErrNotFound = errors.New("account not found")
 
 // ErrNameTaken is returned when the username already has an account.
 var ErrNameTaken = errors.New("that username already has an account")
+
+// ErrBadUsername is returned for a name carrying characters that mean something
+// to markup, or that are not characters at all.
+var ErrBadUsername = errors.New("a username may not contain < > \" ' & or control characters")
 
 // Store reads and writes accounts. It takes an Execer rather than a handle, so
 // a caller can pass a transaction and make this part of a larger unit of work.
@@ -53,6 +58,9 @@ func (s Store) Create(username, plainPassword string, administrator bool, now ti
 	username = normaliseUsername(username)
 	if username == "" {
 		return User{}, errors.New("an account needs a username")
+	}
+	if err := validUsername(username); err != nil {
+		return User{}, err
 	}
 
 	hash, err := password.Hash(plainPassword)
@@ -228,6 +236,20 @@ func normaliseUsername(username string) string {
 	return strings.ToLower(strings.TrimSpace(username))
 }
 
+// validUsername is the one door for what a name may contain. A name is written
+// into pages, replies and mail, and every one of those escapes it; refusing the
+// characters that markup uses means a template that forgets to has nothing to
+// leak. Letters of every script stay valid, which is what a test with non-Latin
+// names checks. Accounts made before this rule keep the name they have.
+func validUsername(username string) error {
+	for _, r := range username {
+		if strings.ContainsRune(`<>"'&`, r) || unicode.IsControl(r) {
+			return ErrBadUsername
+		}
+	}
+	return nil
+}
+
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
@@ -325,6 +347,9 @@ func (s Store) Rename(userID int64, username string) error {
 	username = normaliseUsername(username)
 	if username == "" {
 		return errors.New("an account needs a username")
+	}
+	if err := validUsername(username); err != nil {
+		return err
 	}
 	if _, err := s.DB.Exec(`UPDATE app_user SET username = ? WHERE id = ?`, username, userID); err != nil {
 		if isUniqueViolation(err) {

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // receiver is a notification service that remembers what reached it.
@@ -148,5 +149,37 @@ func TestTheServerChannelIsTheAdministratorsAndABoardChoosesIt(t *testing.T) {
 	panel := body(t, admin.do(http.MethodGet, "/api/orgs/acme/repos/atlas/panel", nil))
 	if !strings.Contains(panel, `"configured":true`) {
 		t.Errorf("the page does not say the server has a channel: %s", panel)
+	}
+}
+
+// TestAReporterAddressIsOneBareMailbox: the field takes the address of the person
+// reporting and nothing shaped like a list or a name with an address inside.
+func TestAReporterAddressIsOneBareMailbox(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+	base := "/api/orgs/codigosh/repos/lastboard"
+
+	send := func(address string) int {
+		form := decode(t, public.do(http.MethodGet, base+"/form", nil))
+		public.tick.advance(5 * time.Second)
+		resp := public.do(http.MethodPost, base+"/items", map[string]any{
+			"kind": "idea", "title": "dark mode " + address, "body": "what happened for the address",
+			"email": address, "token": form["token"],
+		})
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+	for _, good := range []string{"", "ana@example.com", "ana+tag@mail.example.org"} {
+		if got := send(good); got != http.StatusCreated {
+			t.Errorf("%q was refused: %d", good, got)
+		}
+	}
+	for _, bad := range []string{"Ana <ana@example.com>", "a@example.com, b@example.com", "not an address", "ana@", "a@example.com\r\nBcc: x@example.com", strings.Repeat("a", 250) + "@example.com"} {
+		if got := send(bad); got != http.StatusBadRequest {
+			t.Errorf("%q was accepted: %d", bad, got)
+		}
 	}
 }

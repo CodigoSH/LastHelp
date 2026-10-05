@@ -235,3 +235,29 @@ func seed(t *testing.T, s Store) {
 		t.Fatal(err)
 	}
 }
+
+// TestANameMayNotCarryMarkup: the characters a page uses to open a tag or close
+// an attribute are refused when an account is made and when one is renamed,
+// while a name in any script is still a name.
+func TestANameMayNotCarryMarkup(t *testing.T) {
+	s := store(t)
+	for _, bad := range []string{"<b>x</b>", `a"b`, "o'neil", "a&b", "x>y", "tab\tname", "nul\x00"} {
+		if _, err := s.Create(bad, "a good long passphrase", false, epoch); !errors.Is(err, ErrBadUsername) {
+			t.Errorf("Create(%q) gave %v, want ErrBadUsername", bad, err)
+		}
+	}
+	var last User
+	for _, good := range []string{"ana", "山田太郎", "Ольга", "ana.maria-2", "ayşe_k"} {
+		u, err := s.Create(good, "a good long passphrase", false, epoch)
+		if err != nil {
+			t.Errorf("Create(%q) refused a valid name: %v", good, err)
+		}
+		last = u
+	}
+	if err := s.Rename(last.ID, "<script>"); !errors.Is(err, ErrBadUsername) {
+		t.Errorf("Rename to markup gave %v, want ErrBadUsername", err)
+	}
+	if err := s.Rename(last.ID, "ayşe-k"); err != nil {
+		t.Errorf("Rename to a valid name refused: %v", err)
+	}
+}

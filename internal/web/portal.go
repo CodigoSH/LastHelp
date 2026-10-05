@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 
@@ -352,6 +353,10 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	// keeps it from travelling is that nothing reads the column except the code
 	// about to send a message, and that it is deleted when the report closes.
 	address := strings.TrimSpace(in.Email)
+	if address != "" && !plausibleAddress(address) {
+		writeError(w, http.StatusBadRequest, "error.invalid_email")
+		return
+	}
 
 	moderation := item.Pending
 	created, token, createErr := s.items().Create(item.New{
@@ -594,6 +599,18 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 	}
 	// The id lets the reporter's page hang their pictures on this message.
 	writeJSON(w, http.StatusAccepted, map[string]any{"id": c.ID, "moderation": string(item.Pending)})
+}
+
+// plausibleAddress is whether what was typed is one bare mailbox. The relay is
+// the real judge, but a field that takes anything lets somebody write a third
+// party's address with a name and a comma list around it; one address, no
+// display name, no control characters, within the length a mailbox has.
+func plausibleAddress(address string) bool {
+	if len(address) > 254 {
+		return false
+	}
+	parsed, err := mail.ParseAddress(address)
+	return err == nil && parsed.Address == address && !strings.ContainsAny(address, "<>,;\r\n\t ")
 }
 
 // writeCommentError says why a comment or a reply was refused. Shared by the

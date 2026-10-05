@@ -137,6 +137,9 @@ func (s *Server) rename(w http.ResponseWriter, userID int64, username string) (s
 	case errors.Is(err, account.ErrNameTaken):
 		writeError(w, http.StatusConflict, "error.username_taken")
 		return "", false
+	case errors.Is(err, account.ErrBadUsername):
+		writeError(w, http.StatusBadRequest, "error.username_chars")
+		return "", false
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return "", false
@@ -280,6 +283,9 @@ func (s *Server) handleCreatePerson(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, account.ErrNameTaken):
 		writeError(w, http.StatusConflict, "error.username_taken")
+		return
+	case errors.Is(err, account.ErrBadUsername):
+		writeError(w, http.StatusBadRequest, "error.username_chars")
 		return
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, "error.internal")
