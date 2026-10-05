@@ -17,6 +17,7 @@ import type {
 import { escapeAttr, escapeHTML } from "../escape";
 import { areaChart, donut } from "./charts";
 import { icons } from "./icons";
+import { modKey } from "../services/searchShortcut";
 import { actionButton, iconButton } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
@@ -2075,7 +2076,7 @@ export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): s
       <span><kbd>P</kbd> ${escapeHTML(text.t("panel.approve"))}</span>
       <span><kbd>R</kbd> ${escapeHTML(text.t("panel.reject"))}</span>
       <span><kbd>S</kbd> ${escapeHTML(text.t("panel.spam"))}</span>
-      <span><kbd>/</kbd> ${escapeHTML(text.t("board.search"))}</span>
+      <span><kbd>${escapeHTML(modKey())}</kbd><kbd>K</kbd> ${escapeHTML(text.t("board.search"))}</span>
       <span><kbd>Esc</kbd> ${escapeHTML(text.t("review.keyLeave"))}</span>
     </div>
   </div>`;
@@ -2137,7 +2138,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         );
 
   return `<div class="rev-filter">
-    <label class="rev-search">
+    <label class="search-box">
       ${icons.search(14)}
       <input type="search" data-q value="${escapeAttr(filters.q)}"
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
@@ -2665,9 +2666,9 @@ export function antiabuseScreen(data: AntiabuseData, text: Text): string {
 
   const search =
     data.words.length > WORDS_PER_PAGE
-      ? `<label class="search-wrap word-search">
-          ${icons.search(16)}
-          <input class="search" type="search" name="q" autocomplete="off"
+      ? `<label class="search-box word-search">
+          ${icons.search(14)}
+          <input type="search" name="q" autocomplete="off"
             placeholder="${escapeAttr(text.t("antiabuse.search"))}" aria-label="${escapeAttr(text.t("antiabuse.search"))}" />
         </label>`
       : "";
@@ -3400,21 +3401,21 @@ export function itemTeamView(
           text.t("item.waiting"),
           `<div class="settings-row">
             <div class="settings-info"><p>${escapeHTML(text.t("item.waitingHelp"))}</p></div>
-            ${
-              item.team?.can_add_words
-                ? `<div class="field add-word">
-                    <label for="add-word">${escapeHTML(text.t("item.addWordLabel"))}</label>
-                    <input type="text" id="add-word" name="add_word" autocomplete="off" maxlength="60" />
-                    <p class="hint">${escapeHTML(text.t("item.addWordHelp"))}</p>
-                  </div>`
-                : ""
-            }
             <div class="decide-actions">
               <button class="button primary with-icon" data-moderate="published">${icons.check()}<span>${escapeHTML(text.t("panel.approve"))}</span></button>
               <button class="button ghost with-icon" data-moderate="rejected">${icons.close()}<span>${escapeHTML(text.t("panel.reject"))}</span></button>
               <button class="button danger with-icon" data-moderate="spam">${icons.warning()}<span>${escapeHTML(text.t("panel.spam"))}</span></button>
             </div>
-          </div>`,
+          </div>
+          ${
+            item.team?.can_add_words
+              ? `<div class="field add-word">
+                  <label for="add-word">${escapeHTML(text.t("item.addWordLabel"))}</label>
+                  <input type="text" id="add-word" name="add_word" autocomplete="off" maxlength="60" />
+                  <p class="hint">${escapeHTML(text.t("item.addWordHelp"))}</p>
+                </div>`
+              : ""
+          }`,
         )
       : "";
 

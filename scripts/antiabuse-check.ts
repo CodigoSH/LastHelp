@@ -146,6 +146,21 @@ async function main() {
     JSON.stringify(paged),
   );
 
+  // Ctrl+K goes to the search box, from the page and from another plain field.
+  const ctrlK = async () => {
+    for (const type of ["rawKeyDown", "keyUp"]) {
+      await page.send("Input.dispatchKeyEvent", { type, modifiers: 2, key: "k", code: "KeyK", windowsVirtualKeyCode: 75 });
+    }
+    await sleep(150);
+  };
+  await evaluate(`document.activeElement?.blur()`);
+  await ctrlK();
+  const fromPage = await evaluate(`return document.activeElement?.closest(".word-search") !== null && document.activeElement?.type === "search"`);
+  await evaluate(`document.querySelector("#new-word").focus()`);
+  await ctrlK();
+  const fromField = await evaluate(`return document.activeElement?.type === "search"`);
+  check("Ctrl+K takes the focus to the search box, from the page and from another plain field", fromPage === true && fromField === true, JSON.stringify({ fromPage, fromField }));
+
   // The same card as every other screen of the panel, not a wider one.
   const widthOf = async (path: string, marker: string) => {
     await goTo(path, marker);

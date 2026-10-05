@@ -5958,7 +5958,7 @@ a.stat:hover .stat-go {
   border-block-end: 1px solid var(--border);
 }
 
-.rev-search {
+.search-box {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -5968,9 +5968,9 @@ a.stat:hover .stat-go {
   padding: 0 9px;
 }
 
-.rev-search svg { color: var(--text-dim); flex: none; }
+.search-box svg { color: var(--text-dim); flex: none; }
 
-.rev-search input {
+.search-box input {
   border: 0;
   background: none;
   color: var(--text-main);
@@ -5983,7 +5983,7 @@ a.stat:hover .stat-go {
   box-shadow: none;
 }
 
-.rev-search:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
+.search-box:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
 
 .rev-narrow { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -6965,6 +6965,7 @@ a.stat:hover .stat-go {
 .settings-card .word-help + .settings-list { margin-block-start: 16px; }
 .word-edit { display: flex; align-items: center; gap: 6px; flex: 1; min-inline-size: 0; }
 .word-edit input { flex: 1; min-inline-size: 0; }
+.settings-card .settings-row + .add-word { margin-block-start: 16px; padding-block-start: 16px; border-block-start: 1px solid var(--border); }
 .word-search { flex: 0 0 auto; margin-block-start: 16px; max-inline-size: none; }
 .word-results { margin-block-start: 4px; }
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-block-start: 12px; }
