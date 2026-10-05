@@ -76,6 +76,9 @@ drive: build ## Walk the whole journey in a real browser
 drive-reports: build ## Walk the reports screen on an installation with history
 	@SEED=1 CHECK=reports-check.ts scripts/drive.sh
 
+drive-xss: build ## Hang marked payloads on every field a stranger writes and look for what runs
+	@SEED=1 CHECK=xss-check.ts scripts/drive.sh
+
 # Screenshots are generated, never taken by hand: a hand-taken one is one nobody
 # can reproduce when the interface changes, so the documentation ends up showing
 # a version that no longer exists.
