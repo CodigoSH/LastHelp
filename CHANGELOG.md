@@ -10,6 +10,11 @@ file with the stable that carries them.
 
 1.0.0 is the first stable release, so its entry describes the whole product
 rather than a change from an earlier version.
+## [1.2.3] - 2026-10-07
+
+### Fixed
+- In Spanish, the status of a declined idea is "Descartado", agreeing with "Nuevo", "Planificado", "En curso" and "Entregado" instead of standing out as the only feminine one on the Closed tab.
+
 ## [1.2.2] - 2026-10-07
 
 ### Added
