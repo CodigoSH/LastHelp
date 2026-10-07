@@ -73,10 +73,10 @@ They are asked different things and treated differently, on purpose:
   every extra box on a public form is somebody deciding not to bother.
 - **A bug is not voted.** Two hundred people agreeing that something crashes
   does not make it crash harder; what it needs is somebody able to reproduce it.
-  Its statuses are *new, confirmed, fix in progress, fixed, can't reproduce*.
+  Its statuses are *new, confirmed, fix in progress, fixed, couldn't reproduce*.
 - **An idea is voted, and its value is not reaching your issue tracker yet.**
   That is what stops the tracker turning into a wishlist with a thousand open
-  entries. Its statuses are *new, planned, in progress, shipped, not planned*.
+  entries. Its statuses are *new, planned, in progress, shipped, declined*.
 
 Both land on the same three roadmap columns, because to somebody reading it a
 confirmed bug and a planned idea are the same news.
@@ -126,6 +126,14 @@ that the conversation closes for everybody. Answering again starts the 48 hours
 again; reopening the report opens the conversation at once. Pictures follow the
 same rule as the message they go on. You can still edit or delete what is
 already there.
+
+**What you close stays where people can read it.** A declined idea or a bug you
+could not reproduce moves to the board's **Closed** tab with its votes and its
+thread, and the status says what you decided: a delivered one is solid and green,
+a declined one has a dashed edge and a hollow dot. It is also what somebody
+sees when they start typing the same thing: the similar reports under the title
+include closed ones with that status, and the line beside them says a closed
+report takes no more votes, so they read what was decided before asking again.
 
 Votes are there to point you at what people want, not to decide it. Anybody can
 vote again by changing browser, clearing cookies or changing address, and that

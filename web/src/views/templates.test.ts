@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, commentEditForm, itemTeamView, itemView, reportForm, rewriteForm, type Text, updateZone } from "./templates";
+import { accountRole, commentEditForm, itemTeamView, itemView, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -192,6 +192,28 @@ describe("the window after an answer", () => {
 
   test("a report that is open says nothing about a deadline", () => {
     expect(itemView(report(), text)).not.toContain("item.commentsUntil");
+  });
+});
+
+describe("the suggestions under a title", () => {
+  test("a closed report wears what the team decided, and its help says what a closed one is", () => {
+    const html = similarItems(
+      [
+        { public_id: "a", title: "keyboard shortcuts", status: "declined", closed: true },
+        { public_id: "b", title: "keyboard layout", status: "new", closed: false },
+      ],
+      text,
+    );
+    expect(html).toContain("status-declined");
+    expect(html).toContain("form.similarClosedHelp");
+    expect(html.match(/class="status /g)?.length).toBe(1);
+  });
+
+  test("a list of open reports has no chip and no talk of closing", () => {
+    const html = similarItems([{ public_id: "b", title: "keyboard layout", status: "new", closed: false }], text);
+    expect(html).not.toContain("status-");
+    expect(html).not.toContain("form.similarClosedHelp");
+    expect(html).toContain("form.similarHelp");
   });
 });
 

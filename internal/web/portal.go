@@ -194,7 +194,9 @@ func (s *Server) handleRoadmap(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSimilar is the "this looks like these" hint, asked while somebody is
-// still typing the title.
+// still typing the title. It includes what the team has closed — declined and
+// shipped alike — and says so, because a closed report is the best answer to
+// somebody asking again.
 func (s *Server) handleSimilar(w http.ResponseWriter, r *http.Request) {
 	repo, _, ok := s.lookupRepository(w, r)
 	if !ok {
@@ -211,6 +213,9 @@ func (s *Server) handleSimilar(w http.ResponseWriter, r *http.Request) {
 		out = append(out, map[string]any{
 			"public_id": it.PublicID, "title": it.Title,
 			"kind": string(it.Kind), "votes": it.VoteCount,
+			// What the team said about it, so somebody about to ask for the same
+			// thing sees that it was answered, and how, before they type it all.
+			"status": string(it.Status), "closed": it.Status.Closes(),
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"similar": out})

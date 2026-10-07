@@ -378,6 +378,45 @@ func TestSimilarItemsAreOfferedWhileTyping(t *testing.T) {
 	}
 }
 
+// TestASuggestionSaysWhatTheTeamDecided: somebody about to ask for something the
+// team already declined is shown that it was, and how, rather than a bare title
+// that reads as an open report they could vote for.
+func TestASuggestionSaysWhatTheTeamDecided(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	declined, _ := public.submit("codigosh", "lastboard", "idea", "keyboard shortcuts everywhere")
+	open, _ := public.submit("codigosh", "lastboard", "idea", "keyboard layout switcher")
+	for _, id := range []string{declined, open} {
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+	}
+	resp := team.do(http.MethodPost, "/api/items/"+declined+"/status", map[string]string{"status": string(item.StatusDeclined)})
+	_ = resp.Body.Close()
+
+	body := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/similar?title=keyboard", nil))
+	found, _ := body["similar"].([]any)
+	if len(found) != 2 {
+		t.Fatalf("the suggestions are %v, want both reports, the declined one included", body)
+	}
+	for _, raw := range found {
+		entry, _ := raw.(map[string]any)
+		switch entry["public_id"] {
+		case declined:
+			if entry["status"] != string(item.StatusDeclined) || entry["closed"] != true {
+				t.Errorf("a declined report is suggested as %v (closed=%v)", entry["status"], entry["closed"])
+			}
+		case open:
+			if entry["status"] != string(item.StatusNew) || entry["closed"] != false {
+				t.Errorf("an open report is suggested as %v (closed=%v)", entry["status"], entry["closed"])
+			}
+		}
+	}
+}
+
 // TestAKindTheBoardDoesNotAcceptIsRefused.
 func TestAKindTheBoardDoesNotAcceptIsRefused(t *testing.T) {
 	team := newInstance(t)
