@@ -121,6 +121,17 @@ func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
 		}
 		filter.Statuses = statuses
 	}
+	// What was done about the closed ones: delivered, or turned down. Only the closed
+	// side has the question, so it is refused anywhere else instead of ignored.
+	outcomes := map[string][]item.Status{"done": item.DeliveredStatuses(), "undone": item.TurnedDownStatuses()}
+	if outcome := q.Get("outcome"); outcome != "" {
+		statuses, ok := outcomes[outcome]
+		if !ok || state != "closed" {
+			writeError(w, http.StatusBadRequest, "error.bad_request")
+			return
+		}
+		filter.Statuses = statuses
+	}
 	// Moderation is deliberately not taken from the query: the public listing
 	// is published items, and the queue is a different route behind a session.
 	list, err := s.items().List(filter)
@@ -138,13 +149,17 @@ func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
 	all.Limit, all.Offset = 0, 0
 	total, err := s.items().Tally(all)
 	counts := map[string]int{}
-	for side, statuses := range sides {
-		if err != nil {
-			break
+	// The two sides, and the two ways of being closed, each under the same kind and
+	// search as the list: the numbers on the tabs are what the tabs would show.
+	for _, group := range []map[string][]item.Status{sides, outcomes} {
+		for name, statuses := range group {
+			if err != nil {
+				break
+			}
+			one := all
+			one.Status, one.Statuses = "", statuses
+			counts[name], err = s.items().Tally(one)
 		}
-		one := all
-		one.Status, one.Statuses = "", statuses
-		counts[side], err = s.items().Tally(one)
 	}
 	if err != nil {
 		slog.Error("counting items", "error", err)

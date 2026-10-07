@@ -46,6 +46,8 @@
   "board.closed": "クローズ",
   "board.empty": "まだ報告はありません。",
   "board.noneClosed": "クローズしたものはまだありません。",
+  "board.outcomeDone": "対応済み",
+  "board.outcomeUndone": "未対応",
   "board.noneOpen": "現在オープンのものはありません。",
   "board.open": "オープン",
   "board.report": "新規報告",

@@ -46,6 +46,8 @@
   "board.closed": "Закрытые",
   "board.empty": "Обращений пока нет.",
   "board.noneClosed": "Пока ничего не закрыто.",
+  "board.outcomeDone": "Сделано",
+  "board.outcomeUndone": "Не сделано",
   "board.noneOpen": "Сейчас ничего не открыто.",
   "board.open": "Открытые",
   "board.report": "Новое сообщение",

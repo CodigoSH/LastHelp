@@ -46,6 +46,8 @@
   "board.closed": "Gesloten",
   "board.empty": "Nog geen meldingen.",
   "board.noneClosed": "Nog niets gesloten.",
+  "board.outcomeDone": "Gedaan",
+  "board.outcomeUndone": "Niet gedaan",
   "board.noneOpen": "Er staat nu niets open.",
   "board.open": "Open",
   "board.report": "Nieuwe melding",

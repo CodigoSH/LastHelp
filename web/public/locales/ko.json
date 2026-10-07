@@ -46,6 +46,8 @@
   "board.closed": "닫힘",
   "board.empty": "아직 신고가 없습니다.",
   "board.noneClosed": "아직 닫힌 항목이 없습니다.",
+  "board.outcomeDone": "완료",
+  "board.outcomeUndone": "미완료",
   "board.noneOpen": "지금 열려 있는 항목이 없습니다.",
   "board.open": "열림",
   "board.report": "새 제보",

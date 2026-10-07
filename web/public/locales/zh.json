@@ -46,6 +46,8 @@
   "board.closed": "已关闭",
   "board.empty": "还没有反馈。",
   "board.noneClosed": "还没有已关闭的内容。",
+  "board.outcomeDone": "已完成",
+  "board.outcomeUndone": "未完成",
   "board.noneOpen": "目前没有开放的内容。",
   "board.open": "开放",
   "board.report": "新建反馈",

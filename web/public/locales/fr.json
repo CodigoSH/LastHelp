@@ -46,6 +46,8 @@
   "board.closed": "Fermés",
   "board.empty": "Aucun signalement pour l'instant.",
   "board.noneClosed": "Rien de fermé pour l’instant.",
+  "board.outcomeDone": "Réalisés",
+  "board.outcomeUndone": "Non réalisés",
   "board.noneOpen": "Rien d’ouvert pour le moment.",
   "board.open": "Ouverts",
   "board.report": "Nouveau signalement",

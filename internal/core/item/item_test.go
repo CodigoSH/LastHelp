@@ -783,3 +783,44 @@ func TestAnAnswerTooLongIsCutBetweenLettersNotThroughOne(t *testing.T) {
 		t.Errorf("the stored answer is %d characters, want %d", n, maxValue)
 	}
 }
+
+// TestEveryClosingStatusIsDeliveredOrTurnedDown: the board's "done" and "not done"
+// are the two halves of what closes, so a new way of closing has to be put on one
+// of them or the board would count it as neither.
+func TestEveryClosingStatusIsDeliveredOrTurnedDown(t *testing.T) {
+	closed := map[Status]bool{}
+	for _, st := range ClosedStatuses() {
+		closed[st] = true
+	}
+	seen := map[Status]string{}
+	for _, st := range DeliveredStatuses() {
+		seen[st] = "delivered"
+	}
+	for _, st := range TurnedDownStatuses() {
+		if seen[st] != "" {
+			t.Errorf("%s is both delivered and turned down", st)
+		}
+		seen[st] = "turned down"
+	}
+	if len(seen) != len(closed) {
+		t.Errorf("closing statuses %v, split into %v", ClosedStatuses(), seen)
+	}
+	for st := range closed {
+		if seen[st] == "" {
+			t.Errorf("%s closes a report and is on neither side", st)
+		}
+	}
+	if len(DeliveredStatuses()) == 0 || len(TurnedDownStatuses()) == 0 {
+		t.Error("one side of the split is empty")
+	}
+	for _, want := range []Status{StatusDone, StatusClosed} {
+		if !want.Delivered() {
+			t.Errorf("%s is something done and is not counted as delivered", want)
+		}
+	}
+	for _, want := range []Status{StatusDeclined, StatusNotReproducible} {
+		if want.Delivered() {
+			t.Errorf("%s is the team saying no and is counted as delivered", want)
+		}
+	}
+}

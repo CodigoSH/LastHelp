@@ -1317,6 +1317,10 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
     const q = new URLSearchParams(location.search);
     return {
       state: q.get("state") === "closed" ? "closed" : "open",
+      outcome:
+        q.get("state") === "closed" && (q.get("outcome") === "done" || q.get("outcome") === "undone")
+          ? (q.get("outcome") as "done" | "undone")
+          : "",
       kind: q.get("kind") === "bug" || q.get("kind") === "idea" ? (q.get("kind") ?? "") : "",
       sort: q.get("sort") === "votes" ? "votes" : "new",
       query: q.get("q") ?? "",
@@ -1325,6 +1329,7 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
   const write = (f: views.BoardFilters) => {
     const q = new URLSearchParams();
     if (f.state === "closed") q.set("state", "closed");
+    if (f.state === "closed" && f.outcome) q.set("outcome", f.outcome);
     if (f.kind) q.set("kind", f.kind);
     if (f.sort === "votes") q.set("sort", "votes");
     if (f.query.trim()) q.set("q", f.query);
@@ -1333,17 +1338,26 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
 
   let filters = read();
   let shown: ItemSummary[] = [];
-  let totals: views.BoardTotals = { total: 0, open: 0, closed: 0 };
+  let totals: views.BoardTotals = { total: 0, open: 0, closed: 0, done: 0, undone: 0 };
 
   const load = async (offset: number) => {
     const query = new URLSearchParams({ state: filters.state, limit: String(BOARD_PAGE), offset: String(offset) });
+    if (filters.state === "closed" && filters.outcome) query.set("outcome", filters.outcome);
     if (filters.kind) query.set("kind", filters.kind);
     if (filters.sort === "votes") query.set("sort", "votes");
     if (filters.query) query.set("q", filters.query);
-    const body = await api.get<{ items: ItemSummary[]; total?: number; counts?: { open?: number; closed?: number } }>(
-      `${base}/items?${query}`,
-    );
-    totals = { total: body.total ?? 0, open: body.counts?.open ?? 0, closed: body.counts?.closed ?? 0 };
+    const body = await api.get<{
+      items: ItemSummary[];
+      total?: number;
+      counts?: { open?: number; closed?: number; done?: number; undone?: number };
+    }>(`${base}/items?${query}`);
+    totals = {
+      total: body.total ?? 0,
+      open: body.counts?.open ?? 0,
+      closed: body.counts?.closed ?? 0,
+      done: body.counts?.done ?? 0,
+      undone: body.counts?.undone ?? 0,
+    };
     return body.items ?? [];
   };
 
@@ -1376,7 +1390,14 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
 
   const wire = () => {
     root?.querySelectorAll<HTMLButtonElement>("[data-state]").forEach((b) =>
-      b.addEventListener("click", () => void change({ state: b.dataset.state === "closed" ? "closed" : "open" })),
+      // Changing side starts from both again: the outcome is a question of the closed side.
+      b.addEventListener("click", () => void change({ state: b.dataset.state === "closed" ? "closed" : "open", outcome: "" })),
+    );
+    root?.querySelectorAll<HTMLButtonElement>("[data-outcome]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const picked = b.dataset.outcome === "done" ? "done" : "undone";
+        void change({ outcome: filters.outcome === picked ? "" : picked });
+      }),
     );
     root?.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((b) =>
       b.addEventListener("click", () => void change({ kind: b.dataset.kind ?? "" })),

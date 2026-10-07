@@ -46,6 +46,8 @@
   "board.closed": "Kapalı",
   "board.empty": "Henüz bildirim yok.",
   "board.noneClosed": "Henüz kapanan bir şey yok.",
+  "board.outcomeDone": "Yapıldı",
+  "board.outcomeUndone": "Yapılmadı",
   "board.noneOpen": "Şu anda açık bir şey yok.",
   "board.open": "Açık",
   "board.report": "Yeni bildirim",

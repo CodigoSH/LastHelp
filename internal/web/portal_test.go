@@ -378,6 +378,72 @@ func TestSimilarItemsAreOfferedWhileTyping(t *testing.T) {
 	}
 }
 
+// TestTheClosedTabCanBeNarrowedToWhatWasDoneOrNot: the tabs and the list agree, the
+// question is only asked of the closed side, and a made-up answer is refused.
+func TestTheClosedTabCanBeNarrowedToWhatWasDoneOrNot(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	answer := func(kind, title, status string) {
+		id, _ := public.submit("codigosh", "lastboard", kind, title)
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+		if status != "" {
+			resp = team.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": status})
+			_ = resp.Body.Close()
+		}
+	}
+	answer("idea", "shipped one", string(item.StatusDone))
+	answer("bug", "fixed one", string(item.StatusClosed))
+	answer("idea", "declined one", string(item.StatusDeclined))
+	answer("bug", "unreproducible one", string(item.StatusNotReproducible))
+	answer("idea", "still open", "")
+
+	list := func(query string) (map[string]any, int) {
+		resp := public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/items?"+query, nil)
+		return decode(t, resp), resp.StatusCode
+	}
+	titles := func(body map[string]any) []string {
+		var out []string
+		for _, raw := range body["items"].([]any) {
+			out = append(out, raw.(map[string]any)["title"].(string))
+		}
+		return out
+	}
+
+	done, _ := list("state=closed&outcome=done")
+	undone, _ := list("state=closed&outcome=undone")
+	if got := titles(done); len(got) != 2 {
+		t.Errorf("done lists %v, want the shipped and the fixed", got)
+	}
+	if got := titles(undone); len(got) != 2 {
+		t.Errorf("not done lists %v, want the declined and the unreproducible", got)
+	}
+	counts, _ := done["counts"].(map[string]any)
+	if counts["done"] != float64(2) || counts["undone"] != float64(2) || counts["closed"] != float64(4) || counts["open"] != float64(1) {
+		t.Errorf("the counts are %v, want done 2, undone 2, closed 4, open 1", counts)
+	}
+	// Narrowed by kind, the counts follow, as they do for the two sides.
+	ideas, _ := list("state=closed&kind=idea")
+	counts, _ = ideas["counts"].(map[string]any)
+	if counts["done"] != float64(1) || counts["undone"] != float64(1) {
+		t.Errorf("for ideas the counts are %v, want one and one", counts)
+	}
+
+	if _, code := list("state=open&outcome=done"); code != http.StatusBadRequest {
+		t.Errorf("an outcome on the open side was answered %d", code)
+	}
+	if _, code := list("outcome=done"); code != http.StatusBadRequest {
+		t.Errorf("an outcome with no side was answered %d", code)
+	}
+	if _, code := list("state=closed&outcome=maybe"); code != http.StatusBadRequest {
+		t.Errorf("an invented outcome was answered %d", code)
+	}
+}
+
 // TestASuggestionSaysWhatTheTeamDecided: somebody about to ask for something the
 // team already declined is shown that it was, and how, rather than a bare title
 // that reads as an open report they could vote for.

@@ -144,10 +144,33 @@ func (s Status) Closes() bool {
 	return false
 }
 
+// Delivered says whether a closing status is one where the thing was done: shipped
+// or fixed. The other closing statuses — declined, could not be reproduced — are the
+// team's answer that it will not be. Together they are Closes(), and a test holds
+// the two halves to it, so a new way of closing has to be put on one side.
+func (s Status) Delivered() bool {
+	return s == StatusDone || s == StatusClosed
+}
+
 // ClosedStatuses and OpenStatuses split both vocabularies by Closes, for a
 // filter that asks for one side without naming every status on it.
 func ClosedStatuses() []Status { return statusesWhere(true) }
 func OpenStatuses() []Status   { return statusesWhere(false) }
+
+// DeliveredStatuses and TurnedDownStatuses split the closed ones by what the team
+// did: the board's "done" and "not done".
+func DeliveredStatuses() []Status  { return closedWhere(true) }
+func TurnedDownStatuses() []Status { return closedWhere(false) }
+
+func closedWhere(delivered bool) []Status {
+	var out []Status
+	for _, st := range ClosedStatuses() {
+		if st.Delivered() == delivered {
+			out = append(out, st)
+		}
+	}
+	return out
+}
 
 func statusesWhere(closed bool) []Status {
 	var out []Status

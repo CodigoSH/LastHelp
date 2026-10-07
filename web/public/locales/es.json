@@ -46,6 +46,8 @@
   "board.closed": "Cerrados",
   "board.empty": "Aún no hay reportes.",
   "board.noneClosed": "Todavía no hay nada cerrado.",
+  "board.outcomeDone": "Hechos",
+  "board.outcomeUndone": "Sin hacer",
   "board.noneOpen": "No hay nada abierto ahora mismo.",
   "board.open": "Abiertos",
   "board.report": "Nuevo reporte",
