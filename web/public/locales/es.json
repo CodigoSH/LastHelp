@@ -639,7 +639,7 @@
   "shell.waitingCount": "Pendientes: {count}",
   "status.closed": "Corregido",
   "status.confirmed": "Confirmado",
-  "status.declined": "Descartada",
+  "status.declined": "Descartado",
   "status.done": "Entregado",
   "status.in_forge": "Corrección en curso",
   "status.in_progress": "En curso",
