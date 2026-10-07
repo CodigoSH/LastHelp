@@ -956,8 +956,8 @@ ul { list-style: none; margin: 0; padding: 0; }
 .status-new, .status-confirmed { --hue: var(--hue-open); }
 .status-planned { --hue: var(--hue-hold); }
 .status-in_progress, .status-in_forge { --hue: var(--hue-work); }
-.status-done { --hue: var(--hue-done); }
-.status-closed, .status-declined, .status-not_reproducible { --hue: var(--hue-off); }
+.status-done, .status-closed { --hue: var(--hue-done); }
+.status-declined, .status-not_reproducible { --hue: var(--hue-off); }
 
 /* ------------------------------------------------------------------ forms */
 
@@ -3846,6 +3846,13 @@ a.stat:hover {
   color: var(--text-dim);
 }
 
+/* And not by colour alone: a closed "no" has a dashed edge and a hollow dot, where
+   a delivered one is solid. */
+.status-declined,
+.status-not_reproducible { border-style: dashed; }
+.status-declined::before,
+.status-not_reproducible::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+
 body > nav .brand {
   display: inline-flex;
   align-items: center;
@@ -5323,9 +5330,11 @@ a.stat:hover .stat-go {
 .status-new, .status-confirmed, .hue-new, .hue-confirmed { --hue: var(--hue-open); }
 .status-planned, .hue-planned, .hue-pending { --hue: var(--hue-hold); }
 .status-in_progress, .status-in_forge, .hue-in_progress, .hue-in_forge { --hue: var(--hue-work); }
-.status-done, .hue-done, .hue-published { --hue: var(--hue-done); }
-.status-closed, .status-declined, .status-not_reproducible,
-.hue-closed, .hue-declined, .hue-not_reproducible, .hue-rejected, .hue-spam { --hue: var(--hue-off); }
+.status-done, .status-closed, .hue-done, .hue-closed, .hue-published { --hue: var(--hue-done); }
+/* What the team closed without doing it is not the colour of what it did: green is
+   an answer that was delivered, grey an answer that was no. */
+.status-declined, .status-not_reproducible,
+.hue-declined, .hue-not_reproducible, .hue-rejected, .hue-spam { --hue: var(--hue-off); }
 /* A report that has not been published is not open. Its chip says what it is
    waiting for, in the colour waiting wears everywhere else. */
 .status-pending { --hue: var(--hue-hold); }

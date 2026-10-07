@@ -132,7 +132,7 @@ func (i Item) TakesCommentsFrom(author Author, now time.Time) bool {
 	return now.Before(i.ClosedAt.Add(GraceAfterClosing))
 }
 
-// Closes says whether a status is an answer: fixed, shipped, not planned, not
+// Closes says whether a status is an answer: fixed, shipped, declined, not
 // reproducible. An item there is closed — the public list files it apart from
 // what is still open, and it carries the time it was closed. Everything else
 // is open. The one place that decides it.

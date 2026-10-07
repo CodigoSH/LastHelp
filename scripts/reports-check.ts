@@ -681,6 +681,39 @@ async function main() {
     JSON.stringify({ afterCtrlK, afterSlash, foot: buscar.foot.replace(/\s+/g, " ").trim() }),
   );
 
+  // What the team closed stays where people look, and says what it decided: the
+  // closed tab shows a "no" apart from a delivered one (a dashed edge and a hollow
+  // dot, not only a colour), and the suggestions under a new title carry the same
+  // chip with the line that says a closed report takes no more votes.
+  await goTo("/acme/atlas?state=closed", ".items, .empty, .rev-row, .board-row");
+  const cerrados = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    await wait(() => document.querySelector(".status-declined, .status-not_reproducible"));
+    const look = (sel) => { const e = document.querySelector(sel); if (!e) return null; const c = getComputedStyle(e); return { border: c.borderTopStyle, color: c.color, text: e.textContent.trim() }; };
+    return { declined: look(".status-declined"), notRepro: look(".status-not_reproducible"), fixed: look(".status-closed"), shipped: look(".status-done") };
+  `);
+  check(
+    "a closed report the team declined is kept in the closed tab, drawn apart from a delivered one",
+    cerrados.declined?.border === "dashed" && cerrados.notRepro?.border === "dashed" &&
+      cerrados.shipped?.border === "solid" && cerrados.fixed?.border === "solid" &&
+      cerrados.fixed?.color === cerrados.shipped?.color && cerrados.declined?.color !== cerrados.shipped?.color,
+    JSON.stringify(cerrados),
+  );
+  await goTo("/acme/atlas/new", "input[name=title]");
+  const parecidos = await evaluate(`
+    const t = document.querySelector("input[name=title]");
+    t.value = "Keyboard shortcuts";
+    t.dispatchEvent(new Event("input", { bubbles: true }));
+    for (let i = 0; i < 50 && document.querySelector(".similar")?.hidden !== false; i++) await new Promise(r => setTimeout(r, 100));
+    const box = document.querySelector(".similar");
+    return { shown: box?.hidden === false, chip: box?.querySelector(".status-declined")?.className ?? "", help: box?.querySelector(".hint")?.textContent ?? "" };
+  `);
+  check(
+    "a declined report suggested under a new title says it was declined and that a closed one takes no votes",
+    parecidos.shown === true && parecidos.chip.includes("status-declined") && parecidos.help.length > 80,
+    JSON.stringify(parecidos),
+  );
+
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
   check("and the content policy refused nothing", refusedByPolicy.length === 0, refusedByPolicy.slice(0, 3).join(" | "));
   await close();

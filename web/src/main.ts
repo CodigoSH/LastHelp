@@ -1461,7 +1461,7 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
         return;
       }
       const found = await api
-        .get<{ similar: Array<{ public_id: string; title: string }> }>(
+        .get<{ similar: Array<{ public_id: string; title: string; status?: string; closed?: boolean }> }>(
           `${base}/similar?title=${encodeURIComponent(value)}`,
         )
         .catch(() => ({ similar: [] }));

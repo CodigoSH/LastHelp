@@ -631,13 +631,27 @@ function picturesOn(item: ItemDetail, commentID: number): ReportPicture[] {
   return (item.images ?? []).filter((p) => p.comment_id === commentID);
 }
 
-export function similarItems(items: Array<{ public_id: string; title: string }>, text: Text): string {
+export function similarItems(
+  items: Array<{ public_id: string; title: string; status?: string; closed?: boolean }>,
+  text: Text,
+): string {
   if (items.length === 0) return "";
+  // A closed one wears what the team decided. The help says to vote, and a closed
+  // report takes no vote, so when one is in the list the line that says what a
+  // closed report is goes with it.
+  const anyClosed = items.some((i) => i.closed === true);
   return `<p class="similar-head">${escapeHTML(text.t("form.similar"))}</p>
     <ul>${items
-      .map((i) => `<li><a href="/i/${escapeAttr(i.public_id)}">${escapeHTML(i.title)}</a></li>`)
+      .map(
+        (i) =>
+          `<li><a href="/i/${escapeAttr(i.public_id)}">${escapeHTML(i.title)}</a>${
+            i.closed && i.status ? ` ${stateChip({ status: i.status }, text)}` : ""
+          }</li>`,
+      )
       .join("")}</ul>
-    <p class="hint">${escapeHTML(text.t("form.similarHelp"))}</p>`;
+    <p class="hint">${escapeHTML(text.t("form.similarHelp"))}${
+      anyClosed ? ` ${escapeHTML(text.t("form.similarClosedHelp"))}` : ""
+    }</p>`;
 }
 
 /**
