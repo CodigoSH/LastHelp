@@ -46,6 +46,8 @@
   "board.closed": "Tertutup",
   "board.empty": "Belum ada laporan.",
   "board.noneClosed": "Belum ada yang tertutup.",
+  "board.outcomeDone": "Selesai",
+  "board.outcomeUndone": "Tidak dikerjakan",
   "board.noneOpen": "Tidak ada yang terbuka saat ini.",
   "board.open": "Terbuka",
   "board.report": "Laporan baru",

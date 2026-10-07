@@ -46,6 +46,8 @@
   "board.closed": "বন্ধ",
   "board.empty": "এখনো কোনো প্রতিবেদন নেই।",
   "board.noneClosed": "এখনো কিছু বন্ধ হয়নি।",
+  "board.outcomeDone": "সম্পন্ন",
+  "board.outcomeUndone": "করা হয়নি",
   "board.noneOpen": "এই মুহূর্তে কিছু খোলা নেই।",
   "board.open": "খোলা",
   "board.report": "নতুন রিপোর্ট",

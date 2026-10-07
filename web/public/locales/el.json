@@ -46,6 +46,8 @@
   "board.closed": "Κλειστές",
   "board.empty": "Καμία αναφορά ακόμη.",
   "board.noneClosed": "Δεν έχει κλείσει τίποτα ακόμη.",
+  "board.outcomeDone": "Ολοκληρώθηκαν",
+  "board.outcomeUndone": "Δεν έγιναν",
   "board.noneOpen": "Δεν υπάρχει τίποτα ανοιχτό αυτή τη στιγμή.",
   "board.open": "Ανοιχτές",
   "board.report": "Νέα αναφορά",

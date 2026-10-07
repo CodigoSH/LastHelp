@@ -46,6 +46,8 @@
   "board.closed": "Zamknięte",
   "board.empty": "Na razie brak zgłoszeń.",
   "board.noneClosed": "Nic jeszcze nie zostało zamknięte.",
+  "board.outcomeDone": "Zrealizowane",
+  "board.outcomeUndone": "Niezrealizowane",
   "board.noneOpen": "Obecnie nic nie jest otwarte.",
   "board.open": "Otwarte",
   "board.report": "Nowe zgłoszenie",

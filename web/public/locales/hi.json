@@ -46,6 +46,8 @@
   "board.closed": "बंद",
   "board.empty": "अभी कोई रिपोर्ट नहीं।",
   "board.noneClosed": "अभी तक कुछ भी बंद नहीं हुआ है।",
+  "board.outcomeDone": "पूरे हुए",
+  "board.outcomeUndone": "नहीं हुए",
   "board.noneOpen": "अभी कुछ भी खुला नहीं है।",
   "board.open": "खुली",
   "board.report": "नई रिपोर्ट",

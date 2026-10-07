@@ -699,6 +699,33 @@ async function main() {
       cerrados.fixed?.color === cerrados.shipped?.color && cerrados.declined?.color !== cerrados.shipped?.color,
     JSON.stringify(cerrados),
   );
+  // And the closed tab can be narrowed to what was done or what was not, the numbers
+  // on the switches being what the list then holds, in the address and cleared by
+  // pressing the same one again.
+  const resultado = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const count = (v) => Number(document.querySelector('[data-outcome="' + v + '"] .count-chip')?.textContent.replace(/\D/g, "") ?? "-1");
+    const rows = () => document.querySelectorAll("[data-items] > li").length;
+    const out = { done: count("done"), undone: count("undone") };
+    document.querySelector('[data-outcome="undone"]').click();
+    await wait(() => document.querySelector('[data-outcome="undone"]')?.getAttribute("aria-pressed") === "true");
+    await wait(() => rows() === out.undone);
+    out.undoneRows = rows();
+    out.onlyNo = [...document.querySelectorAll("[data-items] .status")].every(e => e.classList.contains("status-declined") || e.classList.contains("status-not_reproducible"));
+    out.address = location.search;
+    document.querySelector('[data-outcome="undone"]').click();
+    await wait(() => document.querySelector('[data-outcome="undone"]')?.getAttribute("aria-pressed") === "false");
+    await wait(() => rows() === out.done + out.undone);
+    out.bothAgain = rows();
+    out.cleared = !location.search.includes("outcome");
+    return out;
+  `);
+  check(
+    "the closed tab narrows to what was done or not done, the counts are what the list holds, and pressing again clears it",
+    resultado.undone > 0 && resultado.done > 0 && resultado.undoneRows === resultado.undone && resultado.onlyNo === true &&
+      resultado.address.includes("outcome=undone") && resultado.bothAgain === resultado.done + resultado.undone && resultado.cleared === true,
+    JSON.stringify(resultado),
+  );
   await goTo("/acme/atlas/new", "input[name=title]");
   const parecidos = await evaluate(`
     const t = document.querySelector("input[name=title]");

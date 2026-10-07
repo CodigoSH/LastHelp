@@ -46,6 +46,8 @@
   "board.closed": "بسته",
   "board.empty": "هنوز گزارشی نیست.",
   "board.noneClosed": "هنوز چیزی بسته نشده است.",
+  "board.outcomeDone": "انجام‌شده",
+  "board.outcomeUndone": "انجام‌نشده",
   "board.noneOpen": "در حال حاضر چیزی باز نیست.",
   "board.open": "باز",
   "board.report": "گزارش جدید",

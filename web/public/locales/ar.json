@@ -46,6 +46,8 @@
   "board.closed": "مغلقة",
   "board.empty": "لا توجد بلاغات بعد.",
   "board.noneClosed": "لم يُغلق شيء بعد.",
+  "board.outcomeDone": "تم إنجازها",
+  "board.outcomeUndone": "لم تُنفَّذ",
   "board.noneOpen": "لا يوجد شيء مفتوح حاليًا.",
   "board.open": "مفتوحة",
   "board.report": "بلاغ جديد",

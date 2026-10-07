@@ -181,16 +181,20 @@ export function forgeOptions(text: Text): [string, string][] {
 export interface BoardFilters {
   /** Open or closed: what still waits for an answer, or what has one. */
   state: "open" | "closed";
+  /** On the closed side, only what was done or only what was not; empty for both. */
+  outcome: "" | "done" | "undone";
   kind: string;
   sort: string;
   query: string;
 }
 
-/** How many there are: in the list as filtered, and on each side of it. */
+/** How many there are: in the list as filtered, on each side of it, and in each way of being closed. */
 export interface BoardTotals {
   total: number;
   open: number;
   closed: number;
+  done: number;
+  undone: number;
 }
 
 /**
@@ -214,6 +218,17 @@ export function board(
       ${escapeHTML(label)}<span class="count-chip">${escapeHTML(text.number(count))}</span></button>`;
   const states = side("open", text.t("board.open"), totals.open) + side("closed", text.t("board.closed"), totals.closed);
 
+  // What was done about the closed ones, as two switches that clear themselves:
+  // pressing the one that is on shows both again. Only on the closed side, which is
+  // where a "no" from the team and a delivery sit in the same list.
+  const outcome = (value: "done" | "undone", label: string, count: number) =>
+    `<button class="tab${filters.outcome === value ? " on" : ""}" data-outcome="${value}" aria-pressed="${filters.outcome === value}">
+      ${escapeHTML(label)}<span class="count-chip">${escapeHTML(text.number(count))}</span></button>`;
+  const outcomes =
+    filters.state === "closed"
+      ? `<div class="tabs outcomes">${outcome("done", text.t("board.outcomeDone"), totals.done)}${outcome("undone", text.t("board.outcomeUndone"), totals.undone)}</div>`
+      : "";
+
   const tabs = [
     tab("", text.t("board.all")),
     repo.accepts_bugs ? tab("bug", text.t("kind.bug")) : "",
@@ -230,7 +245,7 @@ export function board(
   // It carries the one thing to do about it rather than a grey sentence. And
   // an empty list is not always an empty board: a search that finds nothing,
   // or a side with nothing on it, says so rather than "no reports yet".
-  const narrowed = filters.query.trim() !== "" || filters.kind !== "";
+  const narrowed = filters.query.trim() !== "" || filters.kind !== "" || filters.outcome !== "";
   const emptyWords =
     totals.open + totals.closed === 0 && !narrowed
       ? text.t("board.empty")
@@ -282,6 +297,7 @@ export function board(
     </header>
     <div class="controls">
       <div class="tabs states">${states}</div>
+      ${outcomes}
       <div class="tabs">${tabs}</div>
       <div class="sorts">${sorts}</div>
       <label class="search-box board-search">
