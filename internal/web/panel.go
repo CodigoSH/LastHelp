@@ -602,7 +602,7 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("reading the username a reply is signed with", "error", err)
 	}
-	c, err := s.items().Comment(it.ID, item.AuthorTeam, name, in.Body, s.now())
+	c, err := s.items().TeamReply(it.ID, actor.UserID, name, in.Body, s.now())
 	if err != nil {
 		writeCommentError(w, err)
 		return

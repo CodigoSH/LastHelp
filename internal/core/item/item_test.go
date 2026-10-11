@@ -824,3 +824,52 @@ func TestEveryClosingStatusIsDeliveredOrTurnedDown(t *testing.T) {
 		}
 	}
 }
+
+// TestAReplyFollowsItsAuthorsName: renaming the account reaches what it already
+// wrote, a reply from an account that has gone keeps the name it was signed with,
+// and a message from nobody in particular has no account to follow.
+func TestAReplyFollowsItsAuthorsName(t *testing.T) {
+	s := store(t)
+	if _, err := s.DB.Exec(`INSERT INTO app_user (id, username, password_hash, created_at) VALUES (7, 'ana', 'x', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	it, _ := report(t, s, Idea, "dark mode", "")
+	if _, err := s.TeamReply(it.ID, 7, "ana", "looking at it", epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Comment(it.ID, AuthorVisitor, "", "me too", epoch); err != nil {
+		t.Fatal(err)
+	}
+	names := func() []string {
+		t.Helper()
+		var out []string
+		for _, state := range []Moderation{Published, Pending} {
+			list, err := s.Comments(it.ID, state)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, c := range list {
+				out = append(out, string(c.Author)+":"+c.AuthorRef)
+			}
+		}
+		return out
+	}
+	if got := names(); len(got) != 2 || got[0] != "team:ana" || got[1] != "visitor:" {
+		t.Fatalf("before renaming: %v", got)
+	}
+
+	if _, err := s.DB.Exec(`UPDATE app_user SET username = 'alex' WHERE id = 7`); err != nil {
+		t.Fatal(err)
+	}
+	if got := names(); got[0] != "team:alex" || got[1] != "visitor:" {
+		t.Errorf("after renaming the account the thread says %v, want the new name on the reply", got)
+	}
+
+	// The account goes: the reply keeps the name it was signed with, not an empty one.
+	if _, err := s.DB.Exec(`DELETE FROM app_user WHERE id = 7`); err != nil {
+		t.Fatal(err)
+	}
+	if got := names(); got[0] != "team:ana" {
+		t.Errorf("after the account was deleted the reply says %v, want the name it was written under", got)
+	}
+}

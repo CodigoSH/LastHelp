@@ -300,3 +300,72 @@ func TestADatabaseFromTheOlderBinaryStillOpens(t *testing.T) {
 		t.Errorf("schema version is %d after upgrading, want %d", version, want)
 	}
 }
+
+// TestRepliesFromBeforeAreMatchedToTheAccountThatHasTheName: a database written
+// before replies remembered their author is opened by this binary, and each team
+// reply is tied to the account called what it says, where there is one. A reply
+// signed with a name nobody has today keeps it, and a message from a visitor is
+// never given an account.
+func TestRepliesFromBeforeAreMatchedToTheAccountThatHasTheName(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	old, err := sql.Open("sqlite", dsn(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every migration the binary before this one had, and no later.
+	for _, m := range migrations {
+		if m.version >= 13 {
+			break
+		}
+		if err := apply(old, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, stmt := range []string{
+		`INSERT INTO organization (id, slug, name, forge_kind, base_url, forge_owner, created_at) VALUES (1, 'o', 'O', 'none', '', '', 0)`,
+		`INSERT INTO repository (id, org_id, slug, name, forge_repo, created_at) VALUES (1, 1, 'r', 'R', '', 0)`,
+		`INSERT INTO app_user (id, username, password_hash, created_at) VALUES (5, 'ana', 'x', 0)`,
+		`INSERT INTO item (id, public_id, repo_id, kind, title, body, status, moderation_state, body_hash, follow_token_hash, created_at)
+			VALUES (1, 'p', 1, 'idea', 't', 'b', 'new', 'published', 'h', 'f', 0)`,
+		`INSERT INTO comment (id, item_id, author_kind, author_ref, body, moderation_state, created_at) VALUES (1, 1, 'team', 'ana', 'a', 'published', 0)`,
+		`INSERT INTO comment (id, item_id, author_kind, author_ref, body, moderation_state, created_at) VALUES (2, 1, 'team', 'ghost', 'b', 'published', 0)`,
+		`INSERT INTO comment (id, item_id, author_kind, author_ref, body, moderation_state, created_at) VALUES (3, 1, 'visitor', 'ana', 'c', 'pending', 0)`,
+	} {
+		if _, err := old.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := old.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("the older database did not open: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	who := func(id int) any {
+		var by sql.NullInt64
+		if err := db.QueryRow(`SELECT author_id FROM comment WHERE id = ?`, id).Scan(&by); err != nil {
+			t.Fatal(err)
+		}
+		if !by.Valid {
+			return nil
+		}
+		return by.Int64
+	}
+	if who(1) != int64(5) {
+		t.Errorf("a reply signed by an account that exists is tied to %v, want account 5", who(1))
+	}
+	if who(2) != nil {
+		t.Errorf("a reply signed with a name nobody has is tied to %v", who(2))
+	}
+	if who(3) != nil {
+		t.Errorf("a visitor's message was given an account: %v", who(3))
+	}
+	var kept string
+	if err := db.QueryRow(`SELECT author_ref FROM comment WHERE id = 2`).Scan(&kept); err != nil || kept != "ghost" {
+		t.Errorf("the name the reply was signed with is %q (%v)", kept, err)
+	}
+}
