@@ -2005,6 +2005,8 @@ export interface ReportsData {
     moderation: Record<string, number>;
     status: Record<string, number>;
     kind: Record<string, number>;
+    /** What each switch would show under the other filters: all, open, closed, done, undone. */
+    state?: Record<string, number>;
   };
 }
 
@@ -2012,6 +2014,10 @@ export interface ReportFilters {
   moderation: string;
   kind: string;
   status: string;
+  /** "", "open" or "closed": of the published reports, the way the public board splits them. */
+  state: string;
+  /** "", "done" or "undone", only with state "closed". */
+  outcome: string;
   board: string;
   sort: string;
   q: string;
@@ -2169,12 +2175,33 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
           data.boards.map((b) => ({ value: `${b.org}/${b.repo}`, label: `${b.organization} / ${b.name}` })),
         );
 
+  // Open and closed as the public board has them, with what each would show;
+  // under "Closed", the same two outcomes. The counts come from the server, which
+  // counts them the way it lists them.
+  const states = counts.state ?? {};
+  const count = (key: string) => `<span class="count-chip">${escapeHTML(text.number(states[key] ?? 0))}</span>`;
+  const side = (value: string, icon: string, label: string, key: string) =>
+    `<button class="tab${filters.state === value ? " on" : ""}" data-rstate="${value}" aria-pressed="${filters.state === value}">
+      ${icon}${escapeHTML(label)}${count(key)}</button>`;
+  const outcome = (value: "done" | "undone", label: string) =>
+    `<button class="tab${filters.outcome === value ? " on" : ""}" data-routcome="${value}" aria-pressed="${filters.outcome === value}">
+      ${escapeHTML(label)}${count(value)}</button>`;
+  const sides = `<div class="tabs rev-sides">
+      ${side("", icons.bullets(14), text.t("board.all"), "all")}${side("open", icons.circle(14), text.t("board.open"), "open")}${side("closed", icons.circleCheck(14), text.t("board.closed"), "closed")}
+    </div>
+    ${
+      filters.state === "closed"
+        ? `<div class="tabs outcomes rev-sides">${outcome("done", text.t("board.outcomeDone"))}${outcome("undone", text.t("board.outcomeUndone"))}</div>`
+        : ""
+    }`;
+
   return `<div class="rev-filter">
     <label class="search-box">
       ${icons.search(14)}
       <input type="search" data-q value="${escapeAttr(filters.q)}"
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
     </label>
+    ${sides}
     <div class="rev-narrow">${kind}${moderation}${status}${board}</div>
   </div>`;
 }

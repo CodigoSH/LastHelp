@@ -726,6 +726,86 @@ async function main() {
       resultado.address.includes("outcome=undone") && resultado.bothAgain === resultado.done + resultado.undone && resultado.cleared === true,
     JSON.stringify(resultado),
   );
+  // Open and closed on the archive: what a switch says is what pressing it draws,
+  // and the rows are the ones the server counts as that side.
+  // The pass up to here is close to the server's 240 requests a minute, and this
+  // part asks for a few dozen more; a minute's wait is cheaper than a second pass.
+  await sleep(61_000);
+  await goTo("/review?mode=all", ".rev-row");
+  const sides = await evaluate(`
+    const wait = async (test) => { for (let i = 0; i < 60 && !test(); i++) await new Promise(r => setTimeout(r, 100)); };
+    const chip = (sel) => Number(document.querySelector(sel + " .count-chip")?.textContent.replace(/\\D/g, "") ?? NaN);
+    const ids = async () => {
+      for (let i = 0; i < 5; i++) {
+        const more = document.querySelector(".rev-list [data-more]");
+        if (!more) break;
+        more.click();
+        await new Promise(r => setTimeout(r, 500));
+      }
+      return [...document.querySelectorAll('[data-what="report"]')].map(r => r.dataset.pick).sort();
+    };
+    // The screen being left is still in the document while the next one loads, so it
+    // is marked first and the wait is for the mark to go and rows to be there.
+    const press = async (sel) => {
+      document.getElementById("app").firstElementChild.setAttribute("data-leaving", "1");
+      document.querySelector(sel)?.click();
+      await wait(() => !document.querySelector("[data-leaving]") && document.querySelector(".rev-row, .rev-empty"));
+      await new Promise(r => setTimeout(r, 300));
+    };
+    const fromServer = async (query) => {
+      const resp = await fetch("/api/reports?limit=200&" + query);
+      const r = await resp.json();
+      if (!r.items) return ["HTTP " + resp.status + " " + JSON.stringify(r)];
+      return r.items.map(i => i.public_id).sort();
+    };
+    const out = {};
+    out.everyChip = chip('[data-rstate=""]');
+    for (const [name, sel, mark, query] of [
+      ["open", '[data-rstate="open"]', "state=open", "state=open"],
+      ["closed", '[data-rstate="closed"]', "state=closed", "state=closed"],
+    ]) {
+      const n = chip(sel);
+      await press(sel);
+      const rows = await ids();
+      const theirs = await fromServer(query);
+      out[name] = { chip: n, rows: rows.length, same: JSON.stringify(rows) === JSON.stringify(theirs), server: theirs.length > 3 ? theirs.length : theirs, address: location.search };
+    }
+    // Under closed: the two outcomes, each as many as it draws.
+    for (const [name, sel, query] of [
+      ["done", '[data-routcome="done"]', "state=closed&outcome=done"],
+      ["undone", '[data-routcome="undone"]', "state=closed&outcome=undone"],
+    ]) {
+      const n = chip(sel);
+      await press(sel);
+      const rows = await ids();
+      const theirs = await fromServer(query);
+      out[name] = { chip: n, rows: rows.length, same: JSON.stringify(rows) === JSON.stringify(theirs), server: theirs.length > 3 ? theirs.length : theirs, address: location.search };
+    }
+    out.outcomeIsOn = document.querySelector('[data-routcome="undone"]')?.getAttribute("aria-pressed");
+    // Pressing the one that is on shows both closed sides again.
+    await press('[data-routcome="undone"]');
+    out.bothAgain = (await ids()).length === out.closed.rows && !location.search.includes("outcome");
+    // Leaving the closed side takes the outcome row with it; "All" takes the filter off.
+    await press('[data-rstate="open"]');
+    out.outcomesGone = document.querySelector("[data-routcome]") === null;
+    await press('[data-rstate=""]');
+    out.everyRows = (await ids()).length;
+    return out;
+  `);
+  check(
+    "open and closed on the archive: each switch says what it draws, the rows are the server's, and the outcomes sit under closed",
+    sides.open?.chip > 0 && sides.closed?.chip > 0 &&
+      sides.open.chip === sides.open.rows && sides.closed.chip === sides.closed.rows &&
+      sides.open.same === true && sides.closed.same === true &&
+      sides.done.chip === sides.done.rows && sides.undone.chip === sides.undone.rows &&
+      sides.done.same === true && sides.undone.same === true &&
+      sides.done.chip + sides.undone.chip === sides.closed.chip &&
+      sides.outcomeIsOn === "true" && sides.bothAgain === true && sides.outcomesGone === true &&
+      sides.everyRows === sides.everyChip,
+    JSON.stringify(sides),
+  );
+  await shoot("review-sides");
+
   await goTo("/acme/atlas/new", "input[name=title]");
   const parecidos = await evaluate(`
     const t = document.querySelector("input[name=title]");

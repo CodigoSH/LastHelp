@@ -96,20 +96,68 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	filter := item.Filter{
-		RepoIDs:       ids,
-		Kind:          item.Kind(query.Get("kind")),
-		Status:        item.Status(query.Get("status")),
-		Moderation:    item.Moderation(query.Get("moderation")),
-		AnyModeration: query.Get("moderation") == "",
-		Search:        query.Get("q"),
-		SortByVote:    query.Get("sort") == "votes",
-		Limit:         intParam(query.Get("limit"), 50),
-		Offset:        intParam(query.Get("offset"), 0),
+	// Open or closed, and for the closed ones what was done about them, the way the
+	// public board splits them. Asked of published reports only: a report turned
+	// down or still waiting has the status "new" and is not open in any sense that
+	// matters to somebody counting what is left to do, so the question is refused
+	// where it would have counted them and the moderation filter is the way to them.
+	state, outcome := query.Get("state"), query.Get("outcome")
+	if (state != "" && state != "open" && state != "closed") ||
+		(outcome != "" && (state != "closed" || (outcome != "done" && outcome != "undone"))) {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
 	}
 
+	base := item.Filter{
+		RepoIDs:    ids,
+		Kind:       item.Kind(query.Get("kind")),
+		Search:     query.Get("q"),
+		SortByVote: query.Get("sort") == "votes",
+	}
+	// narrowed is the list as asked for one choice of state and outcome, and
+	// whether that choice can hold anything at all given the other filters. The
+	// list and the counts on the switches both come from here, so a switch says
+	// how many rows pressing it would show.
+	narrowed := func(state, outcome string) (item.Filter, bool) {
+		f := base
+		f.Status = item.Status(query.Get("status"))
+		moderation := query.Get("moderation")
+		f.Moderation, f.AnyModeration = item.Moderation(moderation), moderation == ""
+		if state == "" {
+			return f, true
+		}
+		if moderation != "" && moderation != string(item.Published) {
+			return f, false
+		}
+		f.Moderation, f.AnyModeration = item.Published, false
+		allowed := item.OpenStatuses()
+		switch {
+		case outcome == "done":
+			allowed = item.DeliveredStatuses()
+		case outcome == "undone":
+			allowed = item.TurnedDownStatuses()
+		case state == "closed":
+			allowed = item.ClosedStatuses()
+		}
+		if f.Status == "" {
+			f.Statuses = allowed
+			return f, true
+		}
+		// The status picked has to be one of this side's, or nothing is left.
+		for _, st := range allowed {
+			if st == f.Status {
+				f.Statuses = []item.Status{st}
+				return f, true
+			}
+		}
+		return f, false
+	}
+
+	filter, holds := narrowed(state, outcome)
+	filter.Limit, filter.Offset = intParam(query.Get("limit"), 50), intParam(query.Get("offset"), 0)
+
 	var list []item.Item
-	if len(ids) > 0 {
+	if len(ids) > 0 && holds {
 		if list, err = s.items().List(filter); err != nil {
 			slog.Error("listing reports", "error", err)
 			writeError(w, http.StatusInternalServerError, "error.internal")
@@ -154,6 +202,27 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// What each switch of open and closed would show, under every other filter.
+	// Not scope-wide like the counts above, which exist to hide an option that
+	// finds nothing: these are numbers on a switch, and what a switch says is what
+	// pressing it draws.
+	states := map[string]int{}
+	for name, ask := range map[string][2]string{
+		"all": {"", ""}, "open": {"open", ""}, "closed": {"closed", ""},
+		"done": {"closed", "done"}, "undone": {"closed", "undone"},
+	} {
+		f, possible := narrowed(ask[0], ask[1])
+		if !possible || len(ids) == 0 {
+			states[name] = 0
+			continue
+		}
+		if states[name], err = s.items().Tally(f); err != nil {
+			slog.Error("counting reports", "error", err)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+	}
+
 	described := make([]map[string]any, 0, len(boards))
 	for _, b := range boards {
 		described = append(described, describeBoard(b))
@@ -166,6 +235,7 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 			"moderation": moderation,
 			"status":     statuses,
 			"kind":       kinds,
+			"state":      states,
 		},
 	})
 }

@@ -113,7 +113,11 @@ publish, reject, and spam. The arrow keys move down the list. It opens on what
 is waiting when something is, and on every report otherwise.
 
 The same screen is the archive: every report ever sent, found by its words or
-narrowed by type, moderation, status and repository. Whatever you choose opens
+narrowed by type, moderation, status and repository. **All / Open / Closed**
+splits the published reports the way the public board does, each with how many
+it would show; under **Closed**, **Done** and **Not done** tell a delivery from a
+report the team turned down. The queue tab has none of these: whatever waits is
+shown, closed or not. Whatever you choose opens
 beside the list as the whole report — edit its words, change its status, open
 or link an issue, reply, edit or delete any comment on it, and, for the
 organisation's leads and the administrator, delete the report itself. Each repository's page in the
