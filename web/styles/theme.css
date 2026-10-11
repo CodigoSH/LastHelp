@@ -7518,12 +7518,61 @@ a.stat:hover .stat-go {
   .side-update { animation: none; }
 }
 
-/* Open and closed on the archive: the board's switch, with a mark and a count
-   on each, taking a row of the column of its own — and wrapping under it when a
-   language needs the room. */
-.rev-sides { align-self: flex-start; max-inline-size: 100%; flex-wrap: wrap; }
-.rev-sides .tab { display: inline-flex; align-items: center; gap: 0.4rem; padding-inline: 0.65rem; }
-.rev-sides .tab .icon { flex: none; }
+/* Open and closed on the archive. A row of equal segments the width of the search
+   box and the dropdowns under it, in their corners and their 12px, so the column
+   reads as one set of controls; the segment that is on takes the colour a chosen
+   dropdown takes. The count is a number beside the name, not a second control. */
+.rev-sides {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  inline-size: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-dim);
+}
+
+.rev-sides .tab {
+  flex: 1 1 0;
+  min-inline-size: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-sm) - 2px);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.rev-sides .tab .icon { flex: none; opacity: 0.8; }
+
+.rev-side-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.rev-sides .tab .count-chip {
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.rev-sides .tab.on {
+  background: var(--accent-wash);
+  border-color: var(--accent-line);
+  color: var(--accent-alt);
+  box-shadow: none;
+}
+
+.rev-sides .tab.on .icon { opacity: 1; }
+.rev-sides .tab.on .count-chip { background: transparent; border: 0; color: inherit; }
 
 /* A repository's heading in the archive is the control that folds its reports
    away: the same heading, as a button, with a mark that turns down when open. */
