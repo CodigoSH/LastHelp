@@ -7,7 +7,7 @@
 # ---- frontend -------------------------------------------------------------
 # Pinned, and to the same version the CI installs: a floating tag means the
 # image that built the release is not the one the tests ran against.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.2-alpine AS frontend
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.3-alpine AS frontend
 WORKDIR /src
 COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile

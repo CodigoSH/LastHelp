@@ -33,7 +33,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       # Without this there is no `tsc`: it is a devDependency and nothing else
       # here installs one. `bun run build` is not affected — the build script
@@ -84,7 +84,7 @@ jobs:
       # was old, and nothing was asking.
       - name: govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
 
       # -count=1 is not optional: the architecture rules read the repository
@@ -134,7 +134,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.3"
 
       # The Go build embeds internal/web/dist, which is build output and is not
       # in the repository. Without this step every package that imports the web
