@@ -1127,15 +1127,24 @@ async function main() {
       for (const i of document.querySelectorAll(".admin-main .bento-card .card-head > .icon")) {
         if (i.getBoundingClientRect().width > 0) fallos.push("card icon shown");
       }
-      // Laid on their sheet — one solid grey, not the public page's ground.
-      const sonda = document.createElement("i");
-      sonda.style.backgroundColor = "var(--sheet)";
-      document.body.append(sonda);
-      const hoja = getComputedStyle(sonda).backgroundColor;
-      sonda.remove();
+      // Laid on the panel's own ground, with the menu and the cards the sheet a step
+      // above it: nothing is the colour of what it sits on.
+      const colour = (token) => {
+        const sonda = document.createElement("i");
+        sonda.style.backgroundColor = "var(" + token + ")";
+        document.body.append(sonda);
+        const c = getComputedStyle(sonda).backgroundColor;
+        sonda.remove();
+        return c;
+      };
+      const hoja = colour("--sheet");
+      const suelo = colour("--ground");
       n++;
       const fondo = getComputedStyle(document.querySelector(".admin")).backgroundColor;
-      if (fondo !== hoja) fallos.push("panel ground " + fondo + " is not the sheet " + hoja);
+      if (fondo !== suelo) fallos.push("panel ground " + fondo + " is not the ground " + suelo);
+      if (suelo === hoja) fallos.push("the ground " + suelo + " is the sheet: a card would be an outline");
+      const menu = getComputedStyle(document.querySelector(".admin .side")).backgroundColor;
+      if (menu !== hoja) fallos.push("menu " + menu + " is not the sheet " + hoja);
       // And every language named beside its flag, as their picker does.
       for (const o of document.querySelectorAll("#appearance-language option")) {
         n++;
