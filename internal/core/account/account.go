@@ -343,6 +343,15 @@ func (s Store) SetPassword(userID int64, currentPassword, newPassword string) er
 // Rename changes the username: the name the account signs in with, and the one
 // its replies carry. Sessions are by account, not by name, so nobody is signed
 // out by it.
+//
+// It also claims the replies that predate the account link. Those carry only a
+// copy of the name they were written under, and the upgrade could match them just
+// once, to whoever held that name that day: an account that had been renamed before
+// the upgrade, or since, was left without them for good. A rename is the one moment
+// the account says which name was its own — the one it is leaving — so the replies
+// still unclaimed under that name follow it from here on. Only replies nobody has
+// claimed, and only under the name it leaves: the name it takes proves nothing about
+// who wrote them, and one that already names an account is never moved.
 func (s Store) Rename(userID int64, username string) error {
 	username = normaliseUsername(username)
 	if username == "" {
@@ -351,11 +360,23 @@ func (s Store) Rename(userID int64, username string) error {
 	if err := validUsername(username); err != nil {
 		return err
 	}
+	var was string
+	if err := s.DB.QueryRow(`SELECT username FROM app_user WHERE id = ?`, userID).Scan(&was); err != nil {
+		return fmt.Errorf("looking up the account: %w", err)
+	}
 	if _, err := s.DB.Exec(`UPDATE app_user SET username = ? WHERE id = ?`, username, userID); err != nil {
 		if isUniqueViolation(err) {
 			return ErrNameTaken
 		}
 		return fmt.Errorf("renaming the account: %w", err)
+	}
+	// After the rename, not with it: if this fails the name has changed and the replies
+	// are claimed by the next rename, which is a better failure than refusing a rename
+	// the person can see has not been done.
+	if _, err := s.DB.Exec(`UPDATE comment SET author_id = ?
+		WHERE author_kind = 'team' AND author_id IS NULL AND author_ref = ?`,
+		userID, was); err != nil {
+		return fmt.Errorf("claiming the replies written under its old name: %w", err)
 	}
 	return nil
 }
