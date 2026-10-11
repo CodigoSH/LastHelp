@@ -2091,7 +2091,7 @@ export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): s
             // server's, the number the bar shows — the two never disagree.
             `<span class="count-chip">${escapeHTML(text.number(view.mode === "pending" ? total : (view.waiting ?? 0)))}</span>`
           }</button>
-        <button class="tab${view.mode === "all" ? " on" : ""}" data-mode="all">${escapeHTML(text.t("board.all"))}</button>
+        <button class="tab${view.mode === "all" ? " on" : ""}" data-mode="all">${escapeHTML(text.t("review.history"))}</button>
       </div>
       <span class="rev-spacer"></span>
       <button type="button" class="icon-button" data-leave
@@ -2184,10 +2184,10 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
   const count = (key: string) => `<span class="count-chip">${escapeHTML(text.number(states[key] ?? 0))}</span>`;
   const side = (value: string, icon: string, label: string, key: string) =>
     `<button class="tab${filters.state === value ? " on" : ""}" data-rstate="${value}" aria-pressed="${filters.state === value}">
-      ${icon}${escapeHTML(label)}${count(key)}</button>`;
+      ${icon}<span class="rev-side-name">${escapeHTML(label)}</span>${count(key)}</button>`;
   const outcome = (value: "done" | "undone", label: string) =>
     `<button class="tab${filters.outcome === value ? " on" : ""}" data-routcome="${value}" aria-pressed="${filters.outcome === value}">
-      ${escapeHTML(label)}${count(value)}</button>`;
+      <span class="rev-side-name">${escapeHTML(label)}</span>${count(value)}</button>`;
   const sides = `<div class="tabs rev-sides">
       ${side("", icons.bullets(14), text.t("board.all"), "all")}${side("open", icons.circle(14), text.t("board.open"), "open")}${side("closed", icons.circleCheck(14), text.t("board.closed"), "closed")}
     </div>

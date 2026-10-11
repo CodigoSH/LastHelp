@@ -805,6 +805,29 @@ async function main() {
     JSON.stringify(sides),
   );
   await shoot("review-sides");
+  await goTo("/review?mode=all&state=closed&outcome=done", ".rev-row");
+  await shoot("review-closed");
+  // English proves nothing about fit: the longest word of the twenty catalogues goes
+  // into each segment, and none may be cut short. The words are put back after.
+  const fit = await evaluate(`
+    const langs = "ar bn de el en es fa fr hi id it ja ko nl pl pt ru tr ur zh".split(" ");
+    const dicts = await Promise.all(langs.map(l => fetch("/locales/" + l + ".json").then(r => r.json())));
+    const longest = (key) => dicts.map(d => d[key] ?? "").sort((a, b) => b.length - a.length)[0];
+    const wanted = { "": "board.all", open: "board.open", closed: "board.closed", done: "board.outcomeDone", undone: "board.outcomeUndone" };
+    const cut = [];
+    const kept = [];
+    for (const [value, key] of Object.entries(wanted)) {
+      const btn = document.querySelector('[data-rstate="' + value + '"], [data-routcome="' + value + '"]');
+      const name = btn?.querySelector(".rev-side-name");
+      if (!name) { cut.push("missing " + value); continue; }
+      kept.push([name, name.textContent]);
+      name.textContent = longest(key);
+      if (name.scrollWidth > name.clientWidth) cut.push(value + ":" + name.textContent);
+    }
+    for (const [name, text] of kept) name.textContent = text;
+    return { cut, langs: dicts.length };
+  `);
+  check("the open and closed segments hold the longest word of every language without cutting it", fit.cut.length === 0 && fit.langs === 20, JSON.stringify(fit));
 
   // A repository's heading folds its reports away, the arrow keys skip them, the
   // count stays what it was, and the choice is still there on the next visit.
