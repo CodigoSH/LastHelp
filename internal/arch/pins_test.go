@@ -54,12 +54,17 @@ var pins = []pin{
 	// one where floating hurts most: a new advisory database turns the build
 	// red on a morning nobody touched the code.
 	{".forgejo/workflows/ci.yml", "govulncheck", regexp.MustCompile(`govulncheck@(\S+)`)},
+	{"scripts/release.sh", "govulncheck", regexp.MustCompile(`GOVULNCHECK_VERSION="(\S+?)"`)},
 }
 
 // exactVersion is what a pin has to look like: three numbers, optionally with
 // a leading v. `1.26`, `latest` and `1` are all refused — they name a moving
 // target, which is the whole point.
-var exactVersion = regexp.MustCompile(`^v?\d+\.\d+\.\d+$`)
+//
+// A pseudo-version (a commit on the module proxy) is exact too: it names one
+// immutable tree. It has to carry a timestamp and a twelve-digit hash, so a
+// branch name still does not pass.
+var exactVersion = regexp.MustCompile(`^v?\d+\.\d+\.\d+$|^v\d+\.\d+\.\d+-(?:0\.)?[a-z0-9.]*\d{14}-[0-9a-f]{12}$`)
 
 func TestEveryToolVersionIsPinnedAndAgrees(t *testing.T) {
 	root := repoRoot(t)
@@ -103,5 +108,32 @@ func TestEveryToolVersionIsPinnedAndAgrees(t *testing.T) {
 		}
 		t.Errorf("%s is pinned at %d different versions: %s",
 			what, len(versions), strings.Join(said, "; "))
+	}
+}
+
+// TestTheReleaseRunsTheVulnerabilityScanBeforeTagging: the scan that turns the
+// repository red after a release has to be able to stop the release first. It is
+// a guard on an absence, so it strips comments (the prose above explains why the
+// step is there) and reads the entry itself.
+func TestTheReleaseRunsTheVulnerabilityScanBeforeTagging(t *testing.T) {
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "scripts/release.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var code []string
+	for _, line := range strings.Split(string(body), "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			code = append(code, line)
+		}
+	}
+	script := strings.Join(code, "\n")
+	entry := regexp.MustCompile(`(?m)^\s*"govulncheck\|go run golang\.org/x/vuln/cmd/govulncheck@\\\$GOVULNCHECK_VERSION \./\.\.\."\s*$`)
+	if !entry.MatchString(script) {
+		t.Fatal("the preflight in scripts/release.sh has no govulncheck entry: a release " +
+			"could be tagged with a reachable advisory and turn CI red in public")
+	}
+	if strings.Index(script, "govulncheck|") > strings.Index(script, "# --- 2. Calculate") &&
+		strings.Contains(script, "# --- 2. Calculate") {
+		t.Fatal("the scan is listed after the version is computed: it has to run in the preflight")
 	}
 }

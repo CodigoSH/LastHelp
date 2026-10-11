@@ -107,7 +107,18 @@ VERSION_STAMPS=(
 # Pinned, and it is the only version of this analyser named anywhere in the
 # project. A floating one puts the release in the red on a day nobody touched
 # code, because somebody else published a stricter check.
-STATICCHECK_VERSION="v0.8.1"
+# A pseudo-version, deliberately: the last tagged release reads the compiler's export
+# data up to format 4, and Go 1.27.2 writes format 5, so every package that imports
+# the standard library fails to load ("export data version 5 is greater than maximum
+# supported version 4"). The commit named here is exact and immutable on the module
+# proxy; it goes back to a tagged release the day one reads format 5.
+STATICCHECK_VERSION="v0.7.0-0.dev.0.20261009230814-452d5bb86b45"
+
+# The vulnerability scan is a preflight step because of where it fails. In CI it
+# turns the repository red after the tag is public, which is where a user sees it;
+# here it stops the release before anything is written. Pinned for the reason above:
+# the tool is, the advisory database it reads is not, and that is the point.
+GOVULNCHECK_VERSION="v1.8.0"
 
 PREFLIGHT=(
     "gofmt|test -z \"\$(gofmt -l ./cmd ./internal)\""
@@ -120,6 +131,10 @@ PREFLIGHT=(
     "architecture rules|go test -count=1 ./internal/arch/"
     "bun install|bun install --frozen-lockfile"
     "frontend build|bun run build"
+    # After the frontend build on purpose: the bundle is embedded, so nothing that
+    # compiles this code can run before it exists. It exits non-zero only for what
+    # this code reaches, and the usual cause is the Go toolchain being a patch behind.
+    "govulncheck|go run golang.org/x/vuln/cmd/govulncheck@\$GOVULNCHECK_VERSION ./..."
     "go test -race|go test -count=1 -race ./..."
     "typecheck|bun run typecheck"
     "bun test|bun test"
