@@ -118,7 +118,7 @@ STATICCHECK_VERSION="v0.7.0-0.dev.0.20261009230814-452d5bb86b45"
 # turns the repository red after the tag is public, which is where a user sees it;
 # here it stops the release before anything is written. Pinned for the reason above:
 # the tool is, the advisory database it reads is not, and that is the point.
-GOVULNCHECK_VERSION="v1.8.0"
+GOVULNCHECK_VERSION="v1.9.0"
 
 PREFLIGHT=(
     "gofmt|test -z \"\$(gofmt -l ./cmd ./internal)\""

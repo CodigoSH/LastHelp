@@ -21,7 +21,7 @@ import (
 // the others, and a pin that floats — `latest`, a bare major, or a series
 // without its patch.
 //
-// package.json is read too, since 28-sep-2026: it said `"@types/bun":
+// package.json is read too, since 28-sep-2026: it said `"bun-types":
 // "latest"` and `"typescript": "^5.9.3"` for months, two floating pins in the
 // one file this test did not open. The types are held to the Bun that builds,
 // because types that describe another runtime check code against an API the
@@ -44,7 +44,7 @@ var pins = []pin{
 	{"Dockerfile", "bun", regexp.MustCompile(`FROM (?:--platform=\S+ )?oven/bun:(\S+?)-alpine`)},
 	{".forgejo/workflows/ci.yml", "bun", regexp.MustCompile(`bun-version: '?"?([^'"\s]+)`)},
 	{".forgejo/workflows/release.yml", "bun", regexp.MustCompile(`bun-version: '?"?([^'"\s]+)`)},
-	{"package.json", "bun", regexp.MustCompile(`"@types/bun":\s*"([^"]+)"`)},
+	{"package.json", "bun", regexp.MustCompile(`"bun-types":\s*"([^"]+)"`)},
 
 	{"package.json", "typescript", regexp.MustCompile(`"typescript":\s*"([^"]+)"`)},
 
