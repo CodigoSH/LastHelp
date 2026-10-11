@@ -2401,6 +2401,8 @@ async function showReview(): Promise<void> {
     moderation: "",
     kind: "",
     status: "",
+    state: "",
+    outcome: "",
     board: "",
     sort: "",
     q: "",
@@ -2641,6 +2643,16 @@ async function wireReview(
   };
   for (const el of root?.querySelectorAll<HTMLSelectElement>("[data-f]") ?? []) {
     el.addEventListener("change", () => narrowTo({ [el.dataset.f ?? ""]: el.value }));
+  }
+  // Open and closed. Changing side drops the outcome and the status, which belong
+  // to the side they were chosen on; pressing the outcome that is on shows both.
+  for (const el of root?.querySelectorAll<HTMLElement>("[data-rstate]") ?? []) {
+    el.addEventListener("click", () => narrowTo({ state: el.dataset.rstate ?? "", outcome: "", status: "" }));
+  }
+  for (const el of root?.querySelectorAll<HTMLElement>("[data-routcome]") ?? []) {
+    el.addEventListener("click", () =>
+      narrowTo({ outcome: view.filters.outcome === el.dataset.routcome ? "" : (el.dataset.routcome ?? "") }),
+    );
   }
   const search = root?.querySelector<HTMLInputElement>("[data-q]");
   if (search) {

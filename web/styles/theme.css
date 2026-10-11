@@ -7517,3 +7517,10 @@ a.stat:hover .stat-go {
   .notification-dot,
   .side-update { animation: none; }
 }
+
+/* Open and closed on the archive: the board's switch, with a mark and a count
+   on each, taking a row of the column of its own — and wrapping under it when a
+   language needs the room. */
+.rev-sides { align-self: flex-start; max-inline-size: 100%; flex-wrap: wrap; }
+.rev-sides .tab { display: inline-flex; align-items: center; gap: 0.4rem; padding-inline: 0.65rem; }
+.rev-sides .tab .icon { flex: none; }

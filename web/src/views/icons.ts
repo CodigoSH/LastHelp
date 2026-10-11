@@ -235,6 +235,10 @@ export const icons = {
        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>`,
       s,
     ),
+  /** An empty ring: still open. */
+  circle: (s?: number) => stroke(`<circle cx="12" cy="12" r="9"/>`, s),
+  /** A ring with its tick: closed. */
+  circleCheck: (s?: number) => stroke(`<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>`, s),
   open: (s?: number) =>
     stroke(`<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/>`, s),
 };
