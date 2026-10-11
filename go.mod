@@ -1,11 +1,11 @@
 module git.codigosh.com/CodigoSH/LastHelp
 
-go 1.27.1
+go 1.27.2
 
 require (
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.46.0
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	modernc.org/sqlite v1.59.0
 )
 

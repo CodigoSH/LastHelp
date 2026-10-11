@@ -16,7 +16,7 @@ COPY web ./web
 RUN bun run build
 
 # ---- backend --------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine AS backend
+FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine AS backend
 WORKDIR /src
 COPY go.mod go.sum* ./
 RUN go mod download
