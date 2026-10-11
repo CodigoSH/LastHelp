@@ -99,3 +99,51 @@ func block(t *testing.T, css, opener string) []string {
 	sort.Strings(names)
 	return names
 }
+
+// TestNothingInThePanelIsTheColourOfWhatItSitsOn.
+//
+// The panel is laid on a ground, and the menu and the cards are the sheet, one step
+// above it. The panel used to be laid on the sheet itself with the cards a 4% veil
+// over it, so the whole window was the lightest grey in the palette and a card was
+// an outline: next to a product whose settings float over a darker page it read as
+// washed out, and the colours were the same ones.
+//
+// A guard on a value, so it reads the rule rather than the prose around it: the
+// `.admin` block has to take the ground, the menu and the three cards the sheet,
+// and no veil may come back on them.
+func TestNothingInThePanelIsTheColourOfWhatItSitsOn(t *testing.T) {
+	source, err := os.ReadFile(filepath.Join(repoRoot(t), "web/styles/theme.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(source)
+
+	ruleBody := func(selector string) string {
+		t.Helper()
+		at := strings.Index(css, "\n"+selector+" {")
+		if at < 0 {
+			t.Fatalf("theme.css has no %s rule: this test is reading the wrong stylesheet", selector)
+		}
+		rest := css[at+1:]
+		return rest[:strings.Index(rest, "\n}")]
+	}
+
+	for selector, want := range map[string]string{
+		".admin":                  "background: var(--ground);",
+		".side":                   "background: var(--sheet);",
+		".admin-main .bento-card": "background: var(--sheet);",
+		".settings-item":          "background: var(--sheet);",
+		".admin-main .dash-card":  "background: var(--sheet);",
+	} {
+		if !strings.Contains(ruleBody(selector), want) {
+			t.Errorf("%s no longer says %q: a panel surface has to be a step above its ground, "+
+				"not a veil over it", selector, want)
+		}
+	}
+
+	for _, scope := range []string{":root {", "@media (prefers-color-scheme: dark) {", ":root[data-theme=\"dark\"] {"} {
+		if !strings.Contains(text(t, css, scope), "--ground:") {
+			t.Errorf("%s does not set --ground", scope)
+		}
+	}
+}

@@ -28,8 +28,12 @@
      making for one value. */
   --canvas-glass: rgba(246, 247, 249, 0.82);
   --panel: #ffffff;
-  /* The sheet the panel is laid on: white here, #242424 in the dark. */
+  /* The sheet the panel's cards and menu are made of: white here, #242424 in the dark. */
   --sheet: #ffffff;
+  /* What the sheet lies on: the panel's own ground, one step down from the sheet so a
+     card is a raised thing and not a veil over its own background. #eef0f4 here,
+     #1a1a1a in the dark. */
+  --ground: #eef0f4;
   /* A row pointed at, in the accent: 6% here, 10% in the dark. */
   --surface-hover: rgba(var(--accent-rgb), 0.06);
   /* Something switched off but alive: 12% here, 20% in the dark. The track of
@@ -143,6 +147,7 @@
   --dark-feature-card-border: rgba(var(--accent-rgb), 0.3);
   --dark-float-shadow: 0 0 #0000;
   --dark-sheet: #242424;
+  --dark-ground: #1a1a1a;
   --dark-surface-hover: rgba(var(--accent-rgb), 0.1);
   --dark-surface-active: rgba(var(--accent-rgb), 0.2);
   --dark-text-main: #e9ecf2;
@@ -171,6 +176,7 @@
     --canvas-glass: var(--dark-canvas-glass);
     --panel: var(--dark-panel);
     --sheet: var(--dark-sheet);
+    --ground: var(--dark-ground);
     --surface-hover: var(--dark-surface-hover);
     --surface-active: var(--dark-surface-active);
     --surface-dim: var(--dark-surface-dim);
@@ -201,6 +207,7 @@
   --canvas-glass: var(--dark-canvas-glass);
   --panel: var(--dark-panel);
   --sheet: var(--dark-sheet);
+  --ground: var(--dark-ground);
   --surface-hover: var(--dark-surface-hover);
   --surface-active: var(--dark-surface-active);
   --surface-dim: var(--dark-surface-dim);
@@ -2872,14 +2879,15 @@ body.admin-view > main {
   padding: 0;
 }
 
-/* Laid on the sheet: one solid grey rather than the public page's dark
-   ground with its glow — the panel is a tool, and reads as one surface you
-   work on. */
+/* Laid on its own ground: one solid colour rather than the public page's dark
+   ground with its glow — the panel is a tool, and reads as one surface you work on.
+   The menu and the cards are the sheet, a step above it, so nothing is the colour
+   of what it sits on. */
 .admin {
   display: grid;
   grid-template-columns: 16rem 1fr;
   min-block-size: calc(100vh - 48px);
-  background: var(--sheet);
+  background: var(--ground);
 }
 
 /* Merged from the two declared at the top level. The sidebar is the one surface
@@ -2889,8 +2897,8 @@ body.admin-view > main {
    is a different rule, not a copy of this one. */
 .side {
   border-inline-end: 1px solid var(--border);
-  /* The menu column: the sheet with a 4% veil over it. */
-  background: rgba(128, 128, 128, 0.04);
+  /* The menu column: the sheet. */
+  background: var(--sheet);
   padding: 1.25rem 0.9rem;
   display: flex;
   flex-direction: column;
@@ -6772,7 +6780,7 @@ a.stat:hover .stat-go {
   padding: 16px 20px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(128, 128, 128, 0.04);
+  background: var(--sheet);
   box-shadow: none;
 }
 
@@ -6938,7 +6946,7 @@ a.stat:hover .stat-go {
   padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: rgba(128, 128, 128, 0.04);
+  background: var(--sheet);
   transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease);
 }
 
@@ -7077,7 +7085,7 @@ a.stat:hover .stat-go {
 .admin-main .dash-card {
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(128, 128, 128, 0.04);
+  background: var(--sheet);
   box-shadow: none;
 }
 
