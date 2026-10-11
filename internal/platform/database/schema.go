@@ -446,6 +446,29 @@ var migrations = []migration{
 			return addColumn(tx, "repository", "accepts_images", "INTEGER NOT NULL DEFAULT 1")
 		},
 	},
+	{
+		version: 13,
+		name:    "a team reply remembers which account wrote it",
+		// A reply was signed by copying the name of whoever wrote it into the
+		// comment, so renaming the account left every earlier reply under the
+		// old name. The account is stored beside the name now and the name is read
+		// from it, which is what lets a rename reach what was already written; the
+		// copy stays as the answer for a reply whose account has gone.
+		//
+		// Replies written before this carry only the copy. They are matched to the
+		// account that has that name today, which is right unless two people held
+		// the same name at different times; where nobody has it, the reply keeps
+		// the name it was signed with. Safe to run again: it only fills what is empty.
+		fn: func(tx *sql.Tx) error {
+			if err := addColumn(tx, "comment", "author_id", "INTEGER REFERENCES app_user(id) ON DELETE SET NULL"); err != nil {
+				return err
+			}
+			_, err := tx.Exec(`UPDATE comment
+				SET author_id = (SELECT id FROM app_user WHERE username = comment.author_ref)
+				WHERE author_kind = 'team' AND author_id IS NULL AND author_ref <> ''`)
+			return err
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

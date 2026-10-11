@@ -45,6 +45,21 @@ func TestRenamingAnAccountRenamesIt(t *testing.T) {
 		t.Errorf("the reply is signed %v, want the account's name", thread)
 	}
 
+	// And a reply written before the rename carries the new name too, for the
+	// visitor reading the page and for the team reading its own pane.
+	if got := status(t, team.do(http.MethodPost, "/api/me/profile", map[string]string{"username": "alexandra"})); got != http.StatusOK {
+		t.Fatalf("renaming again: %d", got)
+	}
+	for who, client := range map[string]*instance{"a visitor": team.anonymous(), "the team": team} {
+		thread, _ := decode(t, client.do(http.MethodGet, "/api/items/"+published, nil))["comments"].([]any)
+		if len(thread) != 1 || thread[0].(map[string]any)["name"] != "alexandra" {
+			t.Errorf("%s reads the reply signed %v, want the name the account has now", who, thread)
+		}
+	}
+	if got := status(t, team.do(http.MethodPost, "/api/me/profile", map[string]string{"username": "alex"})); got != http.StatusOK {
+		t.Fatalf("renaming back: %d", got)
+	}
+
 	// Somebody else's name is refused, and so is a name too short to be one.
 	if got := status(t, team.do(http.MethodPost, "/api/people", map[string]string{
 		"username": "helper", "password": "a good long passphrase",

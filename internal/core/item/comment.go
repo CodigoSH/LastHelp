@@ -32,12 +32,29 @@ type Comment struct {
 
 const maxComment = 10_000
 
+// authorName is the name a message is shown under: the account's, as it is called
+// now, or the copy written with the message when there is no account to ask. Every
+// query that reads a message selects this and joins app_user as u.
+const authorName = `COALESCE(u.username, c.author_ref)`
+
 // Comment adds a message.
 //
 // Anything not written by the team waits for a human, including the reporter's
 // own follow-up: the secret link proves who they are, not that what they wrote
 // belongs on a public page.
 func (s Store) Comment(itemID int64, author Author, authorRef, body string, now time.Time) (Comment, error) {
+	return s.write(itemID, author, authorRef, 0, body, now)
+}
+
+// TeamReply is a reply from an account of the team. The account is stored with it
+// and the name is read from the account, so the reply keeps the name its author
+// has now rather than the one they had the day they wrote it; name is the copy
+// kept for the day the account is gone.
+func (s Store) TeamReply(itemID, userID int64, name, body string, now time.Time) (Comment, error) {
+	return s.write(itemID, AuthorTeam, name, userID, body, now)
+}
+
+func (s Store) write(itemID int64, author Author, authorRef string, authorID int64, body string, now time.Time) (Comment, error) {
 	body = strings.TrimSpace(body)
 	if body == "" {
 		return Comment{}, fmt.Errorf("a comment needs something in it")
@@ -57,10 +74,14 @@ func (s Store) Comment(itemID int64, author Author, authorRef, body string, now 
 		moderation = Published
 	}
 
+	var by any // NULL for anybody who is not an account
+	if authorID != 0 {
+		by = authorID
+	}
 	res, err := s.DB.Exec(`INSERT INTO comment
-		(item_id, author_kind, author_ref, body, moderation_state, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		itemID, string(author), authorRef, body, string(moderation), now.Unix())
+		(item_id, author_kind, author_ref, author_id, body, moderation_state, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		itemID, string(author), authorRef, by, body, string(moderation), now.Unix())
 	if err != nil {
 		if strings.Contains(err.Error(), "FOREIGN KEY constraint failed") {
 			return Comment{}, ErrNotFound
@@ -83,9 +104,9 @@ func (s Store) Comments(itemID int64, moderation Moderation) ([]Comment, error) 
 	if moderation == "" {
 		moderation = Published
 	}
-	rows, err := s.DB.Query(`SELECT id, item_id, author_kind, author_ref, body,
-		moderation_state, created_at FROM comment
-		WHERE item_id = ? AND moderation_state = ? ORDER BY created_at, id`,
+	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, `+authorName+`, c.body,
+		c.moderation_state, c.created_at FROM comment c LEFT JOIN app_user u ON u.id = c.author_id
+		WHERE c.item_id = ? AND c.moderation_state = ? ORDER BY c.created_at, c.id`,
 		itemID, string(moderation))
 	if err != nil {
 		return nil, fmt.Errorf("reading the thread: %w", err)
@@ -155,9 +176,10 @@ func (s Store) WaitingCommentsOn(repoIDs []int64, limit int) ([]Waiting, error) 
 	}
 	args = append(args, string(Pending), limit)
 
-	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, c.author_ref, c.body,
+	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, `+authorName+`, c.body,
 		c.moderation_state, c.created_at, i.public_id, i.title, i.repo_id
 		FROM comment c
+		LEFT JOIN app_user u ON u.id = c.author_id
 		JOIN item i ON i.id = c.item_id
 		WHERE i.repo_id IN (`+holes+`) AND c.moderation_state = ?
 		ORDER BY c.created_at DESC, c.id DESC LIMIT ?`, args...)
@@ -172,9 +194,10 @@ func (s Store) WaitingComments(repoID int64, limit int) ([]Waiting, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, c.author_ref, c.body,
+	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, `+authorName+`, c.body,
 		c.moderation_state, c.created_at, i.public_id, i.title, i.repo_id
 		FROM comment c
+		LEFT JOIN app_user u ON u.id = c.author_id
 		JOIN item i ON i.id = c.item_id
 		WHERE i.repo_id = ? AND c.moderation_state = ?
 		ORDER BY c.created_at DESC, c.id DESC LIMIT ?`,
@@ -229,8 +252,8 @@ func (s Store) CommentByID(id int64) (Comment, error) {
 	var c Comment
 	var author, moderation string
 	var created int64
-	err := s.DB.QueryRow(`SELECT id, item_id, author_kind, author_ref, body, moderation_state, created_at
-		FROM comment WHERE id = ?`, id).Scan(&c.ID, &c.ItemID, &author, &c.AuthorRef, &c.Body, &moderation, &created)
+	err := s.DB.QueryRow(`SELECT c.id, c.item_id, c.author_kind, `+authorName+`, c.body, c.moderation_state, c.created_at
+		FROM comment c LEFT JOIN app_user u ON u.id = c.author_id WHERE c.id = ?`, id).Scan(&c.ID, &c.ItemID, &author, &c.AuthorRef, &c.Body, &moderation, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Comment{}, ErrNotFound
 	}
