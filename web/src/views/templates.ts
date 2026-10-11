@@ -2048,6 +2048,8 @@ export interface ReviewView {
   now: number;
   /** What waits, as the bar counts it: shown on its tab from either mode. */
   waiting?: number;
+  /** The repositories whose reports are folded away, by the name their heading carries. */
+  folded?: ReadonlySet<string>;
 }
 
 /**
@@ -2286,9 +2288,21 @@ export function reviewList(data: ReportsData, view: ReviewView, text: Text): str
   const list =
     [...boards.values()]
       .map(
-        (b) => `<p class="rev-group">${escapeHTML(b.name)}
-        <span class="count-chip">${escapeHTML(text.number(b.rows.length))}</span></p>
-      ${b.rows.map(reportRow).join("")}`,
+        (b) => {
+          // The heading folds its reports away. The fold stays in the list, hidden,
+          // so a further page or a redraw puts the rows back where they were.
+          if (view.mode !== "all") {
+            // What waits is never put away: a folded heading would hide work.
+            return `<p class="rev-group">${escapeHTML(b.name)}
+              <span class="count-chip">${escapeHTML(text.number(b.rows.length))}</span></p>
+            ${b.rows.map(reportRow).join("")}`;
+          }
+          const folded = view.folded?.has(b.name) ?? false;
+          return `<button type="button" class="rev-group fold${folded ? " shut" : ""}" data-fold="${escapeAttr(b.name)}"
+            aria-expanded="${!folded}">${icons.chevron(12)}<span class="rev-group-name">${escapeHTML(b.name)}</span>
+            <span class="count-chip">${escapeHTML(text.number(b.rows.length))}</span></button>
+          <div class="rev-fold"${folded ? " hidden" : ""}>${b.rows.map(reportRow).join("")}</div>`;
+        },
       )
       .join("") +
     (orphans.length === 0

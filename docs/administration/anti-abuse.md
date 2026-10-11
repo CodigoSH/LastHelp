@@ -116,7 +116,9 @@ The same screen is the archive: every report ever sent, found by its words or
 narrowed by type, moderation, status and repository. **All / Open / Closed**
 splits the published reports the way the public board does, each with how many
 it would show; under **Closed**, **Done** and **Not done** tell a delivery from a
-report the team turned down. The queue tab has none of these: whatever waits is
+report the team turned down. In the archive the list is grouped by repository,
+and a repository's heading folds its reports away and opens them again; the
+choice is kept in your browser. The queue tab has none of these: whatever waits is
 shown, closed or not. Whatever you choose opens
 beside the list as the whole report — edit its words, change its status, open
 or link an issue, reply, edit or delete any comment on it, and, for the

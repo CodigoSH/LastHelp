@@ -2379,6 +2379,23 @@ async function showPanel(): Promise<void> {
  */
 const REVIEW_PAGE = 50;
 
+/**
+ * The repositories whose reports are folded away in the archive. A convenience of
+ * this browser, kept between visits and never needed: without storage every
+ * heading simply starts open.
+ */
+const FOLDED_KEY = "lasthelp.review.folded";
+const foldedRepositories = new Set<string>(
+  (() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
+      return Array.isArray(saved) ? saved.filter((v): v is string => typeof v === "string") : [];
+    } catch {
+      return [];
+    }
+  })(),
+);
+
 /** Whether the search box had the cursor when the screen was last redrawn. */
 let reviewSearching = false;
 
@@ -2452,6 +2469,7 @@ async function showReview(): Promise<void> {
     more: rows.length === REVIEW_PAGE,
     now: Math.floor(Date.now() / 1000),
     waiting,
+    folded: foldedRepositories,
   };
 
   show(views.reviewScreen(data, view, text));
@@ -2621,6 +2639,23 @@ async function wireReview(
       if (narrow()) reading(true);
       return;
     }
+    const heading = target.closest<HTMLElement>("[data-fold]");
+    if (heading) {
+      const name = heading.dataset.fold ?? "";
+      const shut = !foldedRepositories.has(name);
+      if (shut) foldedRepositories.add(name);
+      else foldedRepositories.delete(name);
+      heading.classList.toggle("shut", shut);
+      heading.setAttribute("aria-expanded", String(!shut));
+      const body = heading.nextElementSibling;
+      if (body instanceof HTMLElement) body.hidden = shut;
+      try {
+        localStorage.setItem(FOLDED_KEY, JSON.stringify([...foldedRepositories]));
+      } catch {
+        // Not kept: the next visit starts open.
+      }
+      return;
+    }
     if (target.closest("[data-more]")) void more();
     if (target.closest("[data-unfilter]")) go("/review?mode=all");
   });
@@ -2697,7 +2732,9 @@ async function wireReview(
 
   if (view.chosen) void draw(view.chosen);
 
-  const order = () => [...(root?.querySelectorAll<HTMLElement>("[data-pick]") ?? [])];
+  // Rows in a folded repository are not reachable by the arrow keys.
+  const order = () =>
+    [...(root?.querySelectorAll<HTMLElement>("[data-pick]") ?? [])].filter((el) => !el.closest(".rev-fold[hidden]"));
   const step = (by: number) => {
     const all = order();
     const at = all.findIndex((el) => el.dataset.pick === view.chosen);
