@@ -7524,3 +7524,18 @@ a.stat:hover .stat-go {
 .rev-sides { align-self: flex-start; max-inline-size: 100%; flex-wrap: wrap; }
 .rev-sides .tab { display: inline-flex; align-items: center; gap: 0.4rem; padding-inline: 0.65rem; }
 .rev-sides .tab .icon { flex: none; }
+
+/* A repository's heading in the archive is the control that folds its reports
+   away: the same heading, as a button, with a mark that turns down when open. */
+button.rev-group {
+  inline-size: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: start;
+}
+button.rev-group:hover { color: var(--text-main); }
+button.rev-group .icon { flex: none; transform: rotate(90deg); transition: transform 0.15s var(--ease); }
+button.rev-group.shut .icon { transform: rotate(0deg); }
+:root[dir="rtl"] button.rev-group.shut .icon { transform: rotate(180deg); }
+.rev-group-name { min-inline-size: 0; overflow-wrap: anywhere; }

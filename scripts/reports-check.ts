@@ -806,6 +806,52 @@ async function main() {
   );
   await shoot("review-sides");
 
+  // A repository's heading folds its reports away, the arrow keys skip them, the
+  // count stays what it was, and the choice is still there on the next visit.
+  await goTo("/review?mode=all", ".rev-row");
+  const fold = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const heads = [...document.querySelectorAll("button.rev-group[data-fold]")];
+    const first = heads[0];
+    const rowsOf = (h) => [...h.nextElementSibling.querySelectorAll('[data-what="report"]')];
+    const shown = (el) => el.getBoundingClientRect().height > 0;
+    const before = rowsOf(first).length;
+    const chip = first.querySelector(".count-chip").textContent.trim();
+    const visibleBefore = rowsOf(first).filter(shown).length;
+    first.click();
+    const folded = {
+      expanded: first.getAttribute("aria-expanded"),
+      visible: rowsOf(first).filter(shown).length,
+      chipSame: first.querySelector(".count-chip").textContent.trim() === chip,
+      stored: localStorage.getItem("lasthelp.review.folded"),
+    };
+    // From the first row left showing, stepping up would enter the folded repository above: it never does.
+    document.querySelector('[data-what="report"]:not(.rev-fold[hidden] *)')?.click();
+    for (let i = 0; i < 2; i++) document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    await new Promise(r => setTimeout(r, 400));
+    const on = document.querySelector(".rev-row.on");
+    folded.landedInside = !!on?.closest(".rev-fold[hidden]");
+    // Redrawn (a further page, or coming back): still folded. Then opened again.
+    await fetch("/api/me");
+    location.reload();
+    return { heads: heads.length, before, visibleBefore, ...folded };
+  `);
+  await waitFor("button.rev-group[data-fold]");
+  const afterReload = await evaluate(`
+    const first = document.querySelector("button.rev-group[data-fold]");
+    const was = { expanded: first.getAttribute("aria-expanded"), visible: [...first.nextElementSibling.querySelectorAll('[data-what="report"]')].filter(e => e.getBoundingClientRect().height > 0).length };
+    first.click();
+    const open = [...first.nextElementSibling.querySelectorAll('[data-what="report"]')].filter(e => e.getBoundingClientRect().height > 0).length;
+    return { ...was, reopened: open, stored: localStorage.getItem("lasthelp.review.folded") };
+  `);
+  check(
+    "a repository's heading folds its reports: hidden but counted, skipped by the arrows, kept on reload, and opened again",
+    fold.heads >= 1 && fold.before > 0 && fold.visibleBefore === fold.before &&
+      fold.expanded === "false" && fold.visible === 0 && fold.chipSame === true && fold.landedInside === false &&
+      afterReload.expanded === "false" && afterReload.visible === 0 && afterReload.reopened === fold.before && afterReload.stored === "[]",
+    JSON.stringify({ fold, afterReload }),
+  );
+
   await goTo("/acme/atlas/new", "input[name=title]");
   const parecidos = await evaluate(`
     const t = document.querySelector("input[name=title]");
