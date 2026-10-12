@@ -10,6 +10,11 @@ file with the stable that carries them.
 
 1.0.0 is the first stable release, so its entry describes the whole product
 rather than a change from an earlier version.
+## [1.2.6] - 2026-10-12
+
+### Changed
+- The third point of the front page says what a visitor gets: every report shows where it stands, from new to shipped, in the twenty languages. It used to say that reports can become forge issues, which an installation without a forge never has.
+
 ## [1.2.5] - 2026-10-12
 
 ### Added
