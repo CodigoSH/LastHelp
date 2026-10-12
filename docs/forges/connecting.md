@@ -83,6 +83,10 @@ Add a webhook on the repository (or the organisation) with:
 - A triaged item becomes an issue, or is attached to one that already exists by
   pasting its number or URL. A project with four thousand open issues wants the
   second far more often than the first.
+- What the reporter wrote reaches the issue **as text**. Forges read an issue as Markdown,
+  where `@name` notifies somebody, `![](url)` loads a picture from a host the writer
+  chose and a line starting with `/` can be a command, so those are escaped on the way
+  out; code in backticks is left exactly as it was written.
 - When that issue is **closed** or **reopened**, the item follows: a bug becomes
   *fixed* or *fix in progress*, an idea becomes *shipped* or *in progress*.
 - The roadmap follows from that, which is why nobody has to maintain it.

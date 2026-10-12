@@ -244,7 +244,7 @@ func (b Bridge) createIssue(ctx context.Context, itemID int64, now time.Time) er
 // person who reported it.
 func IssueBody(it item.Item) string {
 	var out strings.Builder
-	out.WriteString(it.Body)
+	out.WriteString(neutralise(it.Body))
 
 	if len(it.Fields) > 0 {
 		out.WriteString("\n\n")
@@ -252,7 +252,7 @@ func IssueBody(it item.Item) string {
 			if strings.TrimSpace(f.Value) == "" {
 				continue
 			}
-			fmt.Fprintf(&out, "**%s:** %s\n", f.Label, f.Value)
+			fmt.Fprintf(&out, "**%s:** %s\n", f.Label, neutralise(f.Value))
 		}
 	}
 
