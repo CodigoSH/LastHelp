@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, commentEditForm, itemTeamView, itemView, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
+import { accountRole, avatar, commentEditForm, itemTeamView, itemView, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -294,5 +294,56 @@ describe("the limits the editing forms keep", () => {
   test("an edited message is as long as the server allows", async () => {
     const attribute = commentEditForm("hello", text).match(/maxlength="(\d+)"/)?.[1];
     expect(Number(attribute)).toBe(await limit("maxComment"));
+  });
+});
+
+describe("the picture beside a name", () => {
+  const thread = [
+    { id: 1, author: "reporter", name: "Sam", body: "it breaks", created_at: 0 },
+    { id: 2, author: "visitor", name: "", body: "me too", created_at: 0 },
+    { id: 3, author: "team", name: "alex", body: "on it", created_at: 0 },
+    { id: 4, author: "team", name: "olga", avatar: "/avatars/9", body: "fixed", created_at: 0 },
+  ];
+  const allowed = { current: "new", statuses: ["new"] };
+  const circles = (html: string) => html.match(/<span class="avatar[^"]*"[^>]*>.*?<\/span>/gs) ?? [];
+
+  test("never draws initials: a name alone is not a picture", () => {
+    for (const html of [itemView(report({ comments: thread }), text), itemTeamView(report({ comments: thread }), allowed, [], text)]) {
+      expect(circles(html).length).toBe(4);
+      for (const c of circles(html)) expect(c).not.toMatch(/>\s*[A-Za-z]{1,2}\s*</);
+    }
+  });
+
+  test("everybody but the team gets the plain default, the team its own", () => {
+    const html = itemView(report({ comments: thread }), text);
+    const [reporter, visitor, team, teamWithOwn] = circles(html);
+    expect(reporter).toContain("is-guest");
+    expect(visitor).toContain("is-guest");
+    expect(team).toContain("is-team");
+    // The same figure for everybody: what tells the team apart is how it is worn.
+    expect(team).toContain("avatar-fig");
+    expect(reporter).toContain("avatar-fig");
+    expect(team).not.toContain("is-guest");
+    expect(reporter).not.toContain("is-team");
+    expect(teamWithOwn).toContain("is-team");
+  });
+
+  test("a teammate's own picture replaces the default, by its address", () => {
+    const html = itemView(report({ comments: thread }), text);
+    const teamWithOwn = circles(html)[3]!;
+    expect(teamWithOwn).toContain('<img src="/avatars/9"');
+    expect(teamWithOwn).not.toContain("avatar-fig");
+    expect(circles(html)[2]).not.toContain("<img");
+  });
+
+  test("a picture address is escaped, so it cannot close its own attribute", () => {
+    expect(avatar('/x"><script>alert(1)</script>')).not.toContain("<script>");
+  });
+
+  test("a reporter that carries a picture field still gets the plain default", () => {
+    // Only the team has pictures; a stranger's message never has one, whatever arrives.
+    const html = itemView(report({ comments: [{ id: 1, author: "visitor", name: "", avatar: "/avatars/3", body: "x", created_at: 0 }] }), text);
+    expect(circles(html)[0]).toContain("is-guest");
+    expect(circles(html)[0]).not.toContain("<img");
   });
 });

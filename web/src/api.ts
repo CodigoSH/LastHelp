@@ -205,7 +205,7 @@ export interface ItemDetail extends ItemSummary {
   fields?: ReportField[];
   merged_into?: string;
   issue?: { number: number; url: string };
-  comments: Array<{ id?: number; author: string; name: string; body: string; created_at: number }>;
+  comments: Array<{ id?: number; author: string; name: string; avatar?: string; body: string; created_at: number }>;
   /** The pictures this reader may see, the report's and each message's. */
   images?: ReportPicture[];
   /** What the reader may do to it, when they work on it; absent for anybody else. */

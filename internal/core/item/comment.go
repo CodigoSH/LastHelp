@@ -25,6 +25,8 @@ type Comment struct {
 	ItemID     int64
 	Author     Author
 	AuthorRef  string // the team member's name; empty for the others
+	AuthorID   int64  // the account that wrote it, 0 for a stranger or a reply from before the link
+	HasAvatar  bool   // whether that account has a picture of its own
 	Body       string
 	Moderation Moderation
 	CreatedAt  time.Time
@@ -105,7 +107,8 @@ func (s Store) Comments(itemID int64, moderation Moderation) ([]Comment, error) 
 		moderation = Published
 	}
 	rows, err := s.DB.Query(`SELECT c.id, c.item_id, c.author_kind, `+authorName+`, c.body,
-		c.moderation_state, c.created_at FROM comment c LEFT JOIN app_user u ON u.id = c.author_id
+		c.moderation_state, c.created_at, COALESCE(c.author_id, 0), COALESCE(u.avatar, '') <> ''
+		FROM comment c LEFT JOIN app_user u ON u.id = c.author_id
 		WHERE c.item_id = ? AND c.moderation_state = ? ORDER BY c.created_at, c.id`,
 		itemID, string(moderation))
 	if err != nil {
@@ -121,7 +124,7 @@ func (s Store) Comments(itemID int64, moderation Moderation) ([]Comment, error) 
 			mod     string
 			created int64
 		)
-		if err := rows.Scan(&c.ID, &c.ItemID, &author, &c.AuthorRef, &c.Body, &mod, &created); err != nil {
+		if err := rows.Scan(&c.ID, &c.ItemID, &author, &c.AuthorRef, &c.Body, &mod, &created, &c.AuthorID, &c.HasAvatar); err != nil {
 			return nil, fmt.Errorf("reading the thread: %w", err)
 		}
 		c.Author = Author(author)
@@ -130,6 +133,25 @@ func (s Store) Comments(itemID int64, moderation Moderation) ([]Comment, error) 
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// TeamAvatar is the picture of an account, for the one place it is served to
+// anybody: beside a reply on a public page.
+//
+// Only an account that has written a reply has one to show. The address of a picture
+// is an account number, and a rule that answered for any account would let whoever
+// counts upwards learn who has an account on this installation and what they look
+// like; this answers for the ones whose name is already on a page.
+func (s Store) TeamAvatar(userID int64) (string, bool) {
+	var picture string
+	err := s.DB.QueryRow(`SELECT u.avatar FROM app_user u
+		WHERE u.id = ? AND u.avatar <> ''
+		AND EXISTS (SELECT 1 FROM comment c WHERE c.author_id = u.id AND c.author_kind = 'team')`,
+		userID).Scan(&picture)
+	if err != nil {
+		return "", false
+	}
+	return picture, true
 }
 
 // Waiting is every comment on a repository that a person has still to look at,
