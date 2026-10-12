@@ -159,7 +159,7 @@ function defaultBandName(id: string, text: Text): string {
 const POINTS: Record<string, { icon: () => string; title: string; body: string }> = {
   "point-1": { icon: () => icons.person(18), title: "landing.point1Title", body: "landing.pointNoAccount" },
   "point-2": { icon: () => icons.idea(18), title: "landing.point2Title", body: "landing.pointVotes" },
-  "point-3": { icon: () => icons.open(18), title: "landing.point3Title", body: "landing.pointForge" },
+  "point-3": { icon: () => icons.open(18), title: "landing.point3Title", body: "landing.pointStatus" },
 };
 
 /** The default words a text module falls back to, or "" for one with none. */
