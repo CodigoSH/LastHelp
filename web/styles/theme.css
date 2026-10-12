@@ -7595,3 +7595,25 @@ button.rev-group .icon { flex: none; transform: rotate(90deg); transition: trans
 button.rev-group.shut .icon { transform: rotate(0deg); }
 :root[dir="rtl"] button.rev-group.shut .icon { transform: rotate(180deg); }
 .rev-group-name { min-inline-size: 0; overflow-wrap: anywhere; }
+
+/* The default picture: one figure, worn two ways. Everybody but the team gets it in the
+   page's light grey, the figure darker than its circle. The team gets the same figure with
+   the colours turned round and a stronger grey — the circle in the text grey, the figure in
+   the page's own — so a reply from the team reads as one without a colour of its own. Drawn,
+   not a font or a file; both follow the theme. */
+.avatar .avatar-fig {
+  inline-size: 68%;
+  block-size: 68%;
+  fill: currentColor;
+}
+
+.avatar.is-guest {
+  background: var(--surface-dim);
+  color: var(--text-dim);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.avatar.is-team {
+  background: var(--text-dim);
+  color: var(--panel);
+}

@@ -454,13 +454,19 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 
 	thread := make([]map[string]any, 0, len(comments))
 	for _, c := range comments {
-		thread = append(thread, map[string]any{
+		row := map[string]any{
 			"id":         c.ID,
 			"author":     string(c.Author),
 			"name":       c.AuthorRef,
 			"body":       c.Body,
 			"created_at": c.CreatedAt.Unix(),
-		})
+		}
+		// The address, not the picture: it is up to 96 KB, and a thread repeats a
+		// teammate in every reply. Only a team reply from an account with a picture.
+		if c.Author == item.AuthorTeam && c.AuthorID > 0 && c.HasAvatar {
+			row["avatar"] = "/avatars/" + strconv.FormatInt(c.AuthorID, 10)
+		}
+		thread = append(thread, row)
 	}
 
 	body := s.describeItem(it, s.voterID(w, r))

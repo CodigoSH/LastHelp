@@ -221,6 +221,7 @@ func (s *Server) routes() {
 	// follow link or the team's role — see pictures.go.
 	s.mux.HandleFunc("POST /api/items/{id}/images", s.handleAddPicture)
 	s.mux.HandleFunc("GET /api/items/{id}/images/{image}", s.handlePicture)
+	s.mux.HandleFunc("GET /avatars/{id}", s.handleAvatar)
 	s.mux.HandleFunc("DELETE /api/items/{id}/images/{image}", s.handleRemovePicture)
 
 	// --- Private ------------------------------------------------------------

@@ -875,6 +875,75 @@ async function main() {
     JSON.stringify({ fold, afterReload }),
   );
 
+  // The picture beside a name: a stranger and a teammate with none get their own
+  // defaults, never initials, and a teammate's own picture is the one that loads —
+  // under the page's policy, from its address, as a real image.
+  await signIn("alex");
+  await evaluate(`
+    const c = document.createElement("canvas"); c.width = 96; c.height = 96; const g = c.getContext("2d");
+    g.fillStyle = "#2563eb"; g.fillRect(0, 0, 96, 96); g.fillStyle = "#fff"; g.beginPath(); g.arc(48, 40, 18, 0, 7); g.fill(); g.fillRect(24, 64, 48, 32);
+    const csrf = () => document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/me/avatar", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() }, body: JSON.stringify({ avatar: c.toDataURL("image/png") }) });
+  `);
+  const target = await evaluate(`
+    const list = await fetch("/api/reports?limit=60").then(r => r.json());
+    for (const it of list.items) {
+      const d = await fetch("/api/items/" + it.public_id).then(r => r.json());
+      if (d.comments.some(c => c.author === "visitor") && d.commentable !== false) return it.public_id;
+    }
+    return "";
+  `);
+  const replyAs = (who: string) => evaluate(`
+    const csrf = () => document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    const r = await fetch("/api/items/${target}/reply", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf() }, body: JSON.stringify({ body: "A reply from ${who}." }) });
+    return r.status;
+  `);
+  const firstReply = await replyAs("alex");
+  await signIn("ana");
+  const secondReply = await replyAs("ana");
+  await signIn("alex");
+  const circlesOf = `
+    return [...document.querySelectorAll(".comments .avatar")].map(a => ({
+      kind: a.classList.contains("is-guest") ? "guest" : a.classList.contains("is-team") ? "team" : "?",
+      img: !!a.querySelector("img"), loaded: a.querySelector("img")?.naturalWidth ?? 0,
+      src: a.querySelector("img")?.getAttribute("src") ?? "", figure: !!a.querySelector(".avatar-fig"), bg: getComputedStyle(a).backgroundColor, ink: getComputedStyle(a).color,
+      letters: a.textContent.trim(),
+    }));
+  `;
+  const readCircles = async (path: string) => {
+    await goTo(path, ".comments .avatar");
+    await evaluate(`for (let i = 0; i < 50 && ![...document.querySelectorAll(".comments .avatar img")].every(i => i.complete); i++) await new Promise(r => setTimeout(r, 100)); return 1`);
+    return evaluate(circlesOf);
+  };
+  const shown = { public: await readCircles(`/i/${target}`), pane: await readCircles(`/review?mode=all&at=${target}`) };
+  const wellDrawn = (rows: any[]) =>
+    rows.length >= 4 &&
+    rows.every((r) => r.letters === "") &&
+    rows.filter((r) => r.kind === "guest").every((r) => !r.img && r.figure) &&
+    rows.filter((r) => r.kind === "team" && !r.img).every((r) => r.figure) &&
+    rows.some((r) => r.kind === "guest") &&
+    rows.some((r) => r.kind === "team" && !r.img) &&
+    rows.some((r) => r.kind === "team" && r.img && r.src.startsWith("/avatars/") && r.loaded > 0) &&
+    // The same figure worn the other way round: the team's circle is the colour the
+    // stranger's figure is drawn in, and it is not the stranger's circle.
+    (() => {
+      const guest = rows.find((r) => r.kind === "guest")!;
+      const team = rows.find((r) => r.kind === "team" && !r.img)!;
+      return team.bg === guest.ink && team.bg !== guest.bg && team.ink !== team.bg;
+    })();
+  check(
+    "beside a reply: strangers and teammates with no picture get their own default, never initials, and a teammate's own picture loads",
+    firstReply === 201 && secondReply === 201 && wellDrawn(shown.public) && wellDrawn(shown.pane),
+    JSON.stringify({ firstReply, secondReply, shown }),
+  );
+  // The address tells nobody who has an account: an account with no reply is not served.
+  const hidden = await evaluate(`
+    const out = {};
+    for (const id of [0, 99999]) out[id] = (await fetch("/avatars/" + id)).status;
+    return out;
+  `);
+  check("a picture address answers only for somebody whose name is on a page", hidden[0] === 404 && hidden[99999] === 404, JSON.stringify(hidden));
+
   await goTo("/acme/atlas/new", "input[name=title]");
   const parecidos = await evaluate(`
     const t = document.querySelector("input[name=title]");

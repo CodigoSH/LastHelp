@@ -899,7 +899,7 @@ export function itemView(
             const who = c.name || text.t(`comment.${c.author}`);
             return `<li class="comment comment-${escapeAttr(c.author)}">
               <p class="who">
-                ${avatar(who)}
+                ${avatar(c.author === "team" ? c.avatar : undefined, { guest: c.author !== "team" })}
                 <span class="who-name">${escapeHTML(who)}</span>
                 ${c.author === "team" ? `<span class="who-badge">${escapeHTML(text.t("comment.team"))}</span>` : ""}
                 <span class="when">${escapeHTML(text.date(c.created_at))}</span>
@@ -1043,8 +1043,6 @@ export interface PickerSpec {
   what: "avatar" | "logo";
   /** The current image as a data URL, or empty. */
   current?: string;
-  /** The initials to draw when there is none. */
-  initials?: string;
   label: string;
   /** Drawn at the size the setup uses, which is bigger than a row's. */
   big?: boolean;
@@ -1070,7 +1068,7 @@ export function imagePicker(spec: PickerSpec, text: Text): string {
   const preview =
     spec.what === "logo"
       ? `<img class="logo-preview" src="${escapeAttr(spec.current || "/logo.svg")}" alt="" />`
-      : avatar(spec.initials ?? "?", spec.current ?? "", spec.big);
+      : avatar(spec.current ?? "", { big: spec.big });
 
   return `<div class="picker">
     <button type="button" class="avatar-pick" data-pick-${spec.what}
@@ -1350,7 +1348,7 @@ export function setupWizard(
         // step before. Two identical jobs on two consecutive screens should
         // not be two different arrangements.
         `<div class="field picture-field">${imagePicker(
-          { what: "logo", current: prefs.logo, initials: "L", label: text.t("personalization.logo"), big: true },
+          { what: "logo", current: prefs.logo, label: text.t("personalization.logo"), big: true },
           text,
         )}</div>` +
         field(
@@ -1545,7 +1543,7 @@ export function adminShell(spec: ShellSpec, text: Text): string {
       <!-- No installation mark here: the bar above carries it. What heads the
            menu is who is acting: the picture, the name and the role. -->
       <div class="side-head">
-        ${avatar(spec.who, spec.avatar)}
+        ${avatar(spec.avatar)}
         <span class="who">${escapeHTML(spec.who)}</span>
         ${spec.role ? `<span class="side-role">${escapeHTML(spec.role)}</span>` : ""}
       </div>
@@ -1649,10 +1647,24 @@ export function iconField(text: Text, name: string, icon = "", id = "icon"): str
   </div>`;
 }
 
-/** Initials when there is no picture, which is most of the time. */
-export function avatar(name: string, src?: string, big = false): string {
-  return `<span class="avatar${big ? " big" : ""}" aria-hidden="true">${
-    src ? `<img src="${escapeAttr(src)}" alt="" />` : escapeHTML(initials(name))
+/**
+ * The picture beside a name, or the default when there is none.
+ *
+ * Never initials: two people with the same letters are the same circle, and a stranger
+ * who reported something is not somebody the page has any reason to name twice. There
+ * is one figure and two ways of wearing it, and they say who is speaking. Everybody
+ * but the team — whoever reported, whoever commented — gets it in the page's light
+ * grey, the figure darker than its circle. The team gets the same figure with the
+ * colours turned round and a stronger grey, so a reply from the team reads as one at a
+ * glance without a colour of its own. A team member's own picture, when they have
+ * chosen one, replaces theirs.
+ */
+export function avatar(src?: string, options: { big?: boolean; guest?: boolean } = {}): string {
+  const kind = options.guest ? "is-guest" : "is-team";
+  return `<span class="avatar ${kind}${options.big ? " big" : ""}" aria-hidden="true">${
+    src
+      ? `<img src="${escapeAttr(src)}" alt="" />`
+      : `<svg class="avatar-fig" viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8.5" r="4"/><path d="M4 21c0-4.4 3.6-7.2 8-7.2s8 2.8 8 7.2z"/></svg>`
   }</span>`;
 }
 
@@ -2456,7 +2468,7 @@ export function profileScreen(
         text.t("shell.profile"),
         `<div class="profile-head">
           ${imagePicker(
-            { what: "avatar", current: me.avatar, initials: me.username, label: text.t("profile.picture"), big: true },
+            { what: "avatar", current: me.avatar, label: text.t("profile.picture"), big: true },
             text,
           )}
           <div class="profile-who">
@@ -2808,7 +2820,7 @@ export function personalizationScreen(
           <label for="instance-name">${escapeHTML(text.t("setup.instanceName"))}</label>
           <div class="logo-row">
             ${imagePicker(
-              { what: "logo", current: instance.logo, initials: instance.name || "L", label: text.t("personalization.logo") },
+              { what: "logo", current: instance.logo, label: text.t("personalization.logo") },
               text,
             )}
             <input type="text" id="instance-name" name="name" value="${escapeAttr(instance.name)}" placeholder="Acme" />
@@ -3097,7 +3109,7 @@ function organizationTeam(
     const owner = isOwner(m);
     return settingsItem({
       attrs: `data-member="${escapeAttr(m.username)}"`,
-      lead: avatar(m.username, m.avatar),
+      lead: avatar(m.avatar),
       name: m.username,
       // Where a collaborator works is what says what they are here.
       sub: owner ? "" : reposOf(m).map((r) => r.where).join(", "),
@@ -3393,7 +3405,7 @@ function repositoryTeam(
   const row = (m: TeamMember, role: string, removable: boolean) =>
     settingsItem({
       attrs: `data-member="${escapeAttr(m.username)}"`,
-      lead: avatar(m.username, m.avatar),
+      lead: avatar(m.avatar),
       name: m.username,
       tags: `<span class="mono-tag${role === "owner" ? " accent" : ""}" data-role="${role}">${escapeHTML(text.t(`role.${role}`))}</span>`,
       actions: removable
@@ -3557,7 +3569,7 @@ export function itemTeamView(
             const who = c.name || text.t(`comment.${c.author}`);
             return `<li class="comment comment-${escapeAttr(c.author)}">
               <p class="who">
-                ${avatar(who)}
+                ${avatar(c.author === "team" ? c.avatar : undefined, { guest: c.author !== "team" })}
                 <span class="who-name">${escapeHTML(who)}</span>
                 ${c.author === "team" ? `<span class="who-badge">${escapeHTML(text.t("comment.team"))}</span>` : ""}
                 <span class="when">${escapeHTML(text.date(c.created_at))}</span>
@@ -3685,7 +3697,7 @@ export function peopleScreen(
     .map((p) =>
       settingsItem({
         attrs: `data-person="${p.id}"`,
-        lead: avatar(p.username, p.avatar),
+        lead: avatar(p.avatar),
         name: p.username,
         tags: [
           p.admin ? `<span class="mono-tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : "",
