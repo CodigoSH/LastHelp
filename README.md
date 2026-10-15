@@ -95,7 +95,7 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 ### Operations
 
 - **A web updater** that verifies the signature and the checksum, makes the new binary prove it runs, refuses one older than the database, takes a backup and only then swaps — showing each step as it happens.
-- **One-line install** on Linux with a hardened systemd unit, `--uninstall` and `--purge`, and a backup before every upgrade.
+- **One-line install** on Linux with a hardened systemd unit, `--uninstall`, `--purge` and `--reinstall`, that tells you which version you have and stops when you already have the latest, and a backup before every upgrade.
 - **Twenty languages**, translated by hand, with right-to-left laid out properly for Arabic, Persian and Urdu — applied on the server for the first paint.
 - **Installable as an app** from the browser's own menu when served over HTTPS.
 - **Reproducible builds** — `-trimpath`, `CGO_ENABLED=0` and a frontend stamped with a digest of its own output, so two builds of the same commit produce the same bytes.

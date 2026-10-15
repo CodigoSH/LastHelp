@@ -28,12 +28,25 @@ configuration it finds rather than asking twice. The one file it never
 overwrites is `/etc/lasthelp/lasthelp.env`, because that is the one you have
 edited by hand.
 
-It answers `--help`, and it can undo itself:
+It tells you which version you have and which it is about to install
+(`Updating v1.2.5 → v1.2.6`). If you already have the latest it says so and
+stops, touching nothing: no download, no backup, no restart. To install it again
+anyway — to repair a damaged binary, or to answer the questions differently —
+add `--reinstall`:
 
 ```sh
-sudo sh install.sh --uninstall           # removes it, keeps the reports
-sudo sh install.sh --uninstall --purge   # erases them too, after you type DELETE
+curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh -s -- --reinstall
 ```
+
+It answers `--help`, and it can undo itself. The installer leaves no copy of
+itself on your machine, so fetch it again and hand the option over with `-s --`:
+
+```sh
+curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh -s -- --uninstall           # removes it, keeps the reports
+curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh -s -- --uninstall --purge   # erases them too, after you type DELETE
+```
+
+If you saved the script to a file, `sudo sh install.sh --uninstall` does the same.
 
 It asks three questions — port, release channel, reverse proxy — and remembers
 the answers, so an upgrade never asks twice. Where there is no terminal to ask

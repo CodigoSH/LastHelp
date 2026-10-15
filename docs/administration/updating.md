@@ -52,9 +52,13 @@ was.
 curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh
 ```
 
-Run it again and it updates: it keeps the port and settings it finds, backs up
-the database, and does the same verification the panel does — with `openssl`
-instead of Go.
+Run it again and it updates: it tells you which version you have, keeps the
+port and settings it finds, backs up the database, and does the same
+verification the panel does — with `openssl` instead of Go.
+
+When you already have the latest version it says so and stops, changing
+nothing. Add `--reinstall` (`… | sudo sh -s -- --reinstall`) to install it
+again anyway, to repair a damaged binary.
 
 ## In a container
 
