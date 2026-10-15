@@ -349,7 +349,9 @@ RELEASE="$BASE/download/$VERSION"
 if [ "$UPGRADE" = yes ] && [ -n "$INSTALLED" ] && [ "$INSTALLED" = "$VERSION" ] && [ "$REINSTALL" != yes ]; then
     say ""
     done_ "You already have $VERSION. Nothing to do."
-    note "To install it again (repair it, or apply other answers): curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh -s -- --reinstall"
+    say ""
+    note "To install it again, to repair it or to apply other answers, run:"
+    say "    ${BLUE}curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh -s -- --reinstall${OFF}"
     say ""
     exit 0
 fi
