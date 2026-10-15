@@ -14,7 +14,12 @@
 # touch.
 #
 #   sudo sh install.sh --uninstall            removes it and keeps the data
+#   sudo sh install.sh --reinstall            installs it again even when it is already the latest
 #   sudo sh install.sh --uninstall --purge    removes the data too
+#
+# The installer leaves no copy of itself, so when it arrives down a pipe the
+# options go through `sh -s --`:
+#   curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh -s -- --uninstall
 #
 # It refuses rather than guesses. A failed verification stops the install; it
 # does not warn and carry on, because a warning in a scrolling terminal is a
@@ -97,11 +102,13 @@ PROXIED=no
 
 UNINSTALL=no
 PURGE=no
+REINSTALL=no
 for ARG in "$@"; do
     case "$ARG" in
         --uninstall) UNINSTALL=yes ;;
         --purge) PURGE=yes ;;
-        --help|-h) sed -n '2,23p' "$0" 2>/dev/null | sed 's/^#\{0,1\} \{0,1\}//'; exit 0 ;;
+        --reinstall) REINSTALL=yes ;;
+        --help|-h) sed -n '2,29p' "$0" 2>/dev/null | sed 's/^#\{0,1\} \{0,1\}//'; exit 0 ;;
         *) die "unknown option: $ARG" ;;
     esac
 done
@@ -205,6 +212,7 @@ say ""
 # somebody to retype the port they chose last time is how an upgrade changes it
 # by accident.
 UPGRADE=no
+INSTALLED=
 # The unit, not the binary, is what says an installation is here.
 #
 # Looking for the binary in the place *this* version puts it means an
@@ -234,7 +242,20 @@ if [ -f "$UNIT" ]; then
         true|1|yes) PROXIED=yes ;;
     esac
 
-    step "Existing installation found. Updating version on port ${BOLD}${PORT}${OFF}..."
+    INSTALLED=$("$PREFIX/bin/$NAME" version 2>/dev/null \
+        | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' | head -1)
+    if [ -n "$INSTALLED" ]; then
+        step "Existing installation found (${BOLD}${INSTALLED}${OFF}) on port ${BOLD}${PORT}${OFF}."
+        # Somebody on a beta who just presses Enter stays on the beta channel: a
+        # default that quietly moved them to stable would be a downgrade they
+        # never asked for, and where no stable release exists yet it finds nothing.
+        # An explicit LASTHELP_CHANNEL always wins.
+        if [ -z "${LASTHELP_CHANNEL:-}" ]; then
+            case "$INSTALLED" in *-*) CHANNEL=beta ;; esac
+        fi
+    else
+        step "Existing installation found on port ${BOLD}${PORT}${OFF}."
+    fi
     say ""
 fi
 
@@ -286,7 +307,6 @@ fi
 # where a person finds out, in the same place they find out in the others.
 step "Checking system compatibility..."
 step "Preparing environment..."
-step "Downloading latest version..."
 
 # A port has to be a number in range, and the answer to that question arrives
 # from a person typing at three in the morning. A bad one here becomes a service
@@ -323,11 +343,30 @@ if [ -z "$VERSION" ]; then
 fi
 RELEASE="$BASE/download/$VERSION"
 
+# Nothing to do is an answer, not an error. Compared as text on purpose: the
+# only question is "is it the one I would install", and ordering a beta against
+# a stable is how somebody ends up never offered an update.
+if [ "$UPGRADE" = yes ] && [ -n "$INSTALLED" ] && [ "$INSTALLED" = "$VERSION" ] && [ "$REINSTALL" != yes ]; then
+    say ""
+    done_ "You already have $VERSION. Nothing to do."
+    note "To install it again (repair it, or apply other answers): curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh -s -- --reinstall"
+    say ""
+    exit 0
+fi
+
+step "Downloading latest version..."
+
 # ============================================================ download
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT INT TERM
 
-step "Installing latest $CHANNEL: $VERSION"
+if [ -n "$INSTALLED" ] && [ "$INSTALLED" = "$VERSION" ]; then
+    step "Reinstalling $VERSION..."
+elif [ -n "$INSTALLED" ]; then
+    step "Updating $INSTALLED → $VERSION..."
+else
+    step "Installing $CHANNEL: $VERSION"
+fi
 curl -fsSL "$RELEASE/SHA256SUMS"       -o "$WORK/SHA256SUMS"      || die "cannot reach $RELEASE"
 curl -fsSL "$RELEASE/SHA256SUMS.sig"   -o "$WORK/SHA256SUMS.sig"  || die "the release has no signature"
 curl -fsSL "$RELEASE/$NAME.service"    -o "$WORK/$NAME.service"   || die "the release has no service unit"
