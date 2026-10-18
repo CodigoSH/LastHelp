@@ -327,3 +327,67 @@ func TestNobodyWhoLeftNoAddressIsChased(t *testing.T) {
 		t.Errorf("something was sent to nobody %d times", called)
 	}
 }
+
+// TestAnIssueClosedOnTheForgeIsToldToTheReporter.
+//
+// The team changing a status in the panel tells the reporter; the forge doing
+// the same thing is the same event and must not be the silent path.
+func TestAnIssueClosedOnTheForgeIsToldToTheReporter(t *testing.T) {
+	b, bug := linked(t)
+
+	mine, _, err := b.Items.Create(item.New{
+		RepoID: bug.RepoID, Kind: item.Bug, Title: "crash on import", Email: "somebody@example.com",
+	}, item.Published, epoch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.RequestIssue(mine.ID, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Run(context.Background(), epoch, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	var told []string
+	b.Tell = func(_ context.Context, address, _, reason, _ string) error {
+		told = append(told, address+"|"+reason)
+		return nil
+	}
+
+	if _, err := b.Apply(1, mine.RepoID, forge.Event{
+		Kind: forge.EventClosed, Number: 2, State: forge.Closed, DeliveryID: "told",
+	}, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Run(context.Background(), epoch, 10); err != nil {
+		t.Fatal(err)
+	}
+	if len(told) != 1 || told[0] != "somebody@example.com|changed status" {
+		t.Errorf("the reporter was told %q after the forge closed the issue", told)
+	}
+}
+
+// TestACommentWaitingIsAnnouncedToTheTeam.
+func TestACommentWaitingIsAnnouncedToTheTeam(t *testing.T) {
+	b, _, it := setup(t, org.ForgeNone)
+
+	var kinds []string
+	b.Announce = func(_ context.Context, _ int64, _, kind, _ string) error {
+		kinds = append(kinds, kind)
+		return nil
+	}
+
+	if err := b.RequestCommentAnnouncement(it.ID, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.RequestAnnouncement(it.ID, epoch); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Run(context.Background(), epoch, 10); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(kinds) != 2 || kinds[0] != CommentWaiting || kinds[1] != string(it.Kind) {
+		t.Errorf("announced %q, want the comment label and then the report's kind", kinds)
+	}
+}

@@ -624,6 +624,11 @@ func (s *Server) handleComment(w http.ResponseWriter, r *http.Request) {
 		writeCommentError(w, err)
 		return
 	}
+	// It waits for somebody to read it, and nobody knows unless told.
+	if err := s.bridge().RequestCommentAnnouncement(it.ID, s.now()); err != nil {
+		slog.Error("queueing a notification", "error", err)
+	}
+
 	// The id lets the reporter's page hang their pictures on this message.
 	writeJSON(w, http.StatusAccepted, map[string]any{"id": c.ID, "moderation": string(item.Pending)})
 }
