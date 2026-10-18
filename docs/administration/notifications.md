@@ -9,6 +9,10 @@ Without this the portal dies quietly: nobody opens a moderation queue every day
 on the chance that it has something in it, so it fills, and a portal full of
 people talking to nobody reads worse from outside than no portal at all.
 
+The channel hears about two things: a **new report**, and a **comment waiting for
+review** (a visitor's, or the reporter's own follow-up), so nothing sits in the queue
+unseen. A team reply does not notify the team: it was written by the team.
+
 Configured **per repository**, so one repository can go to one room and another somewhere
 else. Nothing applies to every repository by itself: a channel everybody is
 signed up to without choosing it is a channel everybody eventually silences.
@@ -83,6 +87,10 @@ That address is never returned by any endpoint — not to the team, not through
 the API — and is **deleted when the item closes**. It was collected for one
 purpose and that purpose is over. It is stored as it was given, so it is in the
 database file: whoever can read that file can read it.
+
+They are written to when the report is published, when its status changes (whether
+the team changed it or the issue on the forge did), and when the team **replies**. The
+mail says that something happened and links to the page; it does not carry the reply.
 
 Mail is plain text, marked `Auto-Submitted: auto-generated`, and nobody reads
 replies to it.
