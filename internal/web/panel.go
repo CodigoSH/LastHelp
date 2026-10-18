@@ -607,6 +607,11 @@ func (s *Server) handleReply(w http.ResponseWriter, r *http.Request) {
 		writeCommentError(w, err)
 		return
 	}
+	// The reporter, if they left an address, hears the team answered.
+	if err := s.bridge().RequestTellReporter(it.ID, "has a new reply", s.now()); err != nil {
+		slog.Error("queueing a reporter notification", "error", err)
+	}
+
 	// The id lets the pane hang the reply's pictures on it.
 	writeJSON(w, http.StatusCreated, map[string]any{"id": c.ID})
 }

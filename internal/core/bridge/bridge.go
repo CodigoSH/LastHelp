@@ -94,6 +94,9 @@ type createIssuePayload struct {
 
 type announcePayload struct {
 	ItemID int64 `json:"item_id"`
+	// What happened, when it is not a new report. Empty for the original job,
+	// which is what jobs queued before this field existed carry.
+	What string `json:"what,omitempty"`
 }
 
 type tellPayload struct {
@@ -119,6 +122,18 @@ func (b Bridge) RequestAnnouncement(itemID int64, now time.Time) error {
 	}
 	return b.Queue.Enqueue(JobAnnounce, announcePayload{ItemID: itemID}, now)
 }
+
+// RequestCommentAnnouncement asks for the team to be told, later, that a
+// message is waiting for somebody to read it before it shows.
+func (b Bridge) RequestCommentAnnouncement(itemID int64, now time.Time) error {
+	if b.Announce == nil {
+		return nil
+	}
+	return b.Queue.Enqueue(JobAnnounce, announcePayload{ItemID: itemID, What: CommentWaiting}, now)
+}
+
+// CommentWaiting is the label a channel shows for a message awaiting review.
+const CommentWaiting = "comment waiting for review"
 
 // RequestIssue asks for an issue to be created, later.
 //
@@ -199,7 +214,7 @@ func (b Bridge) run(ctx context.Context, job outbox.Job, now time.Time) error {
 		if err := json.Unmarshal([]byte(job.Payload), &payload); err != nil {
 			return fmt.Errorf("unreadable payload: %w", err)
 		}
-		return b.announce(ctx, payload.ItemID)
+		return b.announce(ctx, payload.ItemID, payload.What)
 
 	default:
 		return fmt.Errorf("unknown job kind %q", job.Kind)
@@ -366,7 +381,7 @@ func Fingerprint(issue forge.Issue) string {
 // the submission. A notification containing the whole report is a notification
 // that delivers spam to wherever the team reads it — which is the one place the
 // moderation queue was supposed to keep it out of.
-func (b Bridge) announce(ctx context.Context, itemID int64) error {
+func (b Bridge) announce(ctx context.Context, itemID int64, what string) error {
 	if b.Announce == nil {
 		return nil
 	}
@@ -380,7 +395,10 @@ func (b Bridge) announce(ctx context.Context, itemID int64) error {
 	if b.PublicURL != "" {
 		link = strings.TrimSuffix(b.PublicURL, "/") + "/i/" + it.PublicID
 	}
-	return b.Announce(ctx, it.RepoID, it.Title, string(it.Kind), link)
+	if what == "" {
+		what = string(it.Kind)
+	}
+	return b.Announce(ctx, it.RepoID, it.Title, what, link)
 }
 
 // tellReporter tells the person who reported that their item moved.

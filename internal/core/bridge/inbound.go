@@ -96,6 +96,11 @@ func (b Bridge) Apply(orgID int64, repoID int64, event forge.Event, now time.Tim
 		return Applied{}, err
 	}
 
+	// The reporter hears about it, as when the team changes the status by hand.
+	if err := b.RequestTellReporter(itemID, "changed status", now); err != nil {
+		slog.Error("queueing a reporter notification", "error", err)
+	}
+
 	slog.Info("an item followed its issue",
 		"item", it.PublicID, "issue", event.Number, "status", status)
 	return Applied{Item: it.PublicID, Status: status}, nil
