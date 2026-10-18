@@ -10,6 +10,12 @@ file with the stable that carries them.
 
 1.0.0 is the first stable release, so its entry describes the whole product
 rather than a change from an earlier version.
+## [1.2.7] - 2026-10-18
+
+### Added
+- The team is told when a comment is waiting for review. A visitor's comment, or a follow-up from whoever reported, now reaches the repository's channel, so it no longer sits in the queue unseen.
+- Whoever reported something and left an address is written to when the team replies, and when the issue on the forge is closed or changes state, as they already were when the team changed a status in the panel.
+
 ## [1.2.6] - 2026-10-12
 
 ### Changed
