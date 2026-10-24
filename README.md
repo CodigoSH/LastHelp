@@ -42,7 +42,7 @@
 
 ---
 
-## Why LastHelp
+## Why LastHelp 
 
 Self-hosting your forge usually means turning registration off, and that closes the only door outsiders had for telling you something is broken. Opening registration to the world is not the answer; a separate front door is. The open-source feedback tools do not talk to any forge, and the ones that do are closed, paid and hosted by somebody else — so nobody serves the person who self-hosts their own forge, which is almost always the same person who would self-host a feedback portal. LastHelp was built with a simple rule: **anybody can tell you something without an account, and nothing reaches a public page until a person says so.**
 
