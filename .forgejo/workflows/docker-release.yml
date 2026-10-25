@@ -44,12 +44,12 @@ jobs:
           CURL="curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30"
 
           # Docker CLI static binary (pinned, no apt/systemd deps)
-          $CURL "https://download.docker.com/linux/static/stable/x86_64/docker-29.9.0.tgz" \
+          $CURL "https://download.docker.com/linux/static/stable/x86_64/docker-29.9.2.tgz" \
             | tar xz --strip-components=1 -C /usr/local/bin docker/docker
 
           # Buildx plugin (pinned)
           mkdir -p /usr/lib/docker/cli-plugins
-          $CURL "https://github.com/docker/buildx/releases/download/v0.38.0/buildx-v0.38.0.linux-amd64" \
+          $CURL "https://github.com/docker/buildx/releases/download/v0.38.1/buildx-v0.38.1.linux-amd64" \
             -o /usr/lib/docker/cli-plugins/docker-buildx
           chmod +x /usr/lib/docker/cli-plugins/docker-buildx
 
