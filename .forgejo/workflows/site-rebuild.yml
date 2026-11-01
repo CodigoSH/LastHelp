@@ -26,58 +26,42 @@ jobs:
     # file on the server that nothing versions. See the house rule in
     # codigosh/releases.md.
     container: node:24-trixie
+    timeout-minutes: 20
     steps:
-      - name: Ask Coolify to redeploy codigosh-web
+      - name: Ask the web host to rebuild codigosh-web
         env:
-          COOLIFY_DEPLOY_URL: ${{ secrets.COOLIFY_DEPLOY_URL }}
-          COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_TARGET: ${{ secrets.DEPLOY_SSH_TARGET }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          # An unconfigured hook is a skip on a docs push — somebody's fork must
-          # not get a red build over a secret they were never given — and a
-          # failure when a release asked for this: a rebuild that did not happen
-          # must not report success, or the site advertises the wrong version
-          # with nobody the wiser.
-          if [ -z "$COOLIFY_DEPLOY_URL" ] || [ -z "$COOLIFY_DEPLOY_TOKEN" ]; then
+          # An unconfigured key is a skip on a push — somebody's fork must not
+          # get a red build over a secret they were never given — and a failure
+          # when a release asked for this: a rebuild that did not happen must
+          # not report success, or the site advertises the wrong version with
+          # nobody the wiser.
+          if [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_SSH_TARGET" ] || [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
             if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-              echo "A release asked for a rebuild and the deploy hook is not configured." >&2
-              echo "Set COOLIFY_DEPLOY_URL and COOLIFY_DEPLOY_TOKEN in this repository's secrets." >&2
+              echo "A release asked for a rebuild and the deploy key is not configured." >&2
+              echo "Set DEPLOY_SSH_KEY, DEPLOY_SSH_TARGET and DEPLOY_KNOWN_HOSTS in this repository's secrets." >&2
               exit 1
             fi
-            echo "Coolify deploy secrets not set — skipping the website rebuild."
+            echo "Deploy secrets not set — skipping the website rebuild."
             exit 0
           fi
 
-          # The verb depends on which kind of URL is in the secret: Coolify's API
-          # deploy endpoint (/api/v1/deploy?uuid=…) wants GET and a plain deploy
-          # webhook wants POST, and asking with the wrong one answers 405. So it asks one way and,
-          # only on "wrong method", the other. Without the bearer header either
-          # of them answers 401: the endpoint is not anonymous.
-          #
-          # And force=true matters more than it looks: Coolify only redeploys
-          # when the commit touched its configured Watch Paths, and when it did
-          # not it skips the deployment and still answers 2xx — so a release
-          # could report a successful rebuild and leave the site untouched. The
-          # site's content comes from this repository's API at build time, so a
-          # rebuild is worth doing whatever the commit happened to change.
-          URL="$COOLIFY_DEPLOY_URL"
-          case "$URL" in
-            *\?*) URL="$URL&force=true" ;;
-            *)    URL="$URL?force=true" ;;
-          esac
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
 
-          ask() {
-            curl -s -o /dev/null -w "%{http_code}" --max-time 30 -X "$1" \
-              -H "Authorization: Bearer $COOLIFY_DEPLOY_TOKEN" \
-              "$URL"
-          }
-
-          CODE=$(ask GET)
-          if [ "$CODE" = "405" ]; then
-            echo "GET answered 405, retrying as POST"
-            CODE=$(ask POST)
-          fi
-          echo "Website rebuild HTTP $CODE"
-          case "$CODE" in
-            2*) echo "Website rebuild requested." ;;
-            *)  echo "Website rebuild failed (HTTP $CODE)"; exit 1 ;;
-          esac
+          # The key on the other side runs one fixed command whatever it is
+          # asked, and the build runs there with the cache off: the site reads
+          # its releases and docs from Forgejo while it builds, so a build that
+          # reused its layers would succeed and publish nothing new. The host is
+          # pinned, so a wrong machine answering is a failure and not a login.
+          ssh -i "$HOME/.ssh/deploy_key" \
+            -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_SSH_TARGET" rebuild
+          echo "Website rebuild finished."
