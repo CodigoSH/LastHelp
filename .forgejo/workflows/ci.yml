@@ -1,11 +1,9 @@
-# Runs on every push to main. It checks what exists today; steps are added as
-# the things they check come to exist, never before — a workflow that invokes a
-# script nobody wrote fails every run until somebody deletes the step, which
-# teaches people to delete steps.
+# Runs on every push to main, as one job that does each thing once: the checks
+# that fail in seconds first, then the tests, then building and starting the
+# binary. It used to be two jobs that each set up Go and built the frontend.
 #
-# The release workflow is not here yet, and that is deliberate: there is nothing
-# to release, no signing key and no artefact script. It arrives with the first
-# release, not before it.
+# No path filter: tests here read docs/ and the Markdown files, so a change that
+# is only words can still break the build.
 name: CI
 
 on:
@@ -13,8 +11,13 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  check:
+  ci:
+    name: Check, test and build
     runs-on: ubuntu-latest
     # `ubuntu-latest` is a label the runner translates, and by default it lands
     # on a Node image built on Debian bullseye — from 2021, carrying OpenSSL
@@ -36,11 +39,11 @@ jobs:
           bun-version: "1.4.4"
 
       # Without this there is no `tsc`: it is a devDependency and nothing else
-      # here installs one. `bun run build` is not affected — the build script
-      # uses only Bun's own APIs — so the failure looks like a missing toolchain
-      # rather than a missing install.
-      - name: install frontend dependencies
-        run: bun install --frozen-lockfile
+      # here installs one.
+      - name: install dependencies
+        run: |
+          go mod download
+          bun install --frozen-lockfile
 
       - name: gofmt
         run: |
@@ -52,9 +55,7 @@ jobs:
           fi
 
       - name: go mod tidy is clean
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum
+        run: go mod tidy -diff
 
       # Before anything that compiles Go. The binary embeds internal/web/dist,
       # which is build output and therefore not in the repository, so on a fresh
@@ -64,37 +65,39 @@ jobs:
       - name: frontend build
         run: bun run build
 
+      - name: typecheck
+        run: bun run typecheck
+
+      - name: frontend tests
+        run: bun test
+
       - name: go vet
         run: go vet ./...
+
+      # Pinned, and to the same version scripts/release.sh runs in its
+      # preflight: a checker that is not the one CI runs proves nothing about CI.
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
+          staticcheck ./...
+
+      # -count=1 is not optional: the architecture rules read the repository
+      # from disk, which the test cache does not track. A cached pass there means
+      # nothing.
+      - name: go test
+        run: go test -count=1 -race -covermode=atomic ./...
 
       # Blocking, and it blocks on one number: "your code is affected by N
       # vulnerabilities". The other figure it prints — advisories in modules
       # this requires but never calls — is noise, and govulncheck does not exit
       # non-zero for it.
       #
-      # It runs after the frontend build on purpose: the bundle is embedded with
-      # //go:embed, so anything that compiles this code needs it there first.
-      #
       # Pinned. On @latest a new advisory database turns this red on a morning
       # nobody touched the code, which teaches people to ignore it.
-      #
-      # It was worth turning on: the first run reported ten reachable
-      # vulnerabilities, all of them in the standard library of a toolchain that
-      # had gone six patch releases stale. Nothing here was wrong; the compiler
-      # was old, and nothing was asking.
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
-
-      # -count=1 is not optional: the architecture rules read the repository
-      # from disk, which the test cache does not track. A cached pass here means
-      # nothing.
-      - name: architecture rules
-        run: go test -count=1 ./internal/arch/
-
-      - name: typecheck
-        run: bun run typecheck
 
       - name: backend build
         run: make backend
@@ -114,36 +117,3 @@ jobs:
           curl -sf http://127.0.0.1:8099/ | grep -q '<title>LastHelp</title>'
           LASTHELP_PORT=8099 ./bin/healthcheck
           kill $pid
-
-  tests:
-    runs-on: ubuntu-latest
-    # `ubuntu-latest` is a label the runner translates, and by default it lands
-    # on a Node image built on Debian bullseye — from 2021, carrying OpenSSL
-    # 1.1.1. That is not a detail: verifying an ed25519 signature needs
-    # `pkeyutl -rawin`, which arrived in OpenSSL 3.0, and bullseye has no
-    # openssl 3 to install, not even from backports. So the check that our
-    # signer and install.sh agree could not run there and skipped itself,
-    # leaving CI green over the one thing it exists to prove.
-    container: node:24-trixie
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.27.3'
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.4.4"
-
-      # The Go build embeds internal/web/dist, which is build output and is not
-      # in the repository. Without this step every package that imports the web
-      # server fails to build, and the failure names go:embed rather than the
-      # missing build.
-      - name: build the frontend the tests need
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-
-      - name: go test
-        run: go test -count=1 -race -covermode=atomic ./...

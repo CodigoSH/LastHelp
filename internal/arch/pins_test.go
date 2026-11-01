@@ -48,6 +48,7 @@ var pins = []pin{
 
 	{"package.json", "typescript", regexp.MustCompile(`"typescript":\s*"([^"]+)"`)},
 
+	{".forgejo/workflows/ci.yml", "staticcheck", regexp.MustCompile(`staticcheck@(\S+)`)},
 	{"scripts/release.sh", "staticcheck", regexp.MustCompile(`STATICCHECK_VERSION="(\S+?)"`)},
 
 	// Of all the pins here this is the one that most wants to float, and the
