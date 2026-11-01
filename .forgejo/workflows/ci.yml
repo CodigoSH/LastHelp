@@ -1,11 +1,12 @@
-# Runs on every push to main, as one job that does each thing once: the checks
-# that fail in seconds first, then the tests, then building and starting the
-# binary. It used to be two jobs that each set up Go and built the frontend.
+name: CI
+
+# One job that does each thing once, in the same order in every project: the
+# checks that fail in seconds first, then the tests, then building the binary
+# and starting it. The runner executes one job at a time, so a workflow of
+# several jobs only makes the next push wait for all of them.
 #
 # No path filter: tests here read docs/ and the Markdown files, so a change that
 # is only words can still break the build.
-name: CI
-
 on:
   push:
     branches: [main]
@@ -27,6 +28,13 @@ jobs:
     # signer and install.sh agree could not run there and skipped itself,
     # leaving CI green over the one thing it exists to prove.
     container: node:24-trixie
+    env:
+      # What the release publishes is built without cgo, and Go keeps a separate
+      # build cache for each setting: vet, staticcheck and the build compile the
+      # whole dependency graph once, here, instead of once for each. Building the
+      # binary alone took a minute and a half on the runner for that reason. Only
+      # the race detector needs cgo, and its step says so.
+      CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v7
 
@@ -40,7 +48,7 @@ jobs:
 
       # Without this there is no `tsc`: it is a devDependency and nothing else
       # here installs one.
-      - name: install dependencies
+      - name: Install dependencies
         run: |
           go mod download
           bun install --frozen-lockfile
@@ -62,34 +70,36 @@ jobs:
       # checkout `go vet` fails with "pattern all:dist: no matching files found"
       # — a message about embedding that reads like a broken build. Locally it
       # never happens, because the directory is left over from the last build.
-      - name: frontend build
+      - name: Build frontend
         run: bun run build
 
-      - name: typecheck
+      - name: Typecheck
         run: bun run typecheck
 
-      - name: frontend tests
+      - name: Frontend tests
         run: bun test
 
       - name: go vet
         run: go vet ./...
 
-      # Pinned, and to the same version scripts/release.sh runs in its
-      # preflight: a checker that is not the one CI runs proves nothing about CI.
+      # Pinned, and to the same version scripts/release.sh runs in its preflight:
+      # a checker that is not the one CI runs proves nothing about CI.
       - name: staticcheck
         run: |
           go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
-          staticcheck ./...
+          "$(go env GOPATH)/bin/staticcheck" ./...
 
-      # -count=1 is not optional: the architecture rules read the repository
-      # from disk, which the test cache does not track. A cached pass there means
-      # nothing.
-      - name: go test
-        run: go test -count=1 -race -covermode=atomic ./...
+      # -race needs cgo. -count=1 is not optional: the architecture rules read
+      # the repository from disk, which the test cache does not track, so a cached
+      # pass there means nothing.
+      - name: Go tests
+        env:
+          CGO_ENABLED: "1"
+        run: go test -count=1 -race -cover ./...
 
       # Blocking, and it blocks on one number: "your code is affected by N
-      # vulnerabilities". The other figure it prints — advisories in modules
-      # this requires but never calls — is noise, and govulncheck does not exit
+      # vulnerabilities". The other figure it prints — advisories in modules this
+      # requires but never calls — is noise, and govulncheck does not exit
       # non-zero for it.
       #
       # Pinned. On @latest a new advisory database turns this red on a morning
@@ -97,17 +107,21 @@ jobs:
       - name: govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
-          govulncheck ./...
+          "$(go env GOPATH)/bin/govulncheck" ./...
 
-      - name: backend build
+      - name: Build backend
         run: make backend
 
       # Building is not running. This starts the binary the job just built and
       # asks it a question, which is the difference between "it compiles" and
       # "it works".
-      - name: smoke test
+      - name: Smoke test
         run: |
-          LASTHELP_PORT=8099 ./bin/lasthelp &
+          # A database of its own, thrown away: without this the server opens
+          # lasthelp.db in the working directory, which is somebody's real
+          # database the day this step is run anywhere but a fresh checkout.
+          db=$(mktemp -d)
+          LASTHELP_DB_FILE="$db/smoke.db" LASTHELP_PORT=8099 ./bin/lasthelp &
           pid=$!
           for _ in $(seq 1 40); do
             curl -sf http://127.0.0.1:8099/healthz >/dev/null && break
