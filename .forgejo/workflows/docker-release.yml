@@ -53,9 +53,6 @@ jobs:
             -o /usr/lib/docker/cli-plugins/docker-buildx
           chmod +x /usr/lib/docker/cli-plugins/docker-buildx
 
-      - name: Fix Docker socket permissions
-        run: chmod 666 /var/run/docker.sock
-
       - name: Set lowercase image name
         id: vars
         run: echo "image=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
