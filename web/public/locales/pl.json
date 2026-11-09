@@ -668,7 +668,6 @@
   "roadmap.done": "Wydane",
   "roadmap.in_progress": "W trakcie",
   "roadmap.lead": "Tworzony na podstawie stanu każdego zgłoszenia.",
-  "roadmap.more": "Pokaż więcej ({count})",
   "roadmap.planned": "Zaplanowane",
   "roadmap.quietBody": "Gdy pomysł zostanie zaplanowany lub błąd potwierdzony, pojawi się na tej stronie, a to, co dostarczone, układa się w miesiące. Nikt nie aktualizuje jej ręcznie.",
   "roadmap.quietTitle": "Tutaj pojawi się to, co zespół zdecyduje się zrobić.",

@@ -668,7 +668,6 @@
   "roadmap.done": "Rilasciato",
   "roadmap.in_progress": "In corso",
   "roadmap.lead": "Generata dallo stato di ogni segnalazione.",
-  "roadmap.more": "Mostra altri ({count})",
   "roadmap.planned": "Pianificato",
   "roadmap.quietBody": "Quando un'idea viene pianificata o un bug confermato, compare in questa pagina, e ciò che viene consegnato si accumula per mese. Nessuno la aggiorna a mano.",
   "roadmap.quietTitle": "Qui comparirà ciò che il team decide di fare.",

@@ -668,7 +668,6 @@
   "roadmap.done": "Entregue",
   "roadmap.in_progress": "Em curso",
   "roadmap.lead": "Gerado a partir do estado de cada relato.",
-  "roadmap.more": "Mostrar mais ({count})",
   "roadmap.planned": "Planeado",
   "roadmap.quietBody": "Quando uma ideia for planeada ou um erro confirmado, aparece nesta página, e o que for entregue vai-se acumulando por meses. Ninguém a atualiza à mão.",
   "roadmap.quietTitle": "Aqui aparecerá o que a equipa decidir fazer.",

@@ -668,7 +668,6 @@
   "roadmap.done": "リリース済み",
   "roadmap.in_progress": "進行中",
   "roadmap.lead": "各報告の状態から生成しています。",
-  "roadmap.more": "さらに表示（{count}）",
   "roadmap.planned": "予定",
   "roadmap.quietBody": "アイデアが計画されたり、バグが確認されたりすると、このページに載り、提供済みのものは月ごとに積み上がります。手作業で更新する人はいません。",
   "roadmap.quietTitle": "チームが取り組むと決めたことがここに載ります。",

@@ -203,8 +203,8 @@ planned idea share *planned*, and a fixed bug and a shipped idea share
 - A search box and **Ideas** / **Bugs** narrow every lane at once, and the dialog a lane opens starts from the same words and filter.
 - *Planned* is ranked by votes and shows the first six; *delivered* is grouped by
   the month each thing was delivered in and shows the latest two; what is in
-  progress shows six cards. Each lane that has more says how many, and **Show
-  more** opens the lane whole in a dialog, with a search over every item in it,
+  progress shows six cards. Each lane that has more has a **Show
+  more** button, which opens the lane whole in a dialog, with a search over every item in it,
   an Ideas/Bugs filter and a choice of order (most voted, or newest), a page at
   a time. The page itself stays a screen or two long however many reports
   there are.

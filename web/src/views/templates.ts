@@ -430,7 +430,7 @@ export function roadmap(
     `<h2 class="rm-pill"><span class="rm-dot" aria-hidden="true"></span>${escapeHTML(text.t(`roadmap.${l.lane}`))}<span class="rm-pill-n" data-rm-n>${escapeHTML(text.number(l.total))}</span></h2>`;
 
   const empty = () => `<p class="rm-empty" data-rm-empty hidden>${escapeHTML(text.t("overview.nothingYet"))}</p>`;
-  const more = () => `<button type="button" class="rm-more" data-rm-more hidden>${escapeHTML(text.t("roadmap.more", { count: 0 }))}</button>`;
+  const more = () => `<button type="button" class="rm-more" data-rm-more hidden>${escapeHTML(text.t("review.more"))}</button>`;
 
   const history = (l: RoadmapLane, marker: string) =>
     monthGroups(l.items)

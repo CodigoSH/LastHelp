@@ -668,7 +668,6 @@
   "roadmap.done": "출시됨",
   "roadmap.in_progress": "진행 중",
   "roadmap.lead": "각 신고의 상태에서 만들어집니다.",
-  "roadmap.more": "더 보기({count})",
   "roadmap.planned": "예정",
   "roadmap.quietBody": "아이디어가 계획되거나 버그가 확인되면 이 페이지에 나타나고, 전달된 것은 달별로 쌓입니다. 아무도 직접 갱신하지 않습니다.",
   "roadmap.quietTitle": "팀이 하기로 한 일이 여기에 나타납니다.",

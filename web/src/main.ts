@@ -1744,10 +1744,8 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
 
       box.querySelectorAll(":scope > .rm-pill [data-rm-n]").forEach((el) => (el.textContent = text.number(n)));
       page.querySelectorAll(`.rm-tile[data-rm-lane="${lane}"] [data-rm-n]`).forEach((el) => (el.textContent = text.number(n)));
-      if (more) {
-        more.hidden = left === 0;
-        more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
-      }
+      // The button says "show more" and nothing else: how much is left is the dialog's to say.
+      if (more) more.hidden = left === 0;
     });
   };
 

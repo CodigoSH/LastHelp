@@ -668,7 +668,6 @@
   "roadmap.done": "Ausgeliefert",
   "roadmap.in_progress": "In Arbeit",
   "roadmap.lead": "Erzeugt aus dem Zustand jeder Meldung.",
-  "roadmap.more": "Mehr anzeigen ({count})",
   "roadmap.planned": "Geplant",
   "roadmap.quietBody": "Sobald eine Idee geplant oder ein Fehler bestätigt ist, erscheint er auf dieser Seite, und Geliefertes sammelt sich nach Monaten. Niemand pflegt sie von Hand.",
   "roadmap.quietTitle": "Hier erscheint, was das Team umsetzen will.",
