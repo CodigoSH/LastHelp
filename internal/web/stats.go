@@ -25,9 +25,14 @@ type overview struct {
 	Pending       int            `json:"pending"`
 	Kinds         map[string]int `json:"kinds"`
 	Statuses      map[string]int `json:"statuses"`
-	Moderation    map[string]int `json:"moderation"`
-	Votes         int            `json:"votes"`
-	Published     int            `json:"published"`
+	// StatusesByKind is the same count split by kind, because a bug and an idea
+	// do not share a vocabulary: "fixed" is not something an idea becomes, and
+	// one list of both says nothing about either. Statuses stays for a browser
+	// that has not reloaded since the split.
+	StatusesByKind map[string]map[string]int `json:"statuses_by_kind"`
+	Moderation     map[string]int            `json:"moderation"`
+	Votes          int                       `json:"votes"`
+	Published      int                       `json:"published"`
 	// LastReport is when the most recent report arrived, in seconds. Zero means
 	// none ever has — which is a state worth showing rather than a blank.
 	LastReport int64 `json:"last_report"`
@@ -122,8 +127,12 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := overview{
-		Kinds:      map[string]int{},
-		Statuses:   map[string]int{},
+		Kinds:    map[string]int{},
+		Statuses: map[string]int{},
+		StatusesByKind: map[string]map[string]int{
+			string(item.Idea): {},
+			string(item.Bug):  {},
+		},
 		Moderation: map[string]int{},
 		Server:     server,
 	}
@@ -177,6 +186,31 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	split, err := s.db.Query(`SELECT kind, status, count(*) FROM item
+		 WHERE moderation_state = 'published' AND ` + scope + ` GROUP BY kind, status`)
+	if err != nil {
+		slog.Error("counting the statuses by kind", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	defer func() { _ = split.Close() }()
+	for split.Next() {
+		var kind, state string
+		var n int
+		if err := split.Scan(&kind, &state, &n); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		if out.StatusesByKind[kind] == nil {
+			out.StatusesByKind[kind] = map[string]int{}
+		}
+		out.StatusesByKind[kind][state] = n
+	}
+	if err := split.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+
 	// COALESCE, because MAX over no rows is NULL and scanning that into an int64
 	// fails — which would turn "nothing has been reported yet" into a 500.
 	if err := s.db.QueryRow(`SELECT COALESCE(MAX(created_at), 0) FROM item WHERE ` + scope).Scan(&out.LastReport); err != nil {
@@ -184,8 +218,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var err error
-	if out.Series, err = s.activity(30, scope); err != nil {
+	if out.Series, err = s.activity(overviewDays(r), scope); err != nil {
 		slog.Error("reading the activity", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
@@ -207,6 +240,19 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, out)
+}
+
+// overviewDays is how far back the chart goes. Three ranges and no others: the
+// number comes from the request, and a query string that could ask for ten
+// thousand days is a query that builds ten thousand rows.
+func overviewDays(r *http.Request) int {
+	switch r.URL.Query().Get("days") {
+	case "7":
+		return 7
+	case "90":
+		return 90
+	}
+	return 30
 }
 
 // activity is how many reports arrived on each of the last n days.
