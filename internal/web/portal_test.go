@@ -1779,3 +1779,44 @@ func TestARoadmapLaneIsReadWholeByTheDialog(t *testing.T) {
 		t.Errorf("a private board's lane returned %d to the team", code)
 	}
 }
+
+// TestTheBoardSaysHowManyOpenOnesAreIdeasAndHowManyBugs.
+//
+// The tile of what is open says it whichever kind the list is looking at, so
+// the two numbers ignore the kind filter and keep the words.
+func TestTheBoardSaysHowManyOpenOnesAreIdeasAndHowManyBugs(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	publish := func(kind, title string) {
+		id, _ := public.submit("codigosh", "lastboard", kind, title)
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+	}
+	publish("idea", "dark mode")
+	publish("idea", "dark theme for the form")
+	publish("bug", "crash on import")
+
+	counts := func(query string) map[string]any {
+		body := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/items?state=open"+query, nil))
+		c, _ := body["counts"].(map[string]any)
+		return c
+	}
+	c := counts("")
+	if c["open_idea"] != float64(2) || c["open_bug"] != float64(1) {
+		t.Errorf("open ideas and bugs: %v", c)
+	}
+	// The kind narrows the list and its other counts, not these two.
+	c = counts("&kind=bug")
+	if c["open"] != float64(1) || c["open_idea"] != float64(2) || c["open_bug"] != float64(1) {
+		t.Errorf("under a kind: %v", c)
+	}
+	// The words do narrow them.
+	c = counts("&q=dark")
+	if c["open_idea"] != float64(2) || c["open_bug"] != float64(0) {
+		t.Errorf("under words: %v", c)
+	}
+}

@@ -167,6 +167,20 @@ func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
 			counts[name], err = s.items().Tally(one)
 		}
 	}
+	// How many of what is open are ideas and how many are bugs, under the same
+	// words but not under the kind: the page says it on the tile of what is open
+	// whichever kind it is looking at, and a number that changed with the filter
+	// would be a tile that contradicts the list beside it.
+	if err == nil {
+		for _, kind := range []item.Kind{item.Idea, item.Bug} {
+			one := all
+			one.Status, one.Statuses, one.Kind = "", item.OpenStatuses(), kind
+			counts["open_"+string(kind)], err = s.items().Tally(one)
+			if err != nil {
+				break
+			}
+		}
+	}
 	if err != nil {
 		slog.Error("counting items", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
