@@ -5,7 +5,7 @@
 // so the queue fills, the portal fills with people talking to nobody, and that
 // reads worse from outside than having no portal at all.
 //
-// Four channels and no more, chosen because they are what a self-hoster already
+// Five channels and no more, chosen because they are what a self-hoster already
 // runs. The shape is small on purpose — a config with a kind, a switch, one
 // function per channel — because that is all four of them need.
 package notify
@@ -32,6 +32,12 @@ const (
 	Gotify  Kind = "gotify"
 	Webhook Kind = "webhook"
 	SMTP    Kind = "smtp"
+
+	// Push is the browsers of the team: a notification on a phone or a desktop
+	// with no page of LastHelp open. It needs nothing typed in — who receives it
+	// is whoever on the team turned it on in their own browser — so it is a
+	// complete choice by itself, like Server.
+	Push Kind = "push"
 
 	// Server is not a channel but a choice: "use the one the administrator set
 	// for the whole installation". It is stored on a repository like any other
@@ -69,7 +75,7 @@ func (c Config) Active() bool {
 		return c.URL != ""
 	case SMTP:
 		return c.To != ""
-	case Server:
+	case Server, Push:
 		return true
 	}
 	return false
@@ -105,12 +111,22 @@ type Message struct {
 	Title string
 	Body  string
 	URL   string
+
+	// Repo is the board this is about, and User is the one account a test is
+	// for. Only a channel that goes to people rather than to an address reads
+	// them: Push, which sends to the team of Repo, or to User alone.
+	Repo int64
+	User int64
 }
 
-// Notifier holds the two ways out.
+// Notifier holds the ways out.
 type Notifier struct {
 	Out  *outbound.Client
 	Mail mail.Sender
+
+	// Push delivers to browsers. It is a function because who may be told is
+	// the server's to say, and this package does not know what a team is.
+	Push func(ctx context.Context, msg Message) error
 }
 
 // Send delivers one message, or says why not.
@@ -133,6 +149,11 @@ func (n Notifier) Send(ctx context.Context, cfg Config, msg Message) error {
 		return n.sendWebhook(ctx, cfg, msg)
 	case SMTP:
 		return n.Mail.Send(cfg.To, msg.Title, msg.Body+"\n\n"+msg.URL)
+	case Push:
+		if n.Push == nil {
+			return errors.New("push notifications are not available")
+		}
+		return n.Push(ctx, msg)
 	}
 	return fmt.Errorf("unknown notification channel %q", cfg.Kind)
 }

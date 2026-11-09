@@ -96,7 +96,17 @@ assumptions apply, and keeping them apart is most of the design:
 - **No telemetry.** This server reports nothing about you or your instance to
   us, on any schedule, for any reason.
 - **No third parties.** No CDN, no captcha service, no AI provider. What people
-  write in your portal reaches your database and nowhere else.
+  write in your portal reaches your database and nowhere else, with one
+  exception you have to switch on yourself: **push notifications**. A team
+  member who turns them on in their browser is told through that browser's own
+  push service — Google's for Chrome and Android, Apple's for Safari and iPhones,
+  Mozilla's for Firefox, Microsoft's for Edge. The message is encrypted for that
+  one browser, so the service carries it without reading it, but it learns that
+  a device was notified and when. Nothing is sent until a repository chooses the
+  Push channel *and* somebody turns it on in their own profile. The address a
+  browser gives is never trusted: only an https address on one of those
+  services' own domains is sent to, and `LASTHELP_OFFLINE` stops it like every
+  other outbound connection.
 - **No account for the public.** We cannot leak a password database we do not
   have. An email address is stored only if a reporter asked to be notified — and
   the field is not even offered unless a mail relay is configured, because

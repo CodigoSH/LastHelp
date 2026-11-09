@@ -44,8 +44,50 @@ curl -X POST "$BASE/api/orgs/acme/repos/atlas/channel" \
 | `gotify` | `url`, `token` | The server address; `/message` is appended |
 | `webhook` | `url`, optional `token` | Posts `{"title","body","url"}` — point it at Matrix, a bridge, a script |
 | `smtp` | `to` | Uses the relay configured on the server |
+| `push` | — | The browsers of the team: see [Push notifications](#push-notifications) |
 | `server` | — | A repository only: use the channel the administrator set for the server |
 | *(empty)* | — | No notifications |
+
+### Push notifications
+
+The **Push** channel tells the team on their phones and desktops, with no page of
+LastHelp open. It needs nothing typed in: choose it on a repository (or as the
+server's channel) and then **each person turns it on for their own browser**, in
+their profile, under **Notifications on your devices**. Until somebody does,
+nobody is told anything. A person can turn on as many browsers as they like (up to
+20), see them listed, send themselves a test, and remove any of them.
+
+It reaches the administrator, the owners of the repository's organisation and the
+collaborators on that repository, and nobody else. A disabled account is not
+told. Tapping the notification opens the reports.
+
+**It goes through a third party, and that is the one thing about it you should
+know.** A browser that subscribes is given an address by its maker's push
+service — Google's for Chrome and Android, Apple's for Safari and iPhones,
+Mozilla's for Firefox, Microsoft's for Edge — and messages go there. They are
+encrypted for that one browser, so the service carries them without reading
+them, but it learns that a device was notified, and when. That is why it is off
+until a repository chooses it and a person turns it on. LastHelp only ever sends
+to an https address on one of those services' own domains, and
+`LASTHELP_OFFLINE` stops it.
+
+What the page needs:
+
+- **HTTPS**, or `localhost`. Browsers only allow push on a secure origin, so an
+  installation reached at `http://192.168.1.20:8080` cannot use it.
+- On an **iPhone or iPad**, LastHelp has to be added to the Home Screen and opened
+  from there; Safari in a tab cannot receive push.
+- Notifications **allowed** for the site in the browser. If they were blocked the
+  profile says so, and only the browser's own settings can undo that.
+
+The signing key that identifies this installation to the push services is made the first time
+anybody asks and lives in the database, so a backup carries it and a restored
+server keeps every device working. A device whose app was uninstalled is
+forgotten the first time the push service says it is gone.
+
+Over the API, for the signed-in account's own devices: `GET /api/push/key`,
+`GET` and `POST /api/push/subscriptions`, `DELETE /api/push/subscriptions/{id}`
+and `POST /api/push/test`.
 
 ### One channel for the whole server
 

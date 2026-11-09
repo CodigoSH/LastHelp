@@ -271,6 +271,13 @@ func (s *Server) routes() {
 	private("POST /api/orgs/{org}/repos/{repo}/channel", s.handleSetNotifyChannel)
 	private("POST /api/orgs/{org}/repos/{repo}/channel/test", s.handleTestNotifyChannel)
 
+	// Push notifications to this account's own browsers.
+	private("GET /api/push/key", s.handlePushKey)
+	private("GET /api/push/subscriptions", s.handlePushList)
+	private("POST /api/push/subscriptions", s.handlePushSubscribe)
+	private("DELETE /api/push/subscriptions/{id}", s.handlePushDelete)
+	private("POST /api/push/test", s.handlePushTest)
+
 	private("POST /api/me/password", s.handleChangePassword)
 	private("POST /api/me/profile", s.handleChangeProfile)
 	private("POST /api/me/language", s.handleChangeLanguage)

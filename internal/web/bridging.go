@@ -23,6 +23,7 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/mail"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/notify"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/outbound"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
 // webhookBodyLimit is what a delivery may be. Generous — an issue payload with
@@ -309,6 +310,7 @@ func (s *Server) announce(ctx context.Context, repoID int64, title, kind, link s
 		Title: repo.Name + ": " + kind,
 		Body:  title,
 		URL:   link,
+		Repo:  repoID,
 	})
 }
 
@@ -319,6 +321,7 @@ func (s *Server) notifier() notify.Notifier {
 			Config:  s.cfg.Mail,
 			Offline: s.cfg.Offline,
 		},
+		Push: s.pushTo,
 	}
 }
 
@@ -373,6 +376,11 @@ func (in notifyChannel) build(previous notify.Config, mayChooseServer bool) (not
 		Kind: kind, URL: strings.TrimSpace(in.URL), Token: in.Token, To: strings.TrimSpace(in.To),
 	}
 	if kind == notify.Server {
+		cfg.URL, cfg.Token, cfg.To = "", "", ""
+		return cfg, ""
+	}
+	if kind == notify.Push {
+		// Nothing to type in: it goes to the browsers of the team.
 		cfg.URL, cfg.Token, cfg.To = "", "", ""
 		return cfg, ""
 	}
@@ -469,25 +477,29 @@ func (s *Server) handleTestNotifyChannel(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	s.finishChannelTest(w, r.Context(), cfg, repo.Name)
+	s.finishChannelTest(w, r, cfg, repo.Name)
 }
 
 // finishChannelTest sends the test message and answers with the reason it did not
 // arrive, in a form a person can act on.
-func (s *Server) finishChannelTest(w http.ResponseWriter, ctx context.Context, cfg notify.Config, name string) {
+func (s *Server) finishChannelTest(w http.ResponseWriter, r *http.Request, cfg notify.Config, name string) {
 	link := ""
 	if base := strings.TrimSuffix(s.cfg.PublicURL, "/"); base != "" {
 		link = base
 	}
 	// A short deadline of its own: the person is waiting on the button, and a
 	// service that does not answer is the answer.
-	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 
+	// The one who pressed the button, for a channel that goes to people: a test
+	// tells whoever is testing, not the whole team.
+	actor, _ := middleware.ActorFrom(r)
 	err := s.notifier().Send(ctx, cfg, notify.Message{
 		Title: "LastHelp: test",
 		Body:  "This is a test from " + name + ". If you can read it, this channel works.",
 		URL:   link,
+		User:  actor.UserID,
 	})
 	if err == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -504,6 +516,8 @@ func (s *Server) finishChannelTest(w http.ResponseWriter, ctx context.Context, c
 func channelFailure(err error, kind notify.Kind) string {
 	var refused notify.StatusError
 	switch {
+	case errors.Is(err, errNoPushDevices):
+		return "error.push_no_devices"
 	case errors.Is(err, mail.ErrNotConfigured):
 		return "error.channel_no_relay"
 	case errors.Is(err, mail.ErrOffline), errors.Is(err, outbound.ErrOffline):

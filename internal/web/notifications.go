@@ -69,7 +69,7 @@ func (s *Server) handleTestServerChannel(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, failure)
 		return
 	}
-	s.finishChannelTest(w, r.Context(), cfg, "this server")
+	s.finishChannelTest(w, r, cfg, "this server")
 }
 
 // mustJSON is a Config as the JSON it is stored as. Marshalling a struct of

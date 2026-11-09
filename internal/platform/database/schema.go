@@ -505,6 +505,34 @@ var migrations = []migration{
 			return addColumn(tx, "repository", "is_private", "INTEGER NOT NULL DEFAULT 0")
 		},
 	},
+	{
+		version: 16,
+		name:    "a browser can be subscribed to push notifications",
+		// One row per browser an account turned notifications on in. The address
+		// is unique because it names one browser at one push service: a browser
+		// handed to another account moves to whoever subscribes it now. Nobody has
+		// a row until a browser asks for one.
+		fn: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`CREATE TABLE IF NOT EXISTS push_subscription (
+					id         INTEGER PRIMARY KEY,
+					user_id    INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+					endpoint   TEXT    NOT NULL UNIQUE,
+					p256dh     TEXT    NOT NULL,
+					auth       TEXT    NOT NULL,
+					label      TEXT    NOT NULL DEFAULT '',
+					created_at INTEGER NOT NULL,
+					last_ok_at INTEGER
+				)`,
+				`CREATE INDEX IF NOT EXISTS push_subscription_by_user ON push_subscription (user_id)`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

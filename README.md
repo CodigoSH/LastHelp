@@ -124,7 +124,7 @@ For a detailed breakdown, including what the threat model does **not** cover, se
 
 **Reporting is anonymous by design.** No account, no tracking, no analytics, and no telemetry of any kind: nothing about you or your instance is ever reported to us. The email address a reporter may leave is optional, asked for only when a mail relay exists to use it, never returned by any endpoint, and deleted when the report closes.
 
-And no AI. Nothing anybody writes here is sent to a third party — the whole point is that it reaches one database and nowhere else.
+And no AI. Nothing anybody writes here is sent to a third party — the whole point is that it reaches one database and nowhere else. The one thing that leaves is opt-in: a team member who turns on push notifications is told through their own browser's push service, which learns that a device was notified, never what it said.
 
 ---
 

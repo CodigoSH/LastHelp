@@ -27,7 +27,9 @@ Following a board with Atom stores nothing about the reader.
   that slow a flood keep it in memory, grouped by network block (`/24` for IPv4,
   `/64` for IPv6), and it is gone when the server restarts. LastHelp writes no
   access log of its own.
-- No account, no name, no profile, no analytics, no third party of any kind.
+- No account, no name, no profile, no analytics, and no third party — apart from
+  the push service of a team member's own browser, if that person chose to
+  receive push notifications (see [Notifications](notifications.md)).
 
 ## Cookies
 
