@@ -277,6 +277,7 @@ func (s *Server) routes() {
 	private("POST /api/me/avatar", s.handleChangeAvatar)
 
 	private("GET /api/overview", s.handleOverview)
+	private("GET /api/overview/boards", s.handleOverviewBoards)
 	private("GET /api/reports", s.handleReports)
 
 	private("PATCH /api/orgs/{org}", s.handleRenameOrganization)

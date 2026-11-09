@@ -158,3 +158,67 @@ func TestWhatWaitsIsTheNumberTheBadgeShows(t *testing.T) {
 		t.Errorf("a collaborator was told about the server's failed jobs: %v", got)
 	}
 }
+
+// TestTheDetailBehindTheOverviewAddsUpToTheOverview.
+//
+// "See more" opens one row per repository. If the rows do not add up to the
+// number they were opened from, the screen contradicts itself a click later.
+func TestTheDetailBehindTheOverviewAddsUpToTheOverview(t *testing.T) {
+	admin, _, collaborator := teamSetup(t)
+	public := admin.anonymous()
+
+	publish := func(board, kind, title string) string {
+		org, repo, _ := splitBoard(board)
+		id, _ := public.submit(org, repo, kind, title)
+		_ = status(t, admin.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"}))
+		return id
+	}
+	publish("acme/atlas", "idea", "silent one")
+	replied := publish("acme/atlas", "idea", "answered one")
+	publish("other/elsewhere", "bug", "silent bug")
+	admin.submit("acme", "atlas", "bug", "still waiting")
+	_ = status(t, admin.do(http.MethodPost, "/api/items/"+replied+"/reply", map[string]string{"body": "on it"}))
+
+	sum := func(who *instance) (overview map[string]any, detail []any) {
+		overview = decode(t, who.do(http.MethodGet, "/api/overview", nil))
+		detail, _ = decode(t, who.do(http.MethodGet, "/api/overview/boards", nil))["boards"].([]any)
+		return overview, detail
+	}
+
+	for who, boards := range map[*instance]int{admin: 2, collaborator: 1} {
+		overview, detail := sum(who)
+		if len(detail) != boards {
+			t.Fatalf("the detail listed %d repositories, want %d", len(detail), boards)
+		}
+		for _, field := range []string{"unanswered", "waiting_reports", "waiting_messages"} {
+			total := 0.0
+			for _, raw := range detail {
+				total += raw.(map[string]any)[field].(float64)
+			}
+			if total != overview[field].(float64) {
+				t.Errorf("the repositories add up to %v %s, the overview says %v", total, field, overview[field])
+			}
+		}
+	}
+
+	// What it says about each, and nothing that is a secret.
+	_, detail := sum(admin)
+	var atlas map[string]any
+	for _, raw := range detail {
+		if m := raw.(map[string]any); m["repo"] == "atlas" {
+			atlas = m
+		}
+	}
+	if atlas == nil || atlas["answered"] != float64(1) || atlas["answerable"] != float64(2) || atlas["unanswered"] != float64(1) {
+		t.Errorf("atlas was described as %v, want one answered of two and one unanswered", atlas)
+	}
+	ideas, _ := atlas["statuses_by_kind"].(map[string]any)["idea"].(map[string]any)
+	if ideas["new"] != float64(2) {
+		t.Errorf("atlas's ideas by status were %v, want two new", ideas)
+	}
+
+	// Somebody with no role anywhere is not shown it.
+	if got := status(t, public.do(http.MethodGet, "/api/overview/boards", nil)); got == http.StatusOK {
+		t.Errorf("a stranger was given the detail of the boards: %d", got)
+	}
+}

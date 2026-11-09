@@ -1,6 +1,7 @@
 package web
 
 import (
+	"database/sql"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/notify"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
@@ -451,4 +453,214 @@ func (s *Server) boardCounts(limit int, scope string) ([]boardCount, error) {
 		out = append(out, b)
 	}
 	return out, rows.Err()
+}
+
+// boardDetail is one repository in the detail behind the overview: what the
+// tile on the page could not hold.
+type boardDetail struct {
+	Org          string `json:"org"`
+	Repo         string `json:"repo"`
+	Name         string `json:"name"`
+	Organization string `json:"organization"`
+
+	Published       int   `json:"published"`
+	Votes           int   `json:"votes"`
+	WaitingReports  int   `json:"waiting_reports"`
+	WaitingMessages int   `json:"waiting_messages"`
+	WaitingOldest   int64 `json:"waiting_oldest"`
+
+	Unanswered       int   `json:"unanswered"`
+	UnansweredOldest int64 `json:"unanswered_oldest"`
+	Answerable       int   `json:"answerable"`
+	Answered         int   `json:"answered"`
+	FirstReply       int64 `json:"first_reply"`
+
+	// The last thirty days of what arrived, by kind.
+	Ideas int `json:"ideas"`
+	Bugs  int `json:"bugs"`
+
+	StatusesByKind map[string]map[string]int `json:"statuses_by_kind"`
+
+	// Where the work goes from here: the forge of its organisation, how many of
+	// its reports are linked to an issue, and what its team is told through.
+	// The kind of channel and never its address or its token.
+	Forge   string `json:"forge"`
+	Linked  int    `json:"linked"`
+	Channel string `json:"channel"`
+}
+
+// handleOverviewBoards is the detail the overview's "see more" opens: one row
+// per repository this account may triage, with the same figures the page shows
+// in total. Each is read the way the total is — by the item store, from the
+// listing's own conditions — so the rows add up to the number they open from.
+func (s *Server) handleOverviewBoards(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "error.unauthorized")
+		return
+	}
+	if !s.may(w, r, authz.ViewPanel, authz.Scope{}) {
+		return
+	}
+
+	boards, err := s.scopedBoards(actor)
+	if err != nil {
+		slog.Error("listing the boards somebody may triage", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	// Bounded: a detail of fifty repositories is more than a person reads, and
+	// each costs a few queries.
+	if len(boards) > 50 {
+		boards = boards[:50]
+	}
+
+	out := make([]boardDetail, 0, len(boards))
+	if len(boards) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"boards": out})
+		return
+	}
+	ids := make([]int64, 0, len(boards))
+	index := map[int64]int{}
+	for i, b := range boards {
+		ids = append(ids, b.repo.ID)
+		index[b.repo.ID] = i
+		out = append(out, boardDetail{
+			Org: b.org.Slug, Repo: b.repo.Slug, Name: b.repo.Name, Organization: b.org.Name,
+			StatusesByKind: map[string]map[string]int{string(item.Idea): {}, string(item.Bug): {}},
+			Forge:          string(b.org.Forge),
+			Channel:        string(notify.Parse(b.repo.NotifyConfig).Kind),
+		})
+	}
+	fail := func(what string, err error) {
+		slog.Error("reading the detail of the boards: "+what, "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+	}
+
+	// What waits, per board: the same count the badge uses.
+	pending, err := s.items().PendingByBoard()
+	if err != nil {
+		fail("what waits", err)
+		return
+	}
+	for _, p := range pending {
+		if i, found := index[p.RepoID]; found {
+			out[i].WaitingReports, out[i].WaitingMessages = p.Reports, p.Messages
+		}
+	}
+
+	since := s.now().Add(-30 * 24 * time.Hour).Unix()
+	for i, id := range ids {
+		one := []int64{id}
+		if out[i].WaitingOldest, err = s.items().OldestWaiting(one); err != nil {
+			fail("the oldest wait", err)
+			return
+		}
+		facts, err := s.items().Facts(item.Filter{RepoIDs: one, Moderation: item.Published, Statuses: item.OpenStatuses(), Unanswered: true})
+		if err != nil {
+			fail("the unanswered", err)
+			return
+		}
+		out[i].Unanswered, out[i].UnansweredOldest = facts.Count, facts.Oldest
+		replies, err := s.items().FirstReplies(one, since)
+		if err != nil {
+			fail("the replies", err)
+			return
+		}
+		out[i].Answerable, out[i].Answered, out[i].FirstReply = replies.Published, replies.Answered, replies.Median
+	}
+
+	in := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	args := make([]any, 0, len(ids)+1)
+	for _, id := range ids {
+		args = append(args, id)
+	}
+
+	// each runs one grouped query and hands its rows over, and says so when the
+	// reading failed halfway: a half-read answer is a number that is quietly
+	// too small.
+	each := func(query string, args []any, row func(*sql.Rows) error) error {
+		rows, err := s.db.Query(query, args...)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			if err := row(rows); err != nil {
+				return err
+			}
+		}
+		return rows.Err()
+	}
+
+	// Published and votes, the two kinds' arrivals this month, the statuses by
+	// kind and the issues linked: each one grouped query for every board.
+	if err := each(`SELECT repo_id, COALESCE(SUM(moderation_state = 'published'), 0), COALESCE(SUM(vote_count), 0)
+		FROM item WHERE merged_into IS NULL AND repo_id IN (`+in+`) GROUP BY repo_id`, args, func(rows *sql.Rows) error {
+		var id int64
+		var published, votes int
+		if err := rows.Scan(&id, &published, &votes); err != nil {
+			return err
+		}
+		out[index[id]].Published, out[index[id]].Votes = published, votes
+		return nil
+	}); err != nil {
+		fail("published and votes", err)
+		return
+	}
+
+	if err := each(`SELECT repo_id, kind, count(*) FROM item
+		WHERE merged_into IS NULL AND created_at >= ? AND repo_id IN (`+in+`) GROUP BY repo_id, kind`,
+		append([]any{since}, args...), func(rows *sql.Rows) error {
+			var id int64
+			var kind string
+			var n int
+			if err := rows.Scan(&id, &kind, &n); err != nil {
+				return err
+			}
+			switch item.Kind(kind) {
+			case item.Idea:
+				out[index[id]].Ideas = n
+			case item.Bug:
+				out[index[id]].Bugs = n
+			}
+			return nil
+		}); err != nil {
+		fail("what arrived", err)
+		return
+	}
+
+	if err := each(`SELECT repo_id, kind, status, count(*) FROM item
+		WHERE merged_into IS NULL AND moderation_state = 'published' AND repo_id IN (`+in+`)
+		GROUP BY repo_id, kind, status`, args, func(rows *sql.Rows) error {
+		var id int64
+		var kind, state string
+		var n int
+		if err := rows.Scan(&id, &kind, &state, &n); err != nil {
+			return err
+		}
+		if out[index[id]].StatusesByKind[kind] == nil {
+			out[index[id]].StatusesByKind[kind] = map[string]int{}
+		}
+		out[index[id]].StatusesByKind[kind][state] = n
+		return nil
+	}); err != nil {
+		fail("the statuses", err)
+		return
+	}
+
+	if err := each(`SELECT repo_id, count(*) FROM issue_link WHERE repo_id IN (`+in+`) GROUP BY repo_id`, args, func(rows *sql.Rows) error {
+		var id int64
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return err
+		}
+		out[index[id]].Linked = n
+		return nil
+	}); err != nil {
+		fail("the linked issues", err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"boards": out})
 }
