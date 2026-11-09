@@ -3045,18 +3045,6 @@ async function showOrganizationsPanel(): Promise<void> {
           formClass: "org-form",
         },
         text,
-      )) +
-      (!(list.organizations ?? []).some((o) => o.can_manage)
-        ? ""
-        : views.modal(
-        {
-          id: "org-rename",
-          title: text.t("organizations.rename"),
-          body: views.field({ id: "org-new-name", name: "name", label: text.t("panel.name"), required: true }, text),
-          submit: text.t("action.save"),
-          formClass: "org-rename-form",
-        },
-        text,
       )),
     "/panel/organizations",
   );
@@ -3075,20 +3063,6 @@ async function showOrganizationsPanel(): Promise<void> {
     await render();
   });
   wireIconPicker();
-
-  let renaming = "";
-  root?.querySelectorAll<HTMLButtonElement>("[data-edit-org]").forEach((button) =>
-    button.addEventListener("click", () => {
-      renaming = button.dataset.editOrg ?? "";
-      const input = root?.querySelector<HTMLInputElement>("#org-new-name");
-      if (input) input.value = button.dataset.name ?? "";
-      openModal("org-rename");
-    }),
-  );
-  onSubmit("form.org-rename-form", async (data) => {
-    await api.patch(`/api/orgs/${encodeURIComponent(renaming)}`, { name: String(data.get("name") ?? "") });
-    await render();
-  });
 
   root?.querySelectorAll<HTMLButtonElement>("[data-delete-org]").forEach((button) =>
     button.addEventListener("click", async () => {

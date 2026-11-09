@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} حذف شود؟ گزارش‌ها، رأی‌ها و پاسخ‌هایش حذف می‌شوند. این کار بازگشت‌پذیر نیست.",
   "organizations.lead": "یک سازمان مخزن‌ها را گرد هم می‌آورد و یک اتصال به سکو نگه می‌دارد.",
   "organizations.noRepositories": "هنوز مخزنی نیست.",
-  "organizations.rename": "تغییر نام",
   "overview.actAnswer": "پاسخ",
   "overview.actCheck": "بررسی",
   "overview.actOpen": "باز کردن",

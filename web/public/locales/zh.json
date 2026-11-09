@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "删除 {name}？其反馈、投票和回复都会被删除。此操作无法撤销。",
   "organizations.lead": "组织把仓库归到一起，并保存一个代码平台连接。",
   "organizations.noRepositories": "还没有仓库。",
-  "organizations.rename": "重命名",
   "overview.actAnswer": "回复",
   "overview.actCheck": "查看",
   "overview.actOpen": "打开",

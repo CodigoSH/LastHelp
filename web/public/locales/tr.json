@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} silinsin mi? Bildirimleri, oyları ve yanıtları silinecek. Bu geri alınamaz.",
   "organizations.lead": "Bir kuruluş depoları gruplar ve tek bir forge bağlantısı tutar.",
   "organizations.noRepositories": "Henüz depo yok.",
-  "organizations.rename": "Yeniden adlandır",
   "overview.actAnswer": "Yanıtla",
   "overview.actCheck": "Kontrol et",
   "overview.actOpen": "Aç",

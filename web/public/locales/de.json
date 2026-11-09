@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} löschen? Seine Meldungen, Stimmen und Antworten werden gelöscht. Das lässt sich nicht rückgängig machen.",
   "organizations.lead": "Eine Organisation bündelt Repositories und hält eine Forge-Verbindung.",
   "organizations.noRepositories": "Noch keine Repositories.",
-  "organizations.rename": "Umbenennen",
   "overview.actAnswer": "Antworten",
   "overview.actCheck": "Prüfen",
   "overview.actOpen": "Öffnen",

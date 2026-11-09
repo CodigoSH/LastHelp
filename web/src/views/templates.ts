@@ -3149,10 +3149,10 @@ export function organizationsScreen(
             : "",
         ].join(""),
         href: `/panel/${o.slug}`,
-        actions: o.can_manage
-          ? `${iconButton("edit", text.t("organizations.rename"), `data-edit-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)}
-             ${may.canDelete ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`) : ""}`
-          : "",
+        actions:
+          o.can_manage && may.canDelete
+            ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-org="${escapeAttr(o.slug)}" data-name="${escapeAttr(o.name)}"`)
+            : "",
       }),
     )
     .join("");

@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} حذف کریں؟ اس کی رپورٹیں، ووٹ اور جوابات حذف ہو جائیں گے۔ اسے واپس نہیں کیا جا سکتا۔",
   "organizations.lead": "ایک تنظیم مخزنوں کو یکجا کرتی ہے اور پلیٹ فارم سے ایک تعلق رکھتی ہے۔",
   "organizations.noRepositories": "ابھی کوئی مخزن نہیں۔",
-  "organizations.rename": "نام بدلیں",
   "overview.actAnswer": "جواب دیں",
   "overview.actCheck": "جانچیں",
   "overview.actOpen": "کھولیں",

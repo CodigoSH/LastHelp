@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "Удалить {name}? Его обращения, голоса и ответы будут удалены. Это необратимо.",
   "organizations.lead": "Организация объединяет репозитории и хранит одно подключение к форже.",
   "organizations.noRepositories": "Репозиториев пока нет.",
-  "organizations.rename": "Переименовать",
   "overview.actAnswer": "Ответить",
   "overview.actCheck": "Проверить",
   "overview.actOpen": "Открыть",

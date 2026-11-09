@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} को मिटाएँ? इसकी रिपोर्टें, वोट और उत्तर मिट जाएँगे। इसे पलटा नहीं जा सकता।",
   "organizations.lead": "एक संगठन रिपॉज़िटरी को समूह में रखता है और एक फ़ोर्ज कनेक्शन रखता है।",
   "organizations.noRepositories": "अभी कोई रिपॉज़िटरी नहीं।",
-  "organizations.rename": "नाम बदलें",
   "overview.actAnswer": "जवाब दें",
   "overview.actCheck": "जाँचें",
   "overview.actOpen": "खोलें",

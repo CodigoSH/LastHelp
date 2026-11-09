@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} verwijderen? De meldingen, stemmen en reacties ervan worden verwijderd. Dit kan niet ongedaan worden gemaakt.",
   "organizations.lead": "Een organisatie groepeert repositories en houdt één forge-verbinding.",
   "organizations.noRepositories": "Nog geen repositories.",
-  "organizations.rename": "Hernoemen",
   "overview.actAnswer": "Beantwoorden",
   "overview.actCheck": "Controleren",
   "overview.actOpen": "Openen",

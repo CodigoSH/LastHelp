@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "Διαγραφή του {name}; Οι αναφορές, οι ψήφοι και οι απαντήσεις του θα διαγραφούν. Αυτό δεν αναιρείται.",
   "organizations.lead": "Ένας οργανισμός ομαδοποιεί αποθετήρια και κρατά μία σύνδεση με forge.",
   "organizations.noRepositories": "Κανένα αποθετήριο ακόμη.",
-  "organizations.rename": "Μετονομασία",
   "overview.actAnswer": "Απάντηση",
   "overview.actCheck": "Έλεγχος",
   "overview.actOpen": "Άνοιγμα",

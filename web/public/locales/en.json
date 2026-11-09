@@ -414,7 +414,6 @@
   "organizations.confirmDeleteRepo": "Delete {name}? Its reports, votes and replies will be deleted. This cannot be undone.",
   "organizations.lead": "An organisation groups repositories and holds one forge connection.",
   "organizations.noRepositories": "No repositories yet.",
-  "organizations.rename": "Rename",
   "overview.actAnswer": "Answer",
   "overview.actCheck": "Check",
   "overview.actOpen": "Open",

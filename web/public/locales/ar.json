@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "حذف {name}؟ ستُحذف بلاغاته وأصواته وردوده. لا يمكن التراجع عن ذلك.",
   "organizations.lead": "المنظمة تجمع المستودعات وتحتفظ بوصلة واحدة إلى منصة.",
   "organizations.noRepositories": "لا توجد مستودعات بعد.",
-  "organizations.rename": "إعادة تسمية",
   "overview.actAnswer": "رد",
   "overview.actCheck": "تحقق",
   "overview.actOpen": "فتح",

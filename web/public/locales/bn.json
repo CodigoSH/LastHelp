@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} মুছবেন? এর প্রতিবেদন, ভোট ও উত্তর মুছে যাবে। এটি ফেরানো যাবে না।",
   "organizations.lead": "একটি সংগঠন রিপোজিটরিগুলোকে একত্র করে এবং একটি ফোর্জ সংযোগ রাখে।",
   "organizations.noRepositories": "এখনো কোনো রিপোজিটরি নেই।",
-  "organizations.rename": "নাম বদলান",
   "overview.actAnswer": "উত্তর দিন",
   "overview.actCheck": "দেখুন",
   "overview.actOpen": "খুলুন",

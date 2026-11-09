@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "Hapus {name}? Laporan, suara, dan balasannya akan dihapus. Ini tidak bisa dibatalkan.",
   "organizations.lead": "Organisasi mengelompokkan repositori dan memegang satu koneksi forge.",
   "organizations.noRepositories": "Belum ada repositori.",
-  "organizations.rename": "Ubah nama",
   "overview.actAnswer": "Balas",
   "overview.actCheck": "Periksa",
   "overview.actOpen": "Buka",

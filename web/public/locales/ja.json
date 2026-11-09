@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "{name} を削除しますか？ その報告、投票、返信が削除されます。取り消せません。",
   "organizations.lead": "組織はリポジトリをまとめ、フォージ接続をひとつ保持します。",
   "organizations.noRepositories": "まだリポジトリがありません。",
-  "organizations.rename": "名前を変える",
   "overview.actAnswer": "返信",
   "overview.actCheck": "確認",
   "overview.actOpen": "開く",

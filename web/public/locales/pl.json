@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "Usunąć {name}? Jego zgłoszenia, głosy i odpowiedzi zostaną usunięte. Tego nie da się cofnąć.",
   "organizations.lead": "Organizacja grupuje repozytoria i przechowuje jedno połączenie z forge.",
   "organizations.noRepositories": "Na razie brak repozytoriów.",
-  "organizations.rename": "Zmień nazwę",
   "overview.actAnswer": "Odpowiedz",
   "overview.actCheck": "Sprawdź",
   "overview.actOpen": "Otwórz",

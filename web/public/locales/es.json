@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "¿Eliminar {name}? Se eliminarán sus reportes, votos y respuestas. No se puede deshacer.",
   "organizations.lead": "Una organización agrupa repositorios y mantiene una conexión con una forja.",
   "organizations.noRepositories": "Aún no hay repositorios.",
-  "organizations.rename": "Cambiar el nombre",
   "overview.actAnswer": "Responder",
   "overview.actCheck": "Revisar",
   "overview.actOpen": "Abrir",

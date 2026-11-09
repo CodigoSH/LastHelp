@@ -416,7 +416,6 @@
   "organizations.confirmDeleteRepo": "Eliminare {name}? Le sue segnalazioni, i voti e le risposte verranno eliminati. L'operazione non è reversibile.",
   "organizations.lead": "Un'organizzazione raggruppa repository e tiene una connessione alla forge.",
   "organizations.noRepositories": "Ancora nessun repository.",
-  "organizations.rename": "Rinomina",
   "overview.actAnswer": "Rispondi",
   "overview.actCheck": "Controlla",
   "overview.actOpen": "Apri",
