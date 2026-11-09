@@ -108,11 +108,24 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// What nobody on the team has answered. It means published and not finished,
+	// as the overview counts it: a report closed without a word is a different
+	// question from one still waiting for one.
+	reply := query.Get("reply")
+	if reply != "" && reply != "none" {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	if reply == "none" && state == "" {
+		state = "open"
+	}
+
 	base := item.Filter{
 		RepoIDs:    ids,
 		Kind:       item.Kind(query.Get("kind")),
 		Search:     query.Get("q"),
 		SortByVote: query.Get("sort") == "votes",
+		Unanswered: reply == "none",
 	}
 	// narrowed is the list as asked for one choice of state and outcome, and
 	// whether that choice can hold anything at all given the other filters. The

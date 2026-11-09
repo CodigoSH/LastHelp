@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"sort"
 	"testing"
 )
 
@@ -71,5 +72,89 @@ func TestTheChartGoesBackAsFarAsAskedAndNoFurther(t *testing.T) {
 		if len(series) != want {
 			t.Errorf("/api/overview%s drew %d days, want %d", query, len(series), want)
 		}
+	}
+}
+
+// TestWhatNobodyAnsweredIsOneThingEverywhere.
+//
+// The overview says how many reports nobody answered and links to the list of
+// them. The two are read from the same conditions, and this holds them to it:
+// a number that says seven over a list that holds six is the screen
+// contradicting itself, which nothing else would notice.
+func TestWhatNobodyAnsweredIsOneThingEverywhere(t *testing.T) {
+	admin, _, collaborator := teamSetup(t)
+	public := admin.anonymous()
+
+	publish := func(board, kind, title, state string) string {
+		org, repo, _ := splitBoard(board)
+		id, _ := public.submit(org, repo, kind, title)
+		_ = status(t, admin.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"}))
+		if state != "" {
+			_ = status(t, admin.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": state}))
+		}
+		return id
+	}
+	publish("acme/atlas", "idea", "nobody wrote back", "")
+	answered := publish("acme/atlas", "idea", "somebody did", "")
+	publish("acme/atlas", "idea", "finished without a word", "done")
+	publish("other/elsewhere", "bug", "next door, also silent", "")
+	_ = status(t, admin.do(http.MethodPost, "/api/items/"+answered+"/reply", map[string]string{"body": "on it"}))
+	// A visitor's comment is not an answer.
+	_ = status(t, public.do(http.MethodPost, "/api/items/"+answered+"/comments", map[string]string{"body": "me too"}))
+
+	titles := func(who *instance, query string) []string {
+		body := decode(t, who.do(http.MethodGet, "/api/reports?"+query, nil))
+		var out []string
+		for _, raw := range body["items"].([]any) {
+			out = append(out, raw.(map[string]any)["title"].(string))
+		}
+		sort.Strings(out)
+		return out
+	}
+
+	for who, want := range map[*instance][]string{
+		admin:        {"next door, also silent", "nobody wrote back"},
+		collaborator: {"nobody wrote back"},
+	} {
+		overview := decode(t, who.do(http.MethodGet, "/api/overview", nil))
+		listed := titles(who, "reply=none")
+		if len(listed) != len(want) || (len(want) > 0 && listed[0] != want[0]) {
+			t.Errorf("the unanswered list was %v, want %v", listed, want)
+		}
+		if overview["unanswered"] != float64(len(listed)) {
+			t.Errorf("the overview says %v unanswered over a list of %d: %v", overview["unanswered"], len(listed), listed)
+		}
+	}
+
+	if got := status(t, admin.do(http.MethodGet, "/api/reports?reply=maybe", nil)); got != http.StatusBadRequest {
+		t.Errorf("an unknown reply filter answered %d, want a refusal", got)
+	}
+}
+
+// TestWhatWaitsIsTheNumberTheBadgeShows.
+func TestWhatWaitsIsTheNumberTheBadgeShows(t *testing.T) {
+	admin, _, collaborator := teamSetup(t)
+	admin.submit("acme", "atlas", "bug", "waiting one")
+	admin.submit("acme", "atlas", "idea", "waiting two")
+	admin.submit("other", "elsewhere", "bug", "next door")
+
+	for who, want := range map[*instance]float64{admin: 3, collaborator: 2} {
+		overview := decode(t, who.do(http.MethodGet, "/api/overview", nil))
+		me := decode(t, who.do(http.MethodGet, "/api/me", nil))
+		badge, _ := me["pending"].(map[string]any)
+		if overview["waiting_reports"] != badge["reports"] || overview["waiting_messages"] != badge["messages"] {
+			t.Errorf("the overview waits %v+%v, the badge %v+%v", overview["waiting_reports"], overview["waiting_messages"], badge["reports"], badge["messages"])
+		}
+		if overview["waiting_reports"] != want {
+			t.Errorf("waiting_reports = %v, want %v", overview["waiting_reports"], want)
+		}
+		if oldest, _ := overview["waiting_oldest"].(float64); oldest == 0 {
+			t.Errorf("something waits and the oldest wait is unknown")
+		}
+	}
+
+	// Only the administrator is told what the server gave up on.
+	if got := decode(t, collaborator.do(http.MethodGet, "/api/overview", nil))["failed_jobs"]; got != float64(0) {
+		t.Errorf("a collaborator was told about the server's failed jobs: %v", got)
 	}
 }

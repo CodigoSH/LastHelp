@@ -143,6 +143,10 @@ type Filter struct {
 	// question does not.
 	AsTyped    bool
 	SortByVote bool
+	// Unanswered keeps what no member of the team has written on. Asked for by
+	// name, and the caller says which states it means: a report that was closed
+	// without a word is a different question from one still waiting for one.
+	Unanswered bool
 	// SortByClosed is newest finished first, and takes only what has actually
 	// finished: an item with no closing time has not, whatever its status says,
 	// and sorting those by a null would put them somewhere arbitrary.
@@ -248,6 +252,10 @@ func (f Filter) where() (string, []any) {
 	}
 	if f.SortByClosed {
 		where = append(where, "closed_at IS NOT NULL")
+	}
+	if f.Unanswered {
+		where = append(where, "NOT EXISTS (SELECT 1 FROM comment c WHERE c.item_id = item.id AND c.author_kind = ?)")
+		args = append(args, string(AuthorTeam))
 	}
 
 	// The search is a subquery rather than a join, on purpose. item_fts has its

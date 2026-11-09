@@ -9,6 +9,7 @@ import (
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
@@ -41,6 +42,30 @@ type overview struct {
 	// administrator is shown; otherwise they are the reader's boards, and the
 	// server-wide cards — people — are not drawn.
 	Server bool `json:"server"`
+
+	// What a team looking after the queue needs and a count cannot say. The
+	// waiting figures are the ones the menu's badge shows — one place decides
+	// what waits for this person — and the oldest of them says for how long.
+	WaitingReports  int   `json:"waiting_reports"`
+	WaitingMessages int   `json:"waiting_messages"`
+	WaitingOldest   int64 `json:"waiting_oldest"`
+	// Unanswered is what is published, not finished, and has no word from the
+	// team: the people who wrote and heard nothing. How long the longest has
+	// waited, and how much the most wanted of them is.
+	Unanswered          int   `json:"unanswered"`
+	UnansweredOldest    int64 `json:"unanswered_oldest"`
+	UnansweredMostVotes int   `json:"unanswered_most_votes"`
+	// How the last thirty days of reports were answered: how many were, out of
+	// how many were published, and how long the middle one waited, in seconds.
+	Answerable int   `json:"answerable"`
+	Answered   int   `json:"answered"`
+	FirstReply int64 `json:"first_reply"`
+	// NotOnForge is confirmed bugs on a repository whose organisation has a
+	// forge and that nobody has been given an issue for.
+	NotOnForge int `json:"not_on_forge"`
+	// FailedJobs is what the server gave up on — a notification, an issue — and
+	// is for the administrator to look at, so only the administrator is told.
+	FailedJobs int `json:"failed_jobs"`
 
 	// What the numbers above cannot say: whether it is getting busier, what
 	// people are actually asking for, and which board the work is in.
@@ -111,6 +136,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	// Which boards, as a fragment over item.repo_id. Built from integers this
 	// server read from its own database, never from the request.
 	scope, orgs := "1 = 1", map[int64]bool{}
+	var repoIDs []int64
 	if !server {
 		boards, err := s.scopedBoards(actor)
 		if err != nil {
@@ -121,9 +147,26 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		ids := []string{"0"}
 		for _, b := range boards {
 			ids = append(ids, strconv.FormatInt(b.repo.ID, 10))
+			repoIDs = append(repoIDs, b.repo.ID)
 			orgs[b.org.ID] = true
 		}
 		scope = "repo_id IN (" + strings.Join(ids, ",") + ")"
+	}
+
+	if server {
+		all, err := s.db.Query(`SELECT id FROM repository`)
+		if err != nil {
+			slog.Error("listing the repositories", "error", err)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		for all.Next() {
+			var id int64
+			if err := all.Scan(&id); err == nil {
+				repoIDs = append(repoIDs, id)
+			}
+		}
+		_ = all.Close()
 	}
 
 	out := overview{
@@ -223,6 +266,11 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
+	if err := s.supportFigures(&out, actor, repoIDs, server); err != nil {
+		slog.Error("reading what the team needs to know", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
 	if out.Top, err = s.briefs(`kind = 'idea' AND moderation_state = 'published' AND `+scope, `vote_count DESC, created_at DESC`, 5); err != nil {
 		slog.Error("reading the most wanted", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
@@ -240,6 +288,45 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, out)
+}
+
+// supportFigures fills in what a team answering people needs. Each of them is
+// read by the item store from the same conditions the listings use, so a
+// number here and the list it leads to cannot disagree about what is counted.
+func (s *Server) supportFigures(out *overview, actor authz.Actor, repoIDs []int64, server bool) error {
+	waiting := s.pendingFor(actor)
+	out.WaitingReports, out.WaitingMessages = waiting["reports"], waiting["messages"]
+
+	var err error
+	if out.WaitingOldest, err = s.items().OldestWaiting(repoIDs); err != nil {
+		return err
+	}
+
+	facts, err := s.items().Facts(item.Filter{
+		RepoIDs: repoIDs, Moderation: item.Published, Statuses: item.OpenStatuses(), Unanswered: true,
+	})
+	if err != nil {
+		return err
+	}
+	out.Unanswered, out.UnansweredOldest, out.UnansweredMostVotes = facts.Count, facts.Oldest, facts.MostVoted
+
+	replies, err := s.items().FirstReplies(repoIDs, s.now().Add(-30*24*time.Hour).Unix())
+	if err != nil {
+		return err
+	}
+	out.Answerable, out.Answered, out.FirstReply = replies.Published, replies.Answered, replies.Median
+
+	if out.NotOnForge, err = s.items().NotOnForge(repoIDs, string(org.ForgeNone)); err != nil {
+		return err
+	}
+	if server {
+		failed, err := s.outbox().Abandoned()
+		if err != nil {
+			return err
+		}
+		out.FailedJobs = len(failed)
+	}
+	return nil
 }
 
 // overviewDays is how far back the chart goes. Three ranges and no others: the
