@@ -223,3 +223,68 @@ func TestTheOfflineSwitchStopsNotificationsToo(t *testing.T) {
 		t.Error("something reached the server while offline")
 	}
 }
+
+// TestWhatArrivedIsAMarkAndACodeNotAWord.
+//
+// A channel the whole team reads has no one language, so it does not say "idea"
+// in English: it draws the kind as a mark, and a script reads it as a code.
+func TestWhatArrivedIsAMarkAndACodeNotAWord(t *testing.T) {
+	for kind, want := range map[string]struct{ tag, glyph string }{
+		"idea":    {"bulb", "💡"},
+		"bug":     {"beetle", "🐞"},
+		"comment": {"speech_balloon", "💬"},
+	} {
+		server, seen := recorder(t)
+		msg := Message{Title: "Atlas", Body: "dark mode", Kind: kind}
+
+		if err := notifier().Send(context.Background(), Config{Kind: Ntfy, URL: server.URL + "/t"}, msg); err != nil {
+			t.Fatal(err)
+		}
+		if got := seen.headers.Get("Tags"); got != want.tag {
+			t.Errorf("ntfy tag for %s is %q, want %q", kind, got, want.tag)
+		}
+		if got := seen.headers.Get("Title"); got != "Atlas" {
+			t.Errorf("ntfy title for %s is %q: it is the board's name and nothing else", kind, got)
+		}
+
+		server, seen = recorder(t)
+		if err := notifier().Send(context.Background(), Config{Kind: Gotify, URL: server.URL, Token: "t"}, msg); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(seen.body, want.glyph+" Atlas") {
+			t.Errorf("gotify has no mark before the title for %s: %s", kind, seen.body)
+		}
+
+		server, seen = recorder(t)
+		if err := notifier().Send(context.Background(), Config{Kind: Webhook, URL: server.URL}, msg); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(seen.body, `"kind":"`+kind+`"`) {
+			t.Errorf("the webhook has no kind code for %s: %s", kind, seen.body)
+		}
+		if strings.Contains(seen.body, "idea") && kind != "idea" {
+			t.Errorf("the webhook carries a word of the wrong kind: %s", seen.body)
+		}
+	}
+}
+
+// A message that is not about a report — a test — has no mark and no kind.
+func TestAMessageThatIsNotAboutAReportCarriesNoKind(t *testing.T) {
+	server, seen := recorder(t)
+	if err := notifier().Send(context.Background(), Config{Kind: Ntfy, URL: server.URL + "/t"}, Message{Title: "LastHelp: Test", Body: "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := seen.headers.Get("Tags"); got != "" {
+		t.Errorf("a test carries the tag %q", got)
+	}
+	server, seen = recorder(t)
+	if err := notifier().Send(context.Background(), Config{Kind: Webhook, URL: server.URL}, Message{Title: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(seen.body, `"kind"`) {
+		t.Errorf("a test carries a kind: %s", seen.body)
+	}
+	if (Message{Title: "x", Kind: "unknown"}).Glyph() != "" || (Message{Kind: "unknown"}).Tag() != "" {
+		t.Error("a kind nobody knows got a mark")
+	}
+}

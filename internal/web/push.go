@@ -113,6 +113,7 @@ type pushPayload struct {
 
 type pushSub struct {
 	ID       int64
+	UserID   int64
 	Endpoint string
 	P256dh   string
 	Auth     string
@@ -192,20 +193,23 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 		return nil
 	}
 
-	payload, err := json.Marshal(pushPayload{
-		Title: clip(msg.Title, 120),
-		Body:  clip(msg.Body, 300),
-		URL:   "/review",
-	})
-	if err != nil {
-		return err
-	}
 	priv, _, err := s.vapidKeys()
 	if err != nil {
 		return err
 	}
+	// Each person is told in their own language: the browsers are grouped by the
+	// language of the account they belong to, and each group gets one message.
+	payloads := map[string][]byte{}
 	sent, gone := 0, 0
 	for _, sub := range subs {
+		lang := s.languageOf(sub.UserID)
+		payload, ok := payloads[lang]
+		if !ok {
+			if payload, err = json.Marshal(s.pushPayloadIn(lang, msg)); err != nil {
+				return err
+			}
+			payloads[lang] = payload
+		}
 		switch s.sendPushOne(ctx, sub, payload, priv) {
 		case pushSent:
 			sent++
@@ -219,12 +223,23 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 	return nil
 }
 
+// pushPayloadIn is the notification as one language reads it. What arrived is
+// named in that language ("Atlas: Idea"); a message that is not about a report,
+// a test, carries the title its writer already wrote.
+func (s *Server) pushPayloadIn(lang string, msg notify.Message) pushPayload {
+	title := msg.Title
+	if word := s.kindWord(lang, msg.Kind); word != "" {
+		title = isolate(lang, msg.Title) + ": " + word
+	}
+	return pushPayload{Title: clip(title, 120), Body: clip(msg.Body, 300), URL: "/review"}
+}
+
 func scanPushSubs(rows *sql.Rows) ([]pushSub, error) {
 	defer func() { _ = rows.Close() }()
 	var out []pushSub
 	for rows.Next() {
 		var sub pushSub
-		if err := rows.Scan(&sub.ID, &sub.Endpoint, &sub.P256dh, &sub.Auth); err != nil {
+		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.Endpoint, &sub.P256dh, &sub.Auth); err != nil {
 			return nil, err
 		}
 		out = append(out, sub)
@@ -233,7 +248,7 @@ func scanPushSubs(rows *sql.Rows) ([]pushSub, error) {
 }
 
 func (s *Server) pushSubsOfUser(ctx context.Context, userID int64) ([]pushSub, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id, endpoint, p256dh, auth FROM push_subscription WHERE user_id = ? ORDER BY id`, userID)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, user_id, endpoint, p256dh, auth FROM push_subscription WHERE user_id = ? ORDER BY id`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +260,7 @@ func (s *Server) pushSubsOfUser(ctx context.Context, userID int64) ([]pushSub, e
 // account that was disabled is not told anything.
 func (s *Server) pushSubsOfTeam(ctx context.Context, repoID int64) ([]pushSub, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT p.id, p.endpoint, p.p256dh, p.auth
+		SELECT p.id, p.user_id, p.endpoint, p.p256dh, p.auth
 		FROM push_subscription p
 		JOIN app_user u ON u.id = p.user_id AND u.disabled = 0
 		WHERE u.is_administrator = 1
@@ -506,9 +521,10 @@ func (s *Server) handlePushTest(w http.ResponseWriter, r *http.Request) {
 	actor, _ := middleware.ActorFrom(r)
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
+	lang := s.languageOf(actor.UserID)
 	err := s.pushTo(ctx, notify.Message{
-		Title: "LastHelp: test",
-		Body:  "This is a test. If you can read it, this device will be told about new reports.",
+		Title: "LastHelp: " + s.say(lang, "notify.test", nil),
+		Body:  s.say(lang, "notify.testBody", map[string]string{"name": "LastHelp"}),
 		User:  actor.UserID,
 	})
 	switch {

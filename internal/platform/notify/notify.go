@@ -112,11 +112,52 @@ type Message struct {
 	Body  string
 	URL   string
 
+	// Kind is what arrived, as a code and not as a word: "idea", "bug" or
+	// "comment". A channel shared by a whole team has no one language to say it
+	// in, so it says it with a mark every language reads — a bulb, a beetle, a
+	// speech balloon — and a script reads the code itself. A channel that goes to
+	// one person writes the word in that person's language instead.
+	Kind string
+
 	// Repo is the board this is about, and User is the one account a test is
 	// for. Only a channel that goes to people rather than to an address reads
 	// them: Push, which sends to the team of Repo, or to User alone.
 	Repo int64
 	User int64
+}
+
+// Glyph is the mark of a kind, and Tag the name ntfy gives the same mark. Both
+// are empty for a message that is not about a report, a test for one.
+func (m Message) Glyph() string {
+	switch m.Kind {
+	case "idea":
+		return "💡"
+	case "bug":
+		return "🐞"
+	case "comment":
+		return "💬"
+	}
+	return ""
+}
+
+func (m Message) Tag() string {
+	switch m.Kind {
+	case "idea":
+		return "bulb"
+	case "bug":
+		return "beetle"
+	case "comment":
+		return "speech_balloon"
+	}
+	return ""
+}
+
+// withGlyph puts the mark before a title, for a channel that has no place of its own for one.
+func (m Message) withGlyph() string {
+	if g := m.Glyph(); g != "" {
+		return g + " " + m.Title
+	}
+	return m.Title
 }
 
 // Notifier holds the ways out.
@@ -148,7 +189,7 @@ func (n Notifier) Send(ctx context.Context, cfg Config, msg Message) error {
 	case Webhook:
 		return n.sendWebhook(ctx, cfg, msg)
 	case SMTP:
-		return n.Mail.Send(cfg.To, msg.Title, msg.Body+"\n\n"+msg.URL)
+		return n.Mail.Send(cfg.To, msg.withGlyph(), msg.Body+"\n\n"+msg.URL)
 	case Push:
 		if n.Push == nil {
 			return errors.New("push notifications are not available")
@@ -166,6 +207,10 @@ func (n Notifier) sendNtfy(ctx context.Context, cfg Config, msg Message) error {
 		return err
 	}
 	req.Header.Set("Title", header(msg.Title))
+	// The kind as ntfy's own emoji tag, which it draws beside the title: no word to translate.
+	if tag := msg.Tag(); tag != "" {
+		req.Header.Set("Tags", tag)
+	}
 	if msg.URL != "" {
 		req.Header.Set("Click", msg.URL)
 	}
@@ -177,7 +222,7 @@ func (n Notifier) sendNtfy(ctx context.Context, cfg Config, msg Message) error {
 
 func (n Notifier) sendGotify(ctx context.Context, cfg Config, msg Message) error {
 	payload, err := json.Marshal(map[string]any{
-		"title": msg.Title,
+		"title": msg.withGlyph(),
 		"message": func() string {
 			if msg.URL == "" {
 				return msg.Body
@@ -207,11 +252,16 @@ func (n Notifier) sendGotify(ctx context.Context, cfg Config, msg Message) error
 // bridge, at a script — whatever the team already reads. Adding a channel per
 // service would be a channel per service to maintain.
 func (n Notifier) sendWebhook(ctx context.Context, cfg Config, msg Message) error {
-	payload, err := json.Marshal(map[string]any{
+	fields := map[string]any{
 		"title": msg.Title,
 		"body":  msg.Body,
 		"url":   msg.URL,
-	})
+	}
+	// What arrived, as a code a script can switch on without reading a language.
+	if msg.Kind != "" {
+		fields["kind"] = msg.Kind
+	}
+	payload, err := json.Marshal(fields)
 	if err != nil {
 		return err
 	}

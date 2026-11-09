@@ -306,10 +306,17 @@ func (s *Server) announce(ctx context.Context, repoID int64, title, kind, link s
 	if !cfg.Active() {
 		return nil
 	}
+	// What arrived is a code and not a word: a channel the whole team reads has no
+	// one language to say it in, and one that goes to a person writes it in theirs.
+	code := kind
+	if kind == bridge.CommentWaiting {
+		code = "comment"
+	}
 	return s.notifier().Send(ctx, cfg, notify.Message{
-		Title: repo.Name + ": " + kind,
+		Title: repo.Name,
 		Body:  title,
 		URL:   link,
+		Kind:  code,
 		Repo:  repoID,
 	})
 }
@@ -495,9 +502,11 @@ func (s *Server) finishChannelTest(w http.ResponseWriter, r *http.Request, cfg n
 	// The one who pressed the button, for a channel that goes to people: a test
 	// tells whoever is testing, not the whole team.
 	actor, _ := middleware.ActorFrom(r)
+	// In the language of whoever pressed the button, who is the one reading it.
+	lang := s.languageOf(actor.UserID)
 	err := s.notifier().Send(ctx, cfg, notify.Message{
-		Title: "LastHelp: test",
-		Body:  "This is a test from " + name + ". If you can read it, this channel works.",
+		Title: "LastHelp: " + s.say(lang, "notify.test", nil),
+		Body:  s.say(lang, "notify.testBody", map[string]string{"name": name}),
 		URL:   link,
 		User:  actor.UserID,
 	})

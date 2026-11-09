@@ -42,7 +42,7 @@ curl -X POST "$BASE/api/orgs/acme/repos/atlas/channel" \
 |---|---|---|
 | `ntfy` | `url`, optional `token` | The topic URL. Title and click-through go in headers |
 | `gotify` | `url`, `token` | The server address; `/message` is appended |
-| `webhook` | `url`, optional `token` | Posts `{"title","body","url"}` — point it at Matrix, a bridge, a script |
+| `webhook` | `url`, optional `token` | Posts `{"title","body","url","kind"}` — point it at Matrix, a bridge, a script |
 | `smtp` | `to` | Uses the relay configured on the server |
 | `push` | — | The browsers of the team: see [Push notifications](#push-notifications) |
 | `server` | — | A repository only: use the channel the administrator set for the server |
@@ -104,6 +104,20 @@ A repository's test is `POST /api/orgs/{org}/repos/{repo}/channel/test`.
 
 The webhook shape is three fields and is meant to stay that way: it is somebody's
 script.
+
+### What a notification says, and in which language
+
+A channel the whole team reads has no one language, so what arrived is not said
+as a word. The **title is the repository's name**, the **body is the report's
+title** (in whatever language its author wrote it), and the **kind** is a mark:
+💡 an idea, 🐞 a bug, 💬 a comment waiting for review. ntfy gets it as its own
+emoji tag, beside the title; Gotify and mail put the mark before the title; the
+webhook carries it as `"kind": "idea" | "bug" | "comment"`, a code a script can
+switch on without reading a language, and absent for a test.
+
+**Push is the exception, because it goes to one person.** Each account is told in
+its own language: the same report reads *Atlas: Idea* to one account and
+*Atlas: Idee* to another, from the catalogues the page uses.
 
 A notification carries a nudge, not the report. One containing the whole
 submission would deliver spam straight to wherever your team reads things, which

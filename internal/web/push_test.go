@@ -393,3 +393,67 @@ func TestAPushChannelNeedsNothingTypedIn(t *testing.T) {
 		t.Error("a push channel is not a complete choice")
 	}
 }
+
+// TestAPushIsWrittenInTheLanguageOfWhoReadsIt.
+//
+// A channel shared by a team cannot choose a language, but a push goes to one
+// person's browser, and the server knows what language that account reads.
+func TestAPushIsWrittenInTheLanguageOfWhoReadsIt(t *testing.T) {
+	_, srv := newPushInstance(t)
+
+	cases := []struct {
+		lang, kind, want string
+	}{
+		{"en", "idea", "Atlas: Idea"},
+		{"es", "idea", "Atlas: Idea"},
+		{"es", "bug", "Atlas: Fallo"},
+		{"de", "bug", "Atlas: Fehler"},
+		{"es", "comment", "Atlas: Comentario pendiente de revisión"},
+	}
+	for _, c := range cases {
+		got := srv.pushPayloadIn(c.lang, notify.Message{Title: "Atlas", Body: "dark mode", Kind: c.kind}).Title
+		if got != c.want {
+			t.Errorf("%s/%s reads %q, want %q", c.lang, c.kind, got, c.want)
+		}
+	}
+	if es, de := srv.pushPayloadIn("es", notify.Message{Title: "A", Kind: "bug"}).Title, srv.pushPayloadIn("de", notify.Message{Title: "A", Kind: "bug"}).Title; es == de {
+		t.Errorf("two languages read the same notification: %q", es)
+	}
+	// What was written for a test is left as its writer wrote it.
+	if got := srv.pushPayloadIn("es", notify.Message{Title: "LastHelp: Prueba", Body: "b"}).Title; got != "LastHelp: Prueba" {
+		t.Errorf("a message with no kind was rewritten: %q", got)
+	}
+	// A name written the other way is kept from dragging the words around it.
+	if got := srv.pushPayloadIn("ar", notify.Message{Title: "Atlas", Kind: "idea"}).Title; !strings.Contains(got, "⁨Atlas⁩") {
+		t.Errorf("an Arabic notification does not isolate the name: %q", got)
+	}
+}
+
+func TestTheLanguageOfAnAccountFallsBackToEnglish(t *testing.T) {
+	team, srv := newPushInstance(t)
+	team.claim()
+	var me int64
+	if err := team.db().QueryRow(`SELECT id FROM app_user`).Scan(&me); err != nil {
+		t.Fatal(err)
+	}
+	set := func(code string) {
+		t.Helper()
+		if _, err := team.db().Exec(`UPDATE app_user SET language = ? WHERE id = ?`, code, me); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for stored, want := range map[string]string{"es": "es", "": "en", "xx": "en", "../../etc/passwd": "en", "ES": "en"} {
+		set(stored)
+		if got := srv.languageOf(me); got != want {
+			t.Errorf("an account that chose %q is told in %q, want %q", stored, got, want)
+		}
+	}
+	// A code is checked before it is made into a path.
+	if srv.words("../dist/index") != nil || srv.words("") != nil {
+		t.Error("a language code that is not one was read as a file")
+	}
+	// A sentence a language lacks is English, and one English lacks is its key.
+	if got := srv.say("en", "no.such.key", nil); got != "no.such.key" {
+		t.Errorf("a missing key reads %q", got)
+	}
+}
