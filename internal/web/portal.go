@@ -28,7 +28,7 @@ const reportBodyLimit = 128 << 10
 
 // handleOrganizations lists what this instance serves. Public: it is the front
 // page of the portal.
-func (s *Server) handleOrganizations(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleOrganizations(w http.ResponseWriter, r *http.Request) {
 	list, err := s.orgs().ListOrganizations()
 	if err != nil {
 		slog.Error("listing organisations", "error", err)
@@ -37,6 +37,9 @@ func (s *Server) handleOrganizations(w http.ResponseWriter, _ *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, o := range list {
+		if !s.mayViewOrganization(r, o) {
+			continue
+		}
 		out = append(out, map[string]any{"slug": o.Slug, "name": o.Name, "icon": o.Icon})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"organizations": out})
@@ -56,6 +59,9 @@ func (s *Server) handleRepositories(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(list))
 	for _, repo := range list {
+		if !s.mayViewRepository(r, o, repo) {
+			continue
+		}
 		out = append(out, describeRepository(repo, s.mailConfigured()))
 	}
 	organisation := map[string]any{"slug": o.Slug, "name": o.Name, "forge": string(o.Forge), "icon": o.Icon}
@@ -419,7 +425,7 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	store := s.items()
 
 	it, err := store.ByPublicID(publicID)
-	if err != nil {
+	if err != nil || !s.mayViewItem(r, it) {
 		writeError(w, http.StatusNotFound, "error.not_found")
 		return
 	}
@@ -662,7 +668,7 @@ func writeCommentError(w http.ResponseWriter, err error) {
 
 func (s *Server) lookupOrganization(w http.ResponseWriter, r *http.Request) (org.Organization, bool) {
 	o, err := s.orgs().OrganizationBySlug(r.PathValue("org"))
-	if err != nil {
+	if err != nil || !s.mayViewOrganization(r, o) {
 		writeError(w, http.StatusNotFound, "error.not_found")
 		return org.Organization{}, false
 	}
@@ -675,7 +681,7 @@ func (s *Server) lookupRepository(w http.ResponseWriter, r *http.Request) (org.R
 		return org.Repository{}, org.Organization{}, false
 	}
 	repo, err := s.orgs().RepositoryBySlugs(o.Slug, r.PathValue("repo"))
-	if err != nil {
+	if err != nil || !s.mayViewRepository(r, o, repo) {
 		writeError(w, http.StatusNotFound, "error.not_found")
 		return org.Repository{}, org.Organization{}, false
 	}
@@ -684,7 +690,7 @@ func (s *Server) lookupRepository(w http.ResponseWriter, r *http.Request) (org.R
 
 func (s *Server) lookupItem(w http.ResponseWriter, r *http.Request) (item.Item, bool) {
 	it, err := s.items().ByPublicID(r.PathValue("id"))
-	if err != nil {
+	if err != nil || !s.mayViewItem(r, it) {
 		writeError(w, http.StatusNotFound, "error.not_found")
 		return item.Item{}, false
 	}
@@ -777,4 +783,57 @@ func (s *Server) mayTriageItem(r *http.Request, it item.Item) bool {
 		return false
 	}
 	return actor.Can(authz.Triage, authz.Repository(repo.ID, repo.OrgID))
+}
+
+// --- who may see what is private ------------------------------------------
+//
+// One rule, asked in one place: a private organisation or board is a 404 to
+// anybody who is not on the team, and the same 404 a missing one gives, so the
+// answer does not admit it exists. The team is whoever could work on it: the
+// administrator, an owner of the organisation, a collaborator on the board.
+
+// mayViewOrganization: public ones to everybody; a private one to the people
+// who stand somewhere in it.
+func (s *Server) mayViewOrganization(r *http.Request, o org.Organization) bool {
+	if !o.Private {
+		return true
+	}
+	actor, ok := middleware.ActorFrom(r)
+	return ok && (actor.IsAdministrator || actor.StandingIn(o.ID) != "")
+}
+
+// mayViewRepository: a board is seen if neither it nor its organisation is
+// private, or by someone who works on that very board. Being a collaborator on
+// another board of a private organisation does not open this one.
+func (s *Server) mayViewRepository(r *http.Request, o org.Organization, repo org.Repository) bool {
+	if !o.Private && !repo.Private {
+		return true
+	}
+	actor, ok := middleware.ActorFrom(r)
+	return ok && actor.Can(authz.Triage, authz.Repository(repo.ID, repo.OrgID))
+}
+
+func (s *Server) mayViewItem(r *http.Request, it item.Item) bool {
+	repo, err := s.orgs().RepositoryByID(it.RepoID)
+	if err != nil {
+		return false
+	}
+	o, err := s.orgs().OrganizationByID(repo.OrgID)
+	if err != nil {
+		return false
+	}
+	return s.mayViewRepository(r, o, repo)
+}
+
+// visibleBoards drops the boards the asker may not see.
+func (s *Server) visibleBoards(r *http.Request, boards []org.Board) []org.Board {
+	actor, signed := middleware.ActorFrom(r)
+	out := boards[:0:0]
+	for _, b := range boards {
+		if b.Hidden() && !(signed && actor.Can(authz.Triage, authz.Repository(b.ID, b.OrgID))) {
+			continue
+		}
+		out = append(out, b)
+	}
+	return out
 }

@@ -52,13 +52,14 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		"accepts_bugs":   repo.AcceptsBugs,
 		"accepts_ideas":  repo.AcceptsIdeas,
 		"accepts_images": repo.AcceptsImages,
+		"private":        repo.Private,
 		"icon":           repo.Icon,
 		// Which channel. The address and the recipient go only to whoever may
 		// change them, and the token to nobody: an endpoint that returns a stored
 		// token is a way to read one.
 		"channel":      channelKind(repo.NotifyConfig),
 		"pending":      counts[string(item.Pending)],
-		"organization": map[string]any{"slug": organisation.Slug, "name": organisation.Name, "forge": organisation.Forge},
+		"organization": map[string]any{"slug": organisation.Slug, "name": organisation.Name, "forge": organisation.Forge, "private": organisation.Private},
 		"can_manage":   canManage,
 		// A repository is deleted by whoever runs its organisation.
 		"can_delete": canManage,
@@ -124,6 +125,7 @@ func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request)
 			"accepts_bugs":   repo.AcceptsBugs,
 			"accepts_ideas":  repo.AcceptsIdeas,
 			"accepts_images": repo.AcceptsImages,
+			"private":        repo.Private,
 			"icon":           repo.Icon,
 			"pending":        counts[string(item.Pending)],
 		})
@@ -215,6 +217,7 @@ func (s *Server) handleOrganizationsPanel(w http.ResponseWriter, r *http.Request
 			"name":         o.Name,
 			"forge":        string(o.Forge),
 			"icon":         o.Icon,
+			"private":      o.Private,
 			"repositories": len(ids),
 			"pending":      pending,
 			"role":         actor.StandingIn(o.ID),

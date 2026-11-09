@@ -492,6 +492,19 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 15,
+		name:    "an organisation and a repository can be private",
+		// Everything was public. A team may want a board only it can see, so each
+		// level gets a switch; 0 stays public, which is what every existing row
+		// already was, and nothing changes for anybody who does not touch it.
+		fn: func(tx *sql.Tx) error {
+			if err := addColumn(tx, "organization", "is_private", "INTEGER NOT NULL DEFAULT 0"); err != nil {
+				return err
+			}
+			return addColumn(tx, "repository", "is_private", "INTEGER NOT NULL DEFAULT 0")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

@@ -129,6 +129,6 @@ func (s Store) ByHookID(hookID string) (Organization, error) {
 		return Organization{}, ErrNotFound
 	}
 	return s.scanOrganization(s.DB.QueryRow(`
-		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, created_at
+		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, is_private, created_at
 		FROM organization WHERE hook_id = ?`, hookID))
 }

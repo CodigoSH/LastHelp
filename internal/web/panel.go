@@ -42,6 +42,8 @@ type newOrganization struct {
 	ForgeOwner string `json:"forge_owner"`
 	// Icon is a data URL, or empty for the initials of the name.
 	Icon string `json:"icon"`
+	// Private keeps it from the public; public unless chosen.
+	Private bool `json:"private"`
 }
 
 // handleCreateOrganization adds a connection. Server-level: an organisation
@@ -71,7 +73,7 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 	created, err := s.orgs().CreateOrganization(org.Organization{
 		Slug: in.Slug, Name: in.Name, Forge: org.Forge(in.Forge),
 		BaseURL: in.BaseURL, ForgeOwner: in.ForgeOwner,
-		Icon: icon,
+		Icon: icon, Private: in.Private,
 	}, s.now())
 	if err != nil {
 		writeError(w, statusForOrgError(err), keyForOrgError(err))
@@ -99,6 +101,8 @@ type newRepository struct {
 	AcceptsImages *bool `json:"accepts_images"`
 	// Icon is a data URL, or empty for the initials of the name.
 	Icon string `json:"icon"`
+	// Private keeps the board from the public; public unless chosen.
+	Private bool `json:"private"`
 }
 
 // maxIconBytes keeps a repository's icon small enough to travel inline in
@@ -150,7 +154,7 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 	created, err := s.orgs().CreateRepository(org.Repository{
 		OrgID: o.ID, Slug: in.Slug, Name: in.Name, ForgeRepo: in.ForgeRepo,
 		AcceptsBugs: accepts(in.AcceptsBugs), AcceptsIdeas: accepts(in.AcceptsIdeas),
-		Icon: icon,
+		Icon: icon, Private: in.Private,
 	}, s.now())
 	if err != nil {
 		writeError(w, statusForOrgError(err), keyForOrgError(err))

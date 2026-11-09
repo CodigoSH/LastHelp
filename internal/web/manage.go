@@ -18,6 +18,8 @@ import (
 type organizationChange struct {
 	Name string  `json:"name"`
 	Icon *string `json:"icon"`
+	// Private likewise: absent leaves the choice as it was.
+	Private *bool `json:"private"`
 }
 
 // handleRenameOrganization changes the name, never the address.
@@ -58,6 +60,12 @@ func (s *Server) handleRenameOrganization(w http.ResponseWriter, r *http.Request
 			return
 		}
 	}
+	if in.Private != nil {
+		if err := s.orgs().SetOrganizationPrivate(o.ID, *in.Private); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"name": strings.TrimSpace(in.Name)})
 }
 
@@ -92,6 +100,8 @@ type repositoryChange struct {
 	Icon *string `json:"icon"`
 	// AcceptsImages likewise: absent leaves it as it was.
 	AcceptsImages *bool `json:"accepts_images"`
+	// Private likewise.
+	Private *bool `json:"private"`
 }
 
 func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) {
@@ -138,6 +148,12 @@ func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) 
 	}
 	if in.AcceptsImages != nil {
 		if err := s.orgs().SetAcceptsImages(repo.ID, *in.AcceptsImages); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+	}
+	if in.Private != nil {
+		if err := s.orgs().SetRepositoryPrivate(repo.ID, *in.Private); err != nil {
 			writeError(w, http.StatusInternalServerError, "error.internal")
 			return
 		}

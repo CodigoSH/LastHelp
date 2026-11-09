@@ -147,7 +147,7 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := map[string]any{"bands": page.Bands, "settings": page.Settings}
-	boards, needed := s.boardsForLanding(page, composer)
+	boards, needed := s.boardsForLanding(r, page, composer)
 	if needed {
 		body["content"] = landingContentFrom(page, boards, s.describeBoards, s.reportsFor, s.comingIn, s.countedIn)
 	}
@@ -164,7 +164,7 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 // boardsForLanding reads the boards only when somebody on this request needs
 // them: a page of words and pictures shown to a stranger touches neither the
 // board table nor the item table.
-func (s *Server) boardsForLanding(page landing.Page, composer bool) ([]org.Board, bool) {
+func (s *Server) boardsForLanding(r *http.Request, page landing.Page, composer bool) ([]org.Board, bool) {
 	if !page.NeedsData() && !composer {
 		return nil, false
 	}
@@ -173,7 +173,7 @@ func (s *Server) boardsForLanding(page landing.Page, composer bool) ([]org.Board
 		slog.Error("listing boards for the front page", "error", err)
 		return nil, false
 	}
-	return boards, page.NeedsData()
+	return s.visibleBoards(r, boards), page.NeedsData()
 }
 
 // landingContentFrom is what the data modules of a page have to show, keyed by
@@ -419,6 +419,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
+	boards = s.visibleBoards(r, boards)
 	hits := []map[string]any{}
 	if len(boards) > 0 {
 		byID := make(map[int64]org.Board, len(boards))

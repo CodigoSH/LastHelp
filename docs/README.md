@@ -17,6 +17,7 @@ One binary, one SQLite file, no external services.
 - [Connecting a forge](forges/connecting.md)
 - [The overview](administration/overview.md)
 - [Notifications](administration/notifications.md)
+- [Private organisations and boards](administration/private-boards.md)
 - [Updating](administration/updating.md)
 - [Keeping the queue readable](administration/anti-abuse.md)
 - [What a visitor leaves behind](administration/privacy.md)

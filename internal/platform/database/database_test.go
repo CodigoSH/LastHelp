@@ -435,3 +435,38 @@ func TestABugInTheOldStatesMovesToTheSharedOnes(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEveryExistingOrganizationAndBoardStaysPublic(t *testing.T) {
+	db := open(t)
+	if _, err := db.Exec(`INSERT INTO organization (id, slug, name, forge_kind, base_url, forge_owner, created_at)
+		VALUES (1, 'acme', 'Acme', 'none', '', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO repository (id, org_id, slug, name, forge_repo, created_at)
+		VALUES (1, 1, 'atlas', 'Atlas', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	// An installation from before the choice existed, whose tables lack the column.
+	for _, stmt := range []string{
+		`ALTER TABLE organization DROP COLUMN is_private`,
+		`ALTER TABLE repository DROP COLUMN is_private`,
+		`PRAGMA user_version = 14`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	var a, b int
+	if err := db.QueryRow(`SELECT (SELECT is_private FROM organization), (SELECT is_private FROM repository)`).Scan(&a, &b); err != nil {
+		t.Fatal(err)
+	}
+	if a != 0 || b != 0 {
+		t.Errorf("after the update the organisation is private=%d and the board private=%d, want both public", a, b)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+}

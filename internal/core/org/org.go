@@ -89,7 +89,11 @@ type Organization struct {
 	BaseURL    string
 	ForgeOwner string
 	// Icon is a data URL, or empty for the initials of its name.
-	Icon      string
+	Icon string
+	// Private hides the whole organisation, and so every board under it, from
+	// anybody who is not on the team. The zero value is public, which is what
+	// every organisation was before the choice existed.
+	Private   bool
 	CreatedAt time.Time
 }
 
@@ -113,6 +117,10 @@ type Repository struct {
 
 	// Icon is a data URL, or empty for the initials of its name.
 	Icon string
+
+	// Private hides this board from anybody who is not on the team. Public
+	// unless chosen otherwise, like the organisation's.
+	Private bool
 
 	CreatedAt time.Time
 }
@@ -159,9 +167,9 @@ func (s Store) CreateOrganization(o Organization, now time.Time) (Organization, 
 	}
 
 	res, err := s.DB.Exec(`INSERT INTO organization
-		(slug, name, forge_kind, base_url, forge_owner, icon, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		o.Slug, o.Name, string(o.Forge), o.BaseURL, o.ForgeOwner, o.Icon, now.Unix())
+		(slug, name, forge_kind, base_url, forge_owner, icon, is_private, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		o.Slug, o.Name, string(o.Forge), o.BaseURL, o.ForgeOwner, o.Icon, o.Private, now.Unix())
 	if err != nil {
 		if isUnique(err) {
 			return Organization{}, ErrSlugTaken
@@ -178,13 +186,13 @@ func (s Store) CreateOrganization(o Organization, now time.Time) (Organization, 
 // OrganizationBySlug is the lookup every public URL starts with.
 func (s Store) OrganizationBySlug(slug string) (Organization, error) {
 	return s.scanOrganization(s.DB.QueryRow(`
-		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, created_at
+		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, is_private, created_at
 		FROM organization WHERE slug = ?`, NormaliseSlug(slug)))
 }
 
 func (s Store) OrganizationByID(id int64) (Organization, error) {
 	return s.scanOrganization(s.DB.QueryRow(`
-		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, created_at
+		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, is_private, created_at
 		FROM organization WHERE id = ?`, id))
 }
 
@@ -192,7 +200,7 @@ func (s Store) OrganizationByID(id int64) (Organization, error) {
 // reshuffles between two loads is a list nobody trusts.
 func (s Store) ListOrganizations() ([]Organization, error) {
 	rows, err := s.DB.Query(`
-		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, created_at
+		SELECT id, slug, name, forge_kind, base_url, forge_owner, icon, is_private, created_at
 		FROM organization ORDER BY name COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, fmt.Errorf("listing organisations: %w", err)
@@ -204,7 +212,7 @@ func (s Store) ListOrganizations() ([]Organization, error) {
 		var o Organization
 		var forge string
 		var created int64
-		if err := rows.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &o.Icon, &created); err != nil {
+		if err := rows.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &o.Icon, &o.Private, &created); err != nil {
 			return nil, fmt.Errorf("listing organisations: %w", err)
 		}
 		o.Forge = Forge(forge)
@@ -238,9 +246,9 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 	// what is returned matches what was stored.
 	r.AcceptsImages = true
 	res, err := s.DB.Exec(`INSERT INTO repository
-		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, icon, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas, r.Icon, now.Unix())
+		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, icon, is_private, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas, r.Icon, r.Private, now.Unix())
 	if err != nil {
 		if isUnique(err) {
 			return Repository{}, ErrSlugTaken
@@ -262,7 +270,7 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.created_at
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.is_private, r.created_at
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
 		WHERE o.slug = ? AND r.slug = ?`, NormaliseSlug(orgSlug), NormaliseSlug(repoSlug)))
@@ -271,14 +279,14 @@ func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 func (s Store) RepositoryByID(id int64) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, created_at
+		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, is_private, created_at
 		FROM repository WHERE id = ?`, id))
 }
 
 func (s Store) ListRepositories(orgID int64) ([]Repository, error) {
 	rows, err := s.DB.Query(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, created_at
+		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, is_private, created_at
 		FROM repository WHERE org_id = ? ORDER BY name COLLATE NOCASE, id`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("listing repositories: %w", err)
@@ -302,7 +310,7 @@ func (s Store) scanOrganization(row scanner) (Organization, error) {
 	var o Organization
 	var forge string
 	var created int64
-	err := row.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &o.Icon, &created)
+	err := row.Scan(&o.ID, &o.Slug, &o.Name, &forge, &o.BaseURL, &o.ForgeOwner, &o.Icon, &o.Private, &created)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return Organization{}, ErrNotFound
@@ -329,7 +337,7 @@ func scanRepositoryRow(row scanner) (Repository, error) {
 	var r Repository
 	var created int64
 	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.ForgeRepo,
-		&r.AcceptsBugs, &r.AcceptsIdeas, &r.AcceptsImages, &r.NotifyConfig, &r.Icon, &created)
+		&r.AcceptsBugs, &r.AcceptsIdeas, &r.AcceptsImages, &r.NotifyConfig, &r.Icon, &r.Private, &created)
 	if err != nil {
 		return Repository{}, err
 	}
@@ -457,7 +465,14 @@ type Board struct {
 	Repository
 	OrgSlug string
 	OrgName string
+	// OrgPrivate is the organisation's own choice; Hidden says what the pair
+	// of them means.
+	OrgPrivate bool
 }
+
+// Hidden is whether the public must not see this board: it, or the
+// organisation it belongs to, is private.
+func (b Board) Hidden() bool { return b.Private || b.OrgPrivate }
 
 // ListBoards is every board in the installation, in one query.
 //
@@ -468,8 +483,8 @@ type Board struct {
 func (s Store) ListBoards() ([]Board, error) {
 	rows, err := s.DB.Query(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.created_at,
-		       o.slug, o.name
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.is_private, r.created_at,
+		       o.slug, o.name, o.is_private
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
 		ORDER BY o.name COLLATE NOCASE, r.name COLLATE NOCASE, r.id`)
@@ -483,8 +498,8 @@ func (s Store) ListBoards() ([]Board, error) {
 		var b Board
 		var created int64
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Slug, &b.Name, &b.ForgeRepo,
-			&b.AcceptsBugs, &b.AcceptsIdeas, &b.AcceptsImages, &b.NotifyConfig, &b.Icon, &created,
-			&b.OrgSlug, &b.OrgName)
+			&b.AcceptsBugs, &b.AcceptsIdeas, &b.AcceptsImages, &b.NotifyConfig, &b.Icon, &b.Private, &created,
+			&b.OrgSlug, &b.OrgName, &b.OrgPrivate)
 		if err != nil {
 			return nil, fmt.Errorf("listing boards: %w", err)
 		}
@@ -492,4 +507,21 @@ func (s Store) ListBoards() ([]Board, error) {
 		out = append(out, b)
 	}
 	return out, rows.Err()
+}
+
+// SetOrganizationPrivate hides or shows an organisation. Apart from the rename
+// so an edit that does not mention it leaves the choice alone.
+func (s Store) SetOrganizationPrivate(id int64, private bool) error {
+	if _, err := s.DB.Exec(`UPDATE organization SET is_private = ? WHERE id = ?`, private, id); err != nil {
+		return fmt.Errorf("setting the organisation's visibility: %w", err)
+	}
+	return nil
+}
+
+// SetRepositoryPrivate hides or shows one board.
+func (s Store) SetRepositoryPrivate(id int64, private bool) error {
+	if _, err := s.DB.Exec(`UPDATE repository SET is_private = ? WHERE id = ?`, private, id); err != nil {
+		return fmt.Errorf("setting the repository's visibility: %w", err)
+	}
+	return nil
 }

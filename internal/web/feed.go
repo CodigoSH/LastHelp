@@ -111,12 +111,12 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) lookupRepositoryForFeed(w http.ResponseWriter, r *http.Request) (org.Repository, org.Organization, bool) {
 	organisation, err := s.orgs().OrganizationBySlug(r.PathValue("org"))
-	if err != nil {
+	if err != nil || !s.mayViewOrganization(r, organisation) {
 		http.NotFound(w, r)
 		return org.Repository{}, org.Organization{}, false
 	}
 	repo, err := s.orgs().RepositoryBySlugs(organisation.Slug, r.PathValue("repo"))
-	if err != nil {
+	if err != nil || !s.mayViewRepository(r, organisation, repo) {
 		http.NotFound(w, r)
 		return org.Repository{}, org.Organization{}, false
 	}
