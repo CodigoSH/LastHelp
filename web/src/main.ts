@@ -2197,6 +2197,7 @@ async function showOrganizationWizard(step: 1 | 2): Promise<void> {
           base_url: String(data.get("base_url") ?? ""),
           forge_owner: String(data.get("forge_owner") ?? ""),
           icon: draft.orgIcon,
+          private: data.get("private") !== null,
         });
         draft.orgIcon = "";
         go(draft.forge === "none" ? `/panel/${draft.orgSlug}` : "/panel/new/connection");
@@ -2258,6 +2259,7 @@ async function showRepositoryWizard(orgSlug: string, step: 1 | 2): Promise<void>
           accepts_bugs: data.get("accepts_bugs") !== null,
           accepts_ideas: data.get("accepts_ideas") !== null,
           accepts_images: data.get("accepts_images") !== null,
+          private: data.get("private") !== null,
         });
         go(`/panel/${orgSlug}`);
       } catch (err) {
@@ -3068,6 +3070,7 @@ async function showOrganizationsPanel(): Promise<void> {
       base_url: String(data.get("base_url") ?? ""),
       forge_owner: String(data.get("forge_owner") ?? ""),
       icon: String(data.get("icon") ?? ""),
+      private: data.get("private") !== null,
     });
     await render();
   });
@@ -3358,6 +3361,7 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
       accepts_bugs: formData.get("accepts_bugs") !== null,
       accepts_ideas: formData.get("accepts_ideas") !== null,
       accepts_images: formData.get("accepts_images") !== null,
+      private: formData.get("private") !== null,
       icon: String(formData.get("icon") ?? ""),
     });
     await render();
@@ -3430,7 +3434,11 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   );
 
   onSubmit("form.org-settings", async (formData) => {
-    await api.patch(base, { name: String(formData.get("name") ?? ""), icon: String(formData.get("icon") ?? "") });
+    await api.patch(base, {
+      name: String(formData.get("name") ?? ""),
+      icon: String(formData.get("icon") ?? ""),
+      private: formData.get("private") !== null,
+    });
     toast(i18n.t("panel.saved"));
     await render();
   });
@@ -3472,6 +3480,7 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
       accepts_bugs: data.get("accepts_bugs") !== null,
       accepts_ideas: data.get("accepts_ideas") !== null,
       accepts_images: data.get("accepts_images") !== null,
+      private: data.get("private") !== null,
       icon: String(data.get("icon") ?? ""),
     });
     toast(i18n.t("panel.saved"));

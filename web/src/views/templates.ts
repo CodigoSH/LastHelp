@@ -1198,7 +1198,8 @@ export function organizationFields(text: Text, forge: string): string {
         hint: text.t("panel.forgeOwnerHelp"),
         example: example.owner,
       }, text)}
-    </div>`
+    </div>` +
+    visibilityField(text, false, true)
   );
 }
 
@@ -1238,7 +1239,7 @@ export function repositoryFields(text: Text, forge: string, hasForge: boolean): 
  *  refused by the server, and defaulting to off makes that the common mistake.
  *  Pictures are a field of their own: they are not a kind of report, and the
  *  "at least one" under the kinds is not about them. */
-export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean; images?: boolean }): string {
+export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean; images?: boolean; private?: boolean }): string {
   // Two checkboxes that say what they turn on, not two pills reading "Bug" and
   // "Idea". This is a settings form: the control people know here is a
   // checkbox with a sentence beside it, and the words are what somebody
@@ -1263,6 +1264,22 @@ export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: bool
       ${box("accepts_images", text.t("repo.acceptsImages"), current?.images ?? true)}
     </div>
     <p class="hint">${escapeHTML(text.t("repo.imagesHelp"))}</p>
+  </div>
+  ${visibilityField(text, current?.private ?? false, false)}`;
+}
+
+/** Who may see an organisation or a board. One checkbox: public is the ordinary
+ *  state and needs no words, so what is offered is the exception. */
+export function visibilityField(text: Text, isPrivate: boolean, wholeOrganization: boolean): string {
+  return `<div class="field">
+    <label>${escapeHTML(text.t("visibility.label"))}</label>
+    <div class="checks">
+      <label class="check">
+        <input type="checkbox" name="private"${isPrivate ? " checked" : ""} />
+        <span>${escapeHTML(text.t("visibility.private"))}</span>
+      </label>
+    </div>
+    <p class="hint">${escapeHTML(text.t(wholeOrganization ? "visibility.orgHelp" : "visibility.help"))}</p>
   </div>`;
 }
 
@@ -1756,6 +1773,11 @@ function kindMark(kind: string, size = 16): string {
  * tile: a tile beside the row's buttons reads as one more button. Named for
  * whoever cannot see the picture, since the picture is all there is.
  */
+/** The small word on anything only the team can see. */
+function privateMark(text: Text): string {
+  return `<span class="mono-tag" data-private="true">${escapeHTML(text.t("visibility.tag"))}</span>`;
+}
+
 function acceptsMarks(repo: { accepts_bugs: boolean; accepts_ideas: boolean }, text: Text): string {
   const mark = (kind: string) =>
     `<span class="kind kind-${kind}" role="img" title="${escapeAttr(text.t(`kind.${kind}`))}"
@@ -3090,6 +3112,8 @@ export interface OrganizationRow {
   name: string;
   forge: string;
   icon?: string;
+  /** Hidden from everybody who is not on the team. */
+  private?: boolean;
   /** How many of its boards this reader works on. */
   repositories: number;
   /** What is waiting in those. */
@@ -3127,6 +3151,7 @@ export function organizationsScreen(
           o.forge && o.forge !== "none"
             ? `<span class="mono-tag" data-forge="${escapeAttr(o.forge)}">${escapeHTML(forgeName(o.forge))}</span>`
             : "",
+          o.private ? privateMark(text) : "",
           o.connected === false
             ? `<span class="state-mark hold" role="img" data-connected="false"
                  title="${escapeAttr(text.t("org.notConnected"))}" aria-label="${escapeAttr(text.t("org.notConnected"))}">${icons.warning(15)}</span>`
@@ -3166,12 +3191,13 @@ export interface OrganizationPanel {
     name: string;
     forge: string;
     icon?: string;
+    private?: boolean;
     base_url?: string;
     forge_owner?: string;
     webhook_path?: string;
   };
   /** The ones the reader may triage, each with what is waiting in it. */
-  repositories: { slug: string; name: string; accepts_bugs: boolean; accepts_ideas: boolean; pending: number; icon?: string }[];
+  repositories: { slug: string; name: string; accepts_bugs: boolean; accepts_ideas: boolean; pending: number; icon?: string; private?: boolean }[];
   /** Whether a token and a webhook secret are stored; never what they are. */
   connection?: { token: boolean; secret: boolean };
   can_manage: boolean;
@@ -3207,7 +3233,7 @@ export function organizationScreen(
   const summary = settingsCard(
     org.name,
     `<p class="org-tags"><span class="mono-tag">/${escapeHTML(org.slug)}</span>
-      ${hasForge ? `<span class="mono-tag accent">${escapeHTML(org.forge)}</span>` : ""}</p>`,
+      ${hasForge ? `<span class="mono-tag accent">${escapeHTML(org.forge)}</span>` : ""}${org.private ? privateMark(text) : ""}</p>`,
     { action: `<a class="button ghost" href="/${escapeAttr(org.slug)}">${escapeHTML(text.t("shell.publicBoard"))}</a>` },
   );
 
@@ -3221,7 +3247,7 @@ export function organizationScreen(
         tags:
           (r.pending > 0
             ? waitingMark(r.pending, text)
-            : "") + acceptsMarks(r, text),
+            : "") + (r.private ? privateMark(text) : "") + acceptsMarks(r, text),
         href: `/panel/${org.slug}/repos/${r.slug}`,
         actions: `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
           ${data.can_delete_repos ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`,
@@ -3253,6 +3279,7 @@ export function organizationScreen(
     `<form class="org-settings">
       ${iconField(text, org.name, org.icon ?? "", "os-icon")}
       ${field({ id: "os-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: org.name }, text)}
+      ${visibilityField(text, org.private ?? false, true)}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
@@ -3445,6 +3472,8 @@ export interface RepositoryPanel {
   accepts_ideas: boolean;
   /** Whether reporters and the team may attach pictures. */
   accepts_images?: boolean;
+  /** Hidden from everybody who is not on the team. */
+  private?: boolean;
   /** A data URL, or absent for the initials of the name. */
   icon?: string;
   /** Which channel tells the team. Empty for none. */
@@ -3536,7 +3565,7 @@ export function repositoryScreen(
       ${iconField(text, repo.name, repo.icon ?? "")}
       ${field({ id: "rs-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: repo.name }, text)}
       ${hasForge ? field({ id: "rs-forge", name: "forge_repo", label: text.t("panel.forgeRepo"), hint: text.t("panel.forgeRepoHelp"), value: repo.forge_repo }, text) : ""}
-      ${acceptsFields(text, { bugs: repo.accepts_bugs, ideas: repo.accepts_ideas, images: repo.accepts_images ?? true })}
+      ${acceptsFields(text, { bugs: repo.accepts_bugs, ideas: repo.accepts_ideas, images: repo.accepts_images ?? true, private: repo.private ?? false })}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
