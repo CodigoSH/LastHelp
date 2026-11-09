@@ -2396,7 +2396,7 @@ async function main() {
   `);
   check(
     "the overview is one screen, the same for everybody",
-    overview.cards === 11 && overview.draggable === 0 && overview.arrange === false,
+    overview.cards === 12 && overview.draggable === 0 && overview.arrange === false,
     JSON.stringify({ ...overview, desbordan: undefined }),
   );
   check(
@@ -2412,31 +2412,39 @@ async function main() {
 
   // 11d. The chart. A number says how many; only this says whether it is
   //      getting busier, and it is drawn by hand from the series the server
-  //      sends — so what is checked is that there is a line with a point per
-  //      day on it, not that a box is on screen.
+  //      sends — so what is checked is that there is a line per kind with a
+  //      point per day on it, a scale to read it against and a column to ask
+  //      for each day, not that a box is on screen.
   const chart = await evaluate(`
-    const line = document.querySelector('[data-ov="activity"] .chart-line');
-    const d = line?.getAttribute("d") ?? "";
-    return { points: (d.match(/[ML]/g) ?? []).length, comma: d.includes(","), axis: !!document.querySelector(".chart-axis") };
+    const lines = [...document.querySelectorAll('[data-ov="activity"] .tc-line')].map(l => l.getAttribute("d") ?? "");
+    return {
+      lines: lines.length,
+      points: lines.map(d => (d.match(/[ML]/g) ?? []).length),
+      comma: lines.some(d => d.includes(",")),
+      scale: document.querySelectorAll('[data-ov="activity"] .tc-ylab').length,
+      edges: document.querySelectorAll('[data-ov="activity"] .tc-edge').length,
+      columns: document.querySelectorAll('[data-ov="activity"] .tc-col').length,
+    };
   `);
   check(
-    "the overview draws thirty days rather than one more number",
-    chart.points === 30 && chart.comma === false && chart.axis === true,
+    "the overview draws thirty days, a line for each kind, rather than one more number",
+    chart.lines === 2 && chart.points.every((p: number) => p === 30) && chart.comma === false &&
+      chart.scale >= 3 && chart.edges === 2 && chart.columns === 30,
     JSON.stringify(chart),
   );
 
   // And it answers which day was which, under a real pointer. A dispatched
   // MouseEvent does not drive hover — this house has been caught by that — so
-  // the pointer is moved with the browser's own input, onto the last point and
+  // the pointer is moved with the browser's own input, onto the last day and
   // then off the chart entirely.
   const where = await evaluate(`
     // Into view first: the pointer is dispatched in the window's own
     // coordinates, and this browser opens at 600px tall — the chart is below
     // the fold, so the first version of this check moved the pointer past the
     // bottom of the window and measured a page nothing had touched.
-    document.querySelector(".chart-wrap").scrollIntoView({ block: "center" });
+    document.querySelector(".tc-wrap").scrollIntoView({ block: "center" });
     await new Promise(r => setTimeout(r, 300));
-    const box = document.querySelector(".chart-wrap svg").getBoundingClientRect();
+    const box = document.querySelector(".tc-wrap svg").getBoundingClientRect();
     return { x: Math.round(box.left + box.width * 0.98), y: Math.round(box.top + box.height * 0.6),
              away: Math.round(box.top - 40) };
   `);
@@ -2446,20 +2454,23 @@ async function main() {
   await sleep(400);
   const asked = await evaluate(`
     const tip = document.querySelector(".chart-tip");
-    const dot = document.querySelector(".chart-dot.on");
+    const cursor = document.querySelector(".tc-cursor");
+    const at = cursor.getAttribute("x1");
+    // The column the guide is on, which is the day the box is about.
+    const column = [...document.querySelectorAll(".tc-col")].find(c => c.getAttribute("data-x") === at);
     const digits = (el) => Number((el?.textContent ?? "").replace(/[^0-9]/g, ""));
     return {
-      // Compared against the point it landed on rather than against a fixed
+      // Compared against the column it landed on rather than against a fixed
       // string: by now the walk has changed language once, and a check that
       // expects English would be checking the language.
-      day: dot ? Number(dot.dataset.day) : 0,
-      count: dot ? Number(dot.dataset.count) : -1,
+      day: column ? Number(column.dataset.day) : 0,
+      reports: column ? Number(column.dataset.reports) : -1,
       dayLine: (tip?.querySelector(".tip-day")?.textContent ?? "").trim(),
-      total: digits(tip?.querySelector(".tip-total .count")),
+      total: digits(tip?.querySelector(".tip-row.total b")),
       // The breakdown has to add up to what the day was, or it is decoration.
-      parts: [...(tip?.querySelectorAll(".tip-row .count") ?? [])].map(digits),
+      parts: [...(tip?.querySelectorAll(".tip-row:not(.total) b") ?? [])].map(digits),
       shown: tip ? !tip.hidden : false,
-      cursor: !document.querySelector(".chart-cursor").hasAttribute("hidden"),
+      cursor: !cursor.hasAttribute("hidden"),
     };
   `);
   await page.send("Input.dispatchMouseEvent", {
@@ -2467,15 +2478,43 @@ async function main() {
   });
   await sleep(300);
   const gone = await evaluate(`
-    return { tip: document.querySelector(".chart-tip").hidden, lit: document.querySelectorAll(".chart-dot.on").length };
+    return { tip: document.querySelector(".chart-tip").hidden, cursor: document.querySelector(".tc-cursor").hasAttribute("hidden") };
   `);
   const added = (asked.parts as number[]).reduce((sum: number, n: number) => sum + n, 0);
   check(
     "and says which day was which, and of what, under the pointer",
     asked.shown === true && asked.cursor === true && asked.day > 0 &&
-      asked.dayLine.length > 0 && asked.total === asked.count && added === asked.count &&
-      gone.tip === true && gone.lit === 0,
+      asked.dayLine.length > 0 && asked.total === asked.reports && added === asked.reports &&
+      gone.tip === true && gone.cursor === true,
     `${JSON.stringify(asked)} → ${JSON.stringify(gone)}`,
+  );
+
+  // The range. Choosing a week asks the server again and redraws the chart and
+  // nothing around it; choosing thirty days puts it back, so nothing after this
+  // reads a different screen.
+  const ranged = await evaluate(`
+    const days = async (n) => {
+      document.querySelector('[data-ov="activity"] [data-days="' + n + '"]').click();
+      await new Promise(r => setTimeout(r, 900));
+      return {
+        columns: document.querySelectorAll('[data-ov="activity"] .tc-col').length,
+        pressed: [...document.querySelectorAll('[data-ov="activity"] [data-days]')]
+          .filter(b => b.getAttribute("aria-pressed") === "true").map(b => b.dataset.days),
+        kpis: document.querySelectorAll(".ov-kpi").length,
+      };
+    };
+    const week = await days(7);
+    const quarter = await days(90);
+    const back = await days(30);
+    return { week, quarter, back };
+  `);
+  check(
+    "and the range buttons draw a week, a quarter and the month again, redrawing nothing else",
+    ranged.week.columns === 7 && JSON.stringify(ranged.week.pressed) === '["7"]' &&
+      ranged.quarter.columns === 90 && JSON.stringify(ranged.quarter.pressed) === '["90"]' &&
+      ranged.back.columns === 30 && JSON.stringify(ranged.back.pressed) === '["30"]' &&
+      ranged.week.kpis === 4 && ranged.back.kpis === 4,
+    JSON.stringify(ranged),
   );
 
   // 11e. Every number leads to the list it counts. A dashboard whose tiles are

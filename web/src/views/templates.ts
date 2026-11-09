@@ -15,7 +15,7 @@ import type {
   RepositorySummary,
 } from "../api";
 import { escapeAttr, escapeHTML } from "../escape";
-import { areaChart } from "./charts";
+import { trendChart } from "./charts";
 import { icons } from "./icons";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
@@ -1692,6 +1692,8 @@ export interface OverviewData {
   votes: number;
   kinds: Record<string, number>;
   statuses: Record<string, number>;
+  /** The same count split by kind: a bug and an idea do not share a vocabulary. */
+  statuses_by_kind?: Record<string, Record<string, number>>;
   moderation: Record<string, number>;
   last_report: number;
   series: { day: number; reports: number; bugs: number; ideas: number }[];
@@ -1761,6 +1763,55 @@ function waitingMark(count: number, text: Text): string {
     title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${icons.queue(14)}<b>${escapeHTML(text.number(count))}</b></span>`;
 }
 
+/** The ranges the chart can go back, in days. The server answers these and no others. */
+export const overviewRanges = [7, 30, 90] as const;
+
+/**
+ * The chart of what arrived, as its own piece so that choosing another range
+ * redraws it without redrawing the page around it.
+ *
+ * Two lines, one per kind, on one scale: "three reports" and "three bugs" are
+ * different news, and the line for each is the only place that can say which it
+ * was. The column under the pointer carries the day and both numbers.
+ */
+export function overviewActivity(data: OverviewData, text: Text): string {
+  const series = data.series ?? [];
+  const arrived = series.reduce((sum, day) => sum + day.reports, 0);
+  const days = series.length;
+  const range = overviewRanges
+    .map(
+      (n) => `<button type="button" class="ov-seg-btn" data-days="${n}" aria-pressed="${n === days}">${escapeHTML(text.age(n * 86400))}</button>`,
+    )
+    .join("");
+
+  return `<div class="ov-card ov-chart" data-ov="activity">
+    <div class="ov-chart-head">
+      <div>
+        <span class="ov-lbl">${escapeHTML(text.t("overview.reports"))}</span>
+        <span class="ov-chip">${escapeHTML(text.number(arrived))}</span>
+        <div class="ov-legend">
+          <span><i class="ov-key idea"></i>${escapeHTML(text.t("overview.ideas"))}</span>
+          <span><i class="ov-key bug"></i>${escapeHTML(text.t("overview.bugs"))}</span>
+        </div>
+      </div>
+      <span class="ov-seg" role="group" aria-label="${escapeAttr(text.t("overview.range"))}">${range}</span>
+    </div>
+    ${trendChart(
+      [
+        { key: "idea", values: series.map((day) => day.ideas ?? 0) },
+        { key: "bug", values: series.map((day) => day.bugs ?? 0) },
+      ],
+      {
+        width: 640,
+        height: 190,
+        from: series.length > 0 ? text.date(series[0]!.day) : "",
+        to: series.length > 0 ? text.date(series[series.length - 1]!.day) : "",
+        meta: series.map((day) => ({ day: day.day, bug: day.bugs ?? 0, idea: day.ideas ?? 0, reports: day.reports })),
+      },
+    )}
+  </div>`;
+}
+
 /**
  * The front page of the panel, the same one for everybody on the team.
  *
@@ -1786,8 +1837,6 @@ export function overviewScreen(
   const number = (value: number) => escapeHTML(text.number(value));
   const label = (key: string, params?: Record<string, string | number>) => escapeHTML(text.t(key, params));
   const total = Object.values(data.kinds).reduce((a, b) => a + b, 0);
-  const series = data.series ?? [];
-  const arrived = series.reduce((sum, day) => sum + day.reports, 0);
   const team = data.server === false;
 
   /** What the number counts, read from the same place the listing reads it. */
@@ -1873,24 +1922,7 @@ export function overviewScreen(
     )}
   </div>`;
 
-  // The chart: thirty days, ends included, with the first and the last day
-  // named under it. An empty installation gets a flat line rather than an empty
-  // box — the shape of "nothing yet" is still the shape of the chart.
-  const activity = `<div class="ov-card ov-chart" data-ov="activity">
-    <div class="ov-chart-head"><span class="ov-lbl">${label("overview.activity")}</span><span class="ov-chip">${number(arrived)}</span></div>
-    <div class="chart-wrap">
-      ${areaChart(
-        series.map((day) => day.reports),
-        {
-          width: 640,
-          height: 160,
-          from: series.length > 0 ? text.date(series[0]!.day) : "",
-          to: series.length > 0 ? text.date(series[series.length - 1]!.day) : "",
-          meta: series.map((day) => ({ day: day.day, bug: day.bugs ?? 0, idea: day.ideas ?? 0 })),
-        },
-      )}
-    </div>
-  </div>`;
+  const activity = overviewActivity(data, text);
 
   const recent = box(
     "recent",
@@ -1952,12 +1984,19 @@ export function overviewScreen(
           .join("")}</div>`,
   );
 
-  const split = (id: string, title: string, counts: Record<string, number>, name: (key: string) => string) => {
+  /** The order work moves in, so a list reads as a pipeline rather than as a ranking. */
+  const flow: Record<string, string[]> = {
+    idea: ["new", "planned", "in_progress", "done", "declined"],
+    bug: ["new", "confirmed", "in_forge", "in_progress", "closed", "not_reproducible", "declined"],
+  };
+
+  const split = (id: string, title: string, counts: Record<string, number>, name: (key: string) => string, order: string[] = []) => {
+    const rank = (key: string) => (order.includes(key) ? order.indexOf(key) : order.length);
     const entries = Object.entries(counts)
       .filter(([, n]) => n > 0)
-      .sort((a, b) => b[1] - a[1]);
+      .sort((a, b) => rank(a[0]) - rank(b[0]) || b[1] - a[1]);
     if (entries.length === 0) return box(id, title, nothing);
-    const most = entries[0]![1];
+    const most = Math.max(...entries.map(([, n]) => n));
     return box(
       id,
       title,
@@ -1966,10 +2005,13 @@ export function overviewScreen(
           row(null, "", escapeHTML(name(key)), "", `<span class="ov-bar">${fill(n, most, key)}</span><b>${number(n)}</b>`),
         )
         .join("")}</div>`,
+      number(Object.values(counts).reduce((a, b) => a + b, 0)),
     );
   };
 
-  const statuses = split("statuses", text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`));
+  const byKind = data.statuses_by_kind ?? {};
+  const ideaStatuses = split("idea-statuses", text.t("overview.ideasByStatus"), byKind.idea ?? {}, (k) => text.t(`status.${k}`), flow.idea);
+  const bugStatuses = split("bug-statuses", text.t("overview.bugsByStatus"), byKind.bug ?? {}, (k) => text.t(`status.${k}`), flow.bug);
   const moderation = split("moderation", text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`));
 
   const server = team
@@ -1999,7 +2041,7 @@ export function overviewScreen(
       ${kpis}
       <div class="ov-grid ov-main">${activity}${recent}</div>
       ${boards}
-      <div class="ov-grid ov-two">${top}${statuses}</div>
+      <div class="ov-grid ov-three">${top}${ideaStatuses}${bugStatuses}</div>
       <div class="ov-grid ov-two">${moderation}${server}</div>
     </div>`;
 }

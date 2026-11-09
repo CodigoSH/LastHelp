@@ -13,13 +13,23 @@
  * the test asserts.
  */
 
+import { escapeHTML } from "../escape";
+
 /** A number as SVG writes it: at most two decimals, and always with a dot. */
 function n(value: number): string {
   if (!Number.isFinite(value)) return "0";
   return String(Math.round(value * 100) / 100);
 }
 
-export interface AreaChartOptions {
+/** One line of a trend: what it is called in the stylesheet, and a value per day. */
+export interface TrendSeries {
+  /** A class, not a colour: the palette lives in the stylesheet, which is also
+   *  where an operator's accent reaches it. */
+  key: string;
+  values: number[];
+}
+
+export interface TrendOptions {
   /** The drawing area. It scales to the box it is put in; this is its shape. */
   width?: number;
   height?: number;
@@ -27,95 +37,102 @@ export interface AreaChartOptions {
   from?: string;
   to?: string;
   /**
-   * What each point is, beyond its height: the day it belongs to and whatever
-   * the caller wants the reader to be able to ask it — here, the split by kind.
+   * What each day is, beyond its height: the day it belongs to and whatever
+   * the caller wants the reader to be able to ask it.
    *
-   * It travels into the markup as data attributes on the point that was drawn,
-   * so whatever reads the chart back takes the numbers from the drawing rather
-   * than recomputing which value belongs where. Two places doing that
+   * It travels into the markup as data attributes on a column drawn for that
+   * day, so whatever reads the chart back takes the numbers from the drawing
+   * rather than recomputing which value belongs where. Two places doing that
    * arithmetic is one place for them to disagree.
    */
   meta?: Array<Record<string, string | number>>;
 }
 
+/** The room the labels take, in the drawing's own units. */
+const PAD = { left: 32, right: 8, top: 8, bottom: 22 };
+
 /**
- * An area chart of one series, filled under the line.
+ * The top of the scale: the smallest multiple of four that holds the highest
+ * point, and never less than four. Four, so the quarter lines land on whole
+ * numbers — a gridline labelled "2.5" over a chart of reports is a gridline
+ * somebody has to explain.
+ */
+export function niceMax(values: number[]): number {
+  const top = Math.max(0, ...values.filter(Number.isFinite));
+  return Math.max(4, Math.ceil(top / 4) * 4);
+}
+
+/**
+ * Lines over time, one per series, each filled under itself.
  *
  * Every day is expected to be in the array, including the empty ones: a chart
  * drawn only from the days something happened has no gaps and therefore says a
  * quiet month was a busy one. That is the server's job, and this draws what it
  * is given.
+ *
+ * A column is drawn for every day and carries its meta; the lines themselves
+ * are only shapes. What is under the pointer is decided by the column, and the
+ * text it is told in is the caller's.
  */
-export function areaChart(values: number[], options: AreaChartOptions = {}): string {
-  const width = options.width ?? 320;
-  const height = options.height ?? 90;
-  const pad = 8;
-  const floor = height - pad;
+export function trendChart(series: TrendSeries[], options: TrendOptions = {}): string {
+  const width = options.width ?? 640;
+  const height = options.height ?? 190;
+  const days = Math.max(0, ...series.map((s) => s.values.length));
+  const span = width - PAD.left - PAD.right;
+  const tall = height - PAD.top - PAD.bottom;
+  const top = niceMax(series.flatMap((s) => s.values));
 
-  // A flat line at the bottom rather than a division by zero, which is what an
-  // installation on its first day has.
-  const max = Math.max(...values, 1);
-  const span = width - pad * 2;
-  const step = values.length > 1 ? span / (values.length - 1) : 0;
+  const x = (index: number) => PAD.left + (days > 1 ? (index / (days - 1)) * span : 0);
+  const y = (value: number) => PAD.top + tall - (Math.min(Math.max(value, 0), top) / top) * tall;
 
-  const at = (value: number, index: number): [number, number] => [
-    pad + index * step,
-    floor - (value / max) * (height - pad * 2),
-  ];
-
-  const points = values.length > 0 ? values.map(at) : [at(0, 0)];
-  const line = points.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${n(x)} ${n(y)}`).join(" ");
-  const first = points[0]!;
-  const last = points[points.length - 1]!;
-  const area = `${line} L ${n(last[0])} ${n(floor)} L ${n(first[0])} ${n(floor)} Z`;
-
-  // The stops are coloured from the stylesheet rather than here: the accent is
-  // an instance setting, and a colour written into the markup is one an
-  // operator's own colour never reaches. The gradient's id is fixed because
-  // there is one of these per screen; a second chart would share an identical
-  // gradient, which is what it would have drawn anyway.
-  // Three lines behind the series. Without them an empty month is a chart with
-  // one stroke across the bottom and nothing to read it against; with them it
-  // is a chart of a quiet month, which is a different thing.
-  const grid = [0.25, 0.5, 0.75]
+  // Behind the series. Without them an empty month is a chart with one stroke
+  // across the bottom and nothing to read it against; with them it is a chart
+  // of a quiet month, which is a different thing.
+  const grid = [0, 0.25, 0.5, 0.75, 1]
     .map((at) => {
-      const y = pad + (height - pad * 2) * at;
-      return `<line class="chart-grid" x1="${n(pad)}" y1="${n(y)}" x2="${n(width - pad)}" y2="${n(y)}" />`;
+      const line = y(top * at);
+      return `<line class="tc-grid${at === 0 ? " base" : ""}" x1="${n(PAD.left)}" y1="${n(line)}" x2="${n(width - PAD.right)}" y2="${n(line)}" />
+        <text class="tc-ylab" x="${n(PAD.left - 8)}" y="${n(line + 3.5)}">${n(top * at)}</text>`;
     })
     .join("");
 
-  // preserveAspectRatio="none", so the chart fills the card it is given rather
-  // than sitting letterboxed in the middle of it with the drawing scaled to its
-  // height. Every stroke in here is non-scaling, so nothing thickens with the
-  // stretch — and the last point is a tick rather than a circle, because a
-  // circle in a stretched box is an ellipse.
-  return `<svg class="chart" viewBox="0 0 ${n(width)} ${n(height)}"
-    preserveAspectRatio="none" role="img" aria-hidden="true">
-    ${grid}
-    <defs>
-      <linearGradient id="area-chart" x1="0" y1="0" x2="0" y2="1">
-        <stop class="chart-stop-top" offset="0%" />
-        <stop class="chart-stop-bottom" offset="100%" />
-      </linearGradient>
-    </defs>
-    <path class="chart-area" d="${area}" fill="url(#area-chart)" />
-    <path class="chart-line" d="${line}" fill="none" vector-effect="non-scaling-stroke" />
-    <line class="chart-last" x1="${n(last[0])}" y1="${n(last[1])}" x2="${n(last[0])}" y2="${n(floor)}"
-      vector-effect="non-scaling-stroke" />
-    <line class="chart-cursor" x1="0" y1="${n(pad)}" x2="0" y2="${n(floor)}"
-      vector-effect="non-scaling-stroke" hidden />
-    <g class="chart-points">${points
-      .map(
-        ([x, y], i) =>
-          `<circle class="chart-dot" cx="${n(x)}" cy="${n(y)}" r="3" data-i="${i}"
-             data-count="${values[i] ?? 0}"${Object.entries(options.meta?.[i] ?? {})
-               .map(([key, value]) => ` data-${key}="${String(value).replace(/"/g, "&quot;")}"`)
-               .join("")} />`,
-      )
-      .join("")}</g>
-  </svg>${
-    options.from || options.to
-      ? `<p class="chart-axis"><span>${options.from ?? ""}</span><span>${options.to ?? ""}</span></p>`
-      : ""
-  }`;
+  // The gradient stops take their colour from the stylesheet: the accent is an
+  // instance setting, and a colour written into the markup is one an
+  // operator's own colour never reaches.
+  const defs = series
+    .map(
+      (s) => `<linearGradient id="tc-fill-${escapeHTML(s.key)}" class="tc-${escapeHTML(s.key)}" x1="0" y1="0" x2="0" y2="1">
+        <stop class="tc-stop-top" offset="0%" /><stop class="tc-stop-bottom" offset="100%" /></linearGradient>`,
+    )
+    .join("");
+
+  const lines = series
+    .map((s) => {
+      if (s.values.length === 0) return "";
+      const d = s.values.map((v, i) => `${i === 0 ? "M" : "L"} ${n(x(i))} ${n(y(v))}`).join(" ");
+      const floor = n(y(0));
+      return `<path class="tc-area tc-${escapeHTML(s.key)}" d="${d} L ${n(x(s.values.length - 1))} ${floor} L ${n(x(0))} ${floor} Z" fill="url(#tc-fill-${escapeHTML(s.key)})" />
+        <path class="tc-line tc-${escapeHTML(s.key)}" d="${d}" fill="none" vector-effect="non-scaling-stroke" />`;
+    })
+    .join("");
+
+  // The edge labels are text in a drawing, so their ends are physical: oldest
+  // on the left in every language, which is also the way the line runs.
+  const edge = (at: number, anchor: string, text?: string) =>
+    text ? `<text class="tc-edge" x="${n(at)}" y="${n(height - 4)}" text-anchor="${anchor}">${escapeHTML(text)}</text>` : "";
+
+  const columns = Array.from({ length: days }, (_, i) => {
+    const data = Object.entries(options.meta?.[i] ?? {})
+      .map(([key, value]) => ` data-${key}="${escapeHTML(String(value))}"`)
+      .join("");
+    return `<rect class="tc-col" x="${n(x(i))}" y="${n(PAD.top)}" width="1" height="${n(tall)}" data-i="${i}" data-x="${n(x(i))}"${data} />`;
+  }).join("");
+
+  return `<div class="tc-wrap">
+    <svg class="tc" viewBox="0 0 ${n(width)} ${n(height)}" role="img" aria-hidden="true">
+      <defs>${defs}</defs>${grid}${lines}${edge(PAD.left, "start", options.from)}${edge(width - PAD.right, "end", options.to)}
+      <line class="tc-cursor" x1="0" y1="${n(PAD.top)}" x2="0" y2="${n(PAD.top + tall)}" vector-effect="non-scaling-stroke" hidden />
+      <g class="tc-cols">${columns}</g>
+    </svg>
+  </div>`;
 }

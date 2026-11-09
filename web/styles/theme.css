@@ -5228,12 +5228,113 @@ form.merge { grid-template-columns: minmax(0, 1fr); }
 .ov-grid { display: grid; gap: 12px; margin-block-start: 12px; }
 .ov-main { grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr); }
 .ov-two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block-start: 4px; }
+.ov-three { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-block-start: 4px; }
 
 .ov-chart { padding: 14px 16px 10px; }
-.ov-chart-head { display: flex; align-items: center; gap: 8px; margin-block-end: 8px; }
-.ov-chart .chart-wrap { margin: 0; }
-.ov-chart .chart { block-size: 9rem; }
+.ov-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block-end: 8px;
+}
 
+.ov-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-block-start: 8px;
+  font: 500 11px/1 var(--font-mono);
+  color: var(--text-dim);
+}
+
+.ov-legend span { display: inline-flex; align-items: center; }
+
+/* What a line is, in the colour it is drawn in: a bug is the accent and an idea is blue, as everywhere else. */
+.ov-key {
+  display: inline-block;
+  inline-size: 9px;
+  block-size: 3px;
+  margin-inline-end: 6px;
+  border-radius: 2px;
+  background: var(--text-dim);
+}
+
+.ov-key.idea { background: var(--hue-open); }
+.ov-key.bug { background: var(--accent); }
+
+.ov-seg {
+  display: inline-flex;
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  background: var(--sheet);
+  overflow: hidden;
+}
+
+.ov-seg-btn {
+  block-size: 28px;
+  padding: 0 11px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 11px/1 var(--font-mono);
+  cursor: pointer;
+}
+
+.ov-seg-btn:hover { color: var(--text-main); }
+.ov-seg-btn[aria-pressed="true"] { background: var(--surface-active); color: var(--text-main); }
+
+/* The chart runs oldest to newest from left to right in every language, so the
+   box it is drawn in does too: its labels and its tooltip are placed in screen
+   terms, measured from the same edge. */
+.tc-wrap { position: relative; direction: ltr; }
+.tc { display: block; inline-size: 100%; block-size: auto; overflow: visible; }
+
+.tc-grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 4; vector-effect: non-scaling-stroke; }
+.tc-grid.base { stroke-dasharray: none; }
+.tc-ylab, .tc-edge { font: 10px var(--font-mono); fill: var(--text-dim); }
+.tc-ylab { text-anchor: end; }
+
+.tc-idea { --tc: var(--hue-open); }
+.tc-bug { --tc: var(--accent); }
+.tc-stop-top { stop-color: var(--tc); stop-opacity: 0.28; }
+.tc-stop-bottom { stop-color: var(--tc); stop-opacity: 0; }
+
+.tc-line {
+  stroke: var(--tc);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tc-cursor { stroke: var(--text-dim); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.7; }
+.tc-col { fill: transparent; }
+
+.chart-tip {
+  position: absolute;
+  inset-block-start: 6px;
+  /* Where it landed, written into this by the pointer as a rule in the
+     document's adopted sheet — never as a style attribute, which is what the
+     content policy refuses. Physical, because it was measured in pixels. */
+  left: var(--tip-x, 0);
+  z-index: 5;
+  pointer-events: none;
+  padding: 7px 9px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow-md);
+  font: 500 11px/1.5 var(--font-mono);
+  white-space: nowrap;
+}
+
+.chart-tip > * { unicode-bidi: plaintext; }
+.chart-tip .tip-day { color: var(--text-dim); }
+.chart-tip .tip-row { display: flex; align-items: center; gap: 6px; }
+.chart-tip .tip-row b { margin-inline-start: auto; padding-inline-start: 12px; font-variant-numeric: tabular-nums; }
+.chart-tip .tip-row.total { margin-block-start: 3px; padding-block-start: 3px; border-block-start: 1px solid var(--card-border); }
+.chart-tip .ov-key { inline-size: 8px; block-size: 8px; margin: 0; border-radius: 50%; }
 /* The house box: its name is a pill sitting on the border. */
 .ov-box {
   position: relative;
@@ -5348,58 +5449,6 @@ a.ov-row:hover { background: var(--surface-dim); }
   .ov-sum { padding-inline-start: 0; border-inline-start: 0; }
 }
 
-/* --------------------------------------------------------------- the chart */
-
-.chart-wrap {
-  margin: 0 1.1rem 1rem;
-}
-
-/* One rule. The height was set twice and only the later value ever applied, so
-   the first was a number nobody was reading. */
-.chart {
-  display: block;
-  inline-size: 100%;
-  block-size: clamp(4.5rem, 9vw, 6.5rem);
-  overflow: visible;
-}
-
-/* The gradient stops are coloured here rather than in the markup, which is what
-   lets an operator's own accent reach the chart. */
-.chart-stop-top { stop-color: rgba(var(--accent-rgb), 0.45); }
-.chart-stop-bottom { stop-color: rgba(var(--accent-rgb), 0); }
-
-.chart-line {
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.chart-last {
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linecap: round;
-  opacity: 0.55;
-}
-
-.chart-axis {
-  display: flex;
-  justify-content: space-between;
-  margin: 0.35rem 0 0;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-}
-
-
-.swatch {
-  inline-size: 0.7rem;
-  block-size: 0.7rem;
-  border-radius: 3px;
-  flex: none;
-}
-
-.swatch-idea { background: var(--accent); }
-.swatch-bug { background: var(--hue-open); }
 
 /*
  * The hue of a state, in one place for every shape that carries it.
@@ -5595,14 +5644,6 @@ a.ov-row:hover { background: var(--surface-dim); }
   color: var(--accent-alt);
 }
 
-/* The chart reads across, not down: a tall box of mostly empty air says the
-   month was empty when it was only quiet. */
-.chart-grid {
-  stroke: var(--border);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
 /* Inside a .page the thread is a child like any other and the page already
    sets the distance between children: its own top margin on top of that left a
    hand's width of nothing between the team's tools and the first comment. */
@@ -5702,89 +5743,7 @@ a.ov-row:hover { background: var(--surface-dim); }
   background: rgba(var(--danger-rgb), 0.12);
 }
 
-/* ---------------------------------------------------- the chart, asked
-
- * The chart is thirty quiet days and one spike until somebody can ask it which
- * day was which. The pointer gets a guide, the point it landed on, and a label
- * with the day and the number.
- */
-.chart-wrap { position: relative; }
-
-.chart-dot {
-  fill: var(--accent);
-  opacity: 0;
-  transition: opacity 0.12s var(--ease);
-}
-
-.chart-dot.on {
-  opacity: 1;
-  stroke: var(--panel);
-  stroke-width: 2;
-}
-
-.chart-cursor {
-  stroke: var(--border-strong);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-}
-
-.chart-tip {
-  position: absolute;
-  z-index: 2;
-  /* Where it landed, written into these two by the pointer as a rule in the
-     document's adopted sheet — never as a style attribute, which is what the
-     content policy refuses. */
-  inset-block-start: var(--tip-y, 0);
-  left: var(--tip-x, 0);
-  transform: translate(-50%, calc(-100% - 0.6rem));
-  /* Measured before it is placed, so it has to be laid out even while it is
-     off: visibility rather than display, and hidden from the reader either
-     way by [hidden] elsewhere doing the same. */
-  padding: 0.3rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--panel);
-  box-shadow: var(--shadow-md), var(--hairline);
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
 /* Under the point instead, when the point is against the top of the card. */
-.chart-tip.below { transform: translate(-50%, 0.6rem); }
-
-/* The axis is pinned the way the drawing runs — oldest on the left — rather
-   than following the paragraph, which in Arabic put "30 days ago" on the right
-   of a line that starts on the left. */
-.chart-axis { direction: ltr; }
-
-/* What a day was: the date, what arrived, and what kind it was. */
-.chart-tip {
-  display: grid;
-  gap: 0.15rem;
-  min-inline-size: 8rem;
-  text-align: start;
-}
-
-.chart-tip .tip-day {
-  color: var(--text-dim);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.chart-tip .tip-total,
-.chart-tip .tip-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-weight: 500;
-}
-
-.chart-tip .tip-total { font-weight: 700; }
-.chart-tip .count { margin-inline-start: auto; font-variant-numeric: tabular-nums; }
-.chart-tip .tip-row { color: var(--text-dim); font-size: 0.8rem; }
-
 /* Held still so it can start again: an animation that is already running does
    not replay, and removing this class after a reflow is what restarts it. */
 .toast-bar.no-drain { animation: none !important; }

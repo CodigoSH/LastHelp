@@ -418,9 +418,51 @@ describe("the overview", () => {
   });
 
   test("a bar is as wide as its share of the largest, in twentieths", () => {
-    const html = overviewScreen(overview({ statuses: { new: 20, done: 10 } }), text, 4600);
+    const html = overviewScreen(overview({ statuses_by_kind: { idea: { new: 20, done: 10 }, bug: {} } }), text, 4600);
     expect(html).toContain('hue-new" data-fill="20"');
     expect(html).toContain('hue-done" data-fill="10"');
+  });
+
+  test("bugs and ideas are counted apart, each under its own name", () => {
+    const html = overviewScreen(
+      overview({ statuses_by_kind: { idea: { planned: 3 }, bug: { closed: 2 } } }),
+      text,
+      4600,
+    );
+    const box = (id: string) => html.match(new RegExp(`data-ov="${id}">[\\s\\S]*?</section>`))?.[0] ?? "";
+    expect(box("idea-statuses")).toContain("[status.planned]");
+    expect(box("idea-statuses")).not.toContain("[status.closed]");
+    expect(box("bug-statuses")).toContain("[status.closed]");
+    expect(box("bug-statuses")).not.toContain("[status.planned]");
+    expect(html).toContain("[overview.ideasByStatus]");
+    expect(html).toContain("[overview.bugsByStatus]");
+  });
+
+  test("a list of statuses reads in the order work moves, not by size", () => {
+    const html = overviewScreen(
+      overview({ statuses_by_kind: { idea: { done: 50, new: 1, planned: 9 }, bug: {} } }),
+      text,
+      4600,
+    );
+    const box = html.match(/data-ov="idea-statuses">[\s\S]*?<\/section>/)?.[0] ?? "";
+    const order = [...box.matchAll(/\[status\.(\w+)\]/g)].map((m) => m[1]);
+    expect(order.indexOf("new")).toBeLessThan(order.indexOf("planned"));
+    expect(order.indexOf("planned")).toBeLessThan(order.indexOf("done"));
+  });
+
+  test("the chart has a line for each kind and says which range it shows", () => {
+    const week = Array.from({ length: 7 }, (_, i) => ({ day: i + 1, reports: 1, bugs: 0, ideas: 1 }));
+    const html = overviewScreen(overview({ series: week }), text, 4600);
+    expect(html).toContain("tc-line tc-idea");
+    expect(html).toContain("tc-line tc-bug");
+    expect(html).toMatch(/data-days="7" aria-pressed="true"/);
+    expect(html).toMatch(/data-days="30" aria-pressed="false"/);
+    expect(html).toMatch(/data-days="90" aria-pressed="false"/);
+  });
+
+  test("each day of the chart carries both kinds and the total", () => {
+    const html = overviewScreen(overview({ series: [{ day: 5, reports: 3, bugs: 1, ideas: 2 }, { day: 6, reports: 0, bugs: 0, ideas: 0 }] }), text, 4600);
+    expect(html).toContain('data-day="5" data-bug="1" data-idea="2" data-reports="3"');
   });
 
   test("a repository with nothing waiting says so rather than showing a zero", () => {

@@ -9,13 +9,16 @@
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
 overview.bugs
+overview.bugsByStatus
 overview.ideas
+overview.ideasByStatus
 overview.lastReport
 overview.mostVoted
 overview.noReportsYet
 overview.nothingPending
 overview.openPublished
 overview.openQueue
+overview.range
 overview.seeReports
 overview.server
 overview.votedIdeas

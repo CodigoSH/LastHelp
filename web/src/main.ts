@@ -25,7 +25,7 @@ import { toast, toastError } from "./services/toast";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
 import { attachPictureViewer } from "./services/pictureViewer";
-import { attachChartHover } from "./services/chartHover";
+import { attachTrendHover } from "./services/chartHover";
 import { setRule } from "./services/dynamicStyles";
 import { watchSelects } from "./services/select";
 import { attachPasswordToggles } from "./services/password";
@@ -2309,6 +2309,56 @@ async function showSignIn(): Promise<void> {
   });
 }
 
+/** How far back the overview's chart goes. A choice for as long as the page is open, and never needed. */
+let overviewDays = 30;
+
+/**
+ * What a day of the chart was, in the reader's own language: the day, the two
+ * kinds and what arrived in all. The numbers come from the column that was
+ * drawn; the words and the formats come from here, which is where the
+ * catalogue is.
+ */
+function describeDay(point: DOMStringMap): string {
+  const day = Number(point.day ?? 0);
+  const kinds: Array<[string, string]> = [
+    ["idea", point.idea ?? "0"],
+    ["bug", point.bug ?? "0"],
+  ];
+  const rows = kinds
+    .map(
+      ([kind, n]) => `<div class="tip-row"><i class="ov-key ${kind}"></i>${escapeHTML(i18n.t(`kind.${kind}`))}
+        <b>${escapeHTML(i18n.number(Number(n)))}</b></div>`,
+    )
+    .join("");
+  return `<div class="tip-day">${escapeHTML(day > 0 ? i18n.date(day) : "")}</div>${rows}
+    <div class="tip-row total">${escapeHTML(i18n.t("overview.reports"))}
+      <b>${escapeHTML(i18n.number(Number(point.reports ?? 0)))}</b></div>`;
+}
+
+/**
+ * The chart's range buttons. One listener on the page's own body, which is
+ * replaced every time the screen is drawn, so they never pile up; choosing a
+ * range asks the server again and redraws the chart and nothing around it.
+ */
+function wireOverviewChart(): void {
+  attachTrendHover(root, describeDay);
+  const body = root?.querySelector<HTMLElement>(".ov-body");
+  body?.addEventListener("click", async (event) => {
+    const button = (event.target as Element).closest<HTMLElement>("[data-days]");
+    if (!button) return;
+    const days = Number(button.dataset.days);
+    if (days === overviewDays) return;
+    const next = await api
+      .get<Parameters<typeof views.overviewScreen>[0]>(`/api/overview?days=${days}`)
+      .catch(() => null);
+    const card = body.querySelector<HTMLElement>('[data-ov="activity"]');
+    if (!next || !card) return;
+    overviewDays = days;
+    card.outerHTML = views.overviewActivity(next, text);
+    attachTrendHover(body, describeDay);
+  });
+}
+
 async function showPanel(): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
@@ -2317,7 +2367,7 @@ async function showPanel(): Promise<void> {
   renderNav();
 
   const data = await api
-    .get<Parameters<typeof views.overviewScreen>[0]>("/api/overview")
+    .get<Parameters<typeof views.overviewScreen>[0]>(`/api/overview?days=${overviewDays}`)
     .catch(() => null);
 
   if (!data) {
@@ -2331,31 +2381,7 @@ async function showPanel(): Promise<void> {
     return;
   }
   await showInShell(views.overviewScreen(data, text), "/panel");
-  // What a day of the chart was, in the reader's own language and split the way
-  // the card beside it splits everything: the day, what arrived, and what kind
-  // it was. The numbers come from the point that was drawn; the words and the
-  // formats come from here, which is where the catalogue is.
-  attachChartHover(root, (point) => {
-    const day = Number(point.day ?? 0);
-    const total = Number(point.count ?? 0);
-    const kinds: Array<[string, number]> = [
-      ["idea", Number(point.idea ?? 0)],
-      ["bug", Number(point.bug ?? 0)],
-    ];
-    const rows = kinds
-      .filter(([, n]) => n > 0)
-      .map(
-        ([kind, n]) => `<span class="tip-row">
-          <span class="swatch swatch-${kind}"></span>${escapeHTML(i18n.t(`kind.${kind}`))}
-          <span class="count">${escapeHTML(i18n.number(n))}</span>
-        </span>`,
-      )
-      .join("");
-    return `<span class="tip-day">${escapeHTML(day > 0 ? i18n.date(day) : "")}</span>
-      <span class="tip-total">${escapeHTML(i18n.t("overview.reports"))}
-        <span class="count">${escapeHTML(i18n.number(total))}</span></span>
-      ${rows}`;
-  });
+  wireOverviewChart();
 }
 
 /**
