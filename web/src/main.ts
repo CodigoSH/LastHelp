@@ -22,6 +22,7 @@ import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
+import { historyRows, rankedRows, type RoadmapFilter } from "./services/roadmapState";
 import { disablePush, enablePush, loadPush, removePushDevice, testPush, type PushView } from "./services/pushClient";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
@@ -45,6 +46,8 @@ const text: views.Text = {
   markup: (key, markup) => i18n.markup(key, markup),
   date: (value) => i18n.date(value),
   dateTime: (value) => i18n.dateTime(value),
+  month: (value) => i18n.month(value),
+  shortDate: (value) => i18n.shortDate(value),
   number: (value) => i18n.number(value),
   bytes: (value) => i18n.bytes(value),
   since: (seconds) => i18n.since(seconds),
@@ -1561,10 +1564,124 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
 async function showRoadmap(orgSlug: string, repoSlug: string): Promise<void> {
   const base = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}`;
   const repo = await api.get<RepositorySummary>(base);
-  const board = await api.get<{ columns: Array<{ column: string; items: ItemSummary[] }> }>(
-    `${base}/roadmap`,
+  const board = await api.get<{ lanes?: views.RoadmapLane[] }>(`${base}/roadmap`);
+  show(
+    views.roadmap(
+      repo.organization ?? { slug: orgSlug, name: orgSlug },
+      repo,
+      board.lanes ?? [],
+      Math.floor(Date.now() / 1000),
+      text,
+    ),
   );
-  show(views.roadmap(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, board.columns ?? [], text));
+  wireRoadmap();
+}
+
+/**
+ * The roadmap's filter, its "show more" buttons and its tabs.
+ *
+ * The page carries every row; what happens here is only which of them are
+ * hidden, by rules that live in `roadmapState` where they have tests.
+ */
+function wireRoadmap(): void {
+  const page = root?.querySelector<HTMLElement>("[data-rm]");
+  if (!page) return;
+  const plannedRows = Number(page.dataset.plannedRows) || 6;
+  const monthsShut = Number(page.dataset.months) || 2;
+  const state: { filter: RoadmapFilter; open: Record<string, boolean> } = { filter: "", open: {} };
+
+  const kindsOf = (rows: Element[]) => rows.map((r) => (r as HTMLElement).dataset.kind ?? "");
+  const setHidden = (el: Element, hidden: boolean) => ((el as HTMLElement).hidden = hidden);
+  const numberOf = (box: HTMLElement) => {
+    const ideas = Number(box.dataset.ideas) || 0;
+    const bugs = Number(box.dataset.bugs) || 0;
+    return state.filter === "idea" ? ideas : state.filter === "bug" ? bugs : ideas + bugs;
+  };
+
+  const apply = () => {
+    page.querySelectorAll<HTMLElement>("[data-rm-box]").forEach((box) => {
+      const lane = box.dataset.rmBox ?? "";
+      const n = numberOf(box);
+      box.querySelectorAll(":scope > .rm-pill [data-rm-n]").forEach((el) => (el.textContent = text.number(n)));
+      page.querySelectorAll(`.rm-tile[data-rm-lane="${lane}"] [data-rm-n]`).forEach((el) => (el.textContent = text.number(n)));
+      const more = box.querySelector<HTMLButtonElement>("[data-rm-more]");
+      const empty = box.querySelector<HTMLElement>("[data-rm-empty]");
+
+      if (lane === "planned") {
+        const rows = [...box.querySelectorAll("[data-rm-row]")];
+        const r = rankedRows(kindsOf(rows), state.filter, state.open[lane] ? null : plannedRows);
+        rows.forEach((row, i) => {
+          setHidden(row, !r.show[i]);
+          const rank = row.querySelector("[data-rm-rank]");
+          if (rank && r.rank[i]) rank.textContent = text.number(r.rank[i]);
+        });
+        if (more) {
+          more.hidden = r.hidden === 0;
+          more.textContent = i18n.t("roadmap.more", { count: text.number(r.hidden) });
+        }
+        if (empty) empty.hidden = r.matching > 0;
+      } else if (lane === "in_progress") {
+        const rows = [...box.querySelectorAll("[data-rm-row]")];
+        const r = rankedRows(kindsOf(rows), state.filter, null);
+        rows.forEach((row, i) => setHidden(row, !r.show[i]));
+        if (empty) empty.hidden = r.matching > 0;
+      } else {
+        const groups = [...box.querySelectorAll("[data-rm-group]")];
+        const perGroup = groups.map((g) => [...g.querySelectorAll("[data-rm-row]")]);
+        const h = historyRows(perGroup.map(kindsOf), state.filter, state.open[lane] ? null : monthsShut);
+        groups.forEach((g, i) => {
+          const rowShown = h.row[i] ?? [];
+          setHidden(g, !h.group[i]);
+          (perGroup[i] ?? []).forEach((row, j) => setHidden(row, !rowShown[j]));
+          const count = g.querySelector("[data-rm-n]");
+          if (count) count.textContent = text.number(rowShown.filter(Boolean).length);
+        });
+        if (more) more.hidden = h.hiddenGroups === 0;
+        if (empty) empty.hidden = h.matching > 0;
+      }
+    });
+  };
+
+  page.querySelectorAll<HTMLButtonElement>("[data-rm-filter]").forEach((button) =>
+    button.addEventListener("click", () => {
+      state.filter = (button.dataset.rmFilter ?? "") as RoadmapFilter;
+      page.querySelectorAll("[data-rm-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+      apply();
+    }),
+  );
+  page.querySelectorAll<HTMLButtonElement>("[data-rm-more]").forEach((button) =>
+    button.addEventListener("click", () => {
+      const lane = button.closest<HTMLElement>("[data-rm-box]")?.dataset.rmBox ?? "";
+      state.open[lane] = true;
+      apply();
+    }),
+  );
+
+  // What was declined is shut until asked for.
+  const opener = page.querySelector<HTMLButtonElement>("[data-rm-open]");
+  const body = page.querySelector<HTMLElement>("[data-rm-declined]");
+  const toggleDeclined = (open: boolean) => {
+    if (!opener || !body) return;
+    body.hidden = !open;
+    opener.setAttribute("aria-expanded", String(open));
+    const label = opener.querySelector("[data-rm-open-label]");
+    if (label) label.textContent = i18n.t(open ? "roadmap.declinedHide" : "roadmap.declinedShow");
+  };
+  opener?.addEventListener("click", () => toggleDeclined(opener.getAttribute("aria-expanded") !== "true"));
+
+  // The tiles are the lanes' numbers and, on a phone, its tabs: one lane at a
+  // time. On a wide screen they take you to the lane.
+  page.querySelectorAll<HTMLButtonElement>(".rm-tile").forEach((tile) =>
+    tile.addEventListener("click", () => {
+      const lane = tile.dataset.rmLane ?? "";
+      page.querySelectorAll(".rm-tile").forEach((t) => t.setAttribute("aria-pressed", String(t === tile)));
+      page.querySelectorAll<HTMLElement>("[data-rm-box]").forEach((box) => box.classList.toggle("on", box.dataset.rmBox === lane));
+      if (lane === "declined") toggleDeclined(true);
+      page.querySelector<HTMLElement>(`[data-rm-box="${lane}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }),
+  );
+
+  apply();
 }
 
 async function showItem(publicID: string): Promise<void> {

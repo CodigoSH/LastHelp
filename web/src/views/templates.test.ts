@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, avatar, commentEditForm, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
+import { accountRole, avatar, commentEditForm, monthGroups, roadmap, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -17,6 +17,8 @@ const text: Text = {
   bytes: (value) => `${value} bytes`,
   since: (seconds) => `${seconds}s ago`,
   age: (seconds) => `${seconds}s`,
+  month: (value) => `month:${value}`,
+  shortDate: (value) => `day:${value}`,
 };
 
 function report(over: Partial<ItemDetail> = {}): ItemDetail {
@@ -584,5 +586,70 @@ describe("what needs the person looking", () => {
     const fine = overviewNeeds(overview({ ...clear, waiting_messages: 1, waiting_oldest: 10 * day - day }), text, 10 * day);
     expect(late[0]!.tone).toBe("bad");
     expect(fine[0]!.tone).toBe("warn");
+  });
+});
+
+describe("the roadmap page", () => {
+  const org = { slug: "acme", name: "Acme" };
+  const repo = { slug: "atlas", name: "Atlas", accepts_bugs: true, accepts_ideas: true };
+  const item = (id: string, kind: "idea" | "bug", over: Record<string, unknown> = {}) => ({
+    public_id: id, kind, title: `title ${id}`, status: "planned", votes: 3, voted: false, created_at: 1_700_000_000, ...over,
+  });
+  const lane = (key: string, items: ReturnType<typeof item>[], ideas = items.filter((i) => i.kind === "idea").length, bugs = items.length - ideas): RoadmapLane =>
+    ({ lane: key, ideas, bugs, total: ideas + bugs, items });
+
+  test("draws four tiles and the four lanes, the last one shut", () => {
+    const html = roadmap(org as never, repo as never, [
+      lane("in_progress", [item("a", "idea")]),
+      lane("planned", [item("b", "idea"), item("c", "bug")]),
+      lane("done", [item("d", "idea", { closed_at: 1_700_000_000 })]),
+      lane("declined", [item("e", "bug", { closed_at: 1_700_000_000 })]),
+    ], 1_800_000_000, text);
+    for (const key of ["in_progress", "planned", "done", "declined"]) {
+      expect(html).toContain(`data-rm-lane="${key}"`);
+      expect(html).toContain(`data-rm-box="${key}"`);
+    }
+    expect(html).toContain("data-rm-declined hidden");
+    // What was declined is not what is going to happen: it is behind a button.
+    expect(html).toContain("roadmap.declinedShow");
+  });
+
+  test("a lane that is empty is still drawn, so the reader is not left to work out which they see", () => {
+    const html = roadmap(org as never, repo as never, [lane("planned", [item("b", "idea")])], 1_800_000_000, text);
+    expect(html).toContain('data-rm-box="in_progress"');
+    expect(html).toContain('data-rm-box="declined"');
+  });
+
+  test("a bug is not offered a vote and an idea shows its count", () => {
+    const html = roadmap(org as never, repo as never, [lane("planned", [item("i", "idea", { votes: 42 }), item("b", "bug", { votes: 0 })])], 1_800_000_000, text);
+    expect(html).toContain("<b>42</b>");
+    expect(html.match(/class="rm-vote bug"/g)?.length).toBe(1);
+  });
+
+  test("a board with nothing on it says what the page is for instead of four empty lanes", () => {
+    const html = roadmap(org as never, repo as never, [], 1_800_000_000, text);
+    expect(html).toContain("roadmap.quietTitle");
+    expect(html).not.toContain("data-rm-box");
+  });
+
+  test("a title is escaped and linked to its report", () => {
+    const html = roadmap(org as never, repo as never, [lane("planned", [item("x", "idea", { title: "<b>bold</b> & more" })])], 1_800_000_000, text);
+    expect(html).toContain("&lt;b&gt;bold&lt;/b&gt; &amp; more");
+    expect(html).toContain('href="/i/x"');
+  });
+});
+
+describe("months of a history", () => {
+  const at = (y: number, m: number, d: number) => Math.floor(new Date(y, m, d, 12).getTime() / 1000);
+  const entry = (id: string, closed: number) => ({ public_id: id, kind: "idea" as const, title: id, status: "done", votes: 0, voted: false, created_at: 0, closed_at: closed });
+
+  test("groups what ended in the same month and keeps the newest first", () => {
+    const groups = monthGroups([entry("a", at(2026, 10, 4)), entry("b", at(2026, 10, 2)), entry("c", at(2026, 9, 28)), entry("d", at(2026, 9, 1)), entry("e", at(2025, 9, 30))]);
+    expect(groups.map((g) => g.items.map((i) => i.public_id))).toEqual([["a", "b"], ["c", "d"], ["e"]]);
+  });
+
+  test("the same month of another year is another group", () => {
+    const groups = monthGroups([entry("a", at(2026, 9, 5)), entry("b", at(2025, 9, 5))]);
+    expect(groups.length).toBe(2);
   });
 });

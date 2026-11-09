@@ -1340,130 +1340,273 @@ summary:focus-visible,
 
 /* ---------------------------------------------------------------- roadmap */
 
-/* Three columns of the same height, whatever is in them. Left to their
-   contents they stepped down like a bar chart, which made a quiet board look
-   like a broken one. */
-.roadmap {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 1rem;
-  align-items: stretch;
+/* The page of a board's roadmap: four tiles that are its lanes' numbers, a
+   filter, and the lanes — what is under way across the top, what is coming
+   beside what was delivered, and what was declined shut at the foot. Every list
+   is bounded and opens in place, so the page stays a screen or two long. */
+.rm { --rm-gap: 14px; }
+.rm-dot {
+  display: inline-block;
+  inline-size: 8px;
+  block-size: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--hue-off);
 }
+.rm-in_progress .rm-dot { background: var(--hue-work); box-shadow: 0 0 0 3px color-mix(in srgb, var(--hue-work) 22%, transparent); }
+.rm-planned .rm-dot { background: var(--hue-hold); }
+.rm-done .rm-dot { background: var(--hue-done); }
+.rm-declined .rm-dot { background: transparent; border: 1.5px solid var(--hue-off); }
 
-/*
- * A roadmap column is a section of the board, and the house draws a section as
- * a bordered box whose name is a pill sitting ON the border — a fieldset
- * legend, interrupting the line rather than sitting under it inside a rule of
- * its own. Taken from the reference's grid, where it is what makes a group of
- * tiles read as a group.
- *
- * `overflow: visible` and the position are not decoration: the pill is lifted
- * half its height above the top edge and would be clipped otherwise.
- */
-.roadmap .column {
-  position: relative;
-  display: grid;
-  align-content: start;
-  gap: 0.6rem;
-  margin-block-start: 0.55rem;
+.rm-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.rm-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
   border: 1px solid var(--card-border);
-  border-radius: var(--radius-lg);
-  padding: 1.1rem 0.9rem 0.9rem;
-  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  border-radius: 8px;
+  background: var(--sheet);
   box-shadow: var(--card-shadow);
-  overflow: visible;
-  animation: rise 0.4s var(--ease) both;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s;
 }
-
-.roadmap .column:nth-child(2) { animation-delay: 0.07s; }
-.roadmap .column:nth-child(3) { animation-delay: 0.14s; }
-
-/* The legend, on the border. Monospaced and spaced out, which is what tells the
-   eye it labels the box rather than starting its contents — and opaque, so the
-   border passes behind it and stops. Each one carries the colour of the state
-   it collects: three identical grey boxes are three boxes you have to read. */
-.column-head {
-  position: absolute;
-  inset-block-start: 0;
-  inset-inline-start: 0.85rem;
-  transform: translateY(-50%);
-  z-index: 2;
+.rm-tile:hover { border-color: rgba(var(--accent-rgb), 0.3); }
+.rm-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.rm-tile[aria-pressed="true"] { border-color: rgba(var(--accent-rgb), 0.45); }
+.rm-tile.rm-declined { border-style: dashed; box-shadow: none; }
+.rm-tile-top {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.15rem 0.5rem;
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-  background: var(--panel);
-  box-shadow: var(--shadow-sm);
-  --hue: var(--hue-off);
-}
-
-.column-head h2 {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 700;
+  gap: 8px;
+  font: 700 0.65rem/1.4 var(--font-mono);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-dim);
 }
+.rm-tile-n { font-size: 2rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.rm-tile-sub { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 11px var(--font-mono); color: var(--text-dim); }
+.rm-tile-sub span { display: inline-flex; align-items: center; gap: 4px; }
 
-.column-head .dot {
-  inline-size: 0.45rem;
-  block-size: 0.45rem;
-  border-radius: 50%;
-  background: var(--hue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hue) 20%, transparent);
+.rm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.rm-seg {
+  display: inline-flex;
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  background: var(--sheet);
+  overflow: hidden;
 }
-
-/* Inside the pill now, right after the name: pushed to the far end it would
-   stretch the legend the width of the column. */
-.column-head .count-chip {
-  padding: 0 0.3rem;
-  min-inline-size: 0;
-  font-size: 0.65rem;
-}
-
-.column-planned .column-head { --hue: var(--hue-hold); }
-.column-in_progress .column-head { --hue: var(--hue-work); }
-.column-done .column-head { --hue: var(--hue-done); }
-
-.roadmap ul { display: grid; gap: 0.5rem; }
-
-.roadmap li a {
-  display: grid;
-  /* start, not stretch: a grid child fills its column by default, so the kind
-     badge — a pill sized to two words — was being stretched the full width of
-     the card. Only visible by looking at the page. */
-  justify-items: start;
-  gap: 0.3rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel);
-  box-shadow: var(--shadow-sm), var(--hairline);
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.18s var(--ease), border-color 0.18s var(--ease),
-    box-shadow 0.18s var(--ease);
-}
-
-.roadmap li a:hover {
-  transform: translateY(-1px);
-  border-color: var(--accent-line);
-  box-shadow: var(--shadow-md), var(--hairline);
-}
-
-/* A column with nothing in it is quiet, not broken: a short dashed line with a
-   short sentence, rather than a hand-sized grey box saying so. */
-.roadmap .column-empty {
-  padding: 0.9rem 0.5rem;
-  font-size: 0.8rem;
-  border-style: dashed;
-  border-color: var(--border);
+.rm-seg button {
+  block-size: 28px;
+  padding: 0 12px;
+  border: 0;
   background: transparent;
   color: var(--text-dim);
+  font: 600 11px/1 var(--font-mono);
+  cursor: pointer;
+}
+.rm-seg button:hover { color: var(--text-main); }
+.rm-seg button[aria-pressed="true"] { background: var(--surface-active); color: var(--text-main); }
+.rm-note { flex: 1 1 22ch; max-inline-size: 62ch; margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
+
+.rm-lanes { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 0 var(--rm-gap); align-items: start; }
+.rm-lane.rm-in_progress, .rm-lane.rm-declined { grid-column: 1 / -1; }
+
+/* A lane is a section of the board: a bordered box whose name is a pill sitting
+   on its top edge, the way the board and the overview draw one. */
+.rm-box {
+  position: relative;
+  margin-block-start: 22px;
+  padding: 22px 14px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+.rm-box.rm-declined { border-style: dashed; }
+.rm-pill {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 12px;
+  transform: translateY(calc(-50% - 1px));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-inline-size: calc(100% - 24px);
+  margin: 0;
+  padding: 2px 10px 2px 8px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--sheet);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  font: 700 0.65rem/1.4 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.rm-box:hover > .rm-pill { border-color: rgba(var(--accent-rgb), 0.3); }
+.rm-pill-n { margin-inline-start: 2px; padding-inline-start: 8px; border-inline-start: 1px solid var(--card-border); font-weight: 600; color: var(--text-main); }
+
+/* A title is never cut: it wraps, wherever it is. */
+.rm-text { display: grid; gap: 5px; min-inline-size: 0; }
+.rm-title { font-size: 13.5px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.rm-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 11px; color: var(--text-dim); }
+.rm-age, .rm-when { font: 11px var(--font-mono); color: var(--text-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.rm-vote {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  inline-size: 46px;
+  block-size: 46px;
+  flex: none;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--surface-solid, var(--sheet));
+  line-height: 1.1;
+}
+.rm-vote b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rm-vote small { font: 600 8.5px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.rm-vote.bug { color: var(--accent); }
+
+.rm-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.rm-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--sheet);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.rm-card:hover { border-color: rgba(var(--accent-rgb), 0.4); background: rgba(var(--accent-rgb), 0.04); }
+
+.rm-rows { display: grid; }
+.rm-row {
+  display: grid;
+  grid-template-columns: 22px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 6px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+.rm-row:hover { background: rgba(var(--accent-rgb), 0.05); }
+.rm-rank { font: 600 11px var(--font-mono); color: var(--text-dim); text-align: end; font-variant-numeric: tabular-nums; }
+.rm-go { display: inline-flex; color: var(--text-dim); opacity: 0.6; }
+.rm-go svg { transform: scaleX(var(--rtl-flip, 1)); }
+.rm-row:hover .rm-go { color: var(--accent); opacity: 1; }
+/* A rule between the rows that show, not after a hidden one. */
+.rm-row:not([hidden]) ~ .rm-row:not([hidden]) { border-block-start: 1px solid var(--border); }
+
+.rm-more {
+  inline-size: 100%;
+  block-size: 34px;
+  margin-block-start: 10px;
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.rm-more:hover { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.4); }
+.rm-more[hidden], .rm-empty[hidden] { display: none; }
+
+.rm-month + .rm-month { margin-block-start: 14px; }
+.rm-month h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  font: 700 0.65rem/1.4 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.rm-month h3::after { content: ""; flex: 1; block-size: 1px; background: var(--border); order: 2; }
+.rm-month h3 span { order: 3; font-weight: 600; color: var(--text-main); }
+.rm-month[hidden], .rm-done-row[hidden], .rm-row[hidden], .rm-card[hidden] { display: none; }
+.rm-done-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 9px 6px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+.rm-done-row:hover { background: rgba(var(--accent-rgb), 0.05); }
+.rm-check, .rm-dismissed {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  margin-block-start: 1px;
+  border-radius: 50%;
+}
+.rm-check { color: var(--hue-done); background: color-mix(in srgb, var(--hue-done) 16%, transparent); }
+/* A refusal is drawn like the board draws one: hollow, dashed, grey — not a tick. */
+.rm-dismissed { border: 1.5px dashed var(--hue-off); }
+.rm-when { padding-block-start: 2px; }
+.rm-empty { margin: 0; padding: 18px 0; text-align: center; font-size: 0.85rem; color: var(--text-dim); }
+
+.rm-open {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 600 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.rm-open:hover { color: var(--text-main); }
+.rm-open-chevron { display: inline-flex; transform: rotate(90deg) scaleX(var(--rtl-flip, 1)); transition: transform 0.15s; }
+.rm-open[aria-expanded="true"] .rm-open-chevron { transform: rotate(-90deg) scaleX(var(--rtl-flip, 1)); }
+.rm-declined-body { margin-block-start: 10px; }
+.rm-declined-body[hidden] { display: none; }
+.rm-help { margin: 0 0 10px; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
+
+.rm-quiet {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin-block-start: 22px;
+  padding: 44px 20px;
+  border: 1px dashed var(--card-border);
+  border-radius: 8px;
+  text-align: center;
+}
+.rm-quiet p { max-inline-size: 52ch; margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
+.rm-quiet p b { font-size: 15px; color: var(--text-main); }
+
+@media (max-width: 960px) {
+  .rm-lanes { grid-template-columns: minmax(0, 1fr); }
+  .rm-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* On a phone the four tiles are the tabs: one lane at a time, so the page is as
+   long as one lane. Two by two, because four in a row do not fit their words. */
+@media (max-width: 640px) {
+  .rm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .rm-tile { padding: 10px 12px; }
+  .rm-tile-n { font-size: 1.5rem; }
+  .rm-cards { grid-template-columns: minmax(0, 1fr); }
+  .rm-lanes .rm-box { display: none; }
+  .rm-lanes .rm-box.on { display: block; }
 }
 
 /* ----------------------------------------------------------- panel pieces */

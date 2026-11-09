@@ -887,22 +887,44 @@ async function main() {
   `);
   await sleep(600);
 
-  await goTo("/codigosh/lastboard/roadmap", ".roadmap");
+  await goTo("/codigosh/lastboard/roadmap", "[data-rm]");
   const roadmap = await evaluate(`
+    const lanes = [...document.querySelectorAll("[data-rm-box]")].map(b => b.dataset.rmBox);
+    const tiles = [...document.querySelectorAll(".rm-tile")].map(t => ({
+      lane: t.dataset.rmLane,
+      n: Number(t.querySelector("[data-rm-n]").textContent),
+      rows: document.querySelectorAll('[data-rm-box="' + t.dataset.rmLane + '"] [data-rm-row]').length,
+    }));
     return {
-      columns: document.querySelectorAll(".roadmap .column").length,
-      planned: document.querySelectorAll(".roadmap .column:first-child li").length,
+      lanes,
+      tiles,
+      planned: document.querySelectorAll('[data-rm-box="planned"] [data-rm-row]').length,
+      declinedShut: document.querySelector("[data-rm-declined]").hidden === true,
     };
   `);
-  check("the roadmap draws all three columns", roadmap.columns === 3, `columns=${roadmap.columns}`);
+  check("the roadmap draws its four lanes", roadmap.lanes.join() === "in_progress,planned,done,declined", roadmap.lanes.join());
   check("what was just planned is on it", roadmap.planned === 1, `planned=${roadmap.planned}`);
-  // Three columns of the same height. Left to their contents they step down
-  // like a bar chart, and a quiet board reads as a broken one.
-  const columnHeights = await evaluate(`
-    return [...new Set([...document.querySelectorAll(".roadmap .column")]
-      .map(c => Math.round(c.getBoundingClientRect().height)))];
+  // The number on a tile is the length of its lane: two figures that could be
+  // read at the same glance and disagree.
+  check("each tile counts the rows of its lane", roadmap.tiles.every((t: { n: number; rows: number }) => t.n === t.rows), JSON.stringify(roadmap.tiles));
+  check("what was declined is shut until it is asked for", roadmap.declinedShut === true);
+  // The filter hides rows, and says so rather than leaving a lane blank.
+  const filtered = await evaluate(`
+    document.querySelector('[data-rm-filter="bug"]').click();
+    const box = document.querySelector('[data-rm-box="planned"]');
+    return {
+      rows: [...box.querySelectorAll("[data-rm-row]")].filter(r => !r.hidden).length,
+      said: !box.querySelector("[data-rm-empty]").hidden,
+      tile: document.querySelector('.rm-tile[data-rm-lane="planned"] [data-rm-n]').textContent,
+    };
   `);
-  check("and all three are the same height", columnHeights.length === 1, JSON.stringify(columnHeights));
+  check("the bug filter empties a lane of ideas and the lane says so", filtered.rows === 0 && filtered.said === true && filtered.tile === "0", JSON.stringify(filtered));
+  await evaluate(`document.querySelector('[data-rm-filter=""]').click();`);
+  // A title wraps; it is never cut.
+  const cut = await evaluate(`
+    return [...document.querySelectorAll(".rm-title")].filter(t => t.getClientRects().length && t.scrollWidth > t.clientWidth + 1).length;
+  `);
+  check("no title on the roadmap is cut", cut === 0, `cut=${cut}`);
 
   // 10. The bridge control. There is no forge connected in this run, so what
   //     is checked is that the control is there for the team and that asking

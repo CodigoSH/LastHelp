@@ -104,6 +104,18 @@ class I18n {
     return formatDate(this.language, date, { dateStyle: "medium", timeStyle: "short" });
   }
 
+  /** A month and its year, to head a group of dates: "November 2026". */
+  month(value: Date | number): string {
+    const date = typeof value === "number" ? new Date(value * 1000) : value;
+    return formatDate(this.language, date, { month: "long", year: "numeric" });
+  }
+
+  /** A day without its year, for a row inside a month that already says which: "4 Nov". */
+  shortDate(value: Date | number): string {
+    const date = typeof value === "number" ? new Date(value * 1000) : value;
+    return formatDate(this.language, date, { day: "numeric", month: "short" });
+  }
+
   number(value: number): string {
     return formatNumber(this.language, value);
   }

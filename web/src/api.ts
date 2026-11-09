@@ -182,6 +182,8 @@ export interface ItemSummary {
   /** When an answered report stops taking words from this reader, in seconds; absent when it is not answered or is shut to them. */
   comment_until?: number;
   created_at: number;
+  /** When it ended — delivered or turned down. Only on the roadmap's finished lanes. */
+  closed_at?: number;
 }
 
 /** One answer to one question of the report form, with the label it was asked

@@ -15,6 +15,8 @@ const text: Text = {
   bytes: (value) => `${value}b`,
   since: (seconds) => `${seconds}s ago`,
   age: (seconds) => `${seconds}s`,
+  month: (value) => `month:${value}`,
+  shortDate: (value) => `day:${value}`,
 };
 
 const board = { org: "acme", repo: "atlas", name: "Atlas", organization: "Acme" };

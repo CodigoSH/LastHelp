@@ -35,6 +35,10 @@ export interface Text {
   date(value: number): string;
   /** The same with the time of day. */
   dateTime(value: number): string;
+  /** A month and its year, to head a group of dates. */
+  month(value: number): string;
+  /** A day without its year, for a row under a heading that says which. */
+  shortDate(value: number): string;
   number(value: number): string;
   /** A size, at a scale a person reads, with the unit named in their language. */
   bytes(value: number): string;
@@ -369,61 +373,189 @@ function itemRow(item: ItemSummary, text: Text): string {
   </a></li>`;
 }
 
+/** One lane of the roadmap page, as the server says it: how many there are of each kind, and the first of them. */
+export interface RoadmapLane {
+  lane: string;
+  ideas: number;
+  bugs: number;
+  total: number;
+  items: ItemSummary[];
+}
+
+/** Rows that ended, grouped by the month they ended in, newest first. A month is the reader's own, local. */
+export function monthGroups(items: ItemSummary[]): Array<{ at: number; items: ItemSummary[] }> {
+  const groups: Array<{ key: string; at: number; items: ItemSummary[] }> = [];
+  for (const item of items) {
+    const at = item.closed_at ?? item.created_at;
+    const d = new Date(at * 1000);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.items.push(item);
+    else groups.push({ key, at, items: [item] });
+  }
+  return groups.map(({ at, items }) => ({ at, items }));
+}
+
+/** How many rows of the planned lane show before "show more". */
+export const ROADMAP_PLANNED_ROWS = 6;
+/** How many months of a finished lane show before "earlier months". */
+export const ROADMAP_MONTHS = 2;
+
 /**
- * The roadmap: three columns, and all three are drawn even when empty.
+ * The roadmap: what the team is doing, what is coming, what was delivered, and
+ * what it decided not to do.
  *
- * Drawing only the columns that have something in them leaves the reader
- * working out which two of the three they are looking at, and makes an empty
- * board look broken rather than quiet.
+ * Every list is bounded and opens in place, so the page is as long as a screen
+ * or two however many reports a board has. Four tiles at the top are the lanes'
+ * numbers and, on a phone, the tabs between them. The last lane is shut until
+ * somebody asks for it: the page is about what is going to happen, and what was
+ * declined is one press away rather than the first thing in view.
+ *
+ * Everything is in the document and the page only hides what does not fit: the
+ * filter and the openers are the client's, over the same markup.
  */
 export function roadmap(
   org: OrganizationSummary,
   repo: RepositorySummary,
-  columns: Array<{ column: string; items: ItemSummary[] }>,
+  lanes: RoadmapLane[],
+  now: number,
   text: Text,
 ): string {
-  return `<div class="page">
-    <header class="page-head">
+  const lane = (key: string): RoadmapLane =>
+    lanes.find((l) => l.lane === key) ?? { lane: key, ideas: 0, bugs: 0, total: 0, items: [] };
+  const everything = lanes.reduce((n, l) => n + l.total, 0);
+
+  const kindMark = (kind: string) =>
+    `<span class="kind kind-${escapeAttr(kind)}">${kind === "bug" ? icons.bug(13) : icons.idea(13)}<span class="kind-name">${escapeHTML(text.t(`kind.${kind}`))}</span></span>`;
+
+  const tile = (l: RoadmapLane, pressed: boolean) => `<button type="button" class="rm-tile rm-${escapeAttr(l.lane)}" data-rm-lane="${escapeAttr(l.lane)}"
+      data-ideas="${l.ideas}" data-bugs="${l.bugs}" aria-pressed="${pressed}">
+      <span class="rm-tile-top"><span class="rm-dot" aria-hidden="true"></span>${escapeHTML(text.t(`roadmap.${l.lane}`))}</span>
+      <span class="rm-tile-n" data-rm-n>${escapeHTML(text.number(l.total))}</span>
+      <span class="rm-tile-sub">
+        <span title="${escapeAttr(text.t("overview.ideas"))}" aria-label="${escapeAttr(text.t("overview.ideas") + ": " + l.ideas)}">${icons.idea(12)} ${escapeHTML(text.number(l.ideas))}</span>
+        <span title="${escapeAttr(text.t("overview.bugs"))}" aria-label="${escapeAttr(text.t("overview.bugs") + ": " + l.bugs)}">${icons.bug(12)} ${escapeHTML(text.number(l.bugs))}</span>
+      </span>
+    </button>`;
+
+  const pill = (l: RoadmapLane) =>
+    `<h2 class="rm-pill"><span class="rm-dot" aria-hidden="true"></span>${escapeHTML(text.t(`roadmap.${l.lane}`))}<span class="rm-pill-n" data-rm-n>${escapeHTML(text.number(l.total))}</span></h2>`;
+
+  const voteTile = (i: ItemSummary) =>
+    i.kind === "idea"
+      ? `<span class="rm-vote"><b>${escapeHTML(text.number(i.votes))}</b><small>${escapeHTML(text.t("roadmap.votes"))}</small></span>`
+      : `<span class="rm-vote bug" aria-hidden="true">${icons.bug(18)}</span>`;
+
+  const empty = () => `<p class="rm-empty" data-rm-empty hidden>${escapeHTML(text.t("overview.nothingYet"))}</p>`;
+  const more = (label: string) => `<button type="button" class="rm-more" data-rm-more hidden>${escapeHTML(label)}</button>`;
+
+  const history = (l: RoadmapLane, marker: string) =>
+    monthGroups(l.items)
+      .map(
+        (g) => `<div class="rm-month" data-rm-group>
+          <h3>${escapeHTML(text.month(g.at))}<span data-rm-n>${escapeHTML(text.number(g.items.length))}</span></h3>
+          ${g.items
+            .map(
+              (i) => `<a class="rm-done-row" href="/i/${escapeAttr(i.public_id)}" data-rm-row data-kind="${escapeAttr(i.kind)}">
+                <span class="${marker}" aria-hidden="true">${marker === "rm-check" ? icons.check(14) : ""}</span>
+                <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span><span class="rm-meta">${kindMark(i.kind)}</span></span>
+                <span class="rm-when">${escapeHTML(text.shortDate(i.closed_at ?? i.created_at))}</span>
+              </a>`,
+            )
+            .join("")}
+        </div>`,
+      )
+      .join("");
+
+  const header = `<header class="page-head">
       <div class="head-text">
         <p class="crumb"><a href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}">${escapeHTML(repo.name)}</a></p>
         <h1>${escapeHTML(text.t("nav.roadmap"))}</h1>
         <p class="lead">${escapeHTML(text.t("roadmap.lead"))}</p>
       </div>
-    </header>
-    <div class="roadmap">
-      ${columns
-        .map(
-          (c) => `<section class="column column-${escapeAttr(c.column)}">
-            <header class="column-head">
-              <span class="dot" aria-hidden="true"></span>
-              <h2>${escapeHTML(text.t(`roadmap.${c.column}`))}</h2>
-              <span class="count-chip">${escapeHTML(text.number(c.items.length))}</span>
-            </header>
-            ${
-              c.items.length === 0
-                ? `<p class="empty column-empty">${escapeHTML(text.t("overview.nothingYet"))}</p>`
-                : `<ul>${c.items
-                    .map(
-                      (i) => `<li><a href="/i/${escapeAttr(i.public_id)}">
-                        <span class="item-title">${escapeHTML(i.title)}</span>
-                        <span class="item-meta">
-                          <span class="kind kind-${escapeAttr(i.kind)}">
-                            ${i.kind === "bug" ? icons.bug(13) : icons.idea(13)}
-                            <span class="kind-name">${escapeHTML(text.t(`kind.${i.kind}`))}</span>
-                          </span>
-                          ${
-                            i.kind === "idea"
-                              ? `<span class="when">${escapeHTML(text.t("item.votes", { count: text.number(i.votes) }))}</span>`
-                              : ""
-                          }
-                        </span>
-                      </a></li>`,
-                    )
-                    .join("")}</ul>`
-            }
-          </section>`,
-        )
-        .join("")}
+    </header>`;
+
+  const inProgress = lane("in_progress");
+  const planned = lane("planned");
+  const done = lane("done");
+  const declined = lane("declined");
+  const firstWithItems = [inProgress, planned, done].find((l) => l.total > 0)?.lane ?? "in_progress";
+
+  const tiles = `<div class="rm-tiles">${[inProgress, planned, done, declined].map((l) => tile(l, l.lane === firstWithItems)).join("")}</div>`;
+
+  if (everything === 0) {
+    return `<div class="page rm">${header}${tiles}
+      <div class="rm-quiet">
+        <p><b>${escapeHTML(text.t("roadmap.quietTitle"))}</b></p>
+        <p>${escapeHTML(text.t("roadmap.quietBody"))}</p>
+        <a class="button" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new">${escapeHTML(text.t("board.report"))}</a>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="page rm" data-rm data-planned-rows="${ROADMAP_PLANNED_ROWS}" data-months="${ROADMAP_MONTHS}">
+    ${header}
+    ${tiles}
+    <div class="rm-bar">
+      <div class="rm-seg" role="group" aria-label="${escapeAttr(text.t("roadmap.show"))}">
+        <button type="button" data-rm-filter="" aria-pressed="true">${escapeHTML(text.t("board.all"))}</button>
+        <button type="button" data-rm-filter="idea" aria-pressed="false">${escapeHTML(text.t("overview.ideas"))}</button>
+        <button type="button" data-rm-filter="bug" aria-pressed="false">${escapeHTML(text.t("overview.bugs"))}</button>
+      </div>
+      <p class="rm-note">${escapeHTML(text.t("roadmap.note"))}</p>
+    </div>
+
+    <div class="rm-lanes">
+      <section class="rm-box rm-lane rm-in_progress${firstWithItems === "in_progress" ? " on" : ""}" data-rm-box="in_progress" data-ideas="${inProgress.ideas}" data-bugs="${inProgress.bugs}">
+        ${pill(inProgress)}
+        <div class="rm-cards">${inProgress.items
+          .map(
+            (i) => `<a class="rm-card" href="/i/${escapeAttr(i.public_id)}" data-rm-row data-kind="${escapeAttr(i.kind)}">
+              ${voteTile(i)}
+              <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span><span class="rm-meta">${kindMark(i.kind)}</span></span>
+            </a>`,
+          )
+          .join("")}</div>
+        ${empty()}
+      </section>
+
+      <section class="rm-box rm-lane rm-planned${firstWithItems === "planned" ? " on" : ""}" data-rm-box="planned" data-ideas="${planned.ideas}" data-bugs="${planned.bugs}">
+        ${pill(planned)}
+        <div class="rm-rows">${planned.items
+          .map(
+            (i, n) => `<a class="rm-row" href="/i/${escapeAttr(i.public_id)}" data-rm-row data-kind="${escapeAttr(i.kind)}">
+              <span class="rm-rank" data-rm-rank>${n + 1}</span>
+              ${voteTile(i)}
+              <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span>
+                <span class="rm-meta">${kindMark(i.kind)}<span class="rm-age">${escapeHTML(text.age(Math.max(0, now - i.created_at)))}</span></span></span>
+              <span class="rm-go" aria-hidden="true">${icons.chevron(16)}</span>
+            </a>`,
+          )
+          .join("")}</div>
+        ${empty()}
+        ${more(text.t("roadmap.more", { count: 0 }))}
+      </section>
+
+      <section class="rm-box rm-lane rm-done${firstWithItems === "done" ? " on" : ""}" data-rm-box="done" data-ideas="${done.ideas}" data-bugs="${done.bugs}">
+        ${pill(done)}
+        ${history(done, "rm-check")}
+        ${empty()}
+        ${more(text.t("roadmap.earlier"))}
+      </section>
+
+      <section class="rm-box rm-lane rm-declined" data-rm-box="declined" data-ideas="${declined.ideas}" data-bugs="${declined.bugs}">
+        ${pill(declined)}
+        <button type="button" class="rm-open" data-rm-open aria-expanded="false">
+          <span data-rm-open-label>${escapeHTML(text.t("roadmap.declinedShow"))}</span>
+          <span class="rm-open-chevron" aria-hidden="true">${icons.chevron(14)}</span>
+        </button>
+        <div class="rm-declined-body" data-rm-declined hidden>
+          <p class="rm-help">${escapeHTML(text.t("roadmap.declinedHelp"))}</p>
+          ${history(declined, "rm-dismissed")}
+          ${empty()}
+          ${more(text.t("roadmap.earlier"))}
+        </div>
+      </section>
     </div>
   </div>`;
 }
