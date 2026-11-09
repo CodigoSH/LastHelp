@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, avatar, commentEditForm, monthGroups, roadmap, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
+import { accountRole, avatar, commentEditForm, monthGroups, roadmap, roadmapDialogList, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -651,5 +651,47 @@ describe("months of a history", () => {
   test("the same month of another year is another group", () => {
     const groups = monthGroups([entry("a", at(2026, 9, 5)), entry("b", at(2025, 9, 5))]);
     expect(groups.length).toBe(2);
+  });
+});
+
+describe("the dialog behind a lane's show more", () => {
+  const item = (id: string, kind: "idea" | "bug", over: Record<string, unknown> = {}) => ({
+    public_id: id, kind, title: `title ${id}`, status: "planned", votes: 3, voted: false, created_at: 1_700_000_000, ...over,
+  });
+
+  test("says what it holds and how much is left to read", () => {
+    const html = roadmapDialogList("planned", "votes", [item("a", "idea"), item("b", "bug")], 5, 1_800_000_000, text);
+    expect(html).toContain('href="/i/a"');
+    expect(html).toContain("roadmap.shown");
+    expect(html).toContain("{&quot;shown&quot;:&quot;2&quot;,&quot;total&quot;:&quot;5&quot;}");
+    // More to read than has been read: the button is there.
+    expect(html).toContain("data-rm-load");
+  });
+
+  test("has no button once everything is on screen", () => {
+    const html = roadmapDialogList("planned", "votes", [item("a", "idea")], 1, 1_800_000_000, text);
+    expect(html).not.toContain("data-rm-load");
+  });
+
+  test("a finished lane is grouped by month while it reads by date, and flat once it is ranked", () => {
+    const rows = [item("a", "idea", { closed_at: 1_700_000_000 }), item("b", "bug", { closed_at: 1_600_000_000 })];
+    expect(roadmapDialogList("done", "recent", rows, 2, 1_800_000_000, text)).toContain("<h3>");
+    expect(roadmapDialogList("done", "votes", rows, 2, 1_800_000_000, text)).not.toContain("<h3>");
+  });
+
+  test("a declined row is marked as a refusal, not as a delivery", () => {
+    const rows = [item("a", "idea", { closed_at: 1_700_000_000 })];
+    expect(roadmapDialogList("declined", "recent", rows, 1, 1_800_000_000, text)).toContain("rm-dismissed");
+    expect(roadmapDialogList("done", "recent", rows, 1, 1_800_000_000, text)).toContain("rm-check");
+  });
+
+  test("an empty answer says nothing matches, and offers no list", () => {
+    const html = roadmapDialogList("planned", "votes", [], 0, 1_800_000_000, text);
+    expect(html).toContain("review.nothingMatches");
+    expect(html).not.toContain("rm-row");
+  });
+
+  test("a title is escaped", () => {
+    expect(roadmapDialogList("planned", "votes", [item("a", "idea", { title: "<i>x</i>" })], 1, 1_800_000_000, text)).toContain("&lt;i&gt;x&lt;/i&gt;");
   });
 });

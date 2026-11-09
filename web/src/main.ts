@@ -1574,7 +1574,101 @@ async function showRoadmap(orgSlug: string, repoSlug: string): Promise<void> {
       text,
     ),
   );
-  wireRoadmap();
+  wireRoadmap(orgSlug, repoSlug);
+}
+
+/**
+ * A roadmap lane, whole, in a dialog: searched, narrowed by kind and ordered as
+ * the reader chooses, a page at a time.
+ *
+ * Every question goes to the server — the search is the server's, over every
+ * item of the lane and not only the hundred the page loaded — and an answer
+ * that arrives after a newer question was asked is dropped, so typing quickly
+ * never leaves the list showing the words before the last.
+ *
+ * The listeners are put on once, when the page is drawn; opening a lane only
+ * resets what the dialog is asking.
+ */
+function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string): (lane: string, kind: RoadmapFilter) => Promise<void> {
+  const dialog = page.querySelector<HTMLDialogElement>("#rm-modal");
+  const body = dialog?.querySelector<HTMLElement>("[data-rm-modal-body]");
+  const heading = dialog?.querySelector<HTMLElement>("#rm-modal-title");
+  const count = dialog?.querySelector<HTMLElement>("[data-rm-count]");
+  const input = dialog?.querySelector<HTMLInputElement>("[data-rm-q]");
+  if (!dialog || !body || !heading || !count || !input) return async () => undefined;
+
+  const ask: { lane: string; kind: RoadmapFilter; sort: "votes" | "recent"; q: string; items: ItemSummary[]; total: number; seq: number } = {
+    lane: "", kind: "", sort: "votes", q: "", items: [], total: 0, seq: 0,
+  };
+  const url = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}/roadmap`;
+
+  const draw = () => {
+    dialog.querySelectorAll<HTMLElement>("[data-rm-kind]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.rmKind === ask.kind)));
+    dialog.querySelectorAll<HTMLElement>("[data-rm-sort]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.rmSort === ask.sort)));
+    count.textContent = text.number(ask.total);
+    body.innerHTML = views.roadmapDialogList(ask.lane, ask.sort, ask.items, ask.total, Math.floor(Date.now() / 1000), text);
+  };
+
+  const read = async (append: boolean) => {
+    const seq = ++ask.seq;
+    const params = new URLSearchParams({ sort: ask.sort, offset: String(append ? ask.items.length : 0) });
+    if (ask.kind) params.set("kind", ask.kind);
+    if (ask.q.trim().length >= 2) params.set("q", ask.q.trim());
+    try {
+      const answer = await api.get<{ total: number; items: ItemSummary[] }>(`${url}/${encodeURIComponent(ask.lane)}?${params}`);
+      if (seq !== ask.seq) return;
+      ask.items = append ? [...ask.items, ...answer.items] : answer.items;
+      ask.total = answer.total;
+      draw();
+    } catch {
+      if (seq === ask.seq) toast(i18n.t("error.internal"));
+    }
+  };
+
+  dialog.addEventListener("click", (event) => {
+    const target = event.target as Element;
+    // The backdrop is the dialog element itself; its content is its children.
+    if (target === dialog || target.closest("[data-rm-close]")) {
+      dialog.close();
+      return;
+    }
+    const kindButton = target.closest<HTMLElement>("[data-rm-kind]");
+    const sortButton = target.closest<HTMLElement>("[data-rm-sort]");
+    if (kindButton) {
+      ask.kind = (kindButton.dataset.rmKind ?? "") as RoadmapFilter;
+      void read(false);
+    } else if (sortButton) {
+      ask.sort = sortButton.dataset.rmSort === "recent" ? "recent" : "votes";
+      void read(false);
+    } else if (target.closest("[data-rm-load]")) {
+      void read(true);
+    }
+  });
+  let typing: ReturnType<typeof setTimeout> | undefined;
+  input.addEventListener("input", () => {
+    clearTimeout(typing);
+    typing = setTimeout(() => {
+      // Under two characters is not a question: it would match half of everything.
+      const next = input.value.trim().length >= 2 ? input.value.trim() : "";
+      if (next === ask.q) return;
+      ask.q = next;
+      void read(false);
+    }, 250);
+  });
+
+  return async (lane, kind) => {
+    ask.lane = lane;
+    ask.kind = kind;
+    ask.sort = lane === "done" || lane === "declined" ? "recent" : "votes";
+    ask.q = "";
+    ask.items = [];
+    ask.total = 0;
+    heading.textContent = i18n.t(`roadmap.${lane}`);
+    input.value = "";
+    await read(false);
+    if (!dialog.open) dialog.showModal();
+    input.focus();
+  };
 }
 
 /**
@@ -1583,15 +1677,23 @@ async function showRoadmap(orgSlug: string, repoSlug: string): Promise<void> {
  * The page carries every row; what happens here is only which of them are
  * hidden, by rules that live in `roadmapState` where they have tests.
  */
-function wireRoadmap(): void {
+function wireRoadmap(orgSlug: string, repoSlug: string): void {
   const page = root?.querySelector<HTMLElement>("[data-rm]");
   if (!page) return;
   const plannedRows = Number(page.dataset.plannedRows) || 6;
   const monthsShut = Number(page.dataset.months) || 2;
-  const state: { filter: RoadmapFilter; open: Record<string, boolean> } = { filter: "", open: {} };
+  const nowCards = Number(page.dataset.nowCards) || 6;
+  const state: { filter: RoadmapFilter } = { filter: "" };
+  const openLane = wireRoadmapDialog(page, orgSlug, repoSlug);
 
   const kindsOf = (rows: Element[]) => rows.map((r) => (r as HTMLElement).dataset.kind ?? "");
   const setHidden = (el: Element, hidden: boolean) => ((el as HTMLElement).hidden = hidden);
+  // What the lane holds that the page does not show: rows past the first few,
+  // and whatever is past the hundred it loaded. Both are in the dialog.
+  const leftOver = (box: HTMLElement, hiddenRows: number) => {
+    const total = (Number(box.dataset.ideas) || 0) + (Number(box.dataset.bugs) || 0);
+    return hiddenRows + Math.max(0, total - (Number(box.dataset.loaded) || 0));
+  };
   const numberOf = (box: HTMLElement) => {
     const ideas = Number(box.dataset.ideas) || 0;
     const bugs = Number(box.dataset.bugs) || 0;
@@ -1609,26 +1711,32 @@ function wireRoadmap(): void {
 
       if (lane === "planned") {
         const rows = [...box.querySelectorAll("[data-rm-row]")];
-        const r = rankedRows(kindsOf(rows), state.filter, state.open[lane] ? null : plannedRows);
+        const r = rankedRows(kindsOf(rows), state.filter, plannedRows);
         rows.forEach((row, i) => {
           setHidden(row, !r.show[i]);
           const rank = row.querySelector("[data-rm-rank]");
           if (rank && r.rank[i]) rank.textContent = text.number(r.rank[i]);
         });
+        const left = leftOver(box, r.hidden);
         if (more) {
-          more.hidden = r.hidden === 0;
-          more.textContent = i18n.t("roadmap.more", { count: text.number(r.hidden) });
+          more.hidden = left === 0;
+          more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
         }
         if (empty) empty.hidden = r.matching > 0;
       } else if (lane === "in_progress") {
         const rows = [...box.querySelectorAll("[data-rm-row]")];
-        const r = rankedRows(kindsOf(rows), state.filter, null);
+        const r = rankedRows(kindsOf(rows), state.filter, nowCards);
         rows.forEach((row, i) => setHidden(row, !r.show[i]));
+        const left = leftOver(box, r.hidden);
+        if (more) {
+          more.hidden = left === 0;
+          more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
+        }
         if (empty) empty.hidden = r.matching > 0;
       } else {
         const groups = [...box.querySelectorAll("[data-rm-group]")];
         const perGroup = groups.map((g) => [...g.querySelectorAll("[data-rm-row]")]);
-        const h = historyRows(perGroup.map(kindsOf), state.filter, state.open[lane] ? null : monthsShut);
+        const h = historyRows(perGroup.map(kindsOf), state.filter, monthsShut);
         groups.forEach((g, i) => {
           const rowShown = h.row[i] ?? [];
           setHidden(g, !h.group[i]);
@@ -1636,7 +1744,13 @@ function wireRoadmap(): void {
           const count = g.querySelector("[data-rm-n]");
           if (count) count.textContent = text.number(rowShown.filter(Boolean).length);
         });
-        if (more) more.hidden = h.hiddenGroups === 0;
+        // The rows of the months that are not shown, counted by what the filter lets through.
+        const hiddenRows = groups.reduce((n, _g, i) => n + (h.group[i] ? 0 : (h.row[i] ?? []).filter(Boolean).length), 0);
+        const left = leftOver(box, hiddenRows);
+        if (more) {
+          more.hidden = left === 0;
+          more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
+        }
         if (empty) empty.hidden = h.matching > 0;
       }
     });
@@ -1649,11 +1763,11 @@ function wireRoadmap(): void {
       apply();
     }),
   );
+  // "Show more" opens the lane whole, in a dialog with its own search and filters.
   page.querySelectorAll<HTMLButtonElement>("[data-rm-more]").forEach((button) =>
     button.addEventListener("click", () => {
       const lane = button.closest<HTMLElement>("[data-rm-box]")?.dataset.rmBox ?? "";
-      state.open[lane] = true;
-      apply();
+      void openLane(lane, state.filter);
     }),
   );
 

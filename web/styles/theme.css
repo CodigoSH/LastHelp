@@ -1594,6 +1594,16 @@ summary:focus-visible,
 .rm-quiet p { max-inline-size: 52ch; margin: 0; font-size: 13px; line-height: 1.55; color: var(--text-dim); }
 .rm-quiet p b { font-size: 15px; color: var(--text-main); }
 
+/* The dialog behind "show more": the page's own surface, a search and two small
+   controls above, the list under them and a count at its foot. */
+.modal.rm-modal { inline-size: min(760px, calc(100vw - 2rem)); }
+.rm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 0 18px 12px; }
+.rm-tools .search-box { flex: 1 1 14rem; min-inline-size: 0; }
+.rm-modal .rm-seg { flex: none; }
+.rm-mrow { grid-template-columns: auto minmax(0, 1fr) auto; }
+.rm-modal .rm-rows .rm-row:not(:first-child) { border-block-start: 1px solid var(--border); }
+.rm-shown { margin: 12px 0 0; text-align: center; font: 11px var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
 @media (max-width: 960px) {
   .rm-lanes { grid-template-columns: minmax(0, 1fr); }
   .rm-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
