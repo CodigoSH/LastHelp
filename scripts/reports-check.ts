@@ -108,6 +108,34 @@ async function main() {
   );
   await shoot("1-pending");
 
+  // 1b. The overview says the same seven, and what "see more" opens holds
+  //     seven lines. The seeded installation has messages waiting as well as
+  //     reports, which is what a list built from only one of the two cannot
+  //     fake: the reports alone are five.
+  await goTo("/panel", ".ov-kpis");
+  const overview = await evaluate(`
+    const tile = Number(document.querySelector('[data-ov="pending"] .ov-kpi-v')?.textContent ?? -1);
+    document.querySelector('[data-ov="pending"] [data-ov-open]').click();
+    for (let i = 0; i < 40 && !document.querySelector("#ov-modal")?.open; i++) await new Promise(r => setTimeout(r, 100));
+    const dialog = document.querySelector("#ov-modal");
+    const out = {
+      tile,
+      count: Number(dialog?.querySelector("[data-ov-count]")?.textContent ?? -1),
+      rows: dialog?.querySelectorAll(".ov-tbl .ov-tr:not(.head)").length ?? 0,
+      comments: dialog?.querySelectorAll(".ov-td.name").length ?? 0,
+    };
+    dialog?.close();
+    return out;
+  `);
+  check(
+    "the overview's pending figure, the dialog's count and its lines are the same seven",
+    overview.tile === expected && overview.count === expected && overview.rows === expected,
+    JSON.stringify({ ...overview, bar: expected }),
+  );
+  // Back on the list: what follows walks it, and a check that leaves the walk
+  // on another screen breaks the next one rather than its own.
+  await goTo("/review", ".rev-list");
+
   // 2. Holding an arrow key. Each row read in the pane is three requests, and
   //    the server refuses one address past 240 a minute; walking the list
   //    must only ask for the row it stops on.

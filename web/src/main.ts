@@ -31,6 +31,7 @@ import { watchSelects } from "./services/select";
 import { attachPasswordToggles } from "./services/password";
 import * as views from "./views/templates";
 import * as landingViews from "./views/landing";
+import * as detail from "./views/overviewDetail";
 import { LandingEditor } from "./landingEditor";
 import { openUpdateDialog, type UpdateInfo } from "./updateModal";
 import { icons } from "./views/icons";
@@ -2312,6 +2313,47 @@ async function showSignIn(): Promise<void> {
 /** How far back the overview's chart goes. A choice for as long as the page is open, and never needed. */
 let overviewDays = 30;
 
+/** The overview on screen, so what "see more" opens can say how many there are in all. */
+let shownOverview: Parameters<typeof views.overviewScreen>[0] | null = null;
+
+/**
+ * What one "see more" opens: asked of the server when it is pressed, never
+ * before, so a page nobody digs into costs nothing beyond its own request.
+ * Each answer comes from the listing or the detail the number was counted
+ * from, which is what keeps the rows adding up to it.
+ */
+async function overviewDetail(name: string, board: string): Promise<detail.Filled> {
+  const now = Math.floor(Date.now() / 1000);
+  const reports = (query: string) => api.get<views.ReportsData>(`/api/reports?${query}`);
+  const boards = async () => (await api.get<{ boards: detail.BoardDetail[] }>("/api/overview/boards")).boards;
+
+  switch (name) {
+    case "waiting": {
+      // The reports and the comments are two lists on the server, as they are
+      // on the review screen, and "waiting" is both of them.
+      const [queue, messages] = await Promise.all([
+        reports("moderation=pending&limit=50"),
+        api.get<{ comments: views.WaitingComment[] }>("/api/panel/comments").catch(() => ({ comments: [] as views.WaitingComment[] })),
+      ]);
+      queue.comments = messages.comments ?? [];
+      return detail.waitingDetail(queue, now, text);
+    }
+    case "unanswered":
+      return detail.unansweredDetail(await reports("reply=none&limit=50"), now, shownOverview?.unanswered ?? 0, text);
+    case "replies":
+      return detail.repliesDetail(await boards(), text);
+    case "arrived":
+      return detail.arrivedDetail(await boards(), text);
+    case "voted":
+      return detail.votedDetail(await reports("moderation=published&kind=idea&sort=votes&limit=20"), text);
+    default: {
+      const found = (await boards()).find((b) => `${b.org}/${b.repo}` === board);
+      if (!found) throw new Error("no such repository");
+      return detail.repoDetail(found, now, text);
+    }
+  }
+}
+
 /**
  * What a day of the chart was, in the reader's own language: the day, the two
  * kinds and what arrived in all. The numbers come from the column that was
@@ -2340,10 +2382,33 @@ function describeDay(point: DOMStringMap): string {
  * replaced every time the screen is drawn, so they never pile up; choosing a
  * range asks the server again and redraws the chart and nothing around it.
  */
-function wireOverviewChart(): void {
+function wireOverview(): void {
   attachTrendHover(root, describeDay);
+  const dialog = root?.querySelector<HTMLDialogElement>("#ov-modal");
+  dialog?.addEventListener("click", (event) => {
+    // The backdrop is the dialog element itself; its content is its children.
+    if (event.target === dialog || (event.target as Element).closest("[data-ov-close]")) dialog.close();
+  });
   const body = root?.querySelector<HTMLElement>(".ov-body");
   body?.addEventListener("click", async (event) => {
+    const opener = (event.target as Element).closest<HTMLElement>("[data-ov-open]");
+    if (opener && dialog) {
+      const heading = dialog.querySelector<HTMLElement>("#ov-modal-title");
+      const count = dialog.querySelector<HTMLElement>("[data-ov-count]");
+      const content = dialog.querySelector<HTMLElement>("[data-ov-body]");
+      if (!heading || !count || !content) return;
+      try {
+        const filled = await overviewDetail(opener.dataset.ovOpen ?? "", opener.dataset.board ?? "");
+        heading.textContent = filled.title;
+        count.hidden = !filled.count;
+        count.textContent = filled.count ?? "";
+        content.innerHTML = filled.body;
+        dialog.showModal();
+      } catch {
+        toast(i18n.t("error.internal"));
+      }
+      return;
+    }
     const button = (event.target as Element).closest<HTMLElement>("[data-days]");
     if (!button) return;
     const days = Number(button.dataset.days);
@@ -2381,7 +2446,8 @@ async function showPanel(): Promise<void> {
     return;
   }
   await showInShell(views.overviewScreen(data, text), "/panel");
-  wireOverviewChart();
+  shownOverview = data;
+  wireOverview();
 }
 
 /**

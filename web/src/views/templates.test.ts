@@ -392,10 +392,23 @@ describe("the overview", () => {
     expect(html).toMatch(/data-ov="reply">[\s\S]*?ov-kpi-v">21600s</);
   });
 
-  test("each tile is a way into the listing it counts", () => {
+  test("each indicator opens the detail it summarises", () => {
+    const html = overviewScreen(overview(), text, 4600);
+    for (const detail of ["waiting", "unanswered", "replies", "arrived", "voted", "repo"]) {
+      expect(html).toContain(`data-ov-open="${detail}"`);
+    }
+    // One dialog for all of them, drawn with the page.
+    expect(html.match(/id="ov-modal"/g)?.length).toBe(1);
+  });
+
+  test("a repository tile opens its own detail", () => {
+    const html = overviewScreen(overview(), text, 4600);
+    expect(html).toContain('data-ov-open="repo" data-board="acme/atlas"');
+  });
+
+  test("what needs the team is a way into the list it counted", () => {
     const html = overviewScreen(overview(), text, 4600);
     expect(html).toContain('href="/review?mode=pending"');
-    expect(html).toContain('href="/review?mode=all"');
     expect(html).toContain('href="/review?mode=all&amp;reply=none&amp;state=open"');
   });
 

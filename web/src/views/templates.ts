@@ -16,6 +16,7 @@ import type {
 } from "../api";
 import { escapeAttr, escapeHTML } from "../escape";
 import { trendChart } from "./charts";
+import { overviewDialog } from "./overviewDetail";
 import { icons } from "./icons";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
@@ -1934,8 +1935,9 @@ export function overviewScreen(
   /** What the number counts, read from the same place the listing reads it. */
   const count = (name: string, n: number) => `<span>${label(name)}: ${number(n)}</span>`;
 
-  const more = (href: string, key: string) =>
-    `<a class="ov-more" href="${escapeAttr(href)}">${label(key)}${icons.chevron(12)}</a>`;
+  /** "See more" that opens the detail in a dialog, at the foot of what it is about. */
+  const seeMore = (detail: string, key: string) =>
+    `<button type="button" class="ov-more" data-ov-open="${detail}">${label(key)}${icons.chevron(12)}</button>`;
 
   const fill = (value: number, of: number, hue: string) =>
     `<span class="bar-track"><span class="bar-fill hue-${escapeAttr(hue)}" data-fill="${
@@ -1981,7 +1983,7 @@ export function overviewScreen(
         count("review.messages", data.waiting_messages),
         data.waiting_oldest > 0 ? `<span>${label("overview.oldest", { age: age(data.waiting_oldest) })}</span>` : "",
       ],
-      more("/review?mode=pending", "overview.openQueue"),
+      seeMore("waiting", "overview.seeWaiting"),
     )}
     ${kpi(
       "unanswered",
@@ -1992,7 +1994,7 @@ export function overviewScreen(
         data.unanswered_oldest > 0 ? `<span>${label("overview.oldest", { age: age(data.unanswered_oldest) })}</span>` : `<span>${label("overview.nothingYet")}</span>`,
         data.unanswered_most_votes > 0 ? `<span>${label("overview.mostVoted", { count: text.number(data.unanswered_most_votes) })}</span>` : "",
       ],
-      more("/review?mode=all&reply=none&state=open", "overview.seeUnanswered"),
+      seeMore("unanswered", "overview.seeUnanswered"),
     )}
     ${kpi(
       "reply",
@@ -2004,7 +2006,7 @@ export function overviewScreen(
           ? `<span>${label("overview.answeredOf", { answered: text.number(data.answered), total: text.number(data.answerable) })}</span>`
           : `<span>${label("overview.nothingYet")}</span>`,
       ],
-      more("/review?mode=all&moderation=published", "overview.openPublished"),
+      seeMore("replies", "overview.byRepository"),
       fill(data.answered, data.answerable, "published"),
     )}
     ${kpi(
@@ -2013,7 +2015,7 @@ export function overviewScreen(
       icons.repository(),
       number(total),
       [count("overview.ideas", data.kinds.idea ?? 0), count("overview.bugs", data.kinds.bug ?? 0)],
-      more("/review?mode=all", "overview.seeReports"),
+      seeMore("arrived", "overview.byRepository"),
     )}
   </div>`;
 
@@ -2065,7 +2067,7 @@ export function overviewScreen(
       ? nothing
       : `<div class="ov-units">${data.boards
           .map(
-            (b) => `<a class="ov-card ov-unit" href="/review?mode=all&amp;board=${escapeAttr(`${b.org}/${b.repo}`)}">
+            (b) => `<button type="button" class="ov-card ov-unit" data-ov-open="repo" data-board="${escapeAttr(`${b.org}/${b.repo}`)}">
               <span class="ov-unit-head"><span class="ov-dot${b.pending > 0 ? " warn" : " ok"}"></span>
                 <b>${escapeHTML(b.name)}</b>
                 <span class="ov-chip${b.pending > 0 ? " warn" : ""}">${
@@ -2073,7 +2075,7 @@ export function overviewScreen(
                 }</span></span>
               <span class="ov-unit-org">${escapeHTML(b.organization)}</span>
               <span class="ov-kpi-sub"><span>${icons.check(12)} ${number(b.published)}</span><span>${icons.idea(12)} ${number(b.votes)}</span></span>
-            </a>`,
+            </button>`,
           )
           .join("")}</div>`,
     number(data.repositories),
@@ -2094,7 +2096,7 @@ export function overviewScreen(
               stateChip(b, text),
             ),
           )
-          .join("")}</div>`,
+          .join("")}</div><div class="ov-box-foot">${seeMore("voted", "overview.seeTop")}</div>`,
   );
 
   /** The order work moves in, so a list reads as a pipeline rather than as a ranking. */
@@ -2156,7 +2158,8 @@ export function overviewScreen(
       ${boards}
       <div class="ov-grid ov-two">${recent}${top}</div>
       <div class="ov-grid ov-four">${ideaStatuses}${bugStatuses}${moderation}${server}</div>
-    </div>`;
+    </div>
+    ${overviewDialog(text)}`;
 }
 
 /**

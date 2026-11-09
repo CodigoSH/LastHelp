@@ -5221,6 +5221,7 @@ form.merge { grid-template-columns: minmax(0, 1fr); }
 }
 
 .ov-more:hover { text-decoration: underline; text-underline-offset: 3px; }
+button.ov-more { padding: 0; border: 0; background: none; cursor: pointer; }
 .ov-more .icon { transform: scaleX(var(--rtl-flip)); }
 
 /* ---- the chart and the boxes */
@@ -5447,6 +5448,85 @@ a.ov-row:hover { background: var(--surface-dim); }
 .ov-allok { display: flex; align-items: center; gap: 12px; padding: 18px 14px; color: var(--text-dim); }
 .ov-allok .icon { color: var(--success-color); }
 
+/* ---- the detail behind a "see more": a dialog on the page's own surface, a table of lines and a way on at the foot */
+
+.modal.ov-modal {
+  inline-size: min(720px, calc(100vw - 2rem));
+  max-block-size: min(80vh, 760px);
+  background: var(--sheet);
+  overflow: hidden;
+}
+
+.ov-modal[open] { display: flex; flex-direction: column; }
+
+.ov-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 12px;
+}
+
+.ov-modal-head h2 {
+  min-inline-size: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 13px/1.4 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ov-modal-head .icon-button { margin-inline-start: auto; }
+
+.ov-modal-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  min-block-size: 0;
+  padding: 0 18px 18px;
+  overflow-y: auto;
+}
+
+.ov-modal-body > * { flex-shrink: 0; }
+.ov-modal-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 16px; }
+.ov-sub { margin: 4px 0 -4px; font: 700 10px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.ov-box-foot { display: flex; justify-content: flex-end; margin-block-start: 10px; }
+
+/* A table of lines. The columns are named by the class and the head is the first line. */
+.ov-tbl { overflow: hidden; border: 1px solid var(--card-border); border-radius: 8px; background: var(--sheet); }
+
+.ov-tr {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-block-start: 1px solid var(--card-border);
+}
+
+.ov-tr:first-child { border-block-start: 0; }
+.ov-tr.head { padding-block: 8px; background: var(--surface-dim); }
+.ov-tr.head span { font: 700 10px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.ov-td { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11.5px/1.3 var(--font-mono); color: var(--text-dim); }
+.ov-td.name { font: 600 13px/1.3 var(--font); color: var(--text-main); }
+.ov-td.name a { color: inherit; text-decoration: none; }
+.ov-td.name a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.cols-wait { --cols: minmax(0, 1fr) 120px 120px 64px; }
+.cols-unanswered { --cols: minmax(0, 1fr) 80px 120px 56px 56px; }
+.cols-replies { --cols: minmax(0, 1fr) 90px 150px 90px; }
+.cols-arrived { --cols: minmax(0, 1fr) 80px 80px 80px; }
+.cols-voted { --cols: minmax(0, 1fr) 120px 130px 56px; }
+.cols-facts { --cols: minmax(0, 1fr) auto; }
+
+@media (max-width: 560px) {
+  .cols-wait, .cols-unanswered, .cols-replies, .cols-arrived, .cols-voted { --cols: minmax(0, 1fr) auto; }
+  .ov-tr > .ov-td:nth-child(n + 3) { display: none; }
+  .ov-tr.head > span:nth-child(n + 3) { display: none; }
+}
+
 .ov-score {
   min-inline-size: 2rem;
   padding: 2px 8px;
@@ -5472,6 +5552,7 @@ a.ov-row:hover { background: var(--surface-dim); }
 }
 
 .ov-unit:hover { border-color: rgba(var(--accent-rgb), 0.3); }
+button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: pointer; }
 .ov-unit-head { display: flex; align-items: center; gap: 9px; min-inline-size: 0; }
 .ov-unit-head b { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
 .ov-unit-head .ov-chip { margin-inline-start: auto; }

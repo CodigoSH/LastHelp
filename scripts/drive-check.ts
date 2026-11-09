@@ -2517,27 +2517,51 @@ async function main() {
     JSON.stringify(ranged),
   );
 
-  // 11e. Every number leads to the list it counts. A dashboard whose tiles are
-  //      not links is a dashboard that answers "how many" and then leaves you
-  //      to find them yourself.
-  // Out of arranging first: while the dashboard is being rearranged the tiles
-  // are deliberately not links, because a card you meant to drag should not
-  // navigate. Reading the href without leaving that mode measures the mode.
-  // Read as a set rather than by name, so this says what it means — every tile
-  // is a link, and more than one of them goes into the listing — rather than
-  // pinning the order the cards happen to be in.
+  // 11e. Every indicator opens what it summarises, and what it opens adds up to
+  //      it. A summary whose "see more" says seven over a list of six is the
+  //      screen contradicting itself a click later, which no check of either
+  //      number alone would notice — so the relation is what is read: the
+  //      dialog's count against the tile's figure, for each kind of tile that
+  //      is a list of lines.
   const tiles = await evaluate(`
     const cards = [...document.querySelectorAll('.ov-kpi')];
+    const figure = (id) => Number(document.querySelector('[data-ov="' + id + '"] .ov-kpi-v')?.textContent ?? -1);
+    const opens = async (id) => {
+      document.querySelector('[data-ov="' + id + '"] [data-ov-open]').click();
+      for (let i = 0; i < 40 && !document.querySelector("#ov-modal")?.open; i++) await new Promise(r => setTimeout(r, 100));
+      const dialog = document.querySelector("#ov-modal");
+      const out = {
+        open: !!dialog?.open,
+        title: dialog?.querySelector("#ov-modal-title")?.textContent?.trim() ?? "",
+        count: Number(dialog?.querySelector("[data-ov-count]")?.textContent ?? -1),
+        rows: dialog?.querySelectorAll(".ov-tbl .ov-tr:not(.head)").length ?? 0,
+      };
+      dialog?.close();
+      return out;
+    };
+    const waiting = await opens("pending");
+    const unanswered = await opens("unanswered");
+    const replies = await opens("reply");
+    const arrived = await opens("reports");
     return {
-      stats: cards.length,
-      links: cards.map(c => c.querySelector("a.ov-more")?.getAttribute("href") ?? ""),
+      tiles: cards.length,
+      each: cards.every(c => !!c.querySelector("[data-ov-open]")),
+      pending: figure("pending"), unanswered: figure("unanswered"),
+      waiting, unansweredDialog: unanswered, replies, arrived,
+      links: [...document.querySelectorAll('[data-ov="needs"] a.ov-need')].map(a => a.getAttribute("href")),
     };
   `);
   check(
-    "and every number on it leads to the list it counts",
-    tiles.stats > 0 &&
-      tiles.links.every((href: string) => href.length > 0) &&
-      tiles.links.filter((href: string) => href.startsWith("/review")).length >= 2,
+    "and every number on it opens what it summarises, and that adds up to it",
+    tiles.tiles === 4 && tiles.each === true &&
+      tiles.waiting.open && tiles.waiting.title.length > 0 && tiles.waiting.count === tiles.pending && tiles.waiting.rows === tiles.pending &&
+      tiles.unansweredDialog.open && tiles.unansweredDialog.count === tiles.unanswered && tiles.unansweredDialog.rows === tiles.unanswered &&
+      tiles.replies.open && tiles.replies.rows > 0 && tiles.arrived.open && tiles.arrived.rows === tiles.replies.rows,
+    JSON.stringify(tiles),
+  );
+  check(
+    "and what needs the team is a way into the list it counted",
+    tiles.links.length > 0 && tiles.links.every((href: string) => href.startsWith("/review") || href.startsWith("/panel")),
     JSON.stringify(tiles.links),
   );
 
@@ -3100,7 +3124,7 @@ async function main() {
       personas: !!document.querySelector('[data-ov="server"], a[href="/panel/people"]'),
       pendientes: value("pending"),
       servidor: (me.pending?.reports ?? 0) + (me.pending?.messages ?? 0),
-      tableros: [...document.querySelectorAll('[data-ov="boards"] a')].map(a => a.getAttribute("href")),
+      tableros: [...document.querySelectorAll('[data-ov="boards"] [data-board]')].map(a => a.getAttribute("data-board")),
       offersToAdd: !!document.querySelector("[data-open-modal]"),
       role: document.querySelector(".side-head .side-role")?.textContent?.trim() ?? "",
       expected: (await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json()))["comment.team"],
@@ -3112,7 +3136,7 @@ async function main() {
     "a collaborator's overview is the summary of their boards, not the server's",
     collaborator.equipo === true && collaborator.personas === false &&
       collaborator.pendientes === collaborator.servidor &&
-      JSON.stringify(collaborator.tableros) === '["/review?mode=all&board=codigosh/lastboard"]',
+      JSON.stringify(collaborator.tableros) === '["codigosh/lastboard"]',
     JSON.stringify(collaborator),
   );
   check(
