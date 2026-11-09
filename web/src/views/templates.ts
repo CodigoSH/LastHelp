@@ -18,6 +18,7 @@ import { escapeAttr, escapeHTML } from "../escape";
 import { trendChart } from "./charts";
 import { overviewDialog } from "./overviewDetail";
 import { icons } from "./icons";
+import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
 import { actionButton, iconButton } from "./modal";
@@ -2667,6 +2668,7 @@ export function accountRole(me: { admin?: boolean; memberships?: Array<{ role: s
 export function profileScreen(
   me: { username: string; avatar?: string; role: string },
   text: Text,
+  push: PushView | null = null,
 ): string {
   // Profile and password, a card each: the picture, the name and the role; the username — the one name an account
   // has, to sign in with and to sign replies — with its save button on the same
@@ -2711,7 +2713,63 @@ export function profileScreen(
         </form>`,
         { lead: text.t("profile.passwordHelp") },
       )}
+      ${push ? pushCard(push, text) : ""}
     </div>`;
+}
+
+/**
+ * The account's own devices for push notifications: a switch for this browser, and the list of every
+ * browser the account has turned on, each of which can be taken off. A browser that cannot take part
+ * says why instead of showing a switch that would do nothing.
+ */
+export function pushCard(view: PushView, text: Text): string {
+  const blocked =
+    view.support === "ready"
+      ? ""
+      : `<p class="hint" data-push-state="${view.support}">${escapeHTML(
+          text.t(
+            view.support === "denied" ? "push.denied" : view.support === "needs-install" ? "push.needsInstall" : "push.unsupported",
+          ),
+        )}</p>`;
+
+  const row =
+    view.support !== "ready"
+      ? ""
+      : `<div class="settings-row">
+          <div class="settings-info">
+            <h4>${escapeHTML(text.t("push.thisDevice"))}</h4>
+            <p>${escapeHTML(text.t("push.thisDeviceHelp"))}</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" role="switch" data-push-toggle${view.thisDevice !== null ? " checked" : ""}
+              aria-label="${escapeAttr(text.t("push.thisDevice"))}" />
+            <span class="toggle-track" aria-hidden="true"></span>
+          </label>
+        </div>`;
+
+  const devices = view.devices.length
+    ? `<ul class="settings-list push-devices">${view.devices
+        .map((d) =>
+          settingsItem({
+            attrs: `data-push-device="${d.id}"`,
+            lead: `<span class="si-mark">${icons.bell(16)}</span>`,
+            name: d.label,
+            sub: d.last_ok_at !== null ? text.t("push.lastOk", { date: text.dateTime(d.last_ok_at) }) : undefined,
+            tags: d.id === view.thisDevice ? `<span class="mono-tag accent">${escapeHTML(text.t("push.thisDevice"))}</span>` : "",
+            actions: iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-push-remove="${d.id}"`),
+          }),
+        )
+        .join("")}</ul>`
+    : "";
+
+  const test =
+    view.devices.length === 0
+      ? ""
+      : `<div class="settings-actions"><button class="button" type="button" data-push-test>${escapeHTML(text.t("push.test"))}</button></div>`;
+
+  return settingsCard(text.t("push.title"), `${blocked}${row}${devices}${test}<p class="form-error" data-push-error role="alert" hidden></p>`, {
+    lead: text.t("push.lead"),
+  });
 }
 
 /** Language and look, which belong to the reader rather than to the server. */
@@ -2794,6 +2852,7 @@ function channelForm(
     ["gotify", "Gotify"],
     ["webhook", "Webhook"],
     ["smtp", "Email"],
+    ["push", text.t("panel.channelPush")],
   ];
   if (spec.server) kinds.push(["server", text.t("panel.channelServer")]);
 
@@ -2802,6 +2861,8 @@ function channelForm(
         spec.server.configured ? text.t("panel.channelServerSet") : text.t("panel.channelServerUnset"),
       )}</p>`
     : "";
+
+  const pushNote = `<p class="hint" data-channel-push hidden>${escapeHTML(text.t("panel.channelPushNote"))}</p>`;
 
   return `<form class="channel"${spec.repo === undefined ? " data-server-channel" : ""} data-kind="${escapeAttr(spec.kind)}"${
     spec.hasToken ? " data-has-token" : ""
@@ -2828,6 +2889,7 @@ function channelForm(
       ${field({ id: "chan-to", name: "to", label: text.t("panel.mailTo"), type: "email", example: "team@example.com", value: spec.to }, text)}
     </div>
     ${serverNote}
+    ${pushNote}
     <p class="form-error" role="alert" hidden></p>
     <p class="hint channel-result" role="status" hidden></p>
     <div class="settings-actions">

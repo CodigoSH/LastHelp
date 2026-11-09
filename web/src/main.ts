@@ -22,6 +22,7 @@ import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
+import { disablePush, enablePush, loadPush, removePushDevice, testPush, type PushView } from "./services/pushClient";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
 import { attachPictureViewer } from "./services/pictureViewer";
@@ -802,13 +803,18 @@ async function requirePanel(): Promise<boolean> {
 
 async function showProfile(): Promise<void> {
   if (!(await requirePanel())) return;
+  // What the account's devices are doing: left out of the page, not an error on
+  // it, when it cannot be read.
+  const push = await loadPush().catch(() => null);
   await showInShell(
     views.profileScreen(
       { username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) },
       text,
+      push,
     ),
     "/panel/account",
   );
+  wirePush(push);
 
   // The picture, which is read in the browser and sent as a data URL. A file
   // upload would need a store, a route to serve it from and a second thing to
@@ -1927,6 +1933,56 @@ function wireCredentials(orgSlug: string): void {
   });
 }
 
+/** Turning notifications on for this browser, trying one, and taking a device off the list. */
+function wirePush(view: PushView | null): void {
+  if (!view) return;
+  const fail = async (err: unknown) => {
+    // Drawn again first, so the switch shows what is true, and the reason after it.
+    await showProfile();
+    const line = root?.querySelector<HTMLParagraphElement>("[data-push-error]");
+    if (!line) return;
+    const key =
+      err instanceof ApiError ? err.key : err instanceof Error && err.message === "push.permission_denied" ? "push.permissionDenied" : "error.internal";
+    line.textContent = i18n.t(key);
+    line.hidden = false;
+  };
+
+  root?.querySelector<HTMLInputElement>("[data-push-toggle]")?.addEventListener("change", async (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const on = input.checked;
+    // Standing still while the browser and its push service answer, which can take a few seconds:
+    // a second press in the middle would turn it off again.
+    input.disabled = true;
+    try {
+      if (on) await enablePush();
+      else await disablePush(view.thisDevice);
+      await showProfile();
+    } catch (err) {
+      await fail(err);
+    }
+  });
+  root?.querySelectorAll<HTMLButtonElement>("[data-push-remove]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const id = Number(button.dataset.pushRemove);
+      try {
+        if (id === view.thisDevice) await disablePush(id);
+        else await removePushDevice(id);
+        await showProfile();
+      } catch (err) {
+        await fail(err);
+      }
+    }),
+  );
+  root?.querySelector<HTMLButtonElement>("[data-push-test]")?.addEventListener("click", async () => {
+    try {
+      await testPush();
+      toast(i18n.t("push.testSent"));
+    } catch (err) {
+      await fail(err);
+    }
+  });
+}
+
 /** Choosing where a board's team is told something arrived. */
 function wireChannel(
   where: { save: (data: Record<string, unknown>) => Promise<unknown>; test: (data: Record<string, unknown>) => Promise<unknown> },
@@ -1939,6 +1995,7 @@ function wireChannel(
   const fields = form.querySelector<HTMLDivElement>(".channel-fields");
   const mail = form.querySelector<HTMLDivElement>(".channel-mail");
   const serverNote = form.querySelector<HTMLParagraphElement>("[data-channel-server]");
+  const pushNote = form.querySelector<HTMLParagraphElement>("[data-channel-push]");
   const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
   const result = form.querySelector<HTMLParagraphElement>(".channel-result");
   const testButton = form.querySelector<HTMLButtonElement>("[data-channel-test]");
@@ -1948,9 +2005,10 @@ function wireChannel(
   // channel has nothing to fill in here at all.
   const sync = () => {
     const value = kind?.value ?? "";
-    if (fields) fields.hidden = value === "" || value === "smtp" || value === "server";
+    if (fields) fields.hidden = value === "" || value === "smtp" || value === "server" || value === "push";
     if (mail) mail.hidden = value !== "smtp";
     if (serverNote) serverNote.hidden = value !== "server";
+    if (pushNote) pushNote.hidden = value !== "push";
     if (testButton) testButton.hidden = value === "";
   };
   kind?.addEventListener("change", sync);

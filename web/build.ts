@@ -55,6 +55,26 @@ if (!result.success) {
   process.exit(1);
 }
 
+// The service worker, for Web Push and nothing else. It is served from the
+// root (/sw.js) because a worker's scope is the directory it comes from, and
+// this one has to cover the whole site. Its name carries no stamp: a browser
+// looks for a new worker by fetching this very URL and comparing the bytes, so
+// a changing name would only hide an update from it.
+const worker = await build({
+  entrypoints: ["./web/src/sw.ts"],
+  outdir: OUT,
+  minify: true,
+  sourcemap: "none",
+  target: "browser",
+  naming: "sw.js",
+});
+
+if (!worker.success) {
+  console.error("service worker build failed:");
+  for (const message of worker.logs) console.error(message);
+  process.exit(1);
+}
+
 const copyVersioned = async (src: string, dest: string) => {
   const content = (await readFile(src, "utf-8")).replace(/(\?v=)[0-9a-zA-Z]+/g, `$1${PLACEHOLDER}`);
   await writeFile(dest, content);
@@ -81,10 +101,11 @@ try {
   if (existsSync("./web/public")) await cp("./web/public", OUT, { recursive: true });
 
   // The web manifest and the app icons are plain files in web/public, copied
-  // above with everything else — the dashboard's arrangement. No service
-  // worker, on purpose: the app installs but does not work offline, because a
-  // portal needs the network to report or vote, and a cached shell is the one
-  // that serves last week's bundle after an update.
+  // above with everything else. The one service worker (sw.js, built above)
+  // exists for push notifications and caches nothing, on purpose: the app
+  // installs but does not work offline, because a portal needs the network to
+  // report or vote, and a cached shell is the one that serves last week's
+  // bundle after an update.
 
   // Everything is now in place with the placeholder in it. Hash the lot —
   // paths included, so moving a file changes the stamp — and swap it in.
