@@ -609,7 +609,6 @@
   "repo.confirmRevoke": "Remove {name} from this repository? The account is kept.",
   "repo.images": "Images",
   "repo.imagesHelp": "They wait for the team's review with their report, and are erased 30 days after it closes.",
-  "visibility.label": "Visibility",
   "visibility.private": "Only the team can see it",
   "visibility.help": "Everyone else gets a page that does not exist: it is not listed, not searched, has no feed and its links stop working. You can switch it back at any time.",
   "visibility.orgHelp": "Every board under it is hidden too. Everyone else gets a page that does not exist. You can switch it back at any time.",

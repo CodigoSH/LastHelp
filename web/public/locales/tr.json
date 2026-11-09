@@ -616,7 +616,6 @@
   "repo.exportHelp": "Bekleyen ve reddedilenler dahil tüm bildirimler JSON olarak.",
   "repo.images": "Görseller",
   "repo.imagesHelp": "Bildirimleriyle birlikte ekibin incelemesini bekler ve bildirim kapandıktan 30 gün sonra silinir.",
-  "visibility.label": "Görünürlük",
   "visibility.private": "Yalnızca ekip görebilir",
   "visibility.help": "Diğer herkes için sayfa yoktur: listelerde ve aramada çıkmaz, akışı olmaz ve bağlantıları çalışmaz. İstediğiniz zaman geri açabilirsiniz.",
   "visibility.orgHelp": "İçindeki tüm panolar da gizlenir. Diğer herkes için sayfa yoktur. İstediğiniz zaman geri açabilirsiniz.",

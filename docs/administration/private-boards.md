@@ -6,7 +6,7 @@ Everything is public by default. Nothing changes for an installation that does n
 
 ## Turning it on
 
-Tick **Only the team can see it** when you create an organisation or a board, or later in its settings. Untick it to make it public again; nothing is lost either way. An organisation's switch hides every board under it, whatever their own setting says.
+Turn on **Only the team can see it** when you create an organisation or a board, or later in its settings. Turn it off to make it public again; nothing is lost either way. An organisation's switch hides every board under it, whatever their own setting says.
 
 ## What the public sees
 

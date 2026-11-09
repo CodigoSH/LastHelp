@@ -616,7 +616,6 @@
   "repo.exportHelp": "Tous les signalements au format JSON, y compris en attente et rejetés.",
   "repo.images": "Images",
   "repo.imagesHelp": "Elles attendent la relecture de l'équipe avec leur signalement et sont effacées 30 jours après sa clôture.",
-  "visibility.label": "Visibilité",
   "visibility.private": "Visible uniquement par l'équipe",
   "visibility.help": "Pour tous les autres, la page n'existe pas : elle n'apparaît ni dans les listes ni dans la recherche, n'a pas de flux et ses liens cessent de fonctionner. Vous pouvez la rendre de nouveau publique à tout moment.",
   "visibility.orgHelp": "Tous les tableaux qu'elle contient sont aussi masqués. Pour tous les autres, la page n'existe pas. Vous pouvez la rendre de nouveau publique à tout moment.",

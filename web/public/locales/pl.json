@@ -616,7 +616,6 @@
   "repo.exportHelp": "Wszystkie zgłoszenia w JSON, łącznie z oczekującymi i odrzuconymi.",
   "repo.images": "Obrazy",
   "repo.imagesHelp": "Czekają na przegląd zespołu razem ze zgłoszeniem i są usuwane 30 dni po jego zamknięciu.",
-  "visibility.label": "Widoczność",
   "visibility.private": "Widzi to tylko zespół",
   "visibility.help": "Dla wszystkich pozostałych strona nie istnieje: nie ma jej na listach ani w wyszukiwarce, nie ma kanału, a jej linki przestają działać. W każdej chwili możesz to cofnąć.",
   "visibility.orgHelp": "Wszystkie tablice w środku są również ukryte. Dla wszystkich pozostałych strona nie istnieje. W każdej chwili możesz to cofnąć.",

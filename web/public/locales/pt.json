@@ -616,7 +616,6 @@
   "repo.exportHelp": "Todos os relatos em JSON, incluindo pendentes e rejeitados.",
   "repo.images": "Imagens",
   "repo.imagesHelp": "Aguardam a revisão da equipa com o seu relato e são apagadas 30 dias depois de este ser fechado.",
-  "visibility.label": "Visibilidade",
   "visibility.private": "Só a equipa pode ver",
   "visibility.help": "Para todos os outros a página não existe: não aparece em listas nem em pesquisas, não tem feed e as suas ligações deixam de funcionar. Pode torná-lo público de novo quando quiser.",
   "visibility.orgHelp": "Todos os quadros que contém também ficam ocultos. Para todos os outros a página não existe. Pode torná-lo público de novo quando quiser.",

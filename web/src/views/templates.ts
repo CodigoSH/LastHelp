@@ -1268,18 +1268,19 @@ export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: bool
   ${visibilityField(text, current?.private ?? false, false)}`;
 }
 
-/** Who may see an organisation or a board. One checkbox: public is the ordinary
+/** Who may see an organisation or a board. One switch: public is the ordinary
  *  state and needs no words, so what is offered is the exception. */
 export function visibilityField(text: Text, isPrivate: boolean, wholeOrganization: boolean): string {
-  return `<div class="field">
-    <label>${escapeHTML(text.t("visibility.label"))}</label>
-    <div class="checks">
-      <label class="check">
-        <input type="checkbox" name="private"${isPrivate ? " checked" : ""} />
-        <span>${escapeHTML(text.t("visibility.private"))}</span>
-      </label>
+  return `<div class="settings-row visibility-row">
+    <div class="settings-info">
+      <h4>${escapeHTML(text.t("visibility.private"))}</h4>
+      <p>${escapeHTML(text.t(wholeOrganization ? "visibility.orgHelp" : "visibility.help"))}</p>
     </div>
-    <p class="hint">${escapeHTML(text.t(wholeOrganization ? "visibility.orgHelp" : "visibility.help"))}</p>
+    <label class="toggle">
+      <input type="checkbox" role="switch" name="private"${isPrivate ? " checked" : ""}
+        aria-label="${escapeAttr(text.t("visibility.private"))}" />
+      <span class="toggle-track" aria-hidden="true"></span>
+    </label>
   </div>`;
 }
 

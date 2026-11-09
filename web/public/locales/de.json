@@ -616,7 +616,6 @@
   "repo.exportHelp": "Alle Meldungen als JSON, einschließlich wartender und abgelehnter.",
   "repo.images": "Bilder",
   "repo.imagesHelp": "Sie warten mit ihrer Meldung auf die Prüfung durch das Team und werden 30 Tage nach deren Schließung gelöscht.",
-  "visibility.label": "Sichtbarkeit",
   "visibility.private": "Nur das Team kann es sehen",
   "visibility.help": "Für alle anderen existiert die Seite nicht: Sie steht in keiner Liste, ist nicht durchsuchbar, hat keinen Feed und ihre Links funktionieren nicht mehr. Sie können das jederzeit rückgängig machen.",
   "visibility.orgHelp": "Auch alle Boards darin sind verborgen. Für alle anderen existiert die Seite nicht. Sie können das jederzeit rückgängig machen.",

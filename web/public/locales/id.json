@@ -616,7 +616,6 @@
   "repo.exportHelp": "Semua laporan dalam JSON, termasuk yang menunggu dan ditolak.",
   "repo.images": "Gambar",
   "repo.imagesHelp": "Gambar menunggu tinjauan tim bersama laporannya, dan dihapus 30 hari setelah laporan ditutup.",
-  "visibility.label": "Visibilitas",
   "visibility.private": "Hanya tim yang bisa melihat",
   "visibility.help": "Bagi orang lain halaman ini tidak ada: tidak muncul di daftar maupun pencarian, tidak punya feed, dan tautannya berhenti berfungsi. Anda dapat mengembalikannya kapan saja.",
   "visibility.orgHelp": "Semua papan di dalamnya juga disembunyikan. Bagi orang lain halaman ini tidak ada. Anda dapat mengembalikannya kapan saja.",
