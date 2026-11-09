@@ -424,7 +424,7 @@ func TestAPushIsWrittenInTheLanguageOfWhoReadsIt(t *testing.T) {
 		t.Errorf("a message with no kind was rewritten: %q", got)
 	}
 	// A name written the other way is kept from dragging the words around it.
-	if got := srv.pushPayloadIn("ar", notify.Message{Title: "Atlas", Kind: "idea"}).Title; !strings.Contains(got, "⁨Atlas⁩") {
+	if got := srv.pushPayloadIn("ar", notify.Message{Title: "Atlas", Kind: "idea"}).Title; !strings.Contains(got, "\u2068Atlas\u2069") {
 		t.Errorf("an Arabic notification does not isolate the name: %q", got)
 	}
 }

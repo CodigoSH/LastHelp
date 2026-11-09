@@ -64,7 +64,7 @@ func isolate(lang, value string) string {
 	if direction(lang) != "rtl" {
 		return value
 	}
-	return "⁨" + value + "⁩"
+	return "\u2068" + value + "\u2069"
 }
 
 // languageOf is the language an account reads the product in, English when it
