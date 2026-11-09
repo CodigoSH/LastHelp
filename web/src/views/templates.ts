@@ -2147,10 +2147,10 @@ export function overviewScreen(
   return `<header class="ov-head">
       <h1 class="ov-title">${icons.overview(18)}<span>${label("shell.overview")}</span></h1>
       <div class="ov-sum">
-        <span><i class="ov-dot${data.pending > 0 ? " warn" : " ok"}"></i><b>${number(data.pending)}</b> ${label("panel.queue")}</span>
-        <span><i class="ov-dot ok"></i><b>${number(data.published)}</b> ${label("overview.published")}</span>
-        <span><b>${number(data.repositories)}</b> ${label("portal.boards")}</span>
-        ${team ? "" : `<span><b>${number(data.organizations)}</b> ${label("shell.organizations")}</span>`}
+        <span><i class="ov-dot${data.pending > 0 ? " warn" : " ok"}"></i>${label("panel.queue")}: <b>${number(data.pending)}</b></span>
+        <span><i class="ov-dot ok"></i>${label("overview.published")}: <b>${number(data.published)}</b></span>
+        <span>${label("portal.boards")}: <b>${number(data.repositories)}</b></span>
+        ${team ? "" : `<span>${label("shell.organizations")}: <b>${number(data.organizations)}</b></span>`}
       </div>
       <span class="ov-spacer"></span>
       <a class="ov-btn" href="/review?mode=pending">${icons.queue(15)}<span>${label("review.title")}</span></a>
