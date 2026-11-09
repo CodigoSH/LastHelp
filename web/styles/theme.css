@@ -7056,9 +7056,10 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
    draw between themselves, drawn above it. */
 .settings-card form + .settings-row,
 .settings-card .settings-list + .settings-row { margin-block-start: 20px; border-block-start: 1px solid var(--border); }
-/* Who may see it, at the foot of a form: a row of its own under a rule, so it
-   reads as a choice about the whole thing and not as one more field. */
-.settings-row.visibility-row { margin-block-start: 8px; padding-block: 16px 0; border-block-start: 1px solid var(--border); border-block-end: 0; }
+/* A form's switches: rows under a rule, the last one without its own, so the
+   group reads as one block of settings rather than as more fields. */
+.toggle-rows { margin-block-start: 8px; border-block-start: 1px solid var(--border); }
+.toggle-rows .settings-row:last-child { border-block-end: 0; padding-block-end: 0; }
 .settings-info h4 { margin: 0 0 2px; font-size: 13px; font-weight: 600; }
 .settings-info p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim); max-inline-size: 56ch; }
 .settings-info .settings-danger { color: var(--danger-color); font-weight: 600; }

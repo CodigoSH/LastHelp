@@ -1199,7 +1199,7 @@ export function organizationFields(text: Text, forge: string): string {
         example: example.owner,
       }, text)}
     </div>` +
-    visibilityField(text, false, true)
+    visibilityField(text, false)
   );
 }
 
@@ -1240,45 +1240,32 @@ export function repositoryFields(text: Text, forge: string, hasForge: boolean): 
  *  Pictures are a field of their own: they are not a kind of report, and the
  *  "at least one" under the kinds is not about them. */
 export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean; images?: boolean; private?: boolean }): string {
-  // Two checkboxes that say what they turn on, not two pills reading "Bug" and
-  // "Idea". This is a settings form: the control people know here is a
-  // checkbox with a sentence beside it, and the words are what somebody
-  // reporting will be offered rather than the internal name of a kind.
-  const box = (name: string, label: string, on = true) =>
-    `<label class="check">
-      <input type="checkbox" name="${escapeAttr(name)}"${on ? " checked" : ""} />
-      <span>${escapeHTML(label)}</span>
-    </label>`;
-
-  return `<div class="field">
-    <label>${escapeHTML(text.t("repo.accepts"))}</label>
-    <div class="checks">
-      ${box("accepts_bugs", text.t("repo.acceptsBugs"), current?.bugs ?? true)}
-      ${box("accepts_ideas", text.t("repo.acceptsIdeas"), current?.ideas ?? true)}
-    </div>
-    <p class="hint">${escapeHTML(text.t("repo.acceptsHelp"))}</p>
-  </div>
-  <div class="field">
-    <label>${escapeHTML(text.t("repo.images"))}</label>
-    <div class="checks">
-      ${box("accepts_images", text.t("repo.acceptsImages"), current?.images ?? true)}
-    </div>
-    <p class="hint">${escapeHTML(text.t("repo.imagesHelp"))}</p>
-  </div>
-  ${visibilityField(text, current?.private ?? false, false)}`;
+  // What a board takes and who may see it are switches, on rows of their own:
+  // the control the panel uses for a thing that is on or off, with what it
+  // means beside it. Boxed checkboxes read as a form to fill in, and these are
+  // not answers but settings.
+  return `<div class="toggle-rows">
+    ${toggleRow("accepts_bugs", text.t("repo.acceptsBugs"), "", current?.bugs ?? true)}
+    ${toggleRow("accepts_ideas", text.t("repo.acceptsIdeas"), text.t("repo.acceptsHelp"), current?.ideas ?? true)}
+    ${toggleRow("accepts_images", text.t("repo.acceptsImages"), text.t("repo.imagesHelp"), current?.images ?? true)}
+    ${toggleRow("private", text.t("visibility.private"), text.t("visibility.help"), current?.private ?? false)}
+  </div>`;
 }
 
-/** Who may see an organisation or a board. One switch: public is the ordinary
- *  state and needs no words, so what is offered is the exception. */
-export function visibilityField(text: Text, isPrivate: boolean, wholeOrganization: boolean): string {
-  return `<div class="settings-row visibility-row">
+/** Who may see an organisation: the same row, for the whole of it. */
+export function visibilityField(text: Text, isPrivate: boolean): string {
+  return `<div class="toggle-rows">${toggleRow("private", text.t("visibility.private"), text.t("visibility.orgHelp"), isPrivate)}</div>`;
+}
+
+/** One setting that is on or off: what it is and what it means on one side, the switch on the other. */
+function toggleRow(name: string, title: string, help: string, on: boolean): string {
+  return `<div class="settings-row">
     <div class="settings-info">
-      <h4>${escapeHTML(text.t("visibility.private"))}</h4>
-      <p>${escapeHTML(text.t(wholeOrganization ? "visibility.orgHelp" : "visibility.help"))}</p>
+      <h4>${escapeHTML(title)}</h4>${help ? `\n      <p>${escapeHTML(help)}</p>` : ""}
     </div>
     <label class="toggle">
-      <input type="checkbox" role="switch" name="private"${isPrivate ? " checked" : ""}
-        aria-label="${escapeAttr(text.t("visibility.private"))}" />
+      <input type="checkbox" role="switch" name="${escapeAttr(name)}"${on ? " checked" : ""}
+        aria-label="${escapeAttr(title)}" />
       <span class="toggle-track" aria-hidden="true"></span>
     </label>
   </div>`;
@@ -3280,7 +3267,7 @@ export function organizationScreen(
     `<form class="org-settings">
       ${iconField(text, org.name, org.icon ?? "", "os-icon")}
       ${field({ id: "os-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: org.name }, text)}
-      ${visibilityField(text, org.private ?? false, true)}
+      ${visibilityField(text, org.private ?? false)}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>
