@@ -203,3 +203,45 @@ func (s Store) RoadmapLanes(repoID int64, perLane int) ([]LaneView, error) {
 	}
 	return out, nil
 }
+
+// LaneQuery is what the dialog that opens a lane asks of it: everything in the
+// lane, narrowed by kind and by words, in the order it chooses, a page at a time.
+type LaneQuery struct {
+	Kind   Kind   // empty for both
+	Search string // empty for everything
+	// ByVotes ranks by votes. Without it a lane that is open reads newest first,
+	// and one that is finished reads by when it ended.
+	ByVotes bool
+	Offset  int
+	Limit   int
+}
+
+// RoadmapLanePage is one page of a lane and how many items it holds in all
+// under that question. The count is read from the same conditions the page is,
+// so "30 of 47" cannot be about two different sets.
+func (s Store) RoadmapLanePage(repoID int64, lane Lane, q LaneQuery) ([]Item, int, error) {
+	statuses := LaneStatuses(lane)
+	if len(statuses) == 0 {
+		return nil, 0, nil
+	}
+	f := Filter{
+		RepoID: repoID, Statuses: statuses, Kind: q.Kind,
+		Search: q.Search, AsTyped: true,
+		Limit: q.Limit, Offset: q.Offset,
+	}
+	switch {
+	case q.ByVotes:
+		f.SortByVote = true
+	case lane.Finished():
+		f.SortByClosed = true
+	}
+	total, err := s.Tally(f)
+	if err != nil {
+		return nil, 0, err
+	}
+	items, err := s.List(f)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}

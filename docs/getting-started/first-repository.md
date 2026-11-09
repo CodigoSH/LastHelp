@@ -202,13 +202,18 @@ planned idea share *planned*, and a fixed bug and a shipped idea share
   On a phone they are the tabs between the lanes.
 - **Ideas** and **Bugs** narrow every lane at once.
 - *Planned* is ranked by votes and shows the first six; *delivered* is grouped by
-  the month each thing was delivered in and shows the latest two. Both open in
-  place, so the page stays a screen or two long however many reports there are.
+  the month each thing was delivered in and shows the latest two; what is in
+  progress shows six cards. Each lane that has more says how many, and **Show
+  more** opens the lane whole in a dialog, with a search over every item in it,
+  an Ideas/Bugs filter and a choice of order (most voted, or newest), a page at
+  a time. The page itself stays a screen or two long however many reports
+  there are.
 - **Declined** is shut until somebody asks for it: the page is about what is going
   to happen. What was declined is public already, on the board under *Closed*, and
   the reply on each report is where the team says why.
 
-The lanes hold the first hundred of each. The front page's roadmap module is
-unchanged and still shows the first three.
+The page loads the first hundred of each lane; the dialog reads the rest from the
+server. The front page's roadmap module is unchanged and still shows the first
+three.
 
 ![The roadmap](../images/roadmap.png)

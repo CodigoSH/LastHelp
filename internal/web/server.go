@@ -211,6 +211,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/similar", s.handleSimilar)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/form", s.handleForm)
 	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/roadmap", s.handleRoadmap)
+	s.mux.HandleFunc("GET /api/orgs/{org}/repos/{repo}/roadmap/{lane}", s.handleRoadmapLane)
 
 	s.mux.HandleFunc("GET /api/items/{id}", s.handleItem)
 	s.mux.HandleFunc("POST /api/items/{id}/votes", s.handleVote)

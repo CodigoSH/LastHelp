@@ -236,6 +236,60 @@ func (s *Server) handleRoadmap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"lanes": lanes, "columns": columns})
 }
 
+// handleRoadmapLane is one lane of the roadmap, all of it: what the dialog that
+// opens from "show more" reads. Filtered by kind and by words, in the order it
+// asks for, a page at a time.
+//
+// Public like the roadmap itself, and through the same lookup, so a private
+// board answers as one that does not exist.
+func (s *Server) handleRoadmapLane(w http.ResponseWriter, r *http.Request) {
+	repo, _, ok := s.lookupRepository(w, r)
+	if !ok {
+		return
+	}
+	lane := item.Lane(r.PathValue("lane"))
+	if len(item.LaneStatuses(lane)) == 0 {
+		writeError(w, http.StatusNotFound, "error.not_found")
+		return
+	}
+
+	query := r.URL.Query()
+	q := item.LaneQuery{
+		ByVotes: query.Get("sort") == "votes",
+		Offset:  max(intParam(query.Get("offset"), 0), 0),
+		Limit:   min(max(intParam(query.Get("limit"), roadmapPageSize), 1), 50),
+	}
+	switch k := item.Kind(query.Get("kind")); k {
+	case item.Idea, item.Bug:
+		q.Kind = k
+	}
+	// A search starts at two characters, as the front page's does: one matches
+	// half the titles of any board and says nothing. And it is bounded.
+	if words := strings.TrimSpace(query.Get("q")); len([]rune(words)) >= 2 && len([]rune(words)) <= 100 {
+		q.Search = words
+	}
+
+	items, total, err := s.items().RoadmapLanePage(repo.ID, lane, q)
+	if err != nil {
+		slog.Error("reading a roadmap lane", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	voter := s.voterID(w, r)
+	entries := make([]map[string]any, 0, len(items))
+	for _, it := range items {
+		entry := s.describeItem(it, voter)
+		if lane.Finished() && !it.ClosedAt.IsZero() {
+			entry["closed_at"] = it.ClosedAt.Unix()
+		}
+		entries = append(entries, entry)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"total": total, "items": entries})
+}
+
+// roadmapPageSize is how many a lane's dialog reads at a time.
+const roadmapPageSize = 30
+
 // roadmapPerLane bounds each lane of the roadmap page. A hundred is more than
 // anybody reads, and a lane that is longer says how many there are in all.
 const roadmapPerLane = 100

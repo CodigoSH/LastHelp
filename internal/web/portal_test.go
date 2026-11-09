@@ -1728,3 +1728,54 @@ func TestTheRoadmapPageGetsItsLanesAndTheOldPageItsColumns(t *testing.T) {
 		}
 	}
 }
+
+// TestARoadmapLaneIsReadWholeByTheDialog.
+func TestARoadmapLaneIsReadWholeByTheDialog(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	for _, title := range []string{"dark mode", "dark theme for the form", "exports"} {
+		id, _ := public.submit("codigosh", "lastboard", "idea", title)
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+		resp = team.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": "planned"})
+		_ = resp.Body.Close()
+	}
+
+	base := "/api/orgs/codigosh/repos/lastboard/roadmap/planned"
+	body := decode(t, public.do(http.MethodGet, base+"?limit=2", nil))
+	if body["total"] != float64(3) || len(body["items"].([]any)) != 2 {
+		t.Errorf("first page: %v", body)
+	}
+	body = decode(t, public.do(http.MethodGet, base+"?limit=2&offset=2", nil))
+	if len(body["items"].([]any)) != 1 {
+		t.Errorf("second page: %v", body)
+	}
+	body = decode(t, public.do(http.MethodGet, base+"?q=dark", nil))
+	if body["total"] != float64(2) {
+		t.Errorf("a search for dark found %v", body["total"])
+	}
+	// One character is not a search: it would match half of everything.
+	if body = decode(t, public.do(http.MethodGet, base+"?q=d", nil)); body["total"] != float64(3) {
+		t.Errorf("a one-letter search narrowed the lane to %v", body["total"])
+	}
+	if body = decode(t, public.do(http.MethodGet, base+"?kind=bug", nil)); body["total"] != float64(0) {
+		t.Errorf("bugs in a lane of ideas: %v", body["total"])
+	}
+	if code := public.status(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/roadmap/nonsense"); code != http.StatusNotFound {
+		t.Errorf("a lane that does not exist returned %d", code)
+	}
+
+	// A private board answers as one that does not exist.
+	resp := team.do(http.MethodPatch, "/api/orgs/codigosh/repos/lastboard", map[string]any{"name": "lastboard", "accepts_bugs": true, "accepts_ideas": true, "private": true})
+	_ = resp.Body.Close()
+	if code := public.status(http.MethodGet, base); code != http.StatusNotFound {
+		t.Errorf("a private board's lane returned %d to the public", code)
+	}
+	if code := team.status(http.MethodGet, base); code != http.StatusOK {
+		t.Errorf("a private board's lane returned %d to the team", code)
+	}
+}

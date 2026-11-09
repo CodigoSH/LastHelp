@@ -219,3 +219,71 @@ func TestALaneCountsWhatItListsAndSaysHowManyThereAre(t *testing.T) {
 		}
 	}
 }
+
+// TestALanePageIsNarrowedPagedAndCounted.
+func TestALanePageIsNarrowedPagedAndCounted(t *testing.T) {
+	s := store(t)
+	made := func(kind Kind, title string, status Status, votes int, at int64) {
+		t.Helper()
+		it, _, err := s.Create(New{RepoID: 1, Kind: kind, Title: title}, Published, epoch)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetStatus(it.ID, status, time.Unix(at, 0)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.DB.Exec(`UPDATE item SET vote_count = ? WHERE id = ?`, votes, it.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	made(Idea, "export to csv", StatusDone, 9, 100)
+	made(Idea, "dark mode", StatusDone, 40, 300)
+	made(Bug, "csv export crashes", StatusClosed, 0, 500)
+	made(Idea, "keyboard shortcuts", StatusDone, 2, 400)
+	made(Idea, "planned thing", StatusPlanned, 1, 100)
+
+	titles := func(items []Item) []string {
+		var out []string
+		for _, it := range items {
+			out = append(out, it.Title)
+		}
+		return out
+	}
+
+	// A finished lane reads by when it ended; the total is of the whole lane.
+	items, total, err := s.RoadmapLanePage(1, LaneDone, LaneQuery{Limit: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 4 || len(items) != 2 || items[0].Title != "csv export crashes" || items[1].Title != "keyboard shortcuts" {
+		t.Errorf("first page: total %d, %v", total, titles(items))
+	}
+	// The next page carries on where the first stopped, and says the same total.
+	items, total, _ = s.RoadmapLanePage(1, LaneDone, LaneQuery{Limit: 2, Offset: 2})
+	if total != 4 || len(items) != 2 || items[0].Title != "dark mode" {
+		t.Errorf("second page: total %d, %v", total, titles(items))
+	}
+	// Ranked by votes it is a different order of the same set.
+	items, _, _ = s.RoadmapLanePage(1, LaneDone, LaneQuery{ByVotes: true, Limit: 10})
+	if items[0].Title != "dark mode" {
+		t.Errorf("by votes starts with %q", items[0].Title)
+	}
+	// Narrowed by kind, the count is of what is left.
+	items, total, _ = s.RoadmapLanePage(1, LaneDone, LaneQuery{Kind: Bug, Limit: 10})
+	if total != 1 || len(items) != 1 || items[0].Kind != Bug {
+		t.Errorf("bugs only: %d %v", total, titles(items))
+	}
+	// And by words, which find the title however it is cased.
+	items, total, _ = s.RoadmapLanePage(1, LaneDone, LaneQuery{Search: "CSV", Limit: 10})
+	if total != 2 {
+		t.Errorf("a search for csv found %d, want the two that name it: %v", total, titles(items))
+	}
+	// Another lane's items are not in it.
+	if _, total, _ = s.RoadmapLanePage(1, LanePlanned, LaneQuery{Limit: 10}); total != 1 {
+		t.Errorf("planned has %d", total)
+	}
+	// A lane nobody knows is nothing, not everything.
+	if items, total, _ = s.RoadmapLanePage(1, Lane("nope"), LaneQuery{Limit: 10}); total != 0 || len(items) != 0 {
+		t.Errorf("an unknown lane returned %d", total)
+	}
+}
