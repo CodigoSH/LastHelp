@@ -669,7 +669,6 @@
   "roadmap.in_progress": "Devam ediyor",
   "roadmap.lead": "Her bildirimin durumundan üretilir.",
   "roadmap.more": "Daha fazla göster ({count})",
-  "roadmap.note": "Oya göre sıralı. Onaylanmış bir hataya oy verilmez: ekip gerçek olduğuna karar verdiğinde görünür.",
   "roadmap.planned": "Planlandı",
   "roadmap.quietBody": "Bir fikir planlandığında ya da bir hata onaylandığında bu sayfada görünür, teslim edilenler aylara göre birikir. Kimse elle güncellemez.",
   "roadmap.quietTitle": "Ekibin yapmaya karar verdiği şeyler burada görünecek.",

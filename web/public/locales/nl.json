@@ -669,7 +669,6 @@
   "roadmap.in_progress": "Bezig",
   "roadmap.lead": "Gegenereerd uit de staat van elke melding.",
   "roadmap.more": "Meer tonen ({count})",
-  "roadmap.note": "Gesorteerd op stemmen. Op een bevestigde bug stem je niet: hij verschijnt zodra het team hem als echt beschouwt.",
   "roadmap.planned": "Gepland",
   "roadmap.quietBody": "Zodra een idee is gepland of een bug is bevestigd, verschijnt het op deze pagina, en wat is opgeleverd stapelt zich per maand op. Niemand werkt haar met de hand bij.",
   "roadmap.quietTitle": "Hier verschijnt wat het team besluit te doen.",

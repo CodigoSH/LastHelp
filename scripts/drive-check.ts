@@ -920,6 +920,24 @@ async function main() {
   `);
   check("the bug filter empties a lane of ideas and the lane says so", filtered.rows === 0 && filtered.said === true && filtered.tile === "0", JSON.stringify(filtered));
   await evaluate(`document.querySelector('[data-rm-filter=""]').click();`);
+  // The search narrows what the page holds, and says so when nothing is left.
+  const searched = await evaluate(`
+    const input = document.querySelector("[data-rm-search]");
+    input.value = "zzqx";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    const box = document.querySelector('[data-rm-box="planned"]');
+    const gone = {
+      rows: [...box.querySelectorAll("[data-rm-row]")].filter(r => !r.hidden).length,
+      said: !box.querySelector("[data-rm-empty]").hidden,
+      tile: document.querySelector('.rm-tile[data-rm-lane="planned"] [data-rm-n]').textContent,
+    };
+    input.value = "";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    gone.back = [...box.querySelectorAll("[data-rm-row]")].filter(r => !r.hidden).length;
+    return gone;
+  `);
+  check("a search that finds nothing empties the lane, and clearing it brings the rows back",
+    searched.rows === 0 && searched.said === true && searched.tile === "0" && searched.back === 1, JSON.stringify(searched));
   // A title wraps; it is never cut.
   const cut = await evaluate(`
     return [...document.querySelectorAll(".rm-title")].filter(t => t.getClientRects().length && t.scrollWidth > t.clientWidth + 1).length;

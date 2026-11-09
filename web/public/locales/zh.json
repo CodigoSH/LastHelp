@@ -669,7 +669,6 @@
   "roadmap.in_progress": "进行中",
   "roadmap.lead": "根据每条反馈的状态生成。",
   "roadmap.more": "显示更多（{count}）",
-  "roadmap.note": "按票数排序。已确认的缺陷不投票：团队认定属实后才会出现。",
   "roadmap.planned": "已计划",
   "roadmap.quietBody": "当某个想法被列入计划或某个缺陷被确认时，会出现在此页面，已交付的内容按月累积。无人手动更新。",
   "roadmap.quietTitle": "团队决定要做的事会出现在这里。",

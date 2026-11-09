@@ -669,7 +669,6 @@
   "roadmap.in_progress": "In progress",
   "roadmap.lead": "Generated from the state of each report.",
   "roadmap.more": "Show more ({count})",
-  "roadmap.note": "Ordered by votes. A confirmed bug is not voted on: it appears when the team agrees it is real.",
   "roadmap.planned": "Planned",
   "roadmap.quietBody": "When an idea is planned or a bug is confirmed it shows up on this page, and what is delivered stacks up by month. Nobody updates it by hand.",
   "roadmap.quietTitle": "What the team decides to do will appear here.",

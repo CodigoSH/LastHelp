@@ -22,7 +22,7 @@ import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
-import { historyRows, rankedRows, type RoadmapFilter } from "./services/roadmapState";
+import { historyRows, rankedRows, titleHas, type RoadmapFilter } from "./services/roadmapState";
 import { disablePush, enablePush, loadPush, removePushDevice, testPush, type PushView } from "./services/pushClient";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
@@ -1589,7 +1589,7 @@ async function showRoadmap(orgSlug: string, repoSlug: string): Promise<void> {
  * The listeners are put on once, when the page is drawn; opening a lane only
  * resets what the dialog is asking.
  */
-function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string): (lane: string, kind: RoadmapFilter) => Promise<void> {
+function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string): (lane: string, kind: RoadmapFilter, words: string) => Promise<void> {
   const dialog = page.querySelector<HTMLDialogElement>("#rm-modal");
   const body = dialog?.querySelector<HTMLElement>("[data-rm-modal-body]");
   const heading = dialog?.querySelector<HTMLElement>("#rm-modal-title");
@@ -1656,15 +1656,16 @@ function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string)
     }, 250);
   });
 
-  return async (lane, kind) => {
+  return async (lane, kind, words) => {
     ask.lane = lane;
     ask.kind = kind;
     ask.sort = lane === "done" || lane === "declined" ? "recent" : "votes";
-    ask.q = "";
+    // It opens on what the page was showing: the words typed there are the question.
+    ask.q = words.trim().length >= 2 ? words.trim() : "";
     ask.items = [];
     ask.total = 0;
     heading.textContent = i18n.t(`roadmap.${lane}`);
-    input.value = "";
+    input.value = words;
     await read(false);
     if (!dialog.open) dialog.showModal();
     input.focus();
@@ -1683,7 +1684,7 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
   const plannedRows = Number(page.dataset.plannedRows) || 6;
   const monthsShut = Number(page.dataset.months) || 2;
   const nowCards = Number(page.dataset.nowCards) || 6;
-  const state: { filter: RoadmapFilter } = { filter: "" };
+  const state: { filter: RoadmapFilter; query: string } = { filter: "", query: "" };
   const openLane = wireRoadmapDialog(page, orgSlug, repoSlug);
 
   const kindsOf = (rows: Element[]) => rows.map((r) => (r as HTMLElement).dataset.kind ?? "");
@@ -1700,43 +1701,33 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
     return state.filter === "idea" ? ideas : state.filter === "bug" ? bugs : ideas + bugs;
   };
 
+  const titleOf = (row: Element) => row.querySelector(".rm-title")?.textContent ?? "";
+  const hitsOf = (rows: Element[]) => rows.map((row) => titleHas(titleOf(row), state.query));
+  const searching = () => state.query.trim().length >= 2;
+
   const apply = () => {
     page.querySelectorAll<HTMLElement>("[data-rm-box]").forEach((box) => {
       const lane = box.dataset.rmBox ?? "";
-      const n = numberOf(box);
-      box.querySelectorAll(":scope > .rm-pill [data-rm-n]").forEach((el) => (el.textContent = text.number(n)));
-      page.querySelectorAll(`.rm-tile[data-rm-lane="${lane}"] [data-rm-n]`).forEach((el) => (el.textContent = text.number(n)));
       const more = box.querySelector<HTMLButtonElement>("[data-rm-more]");
       const empty = box.querySelector<HTMLElement>("[data-rm-empty]");
+      let n = numberOf(box);
+      let left = 0;
 
-      if (lane === "planned") {
+      if (lane === "planned" || lane === "in_progress") {
         const rows = [...box.querySelectorAll("[data-rm-row]")];
-        const r = rankedRows(kindsOf(rows), state.filter, plannedRows);
+        const r = rankedRows(kindsOf(rows), state.filter, lane === "planned" ? plannedRows : nowCards, hitsOf(rows));
         rows.forEach((row, i) => {
           setHidden(row, !r.show[i]);
           const rank = row.querySelector("[data-rm-rank]");
           if (rank && r.rank[i]) rank.textContent = text.number(r.rank[i]);
         });
-        const left = leftOver(box, r.hidden);
-        if (more) {
-          more.hidden = left === 0;
-          more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
-        }
-        if (empty) empty.hidden = r.matching > 0;
-      } else if (lane === "in_progress") {
-        const rows = [...box.querySelectorAll("[data-rm-row]")];
-        const r = rankedRows(kindsOf(rows), state.filter, nowCards);
-        rows.forEach((row, i) => setHidden(row, !r.show[i]));
-        const left = leftOver(box, r.hidden);
-        if (more) {
-          more.hidden = left === 0;
-          more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
-        }
+        if (searching()) n = r.matching;
+        left = leftOver(box, r.hidden);
         if (empty) empty.hidden = r.matching > 0;
       } else {
         const groups = [...box.querySelectorAll("[data-rm-group]")];
         const perGroup = groups.map((g) => [...g.querySelectorAll("[data-rm-row]")]);
-        const h = historyRows(perGroup.map(kindsOf), state.filter, monthsShut);
+        const h = historyRows(perGroup.map(kindsOf), state.filter, monthsShut, perGroup.map(hitsOf));
         groups.forEach((g, i) => {
           const rowShown = h.row[i] ?? [];
           setHidden(g, !h.group[i]);
@@ -1744,14 +1735,18 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
           const count = g.querySelector("[data-rm-n]");
           if (count) count.textContent = text.number(rowShown.filter(Boolean).length);
         });
-        // The rows of the months that are not shown, counted by what the filter lets through.
-        const hiddenRows = groups.reduce((n, _g, i) => n + (h.group[i] ? 0 : (h.row[i] ?? []).filter(Boolean).length), 0);
-        const left = leftOver(box, hiddenRows);
-        if (more) {
-          more.hidden = left === 0;
-          more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
-        }
+        if (searching()) n = h.matching;
+        // The rows of the months that are not shown, counted by what the filter and the search let through.
+        const hiddenRows = groups.reduce((acc, _g, i) => acc + (h.group[i] ? 0 : (h.row[i] ?? []).filter(Boolean).length), 0);
+        left = leftOver(box, hiddenRows);
         if (empty) empty.hidden = h.matching > 0;
+      }
+
+      box.querySelectorAll(":scope > .rm-pill [data-rm-n]").forEach((el) => (el.textContent = text.number(n)));
+      page.querySelectorAll(`.rm-tile[data-rm-lane="${lane}"] [data-rm-n]`).forEach((el) => (el.textContent = text.number(n)));
+      if (more) {
+        more.hidden = left === 0;
+        more.textContent = i18n.t("roadmap.more", { count: text.number(left) });
       }
     });
   };
@@ -1763,11 +1758,18 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
       apply();
     }),
   );
+  // The search narrows what the page holds; the dialog, which reads the lane whole,
+  // starts from the same words.
+  page.querySelector<HTMLInputElement>("[data-rm-search]")?.addEventListener("input", (event) => {
+    state.query = (event.currentTarget as HTMLInputElement).value;
+    apply();
+  });
+
   // "Show more" opens the lane whole, in a dialog with its own search and filters.
   page.querySelectorAll<HTMLButtonElement>("[data-rm-more]").forEach((button) =>
     button.addEventListener("click", () => {
       const lane = button.closest<HTMLElement>("[data-rm-box]")?.dataset.rmBox ?? "";
-      void openLane(lane, state.filter);
+      void openLane(lane, state.filter, state.query);
     }),
   );
 

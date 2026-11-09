@@ -200,7 +200,7 @@ planned idea share *planned*, and a fixed bug and a shipped idea share
 
 - Four tiles at the top count the lanes, with how many ideas and how many bugs.
   On a phone they are the tabs between the lanes.
-- **Ideas** and **Bugs** narrow every lane at once.
+- A search box and **Ideas** / **Bugs** narrow every lane at once, and the dialog a lane opens starts from the same words and filter.
 - *Planned* is ranked by votes and shows the first six; *delivered* is grouped by
   the month each thing was delivered in and shows the latest two; what is in
   progress shows six cards. Each lane that has more says how many, and **Show

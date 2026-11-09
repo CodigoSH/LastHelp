@@ -669,7 +669,6 @@
   "roadmap.in_progress": "Sedang dikerjakan",
   "roadmap.lead": "Dihasilkan dari keadaan setiap laporan.",
   "roadmap.more": "Tampilkan lebih banyak ({count})",
-  "roadmap.note": "Diurutkan menurut suara. Bug yang sudah dipastikan tidak diberi suara: muncul saat tim menganggapnya nyata.",
   "roadmap.planned": "Direncanakan",
   "roadmap.quietBody": "Saat sebuah ide direncanakan atau bug dipastikan, ia muncul di halaman ini, dan yang sudah dikirim menumpuk per bulan. Tidak ada yang memperbaruinya secara manual.",
   "roadmap.quietTitle": "Apa yang diputuskan tim untuk dikerjakan akan muncul di sini.",

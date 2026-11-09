@@ -1411,7 +1411,7 @@ summary:focus-visible,
 }
 .rm-seg button:hover { color: var(--text-main); }
 .rm-seg button[aria-pressed="true"] { background: var(--surface-active); color: var(--text-main); }
-.rm-note { flex: 1 1 22ch; max-inline-size: 62ch; margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
+.rm-bar .search-box { flex: 1 1 16rem; max-inline-size: 26rem; min-inline-size: 0; }
 
 .rm-lanes { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 0 var(--rm-gap); align-items: start; }
 .rm-lane.rm-in_progress, .rm-lane.rm-declined { grid-column: 1 / -1; }
@@ -5632,6 +5632,41 @@ a.ov-row:hover { background: var(--surface-dim); }
 }
 
 .ov-modal-head .icon-button { margin-inline-start: auto; }
+
+/* The close of a dialog is the house's: a bordered square that does not just
+   change colour but turns a quarter turn into the accent, with a wash behind it.
+   Said once for every dialog that draws it as an icon button, the form dialogs
+   and the two that read a list. The radius is restated on focus because a dialog
+   opened with showModal() puts focus on this button, and the focus-ring rule
+   would otherwise round it to 8. */
+.modal-head > .icon-button,
+.ov-modal-head > .icon-button {
+  inline-size: 36px;
+  block-size: 36px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-dim);
+  transition: all 0.2s;
+}
+
+.modal-head > .icon-button:hover,
+.modal-head > .icon-button:focus-visible,
+.ov-modal-head > .icon-button:hover,
+.ov-modal-head > .icon-button:focus-visible {
+  background: var(--accent-wash);
+  transform: rotate(90deg);
+  color: var(--accent);
+  border-color: var(--accent-line);
+  border-radius: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-head > .icon-button:hover,
+  .modal-head > .icon-button:focus-visible,
+  .ov-modal-head > .icon-button:hover,
+  .ov-modal-head > .icon-button:focus-visible { transform: none; }
+}
 
 .ov-modal-body {
   display: flex;

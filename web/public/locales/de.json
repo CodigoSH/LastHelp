@@ -669,7 +669,6 @@
   "roadmap.in_progress": "In Arbeit",
   "roadmap.lead": "Erzeugt aus dem Zustand jeder Meldung.",
   "roadmap.more": "Mehr anzeigen ({count})",
-  "roadmap.note": "Nach Stimmen sortiert. Über einen bestätigten Fehler wird nicht abgestimmt: Er erscheint, sobald das Team ihn für echt hält.",
   "roadmap.planned": "Geplant",
   "roadmap.quietBody": "Sobald eine Idee geplant oder ein Fehler bestätigt ist, erscheint er auf dieser Seite, und Geliefertes sammelt sich nach Monaten. Niemand pflegt sie von Hand.",
   "roadmap.quietTitle": "Hier erscheint, was das Team umsetzen will.",

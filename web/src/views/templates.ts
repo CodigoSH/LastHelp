@@ -485,7 +485,10 @@ export function roadmap(
         <button type="button" data-rm-filter="idea" aria-pressed="false">${escapeHTML(text.t("overview.ideas"))}</button>
         <button type="button" data-rm-filter="bug" aria-pressed="false">${escapeHTML(text.t("overview.bugs"))}</button>
       </div>
-      <p class="rm-note">${escapeHTML(text.t("roadmap.note"))}</p>
+      <label class="search-box rm-search">
+        ${icons.search(14)}
+        <input type="search" data-rm-search placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
+      </label>
     </div>
 
     <div class="rm-lanes">

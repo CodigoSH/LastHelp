@@ -11,16 +11,32 @@ export type RoadmapFilter = "" | "idea" | "bug";
 const matches = (filter: RoadmapFilter, kind: string): boolean => filter === "" || kind === filter;
 
 /**
+ * Whether a title holds what somebody typed. A query under two characters is not
+ * a search — it would match half of everything — so it matches all, the same
+ * rule the server's search has.
+ */
+export function titleHas(title: string, query: string): boolean {
+  const q = query.trim().toLocaleLowerCase();
+  return q.length < 2 || title.toLocaleLowerCase().includes(q);
+}
+
+/**
  * A ranked list: which rows show. `limit` is how many show while it is shut and
  * null once it is open. The rank is of what is shown, so a filter renumbers: the
  * first idea is first of the ideas.
  */
-export function rankedRows(kinds: string[], filter: RoadmapFilter, limit: number | null): { show: boolean[]; rank: number[]; hidden: number; matching: number } {
+export function rankedRows(
+  kinds: string[],
+  filter: RoadmapFilter,
+  limit: number | null,
+  /** Rows the search lets through; absent means all of them. */
+  hits?: boolean[],
+): { show: boolean[]; rank: number[]; hidden: number; matching: number } {
   const show: boolean[] = [];
   const rank: number[] = [];
   let seen = 0;
-  for (const kind of kinds) {
-    if (!matches(filter, kind)) {
+  for (const [i, kind] of kinds.entries()) {
+    if (!matches(filter, kind) || hits?.[i] === false) {
       show.push(false);
       rank.push(0);
       continue;
@@ -43,24 +59,26 @@ export function historyRows(
   groups: string[][],
   filter: RoadmapFilter,
   months: number | null,
+  /** Rows the search lets through, by group; absent means all of them. */
+  hits?: boolean[][],
 ): { group: boolean[]; row: boolean[][]; hiddenGroups: number; matching: number } {
   const group: boolean[] = [];
   const row: boolean[][] = [];
   let withRows = 0;
   let matching = 0;
-  for (const kinds of groups) {
-    const hits = kinds.map((k) => matches(filter, k));
-    const n = hits.filter(Boolean).length;
+  for (const [g, kinds] of groups.entries()) {
+    const keep = kinds.map((k, i) => matches(filter, k) && hits?.[g]?.[i] !== false);
+    const n = keep.filter(Boolean).length;
     matching += n;
     if (n === 0) {
       group.push(false);
-      row.push(hits);
+      row.push(keep);
       continue;
     }
     withRows++;
     const visible = months === null || withRows <= months;
     group.push(visible);
-    row.push(hits);
+    row.push(keep);
   }
   return { group, row, hiddenGroups: withRows - group.filter(Boolean).length, matching };
 }

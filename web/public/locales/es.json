@@ -669,7 +669,6 @@
   "roadmap.in_progress": "En curso",
   "roadmap.lead": "Se genera a partir del estado de cada reporte.",
   "roadmap.more": "Mostrar más ({count})",
-  "roadmap.note": "Ordenado por votos. Un fallo confirmado no se vota: entra cuando el equipo lo da por cierto.",
   "roadmap.planned": "Planificado",
   "roadmap.quietBody": "Cuando una idea se planifique o un fallo se confirme, saldrá en esta página, y lo entregado se irá apilando por meses. Nadie la actualiza a mano.",
   "roadmap.quietTitle": "Aquí aparecerá lo que el equipo decida hacer.",
