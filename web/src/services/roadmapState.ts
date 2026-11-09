@@ -53,7 +53,9 @@ export function rankedRows(
  * Months of a history: which groups and which rows show. A month with nothing
  * that matches is not shown, and the months that count against `months` are the
  * ones that have something — a filter must not spend the allowance on empty ones.
- * `months` is how many show while shut, null once open.
+ * `months` is how many show while shut, null once open. `rows` caps the rows in
+ * all, newest first, whatever month they are in: a single busy month would
+ * otherwise be a page as long as the month.
  */
 export function historyRows(
   groups: string[][],
@@ -61,11 +63,14 @@ export function historyRows(
   months: number | null,
   /** Rows the search lets through, by group; absent means all of them. */
   hits?: boolean[][],
-): { group: boolean[]; row: boolean[][]; hiddenGroups: number; matching: number } {
+  /** How many rows show in all; null or absent is no cap. */
+  rows: number | null = null,
+): { group: boolean[]; row: boolean[][]; hidden: number; matching: number } {
   const group: boolean[] = [];
   const row: boolean[][] = [];
   let withRows = 0;
   let matching = 0;
+  let shown = 0;
   for (const [g, kinds] of groups.entries()) {
     const keep = kinds.map((k, i) => matches(filter, k) && hits?.[g]?.[i] !== false);
     const n = keep.filter(Boolean).length;
@@ -76,9 +81,15 @@ export function historyRows(
       continue;
     }
     withRows++;
-    const visible = months === null || withRows <= months;
-    group.push(visible);
-    row.push(keep);
+    const monthShows = months === null || withRows <= months;
+    const flags = keep.map((k) => {
+      if (!k || !monthShows) return false;
+      if (rows !== null && shown >= rows) return false;
+      shown++;
+      return true;
+    });
+    group.push(flags.some(Boolean));
+    row.push(flags);
   }
-  return { group, row, hiddenGroups: withRows - group.filter(Boolean).length, matching };
+  return { group, row, hidden: matching - shown, matching };
 }

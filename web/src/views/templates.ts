@@ -450,6 +450,8 @@ export { monthGroups, roadmapDialogList } from "./roadmapModal";
 export const ROADMAP_PLANNED_ROWS = 6;
 /** How many months of a finished lane show before "show more". */
 export const ROADMAP_MONTHS = 2;
+/** How many rows the shipped and declined lanes show in all while they are shut. */
+export const ROADMAP_HISTORY_ROWS = 6;
 /** How many cards of what is in progress show before "show more". */
 export const ROADMAP_NOW_CARDS = 6;
 
@@ -536,7 +538,7 @@ export function roadmap(
     </div>`;
   }
 
-  return `<div class="page rm" data-rm data-planned-rows="${ROADMAP_PLANNED_ROWS}" data-months="${ROADMAP_MONTHS}" data-now-cards="${ROADMAP_NOW_CARDS}">
+  return `<div class="page rm" data-rm data-planned-rows="${ROADMAP_PLANNED_ROWS}" data-months="${ROADMAP_MONTHS}" data-history-rows="${ROADMAP_HISTORY_ROWS}" data-now-cards="${ROADMAP_NOW_CARDS}">
     ${header}
     ${tiles}
     <div class="rm-bar">

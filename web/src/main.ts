@@ -1802,6 +1802,7 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
   if (!page) return;
   const plannedRows = Number(page.dataset.plannedRows) || 6;
   const monthsShut = Number(page.dataset.months) || 2;
+  const historyShut = Number(page.dataset.historyRows) || 6;
   const nowCards = Number(page.dataset.nowCards) || 6;
   const state: { filter: RoadmapFilter; query: string } = { filter: "", query: "" };
   const openLane = wireRoadmapDialog(page, orgSlug, repoSlug);
@@ -1846,7 +1847,7 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
       } else {
         const groups = [...box.querySelectorAll("[data-rm-group]")];
         const perGroup = groups.map((g) => [...g.querySelectorAll("[data-rm-row]")]);
-        const h = historyRows(perGroup.map(kindsOf), state.filter, monthsShut, perGroup.map(hitsOf));
+        const h = historyRows(perGroup.map(kindsOf), state.filter, monthsShut, perGroup.map(hitsOf), historyShut);
         groups.forEach((g, i) => {
           const rowShown = h.row[i] ?? [];
           setHidden(g, !h.group[i]);
@@ -1855,9 +1856,7 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
           if (count) count.textContent = text.number(rowShown.filter(Boolean).length);
         });
         if (searching()) n = h.matching;
-        // The rows of the months that are not shown, counted by what the filter and the search let through.
-        const hiddenRows = groups.reduce((acc, _g, i) => acc + (h.group[i] ? 0 : (h.row[i] ?? []).filter(Boolean).length), 0);
-        left = leftOver(box, hiddenRows);
+        left = leftOver(box, h.hidden);
         if (empty) empty.hidden = h.matching > 0;
       }
 

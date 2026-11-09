@@ -1408,7 +1408,7 @@ summary:focus-visible,
 .rm-seg button[aria-pressed="true"] { background: var(--surface-active); color: var(--text-main); }
 .rm-bar .search-box { flex: 1 1 16rem; max-inline-size: 26rem; min-inline-size: 0; }
 
-.rm-lanes { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 0 var(--rm-gap); align-items: start; }
+.rm-lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--rm-gap); align-items: start; }
 .rm-lane.rm-in_progress, .rm-lane.rm-declined { grid-column: 1 / -1; }
 
 /* A lane is a section of the board: a bordered box whose name is a pill sitting
@@ -1419,6 +1419,10 @@ summary:focus-visible,
   padding: 22px 14px 14px;
   border: 1px solid var(--card-border);
   border-radius: 8px;
+  /* A public page has a ground with a glow, so a box is filled like every card on
+     it: left clear it would show the glow through and read as unfinished. */
+  background: var(--panel);
+  box-shadow: var(--card-shadow);
 }
 .rm-box.rm-declined { border-style: dashed; }
 .rm-pill {
@@ -1641,8 +1645,6 @@ summary:focus-visible,
 .bd-tile:hover { border-color: rgba(var(--accent-rgb), 0.3); }
 .bd-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bd-tile[aria-pressed="true"] { border-color: rgba(var(--accent-rgb), 0.45); }
-/* The way to the roadmap is a link and reads as one: no fill, no shadow, an arrow. */
-.bd-tile.road { background: transparent; box-shadow: none; }
 .bd-tile-top {
   display: flex;
   align-items: center;
@@ -1723,7 +1725,7 @@ summary:focus-visible,
 /* The lanes of the view: two side by side while it has a natural split, one across once a filter has chosen. */
 .bd-lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; align-items: start; }
 .bd-lanes.one { grid-template-columns: minmax(0, 1fr); }
-.bd-box { position: relative; margin-block-start: 22px; padding: 22px 10px 10px; border: 1px solid var(--card-border); border-radius: 8px; }
+.bd-box { position: relative; margin-block-start: 22px; padding: 22px 10px 10px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--panel); box-shadow: var(--card-shadow); }
 .bd-box.no { border-style: dashed; }
 .bd-pill {
   position: absolute;

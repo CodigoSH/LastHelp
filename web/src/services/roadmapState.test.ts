@@ -39,7 +39,7 @@ describe("historyRows", () => {
   it("shows the latest months and counts the ones left", () => {
     const h = historyRows(months, "", 2);
     expect(h.group).toEqual([true, true, false, false]);
-    expect(h.hiddenGroups).toBe(2);
+    expect(h.hidden).toBe(3);
     expect(h.matching).toBe(6);
   });
 
@@ -47,10 +47,22 @@ describe("historyRows", () => {
     // Ideas only: the third month has none, so the two shown are the first, second... and the fourth is one left.
     const h = historyRows(months, "idea", 2);
     expect(h.group).toEqual([true, true, false, false]);
-    expect(h.hiddenGroups).toBe(1);
+    expect(h.hidden).toBe(1);
     const bugs = historyRows(months, "bug", 2);
     expect(bugs.group).toEqual([true, false, true, false]);
-    expect(bugs.hiddenGroups).toBe(0);
+    expect(bugs.hidden).toBe(0);
+  });
+
+  it("caps the rows in all, so one busy month is not a page as long as the month", () => {
+    const busy = [Array(12).fill("idea"), ["bug"]];
+    const h = historyRows(busy, "", 2, undefined, 6);
+    expect(h.row[0]?.filter(Boolean).length).toBe(6);
+    expect(h.group).toEqual([true, false]);
+    expect(h.hidden).toBe(7);
+    // What the cap leaves out is in the next month too, newest first.
+    const spread = historyRows([["idea", "idea"], ["bug", "bug", "bug"]], "", 2, undefined, 3);
+    expect(spread.row).toEqual([[true, true], [true, false, false]]);
+    expect(spread.hidden).toBe(2);
   });
 
   it("hides the rows that do not match inside a month that does", () => {
@@ -86,7 +98,7 @@ describe("a search over the rules", () => {
   it("narrows a history, and a month the search empties does not spend the allowance", () => {
     const h = historyRows([["idea"], ["idea"], ["idea"]], "", 1, [[false], [true], [true]]);
     expect(h.group).toEqual([false, true, false]);
-    expect(h.hiddenGroups).toBe(1);
+    expect(h.hidden).toBe(1);
     expect(h.matching).toBe(2);
   });
 
