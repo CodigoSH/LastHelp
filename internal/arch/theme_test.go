@@ -133,7 +133,8 @@ func TestNothingInThePanelIsTheColourOfWhatItSitsOn(t *testing.T) {
 		".side":                   "background: var(--sheet);",
 		".admin-main .bento-card": "background: var(--sheet);",
 		".settings-item":          "background: var(--sheet);",
-		".admin-main .dash-card":  "background: var(--sheet);",
+		".ov-card":                "background: var(--sheet);",
+		".ov-kpi":                 "background: var(--sheet);",
 	} {
 		if !strings.Contains(ruleBody(selector), want) {
 			t.Errorf("%s no longer says %q: a panel surface has to be a step above its ground, "+

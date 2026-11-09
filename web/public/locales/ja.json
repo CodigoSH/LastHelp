@@ -418,7 +418,6 @@
   "organizations.noRepositories": "まだリポジトリがありません。",
   "organizations.rename": "名前を変える",
   "overview.activity": "過去30日間",
-  "overview.byKind": "種類ごと",
   "overview.byModeration": "確認状況ごと",
   "overview.byStatus": "状態ごと",
   "overview.emptyLead": "まだ報告はありません。",

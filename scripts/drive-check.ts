@@ -1119,7 +1119,7 @@ async function main() {
         if (c.backgroundImage !== "none" || !/rgba\\(0, 0, 0, 0\\)|transparent/.test(c.backgroundColor) || c.borderTopWidth !== "2px" || c.textTransform !== "uppercase")
           fallos.push("button " + b.textContent.trim().slice(0, 20) + ": " + c.backgroundColor + " " + c.borderTopWidth);
       }
-      for (const t of document.querySelectorAll(".admin-main .card-top h3, .admin-main .bento-card .card-head h3, .admin-main .dash-card > h3")) {
+      for (const t of document.querySelectorAll(".admin-main .card-top h3, .admin-main .bento-card .card-head h3")) {
         n++;
         const c = getComputedStyle(t);
         if (c.fontSize !== "13px" || c.textTransform !== "uppercase") fallos.push("title " + t.textContent.trim().slice(0, 20) + ": " + c.fontSize);
@@ -1254,10 +1254,10 @@ async function main() {
   }
 
   // The panel uses the window rather than a column on the left of it.
-  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  await goTo("/panel", ".ov-kpis, .bento-card, .cards, .empty");
   const room = await evaluate(`
     const main = document.querySelector(".admin-main");
-    const cards = [...document.querySelectorAll(".dash-card")].map(c => c.getBoundingClientRect());
+    const cards = [...document.querySelectorAll(".ov-kpi, .ov-box")].map(c => c.getBoundingClientRect());
     const box = main.getBoundingClientRect();
     return { width: Math.round(box.width),
              used: cards.length ? Math.round(Math.max(...cards.map(c => c.right)) - box.left) : 0 };
@@ -1324,7 +1324,7 @@ async function main() {
 
   // Back to the panel: what follows reads the sidebar, and a check that leaves
   // the walk on another screen breaks the next one rather than its own.
-  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  await goTo("/panel", ".ov-kpis, .bento-card, .cards, .empty");
 
   const sidebar = await evaluate(`
     return {
@@ -2272,7 +2272,7 @@ async function main() {
     await new Promise(r => setTimeout(r, 700));
     return v;
   `);
-  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  await goTo("/panel", ".ov-kpis, .bento-card, .cards, .empty");
   modos.panel = await evaluate(leerBarra);
   await goTo("/review", ".rev-list, .rev-empty");
   modos.revision = await evaluate(leerBarra);
@@ -2303,7 +2303,7 @@ async function main() {
   // show. And the content keeps its measure: the edge is the column's, not
   // the dashboard's.
   await page.send("Emulation.setDeviceMetricsOverride", { width: 2200, height: 900, deviceScaleFactor: 1, mobile: false });
-  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  await goTo("/panel", ".ov-kpis, .bento-card, .cards, .empty");
   // Measured at rest: the panel slides in from the side, and a column caught
   // mid-slide is a few pixels past the edge it will settle on.
   await waitFor(".admin:not(.arriving)");
@@ -2366,11 +2366,11 @@ async function main() {
   //      the endpoint that stored a layout is not there any more. A feature
   //      removed from a screen but left in the server is a feature that comes
   //      back the next time somebody wires a button.
-  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  await goTo("/panel", ".ov-kpis, .bento-card, .cards, .empty");
 
   const overview = await evaluate(`
     return {
-      cards: document.querySelectorAll("[data-card]").length,
+      cards: document.querySelectorAll("[data-ov]").length,
       draggable: document.querySelectorAll("[draggable=true]").length,
       arrange: !!document.querySelector("[data-edit-dash], [data-hide], [data-show]"),
       stored: (await fetch("/api/me/dashboard")).status,
@@ -2380,12 +2380,12 @@ async function main() {
       // card that clips. The title is lengthened, measured and put back, so
       // nothing after this reads a different screen.
       desbordan: (() => {
-        const titulo = document.querySelector(".briefs .brief-title");
+        const titulo = document.querySelector('[data-ov="recent"] .ov-row-main b');
         if (!titulo) return ["no rows"];
         const antes = titulo.textContent;
         titulo.textContent = "A title long enough to push anything beside it out of the card ".repeat(3);
-        const fuera = [...document.querySelectorAll(".briefs .brief")].filter(b => {
-          const card = b.closest(".dash-card")?.getBoundingClientRect();
+        const fuera = [...document.querySelectorAll('[data-ov="recent"] .ov-row')].filter(b => {
+          const card = b.closest(".ov-card")?.getBoundingClientRect();
           const chip = (b.querySelector(".status") ?? b).getBoundingClientRect();
           return card && (chip.left < card.left - 1 || chip.right > card.right + 1);
         }).map(b => b.textContent.trim().slice(0, 30));
@@ -2396,7 +2396,7 @@ async function main() {
   `);
   check(
     "the overview is one screen, the same for everybody",
-    overview.cards === 13 && overview.draggable === 0 && overview.arrange === false,
+    overview.cards === 11 && overview.draggable === 0 && overview.arrange === false,
     JSON.stringify({ ...overview, desbordan: undefined }),
   );
   check(
@@ -2415,7 +2415,7 @@ async function main() {
   //      sends — so what is checked is that there is a line with a point per
   //      day on it, not that a box is on screen.
   const chart = await evaluate(`
-    const line = document.querySelector('[data-card="activity"] .chart-line');
+    const line = document.querySelector('[data-ov="activity"] .chart-line');
     const d = line?.getAttribute("d") ?? "";
     return { points: (d.match(/[ML]/g) ?? []).length, comma: d.includes(","), axis: !!document.querySelector(".chart-axis") };
   `);
@@ -2488,10 +2488,10 @@ async function main() {
   // is a link, and more than one of them goes into the listing — rather than
   // pinning the order the cards happen to be in.
   const tiles = await evaluate(`
-    const cards = [...document.querySelectorAll('.dash-card:has(.stat)')];
+    const cards = [...document.querySelectorAll('.ov-kpi')];
     return {
       stats: cards.length,
-      links: cards.map(c => c.querySelector("a.stat")?.getAttribute("href") ?? ""),
+      links: cards.map(c => c.querySelector("a.ov-more")?.getAttribute("href") ?? ""),
     };
   `);
   check(
@@ -3049,19 +3049,19 @@ async function main() {
     await fetch("/api/session", { method: "DELETE", headers: { "X-CSRF-Token": csrf() } });
     await post("/api/session", { username: "ana", password: "una contraseña larga de verdad" });
   `);
-  await goTo("/panel", ".dash-card, .bento-card, .cards, .empty");
+  await goTo("/panel", ".ov-kpis, .bento-card, .cards, .empty");
 
   const collaborator = await evaluate(`
     const me = await fetch("/api/me").then(r => r.json());
-    const value = (card) => Number(document.querySelector('[data-card="' + card + '"] .value')?.textContent ?? -1);
+    const value = (card) => Number(document.querySelector('[data-ov="' + card + '"] .ov-kpi-v')?.textContent ?? -1);
     return {
       groups: [...document.querySelectorAll(".side-label")].map(e => e.textContent.trim()),
       items: [...document.querySelectorAll(".side-item")].map(e => e.textContent.trim()),
-      equipo: !!document.querySelector(".dashboard.team"),
-      personas: !!document.querySelector('[data-card="people"]'),
-      pendientes: value("waiting"),
+      equipo: !!document.querySelector(".ov-head") && !document.querySelector('[data-ov="server"]'),
+      personas: !!document.querySelector('[data-ov="server"], a[href="/panel/people"]'),
+      pendientes: value("pending"),
       servidor: me.pending?.reports ?? -1,
-      tableros: [...document.querySelectorAll('[data-card="boards"] a')].map(a => a.getAttribute("href")),
+      tableros: [...document.querySelectorAll('[data-ov="boards"] a')].map(a => a.getAttribute("href")),
       offersToAdd: !!document.querySelector("[data-open-modal]"),
       role: document.querySelector(".side-head .side-role")?.textContent?.trim() ?? "",
       expected: (await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json()))["comment.team"],

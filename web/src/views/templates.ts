@@ -15,7 +15,7 @@ import type {
   RepositorySummary,
 } from "../api";
 import { escapeAttr, escapeHTML } from "../escape";
-import { areaChart, donut } from "./charts";
+import { areaChart } from "./charts";
 import { icons } from "./icons";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
@@ -1668,35 +1668,6 @@ export function avatar(src?: string, options: { big?: boolean; guest?: boolean }
   }</span>`;
 }
 
-/**
- * Every card the overview shows, in the order it shows them.
- *
- * One order, the same for everybody who opens this installation. It used to be
- * arrangeable per account, and two people looking at the same server were then
- * looking at two different screens: nothing could be pointed at by where it is,
- * and a card somebody had hidden made half a conversation about it impossible.
- *
- * The counting is the server's, not the browser's: a portal that has been
- * useful for two years opens as fast as one installed this morning.
- */
-export const overviewCards = [
-  "reports",
-  "waiting",
-  "published",
-  "votes",
-  "organizations",
-  "people",
-  "activity",
-  "kinds",
-  "statuses",
-  "top",
-  "recent",
-  "boards",
-  "moderation",
-] as const;
-
-export type OverviewCard = (typeof overviewCards)[number];
-
 /** One report as a line in a list: enough to recognise it and to go to it. */
 export interface Brief {
   public_id: string;
@@ -1790,196 +1761,247 @@ function waitingMark(count: number, text: Text): string {
     title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}">${icons.queue(14)}<b>${escapeHTML(text.number(count))}</b></span>`;
 }
 
-/** One report as a row of a list on the dashboard. */
-function briefRow(b: Brief, text: Text, showVotes = false): string {
-  return `<li><a class="brief" href="/i/${escapeAttr(b.public_id)}">
-    ${
-      showVotes
-        ? `<span class="score small"><span class="count">${escapeHTML(text.number(b.votes))}</span></span>`
-        : kindMark(b.kind)
-    }
-    <span class="brief-title">${escapeHTML(b.title)}</span>
-    ${stateChip(b, text)}
-  </a></li>`;
-}
-
 /**
  * The front page of the panel, the same one for everybody on the team.
  *
- * It was a wall of tiles each holding one number, and a number on its own
- * answers "how many" and nothing else: not whether it is getting busier, not
- * what people are actually asking for, not which board the work is in, and not
- * where to go next. Every tile is a way into the listing it counts, and beside
- * them are the three things the numbers cannot say — the last thirty days, the
- * most wanted ideas, and the newest reports.
+ * It answers what a person looking after support asks first: what is waiting
+ * for me, how busy has it been, and where is the work. The numbers on top are
+ * the ones somebody acts on, each a way into the listing it counts; beside the
+ * last thirty days are the newest reports, and underneath, one tile per
+ * repository with what is waiting in it.
  *
- * There is no arranging it. A dashboard that every account rearranges is one
- * nobody can talk about: "the third card" and "the one at the top" stop meaning
+ * One order, decided here. A page that every account rearranges is one nobody
+ * can talk about: "the third card" and "the one at the top" stop meaning
  * anything, and a card somebody hid is a screen the person beside them cannot
- * see. One order, decided here.
+ * see. The counting is the server's, not the browser's: a portal that has been
+ * useful for two years opens as fast as one installed this morning.
+ *
+ * `now` is given rather than read so the age of the last report can be tested.
  */
-export function overviewScreen(data: OverviewData, text: Text): string {
+export function overviewScreen(
+  data: OverviewData,
+  text: Text,
+  now: number = Math.floor(Date.now() / 1000),
+): string {
   const number = (value: number) => escapeHTML(text.number(value));
-
-  const stat = (id: string, value: number, label: string, icon: string, href?: string) => {
-    const inner = `<span class="value">${number(value)}</span>
-      <span class="label">${icon}${escapeHTML(label)}</span>`;
-    return card(
-      id,
-      href
-        ? `<a class="stat" href="${escapeAttr(href)}">${inner}<span class="stat-go" aria-hidden="true">${icons.chevron(14)}</span></a>`
-        : `<div class="stat">${inner}</div>`,
-      "narrow",
-    );
-  };
-
-  const bars = (id: string, title: string, counts: Record<string, number>, label: (key: string) => string) => {
-    const entries = Object.entries(counts).filter(([, n]) => n > 0);
-    const body =
-      entries.length === 0
-        ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
-        : `<div class="bars">${entries
-            .sort((a, b) => b[1] - a[1])
-            .map(([key, n]) => {
-              const most = Math.max(...entries.map(([, count]) => count));
-              return `<div class="bar-row hue-${escapeAttr(key)}">
-                <span>${escapeHTML(label(key))}</span>
-                <span class="bar-track"><span class="bar-fill" data-fill="${Math.round((n / most) * 20)}"></span></span>
-                <span class="count">${number(n)}</span>
-              </div>`;
-            })
-            .join("")}</div>`;
-    return card(id, `<h3>${escapeHTML(title)}</h3>${body}`, "wide");
-  };
-
-  function card(id: string, body: string, size: string): string {
-    return `<li class="dash-card ${size}" data-card="${escapeAttr(id)}">${body}</li>`;
-  }
-
+  const label = (key: string, params?: Record<string, string | number>) => escapeHTML(text.t(key, params));
   const total = Object.values(data.kinds).reduce((a, b) => a + b, 0);
   const series = data.series ?? [];
   const arrived = series.reduce((sum, day) => sum + day.reports, 0);
+  const team = data.server === false;
+
+  /** What the number counts, read from the same place the listing reads it. */
+  const count = (name: string, n: number) => `<span>${label(name)}: ${number(n)}</span>`;
+
+  const more = (href: string, key: string) =>
+    `<a class="ov-more" href="${escapeAttr(href)}">${label(key)}${icons.chevron(12)}</a>`;
+
+  const fill = (value: number, of: number, hue: string) =>
+    `<span class="bar-track"><span class="bar-fill hue-${escapeAttr(hue)}" data-fill="${
+      of > 0 ? Math.min(20, Math.max(0, Math.round((value / of) * 20))) : 0
+    }"></span></span>`;
+
+  const kpi = (id: string, name: string, icon: string, value: number, sub: [string, string], link: string, meter = "") => `
+    <div class="ov-kpi" data-ov="${id}">
+      <div class="ov-kpi-top"><span class="ov-lbl">${label(name)}</span>${icon}</div>
+      <div class="ov-kpi-main"><span class="ov-kpi-v">${number(value)}</span></div>
+      <div class="ov-meter">${meter}</div>
+      <div class="ov-kpi-sub">${sub[0]}${sub[1]}</div>
+      ${link}
+    </div>`;
+
+  const box = (id: string, title: string, body: string, tail = "") => `
+    <section class="ov-box" data-ov="${id}">
+      <span class="ov-pill">${escapeHTML(title)}${tail ? `<span class="ov-pill-n">${tail}</span>` : ""}</span>
+      ${body}
+    </section>`;
+
+  const nothing = `<p class="ov-empty">${label("overview.nothingYet")}</p>`;
+
+  /** A line in a list: a mark, a name, and what to say about it on the right. */
+  const row = (href: string | null, lead: string, title: string, small: string, right: string) => {
+    const inner = `${lead}<span class="ov-row-main"><b>${title}</b>${small ? `<small>${small}</small>` : ""}</span><span class="ov-row-r">${right}</span>`;
+    const cls = lead ? "ov-row" : "ov-row bare";
+    return href
+      ? `<a class="${cls}" href="${escapeAttr(href)}">${inner}</a>`
+      : `<div class="${cls}">${inner}</div>`;
+  };
+
+  const kpis = `<div class="ov-kpis">
+    ${kpi(
+      "pending",
+      "panel.queue",
+      icons.queue(),
+      data.pending,
+      [
+        data.last_report > 0
+          ? `<span>${label("overview.lastReport", { age: text.age(Math.max(0, now - data.last_report)) })}</span>`
+          : `<span>${label("overview.noReportsYet")}</span>`,
+        "",
+      ],
+      more("/review?mode=pending", "overview.openQueue"),
+    )}
+    ${kpi(
+      "reports",
+      "overview.reports",
+      icons.repository(),
+      total,
+      [count("overview.ideas", data.kinds.idea ?? 0), count("overview.bugs", data.kinds.bug ?? 0)],
+      more("/review?mode=all", "overview.seeReports"),
+    )}
+    ${kpi(
+      "published",
+      "overview.published",
+      icons.check(),
+      data.published,
+      [count("moderation.rejected", data.moderation.rejected ?? 0), count("moderation.spam", data.moderation.spam ?? 0)],
+      more("/review?mode=all&moderation=published", "overview.openPublished"),
+      fill(data.published, total, "published"),
+    )}
+    ${kpi(
+      "votes",
+      "overview.votes",
+      icons.idea(),
+      data.votes,
+      [
+        (data.top ?? []).length > 0
+          ? `<span>${label("overview.mostVoted", { count: text.number(data.top[0]!.votes) })}</span>`
+          : `<span>${label("overview.nothingYet")}</span>`,
+        "",
+      ],
+      more("/review?mode=all&kind=idea&sort=votes", "overview.votedIdeas"),
+    )}
+  </div>`;
 
   // The chart: thirty days, ends included, with the first and the last day
   // named under it. An empty installation gets a flat line rather than an empty
   // box — the shape of "nothing yet" is still the shape of the chart.
-  const activity = card(
-    "activity",
-    `<h3>${escapeHTML(text.t("overview.activity"))}
-       <span class="count-chip">${number(arrived)}</span></h3>
-     <div class="chart-wrap">
-       ${areaChart(
-         series.map((day) => day.reports),
-         {
-           width: 640,
-           height: 120,
-           from: series.length > 0 ? text.date(series[0]!.day) : "",
-           to: series.length > 0 ? text.date(series[series.length - 1]!.day) : "",
-           meta: series.map((day) => ({
-             day: day.day,
-             bug: day.bugs ?? 0,
-             idea: day.ideas ?? 0,
-           })),
-         },
-       )}
-     </div>`,
-    "full",
+  const activity = `<div class="ov-card ov-chart" data-ov="activity">
+    <div class="ov-chart-head"><span class="ov-lbl">${label("overview.activity")}</span><span class="ov-chip">${number(arrived)}</span></div>
+    <div class="chart-wrap">
+      ${areaChart(
+        series.map((day) => day.reports),
+        {
+          width: 640,
+          height: 160,
+          from: series.length > 0 ? text.date(series[0]!.day) : "",
+          to: series.length > 0 ? text.date(series[series.length - 1]!.day) : "",
+          meta: series.map((day) => ({ day: day.day, bug: day.bugs ?? 0, idea: day.ideas ?? 0 })),
+        },
+      )}
+    </div>
+  </div>`;
+
+  const recent = box(
+    "recent",
+    text.t("overview.recent"),
+    (data.recent ?? []).length === 0
+      ? nothing
+      : `<div class="ov-card ov-rows">${data.recent
+          .map((b) =>
+            row(
+              `/i/${b.public_id}`,
+              kindMark(b.kind),
+              escapeHTML(b.title),
+              stateChip(b, text),
+              escapeHTML(text.age(Math.max(0, now - b.created_at))),
+            ),
+          )
+          .join("")}</div>`,
   );
 
-  const kinds = card(
-    "kinds",
-    `<h3>${escapeHTML(text.t("overview.byKind"))}</h3>
-     <div class="donut-row">
-       ${donut(
-         [
-           { value: data.kinds.idea ?? 0, className: "arc-idea" },
-           { value: data.kinds.bug ?? 0, className: "arc-bug" },
-         ],
-         `<span class="donut-value">${number(total)}</span>`,
-       )}
-       <ul class="legend">
-         <li><span class="swatch swatch-idea"></span>${escapeHTML(text.t("kind.idea"))}
-           <span class="count">${number(data.kinds.idea ?? 0)}</span></li>
-         <li><span class="swatch swatch-bug"></span>${escapeHTML(text.t("kind.bug"))}
-           <span class="count">${number(data.kinds.bug ?? 0)}</span></li>
-       </ul>
-     </div>`,
-    "wide",
-  );
-
-  const list = (id: string, title: string, rows: Brief[], votes: boolean) =>
-    card(
-      id,
-      `<h3>${escapeHTML(title)}</h3>
-       ${
-         rows.length === 0
-           ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
-           : `<ul class="briefs">${rows.map((b) => briefRow(b, text, votes)).join("")}</ul>`
-       }`,
-      "wide",
-    );
-
-  // The boards, busiest first, each a way into its own share of the work. What
-  // is waiting is the number somebody acts on, so it wears the colour of a
+  // The repositories, busiest first, each a way into its own share of the work.
+  // What is waiting is the number somebody acts on, so it wears the colour of a
   // thing that is waiting rather than being the third grey number in a row.
-  const boards = card(
+  const boards = box(
     "boards",
-    `<h3>${escapeHTML(text.t("portal.boards"))}
-       <span class="count-chip">${number(data.repositories)}</span></h3>
-     ${
-       (data.boards ?? []).length === 0
-         ? `<p class="hint">${escapeHTML(text.t("overview.nothingYet"))}</p>`
-         : `<ul class="board-rows">${data.boards
-             .map(
-               (b) => `<li><a href="/review?mode=all&amp;board=${escapeAttr(`${b.org}/${b.repo}`)}">
-                 <span class="board-name">
-                   <span class="card-title">${escapeHTML(b.name)}</span>
-                   <span class="card-sub">${escapeHTML(b.organization)}</span>
-                 </span>
-                 <span class="board-counts">
-                   ${
-                     b.pending > 0
-                       ? `<span class="status status-planned">${escapeHTML(text.t("panel.queue"))}
-                            <span class="count">${number(b.pending)}</span></span>`
-                       : ""
-                   }
-                   <span class="chip">${icons.check(12)}<span>${number(b.published)}</span></span>
-                   <span class="chip">${icons.idea(12)}<span>${number(b.votes)}</span></span>
-                 </span>
-               </a></li>`,
-             )
-             .join("")}</ul>`
-     }`,
-    "wide",
+    text.t("portal.boards"),
+    (data.boards ?? []).length === 0
+      ? nothing
+      : `<div class="ov-units">${data.boards
+          .map(
+            (b) => `<a class="ov-card ov-unit" href="/review?mode=all&amp;board=${escapeAttr(`${b.org}/${b.repo}`)}">
+              <span class="ov-unit-head"><span class="ov-dot${b.pending > 0 ? " warn" : " ok"}"></span>
+                <b>${escapeHTML(b.name)}</b>
+                <span class="ov-chip${b.pending > 0 ? " warn" : ""}">${
+                  b.pending > 0 ? `${label("panel.queue")}: ${number(b.pending)}` : label("overview.nothingPending")
+                }</span></span>
+              <span class="ov-unit-org">${escapeHTML(b.organization)}</span>
+              <span class="ov-kpi-sub"><span>${icons.check(12)} ${number(b.published)}</span><span>${icons.idea(12)} ${number(b.votes)}</span></span>
+            </a>`,
+          )
+          .join("")}</div>`,
+    number(data.repositories),
   );
 
-  const all: Record<OverviewCard, string> = {
-    reports: stat("reports", total, text.t("overview.reports"), icons.repository(), "/review?mode=all"),
-    waiting: stat("waiting", data.pending, text.t("panel.queue"), icons.queue(), "/review?mode=pending"),
-    published: stat("published", data.published, text.t("overview.published"), icons.check(), "/review?mode=all&moderation=published"),
-    votes: stat("votes", data.votes, text.t("overview.votes"), icons.idea(), "/review?mode=all&kind=idea&sort=votes"),
-    organizations: stat("organizations", data.organizations, text.t("shell.organizations"), icons.organization(), "/panel/organizations"),
-    people: stat("people", data.people, text.t("shell.people"), icons.people(), "/panel/people"),
-    activity,
-    kinds,
-    statuses: bars("statuses", text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`)),
-    moderation: bars("moderation", text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`)),
-    top: list("top", text.t("board.sortVotes"), data.top ?? [], true),
-    recent: list("recent", text.t("overview.recent"), data.recent ?? [], false),
-    boards,
+  const top = box(
+    "top",
+    text.t("board.sortVotes"),
+    (data.top ?? []).length === 0
+      ? nothing
+      : `<div class="ov-card ov-rows">${data.top
+          .map((b) =>
+            row(
+              `/i/${b.public_id}`,
+              `<span class="ov-score">${number(b.votes)}</span>`,
+              escapeHTML(b.title),
+              "",
+              stateChip(b, text),
+            ),
+          )
+          .join("")}</div>`,
+  );
+
+  const split = (id: string, title: string, counts: Record<string, number>, name: (key: string) => string) => {
+    const entries = Object.entries(counts)
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return box(id, title, nothing);
+    const most = entries[0]![1];
+    return box(
+      id,
+      title,
+      `<div class="ov-card ov-rows">${entries
+        .map(([key, n]) =>
+          row(null, "", escapeHTML(name(key)), "", `<span class="ov-bar">${fill(n, most, key)}</span><b>${number(n)}</b>`),
+        )
+        .join("")}</div>`,
+    );
   };
 
-  return `<div class="screen-head">
-      <h1 class="visually-hidden">${escapeHTML(text.t("shell.overview"))}</h1>
-    </div>
-    ${total === 0 ? `<p class="lead">${escapeHTML(text.t("overview.emptyLead"))}</p>` : ""}
+  const statuses = split("statuses", text.t("overview.byStatus"), data.statuses, (k) => text.t(`status.${k}`));
+  const moderation = split("moderation", text.t("overview.byModeration"), data.moderation, (k) => text.t(`moderation.${k}`));
 
-    <ul class="dashboard${data.server === false ? " team" : ""}">
-      ${overviewCards
-        .filter((name) => data.server !== false || name !== "people")
-        .map((name) => all[name])
-        .join("")}
-    </ul>`;
+  const server = team
+    ? ""
+    : box(
+        "server",
+        text.t("overview.server"),
+        `<div class="ov-card ov-rows">
+          ${row("/panel/organizations", "", label("shell.organizations"), "", `<b>${number(data.organizations)}</b>`)}
+          ${row("/panel/people", "", label("shell.people"), "", `<b>${number(data.people)}</b>`)}
+        </div>`,
+      );
+
+  return `<header class="ov-head">
+      <h1 class="ov-title">${icons.overview(18)}<span>${label("shell.overview")}</span></h1>
+      <div class="ov-sum">
+        <span><i class="ov-dot${data.pending > 0 ? " warn" : " ok"}"></i><b>${number(data.pending)}</b> ${label("panel.queue")}</span>
+        <span><i class="ov-dot ok"></i><b>${number(data.published)}</b> ${label("overview.published")}</span>
+        <span><b>${number(data.repositories)}</b> ${label("portal.boards")}</span>
+        ${team ? "" : `<span><b>${number(data.organizations)}</b> ${label("shell.organizations")}</span>`}
+      </div>
+      <span class="ov-spacer"></span>
+      <a class="ov-btn" href="/review?mode=pending">${icons.queue(15)}<span>${label("review.title")}</span></a>
+    </header>
+    <div class="ov-body">
+      ${total === 0 ? `<p class="ov-lead">${label("overview.emptyLead")}</p>` : ""}
+      ${kpis}
+      <div class="ov-grid ov-main">${activity}${recent}</div>
+      ${boards}
+      <div class="ov-grid ov-two">${top}${statuses}</div>
+      <div class="ov-grid ov-two">${moderation}${server}</div>
+    </div>`;
 }
 
 /**

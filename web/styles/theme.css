@@ -3502,75 +3502,6 @@ a.bento-card:hover {
   }
 }
 
-/* ------------------------------------------------------------------- stats */
-
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 0.75rem;
-  margin: 1.25rem 0 2rem;
-  padding: 0;
-  list-style: none;
-}
-
-.stat {
-  padding: 0.9rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--panel);
-}
-
-/* A stat that is a link is still a card. Without this the anchor stays inline,
-   the list item keeps no border, and the number floats over the one below. */
-a.stat {
-  display: block;
-  color: inherit;
-  text-decoration: none;
-}
-
-a.stat:hover {
-  border-color: rgba(var(--accent-rgb), 0.55);
-}
-
-.stats > li {
-  display: contents;
-}
-
-.stat .value {
-  display: block;
-  font-size: 1.9rem;
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.stat .label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.2rem;
-  font-size: 0.85rem;
-  color: var(--text-dim);
-}
-
-/* A bar per status, drawn from the numbers rather than from a chart library:
-   one dependency for eight rectangles is one dependency too many. */
-.bars {
-  display: grid;
-  gap: 0.55rem;
-  margin: 1rem 0 2rem;
-  max-inline-size: 40rem;
-}
-
-.bar-row {
-  display: grid;
-  grid-template-columns: 9rem 1fr 3rem;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.9rem;
-}
-
 /*
  * The track and the fill are spans, so they have to be told to be boxes.
  *
@@ -3622,12 +3553,6 @@ a.stat:hover {
   min-inline-size: 0.55rem;
   border-radius: 999px;
   background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.75), var(--accent));
-}
-
-.bar-row .count {
-  text-align: end;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------------ avatar */
@@ -3864,93 +3789,6 @@ body > nav .brand {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-/* ------------------------------------------------------------- the dashboard */
-
-/* A fixed number of columns per width, not a track size.
- *
- * With auto-fit the column width came from the widest card, so a tile showing
- * "0" and a chart spanning three of them never lined up and every row started
- * somewhere different. A dashboard is read down as well as across: the columns
- * have to be the same on every row, which is what a fixed count gives.
- *
- * dense, so a one-column tile fills the gap a three-column chart leaves at the
- * end of a row instead of leaving a hole and starting a new one. */
-.dashboard {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-flow: row dense;
-  gap: 0.85rem;
-  margin: 1.25rem 0 2rem;
-  padding: 0;
-  list-style: none;
-  align-items: stretch;
-}
-
-@media (min-width: 48rem) {
-  .dashboard { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
-@media (min-width: 80rem) {
-  .dashboard { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-}
-
-/* A team member's overview has five numbers, not six — the server's people
-   are not theirs — so the wide row is ten columns: two each, and the wide
-   cards half of it, and the first row fills as the administrator's does. */
-@media (min-width: 80rem) {
-  .dashboard.team { grid-template-columns: repeat(10, minmax(0, 1fr)); }
-  .dashboard.team .dash-card:not(.wide):not(.full) { grid-column: span 2; }
-  .dashboard.team .dash-card.wide { grid-column: span 5; }
-}
-
-.dash-card {
-  position: relative;
-  border: 1px solid var(--card-border);
-  border-radius: calc(var(--radius) + 2px);
-  background: var(--panel);
-  box-shadow: var(--card-shadow);
-  padding: 0;
-  overflow: hidden;
-}
-
-.dash-card.wide {
-  grid-column: span 2;
-}
-
-@media (min-width: 80rem) {
-  .dash-card.wide {
-    grid-column: span 3;
-  }
-}
-
-/* Merged from two: the later one laid it out and won the margin, so the
-   quarter-rem in the first was a number nobody was reading. */
-.dash-card > h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin: 1rem 1.1rem 0.5rem;
-  font-size: 1rem;
-}
-
-.dash-card .bars,
-.dash-card .hint {
-  margin: 0.5rem 1.1rem 1.1rem;
-}
-
-.dash-card .lead {
-  margin: 0 1.1rem 1.1rem;
-}
-
-/* The stat fills its card rather than drawing a second border inside it. */
-.dash-card .stat {
-  display: block;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  block-size: 100%;
 }
 
 /* -------------------------------------------------------- one report, public */
@@ -5198,27 +5036,316 @@ form.merge { grid-template-columns: minmax(0, 1fr); }
 
 /* A card that takes the whole row, whatever the row is. The chart is read
    across: at a quarter of the window it is a smear. */
-.dash-card.full {
-  grid-column: 1 / -1;
+/* ------------------------------------------------------- the overview, shell
+ *
+ * The page the team opens first: what is waiting, how busy it has been, where
+ * the work is. A header with the page's name and one line of what is true now,
+ * the numbers somebody acts on, and boxes whose names sit on their border.
+ *
+ * Every state is green, amber or grey, never the accent: the accent belongs to
+ * the operator and can be any colour, and a meter that turns red because the
+ * operator chose red is an alarm nobody raised.
+ */
+.admin-main:has(> .ov-head) { padding: 0; }
+
+.ov-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-block-size: 56px;
+  padding: 8px 20px;
+  border-block-end: 1px solid var(--card-border);
+  background: var(--sheet);
 }
 
-.stat-go {
+.ov-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ov-title .icon { color: var(--accent); }
+
+.ov-sum {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-inline-size: 0;
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid var(--card-border);
+  font: 500 11px/1 var(--font-mono);
+  color: var(--text-dim);
+}
+
+.ov-sum span { display: inline-flex; align-items: center; gap: 6px; }
+.ov-sum b { color: var(--text-main); font-weight: 700; }
+.ov-spacer { flex: 1; }
+
+.ov-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  block-size: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  background: var(--sheet);
+  color: var(--text-dim);
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ov-btn:hover { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.35); }
+
+.ov-dot {
+  display: inline-block;
+  inline-size: 8px;
+  block-size: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--text-dim);
+  opacity: 0.7;
+}
+
+.ov-dot.ok { background: var(--success-color); opacity: 1; box-shadow: 0 0 0 3px rgba(var(--success-rgb), 0.16); }
+.ov-dot.warn { background: var(--warning-color); opacity: 1; box-shadow: 0 0 0 3px rgba(var(--warning-rgb), 0.16); }
+
+.ov-body { padding: 8px 20px 48px; }
+.ov-lead { margin: 16px 0 0; color: var(--text-dim); }
+
+/* The mono-caps label every tile and chart carries. */
+.ov-lbl {
+  font: 700 10px/1 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ov-card {
+  position: relative;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--sheet);
+  box-shadow: var(--card-shadow);
+}
+
+.ov-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--card-border);
+  border-radius: 99px;
+  background: var(--sheet);
+  color: var(--text-dim);
+  font: 600 10.5px/1.5 var(--font-mono);
+  white-space: nowrap;
+}
+
+.ov-chip.warn {
+  color: var(--warning-color);
+  border-color: rgba(var(--warning-rgb), 0.3);
+  background: rgba(var(--warning-rgb), 0.08);
+}
+
+/* ---- the numbers somebody acts on */
+
+.ov-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-block-start: 16px;
+}
+
+.ov-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-block-size: 134px;
+  padding: 14px 16px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--sheet);
+  box-shadow: var(--card-shadow);
+}
+
+.ov-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ov-kpi-top .icon { color: var(--text-dim); opacity: 0.8; }
+.ov-kpi-main { display: flex; align-items: center; min-block-size: 40px; }
+
+.ov-kpi-v {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A tile with no meter keeps the meter's place, so the line under it sits where it does in the tiles beside it. */
+.ov-meter { min-block-size: 0.55rem; }
+
+.ov-kpi-sub {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 8px;
+  font: 500 11px/1.3 var(--font-mono);
+  color: var(--text-dim);
+}
+
+.ov-kpi-sub span { display: inline-flex; align-items: center; gap: 4px; }
+
+/* "See more" sits at the foot of its tile, at the end, beside the chevron it points with. */
+.ov-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-end;
+  margin-block-start: auto;
+  color: var(--accent-alt);
+  font: 600 11px/1.3 var(--font-mono);
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.ov-more:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ov-more .icon { transform: scaleX(var(--rtl-flip)); }
+
+/* ---- the chart and the boxes */
+
+.ov-grid { display: grid; gap: 12px; margin-block-start: 12px; }
+.ov-main { grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr); }
+.ov-two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block-start: 4px; }
+
+.ov-chart { padding: 14px 16px 10px; }
+.ov-chart-head { display: flex; align-items: center; gap: 8px; margin-block-end: 8px; }
+.ov-chart .chart-wrap { margin: 0; }
+.ov-chart .chart { block-size: 9rem; }
+
+/* The house box: its name is a pill sitting on the border. */
+.ov-box {
+  position: relative;
+  margin-block-start: 22px;
+  padding: 22px 14px 14px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+.ov-main > .ov-box { margin-block-start: 22px; }
+
+.ov-pill {
   position: absolute;
-  inset-block-start: 0.9rem;
-  inset-inline-end: 0.9rem;
-  color: var(--border-strong);
-  transform: scaleX(var(--rtl-flip));
-  transition: color 0.15s var(--ease), transform 0.15s var(--ease);
+  inset-block-start: 0;
+  inset-inline-start: 12px;
+  transform: translateY(calc(-50% - 1px));
+  max-inline-size: calc(100% - 24px);
+  padding: 2px 8px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--sheet);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  font: 700 0.65rem/1.4 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-a.stat:hover .stat-go {
-  color: var(--accent);
-  transform: scaleX(var(--rtl-flip)) translateX(2px);
+.ov-box:hover > .ov-pill { border-color: rgba(var(--accent-rgb), 0.3); }
+
+.ov-pill-n {
+  margin-inline-start: 8px;
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid var(--card-border);
+  font-weight: 600;
+  color: var(--text-main);
 }
 
-.dash-card:has(a.stat):hover {
-  border-color: var(--accent-line);
-  box-shadow: var(--shadow-md), var(--hairline);
+.ov-empty { margin: 0; padding: 22px 0; text-align: center; color: var(--text-dim); font-size: 0.85rem; }
+
+/* ---- lists */
+
+.ov-rows { display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
+
+.ov-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-block-start: 1px solid var(--card-border);
+  color: inherit;
+  text-decoration: none;
+  transition: background 0.12s;
+}
+
+.ov-row:first-child { border-block-start: 0; }
+a.ov-row:hover { background: var(--surface-dim); }
+.ov-row-main { min-inline-size: 0; }
+.ov-row-main b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.ov-row-r { display: inline-flex; align-items: center; gap: 10px; font: 500 11px/1.4 var(--font-mono); color: var(--text-dim); }
+.ov-row-r b { color: var(--text-main); font-size: 13px; }
+.ov-row.bare { grid-template-columns: minmax(0, 1fr) auto; }
+.ov-bar { display: block; inline-size: 9rem; }
+
+/* A meter is the colour of what it counts, flat and never the accent. */
+.ov-body .bar-track { block-size: 5px; }
+.ov-body .bar-fill { background: var(--hue, var(--hue-done)); min-inline-size: 5px; }
+.ov-row-main small { display: block; margin-block-start: 3px; }
+
+.ov-score {
+  min-inline-size: 2rem;
+  padding: 2px 8px;
+  border: 1px solid var(--card-border);
+  border-radius: 99px;
+  text-align: center;
+  font: 600 11px/1.5 var(--font-mono);
+  color: var(--text-main);
+}
+
+/* ---- one tile per repository */
+
+.ov-units { display: grid; grid-template-columns: repeat(auto-fill, minmax(262px, 320px)); gap: 10px; }
+
+.ov-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.ov-unit:hover { border-color: rgba(var(--accent-rgb), 0.3); }
+.ov-unit-head { display: flex; align-items: center; gap: 9px; min-inline-size: 0; }
+.ov-unit-head b { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+.ov-unit-head .ov-chip { margin-inline-start: auto; }
+.ov-unit-org { font: 500 10.5px/1 var(--font-mono); color: var(--text-dim); }
+
+@media (max-width: 1100px) {
+  .ov-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ov-main, .ov-two { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 560px) {
+  .ov-kpis { grid-template-columns: minmax(0, 1fr); }
+  .ov-head, .ov-body { padding-inline: 14px; }
+  .ov-sum { padding-inline-start: 0; border-inline-start: 0; }
 }
 
 /* --------------------------------------------------------------- the chart */
@@ -5263,60 +5390,6 @@ a.stat:hover .stat-go {
   color: var(--text-dim);
 }
 
-/* ---------------------------------------------------------------- the ring */
-
-.donut-row {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  margin: 0 1.1rem 1.1rem;
-  flex-wrap: wrap;
-}
-
-.donut {
-  position: relative;
-  inline-size: 7rem;
-  flex: none;
-}
-
-.donut svg { display: block; inline-size: 100%; }
-
-.donut-middle {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-}
-
-.donut-value {
-  font-size: 1.4rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.arc-track { stroke: var(--surface-dim); }
-.arc-idea { stroke: var(--accent); }
-.arc-bug { stroke: var(--hue-open); }
-
-.legend {
-  display: grid;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-  min-inline-size: 8rem;
-}
-
-.legend li {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.legend .count {
-  margin-inline-start: auto;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
 
 .swatch {
   inline-size: 0.7rem;
@@ -5351,25 +5424,9 @@ a.stat:hover .stat-go {
 
 /* A bar takes the colour of what it counts. A chart in one grey is a chart you
    have to read the labels of. */
-.bar-row .bar-fill {
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--hue, var(--accent)) 70%, transparent), var(--hue, var(--accent)));
-}
-
 /* ------------------------------------------------------------- brief lists */
 
-.briefs, .board-rows {
-  display: grid;
-  /* One column that is as wide as the card and no wider. Without it the grid's
-     implicit column took the width of its longest row, so a long title never
-     reached its ellipsis and the state beside it was pushed out of a card
-     that clips — "En attente de vali…" on the overview, in French. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.35rem;
-  margin: 0 1.1rem 1.1rem;
-}
-
-.brief, .board-rows a {
+.brief {
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -5381,7 +5438,7 @@ a.stat:hover .stat-go {
   transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
 }
 
-.brief:hover, .board-rows a:hover {
+.brief:hover {
   background: var(--surface-dim);
   border-color: var(--border);
 }
@@ -5545,10 +5602,6 @@ a.stat:hover .stat-go {
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
-
-/* The ring and its legend sit in the middle of the card rather than at the top
-   of a box sized by whatever is beside it. */
-.dash-card:has(.donut-row) { display: grid; align-content: center; }
 
 /* Inside a .page the thread is a child like any other and the page already
    sets the distance between children: its own top margin on top of that left a
@@ -7078,32 +7131,6 @@ a.stat:hover .stat-go {
 }
 
 .admin-main .theme-choice button[aria-pressed="true"] .icon { color: inherit; }
-
-/* Overview wears the same card: no icons, the quiet capital name, the number
-   under it. */
-.admin-main .dash-card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--sheet);
-  box-shadow: none;
-}
-
-.admin-main .dash-card > h3 {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-
-.admin-main .dash-card .stat .label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.admin-main .dash-card .stat .label .icon { display: none; }
 
 @media (max-width: 40rem) {
   .settings-row { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }

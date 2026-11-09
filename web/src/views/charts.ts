@@ -2,7 +2,7 @@
  * The charts, drawn as SVG by hand.
  *
  * No chart library: this house ships one binary with no external anything, and
- * a dependency for four shapes is a dependency. They are pure functions of
+ * a dependency for a few shapes is a dependency. They are pure functions of
  * numbers, so they can be asked what they draw without a browser.
  *
  * The one rule that matters here: **an SVG coordinate is a machine value and
@@ -118,48 +118,4 @@ export function areaChart(values: number[], options: AreaChartOptions = {}): str
       ? `<p class="chart-axis"><span>${options.from ?? ""}</span><span>${options.to ?? ""}</span></p>`
       : ""
   }`;
-}
-
-export interface Segment {
-  value: number;
-  /** A class rather than a colour: the palette lives in the stylesheet, which
-   *  is also where an operator's accent reaches it. */
-  className: string;
-}
-
-/**
- * A ring, one arc per segment, drawn with dash offsets on a single circle.
- *
- * Arcs by dasharray rather than by path arithmetic: no trigonometry, no
- * large-arc flags, and a segment of zero simply draws nothing instead of
- * becoming a full circle, which is what the sweep-flag version does.
- */
-export function donut(segments: Segment[], middle = ""): string {
-  const size = 120;
-  const radius = 46;
-  const circumference = 2 * Math.PI * radius;
-  const total = segments.reduce((sum, s) => sum + Math.max(s.value, 0), 0);
-
-  let offset = 0;
-  const arcs = segments
-    .filter((s) => s.value > 0)
-    .map((s) => {
-      const length = total > 0 ? (s.value / total) * circumference : 0;
-      const arc = `<circle class="arc ${s.className}" cx="${n(size / 2)}" cy="${n(size / 2)}" r="${n(radius)}"
-        fill="none" stroke-width="14" stroke-linecap="butt"
-        stroke-dasharray="${n(length)} ${n(circumference - length)}"
-        stroke-dashoffset="${n(-offset)}" />`;
-      offset += length;
-      return arc;
-    })
-    .join("");
-
-  return `<div class="donut">
-    <svg viewBox="0 0 ${n(size)} ${n(size)}" role="img" aria-hidden="true">
-      <circle class="arc-track" cx="${n(size / 2)}" cy="${n(size / 2)}" r="${n(radius)}"
-        fill="none" stroke-width="14" />
-      <g transform="rotate(-90 ${n(size / 2)} ${n(size / 2)})">${arcs}</g>
-    </svg>
-    ${middle ? `<span class="donut-middle">${middle}</span>` : ""}
-  </div>`;
 }

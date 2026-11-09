@@ -418,7 +418,6 @@
   "organizations.noRepositories": "Aucun dépôt pour l'instant.",
   "organizations.rename": "Renommer",
   "overview.activity": "30 derniers jours",
-  "overview.byKind": "Par type",
   "overview.byModeration": "Par modération",
   "overview.byStatus": "Par statut",
   "overview.emptyLead": "Aucun signalement pour l'instant.",

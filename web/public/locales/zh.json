@@ -418,7 +418,6 @@
   "organizations.noRepositories": "还没有仓库。",
   "organizations.rename": "重命名",
   "overview.activity": "最近 30 天",
-  "overview.byKind": "按类型",
   "overview.byModeration": "按审核状态",
   "overview.byStatus": "按状态",
   "overview.emptyLead": "还没有反馈。",

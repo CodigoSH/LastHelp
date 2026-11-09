@@ -418,7 +418,6 @@
   "organizations.noRepositories": "Репозиториев пока нет.",
   "organizations.rename": "Переименовать",
   "overview.activity": "Последние 30 дней",
-  "overview.byKind": "По виду",
   "overview.byModeration": "По разбору",
   "overview.byStatus": "По состоянию",
   "overview.emptyLead": "Обращений пока нет.",

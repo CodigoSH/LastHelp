@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, avatar, commentEditForm, itemTeamView, itemView, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
+import { accountRole, avatar, commentEditForm, itemTeamView, itemView, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -345,5 +345,90 @@ describe("the picture beside a name", () => {
     const html = itemView(report({ comments: [{ id: 1, author: "visitor", name: "", avatar: "/avatars/3", body: "x", created_at: 0 }] }), text);
     expect(circles(html)[0]).toContain("is-guest");
     expect(circles(html)[0]).not.toContain("<img");
+  });
+});
+
+
+function overview(over: Partial<OverviewData> = {}): OverviewData {
+  return {
+    server: true,
+    organizations: 2,
+    repositories: 3,
+    people: 5,
+    pending: 12,
+    published: 148,
+    votes: 573,
+    kinds: { idea: 98, bug: 63 },
+    statuses: { new: 21, done: 52 },
+    moderation: { published: 148, pending: 12, rejected: 1, spam: 2 },
+    last_report: 1000,
+    series: [{ day: 1, reports: 3, bugs: 1, ideas: 2 }, { day: 2, reports: 0, bugs: 0, ideas: 0 }],
+    top: [{ public_id: "a", title: "Dark mode", kind: "idea", status: "planned", votes: 31, created_at: 500 }],
+    recent: [{ public_id: "b", title: "Crash <b>", kind: "bug", status: "new", moderation: "pending", votes: 0, created_at: 900 }],
+    boards: [{ org: "acme", repo: "atlas", name: "Atlas", organization: "Acme", published: 71, pending: 5, votes: 412 }],
+    ...over,
+  };
+}
+
+describe("the overview", () => {
+  test("every number it shows is the one the server counted", () => {
+    const html = overviewScreen(overview(), text, 4600);
+    for (const [id, value] of [["pending", 12], ["reports", 161], ["published", 148], ["votes", 573]] as const) {
+      const tile = html.match(new RegExp(`data-ov="${id}">[\\s\\S]*?<div class="ov-kpi-main"><span class="ov-kpi-v">(\\d+)</span>`))?.[1];
+      expect(Number(tile)).toBe(value);
+    }
+  });
+
+  test("each tile is a way into the listing it counts", () => {
+    const html = overviewScreen(overview(), text, 4600);
+    expect(html).toContain('href="/review?mode=pending"');
+    expect(html).toContain('href="/review?mode=all"');
+    expect(html).toContain('href="/review?mode=all&amp;moderation=published"');
+    expect(html).toContain('href="/review?mode=all&amp;kind=idea&amp;sort=votes"');
+  });
+
+  test("how old the last report is comes from the clock it is given", () => {
+    const html = overviewScreen(overview({ last_report: 1000 }), text, 4600);
+    expect(html).toContain("&quot;age&quot;:&quot;3600s&quot;");
+  });
+
+  test("a new installation says so and draws no NaN", () => {
+    const html = overviewScreen(
+      overview({ pending: 0, published: 0, votes: 0, kinds: {}, statuses: {}, moderation: {}, last_report: 0, series: [], top: [], recent: [], boards: [], repositories: 0 }),
+      text,
+      4600,
+    );
+    expect(html).toContain("[overview.emptyLead]");
+    expect(html).toContain("[overview.noReportsYet]");
+    expect(html).not.toContain("NaN");
+    expect(html).not.toContain("Infinity");
+  });
+
+  test("what comes from a stranger is escaped", () => {
+    const html = overviewScreen(overview(), text, 4600);
+    expect(html).toContain("Crash &lt;b&gt;");
+    expect(html).not.toContain("Crash <b>");
+  });
+
+  test("a team member does not see the server's numbers", () => {
+    const html = overviewScreen(overview({ server: false }), text, 4600);
+    expect(html).not.toContain('data-ov="server"');
+    expect(html).not.toContain("/panel/people");
+    expect(overviewScreen(overview(), text, 4600)).toContain("/panel/people");
+  });
+
+  test("a bar is as wide as its share of the largest, in twentieths", () => {
+    const html = overviewScreen(overview({ statuses: { new: 20, done: 10 } }), text, 4600);
+    expect(html).toContain('hue-new" data-fill="20"');
+    expect(html).toContain('hue-done" data-fill="10"');
+  });
+
+  test("a repository with nothing waiting says so rather than showing a zero", () => {
+    const html = overviewScreen(
+      overview({ boards: [{ org: "a", repo: "b", name: "B", organization: "A", published: 1, pending: 0, votes: 0 }] }),
+      text,
+      4600,
+    );
+    expect(html).toContain("[overview.nothingPending]");
   });
 });

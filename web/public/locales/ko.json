@@ -418,7 +418,6 @@
   "organizations.noRepositories": "아직 저장소가 없습니다.",
   "organizations.rename": "이름 바꾸기",
   "overview.activity": "최근 30일",
-  "overview.byKind": "종류별",
   "overview.byModeration": "검토 상태별",
   "overview.byStatus": "상태별",
   "overview.emptyLead": "아직 신고가 없습니다.",
