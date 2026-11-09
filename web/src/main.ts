@@ -1385,7 +1385,14 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
       total: answers[i]?.total ?? 0,
       items: answers[i]?.items ?? [],
     }));
+    // The page is drawn again whole, and a page that is emptied for an instant is
+    // a page whose scroll the browser clamps: the position and the pressed tile
+    // are put back so a press on a tile does not move what is being read.
+    const top = window.scrollY;
+    const pressed = document.activeElement instanceof HTMLElement ? document.activeElement.dataset : null;
     show(views.board(org, repo, lanes, filters, tileNumbers(filters, answers), roadmap, pick, text));
+    window.scrollTo({ top, behavior: "instant" });
+    if (pressed?.bdState) root?.querySelector<HTMLElement>(`[data-bd-state="${pressed.bdState}"]`)?.focus({ preventScroll: true });
     wire(plan);
   };
 
@@ -1894,18 +1901,6 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
     if (label) label.textContent = i18n.t(open ? "roadmap.declinedHide" : "roadmap.declinedShow");
   };
   opener?.addEventListener("click", () => toggleDeclined(opener.getAttribute("aria-expanded") !== "true"));
-
-  // The tiles are the lanes' numbers and, on a phone, its tabs: one lane at a
-  // time. On a wide screen they take you to the lane.
-  page.querySelectorAll<HTMLButtonElement>(".rm-tile").forEach((tile) =>
-    tile.addEventListener("click", () => {
-      const lane = tile.dataset.rmLane ?? "";
-      page.querySelectorAll(".rm-tile").forEach((t) => t.setAttribute("aria-pressed", String(t === tile)));
-      page.querySelectorAll<HTMLElement>("[data-rm-box]").forEach((box) => box.classList.toggle("on", box.dataset.rmBox === lane));
-      if (lane === "declined") toggleDeclined(true);
-      page.querySelector<HTMLElement>(`[data-rm-box="${lane}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }),
-  );
 
   apply();
 }

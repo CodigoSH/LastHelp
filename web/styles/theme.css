@@ -1372,12 +1372,7 @@ summary:focus-visible,
   color: inherit;
   font: inherit;
   text-align: start;
-  cursor: pointer;
-  transition: border-color 0.15s;
 }
-.rm-tile:hover { border-color: rgba(var(--accent-rgb), 0.3); }
-.rm-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.rm-tile[aria-pressed="true"] { border-color: rgba(var(--accent-rgb), 0.45); }
 .rm-tile.rm-declined { border-style: dashed; box-shadow: none; }
 .rm-tile-top {
   display: flex;
@@ -1608,15 +1603,13 @@ summary:focus-visible,
   .rm-lanes { grid-template-columns: minmax(0, 1fr); }
   .rm-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-/* On a phone the four tiles are the tabs: one lane at a time, so the page is as
-   long as one lane. Two by two, because four in a row do not fit their words. */
+/* On a phone the four tiles are two by two, because four in a row do not fit
+   their words; the lanes follow one under another. */
 @media (max-width: 640px) {
   .rm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   .rm-tile { padding: 10px 12px; }
   .rm-tile-n { font-size: 1.5rem; }
   .rm-cards { grid-template-columns: minmax(0, 1fr); }
-  .rm-lanes .rm-box { display: none; }
-  .rm-lanes .rm-box.on { display: block; }
 }
 
 /* ------------------------------------------------------------------ board */

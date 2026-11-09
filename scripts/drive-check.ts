@@ -902,8 +902,10 @@ async function main() {
       tiles,
       planned: document.querySelectorAll('[data-rm-box="planned"] [data-rm-row]').length,
       declinedShut: document.querySelector("[data-rm-declined]").hidden === true,
+      pressable: document.querySelectorAll("button.rm-tile, a.rm-tile").length,
     };
   `);
+  check("the roadmap tiles only inform: none can be pressed", roadmap.pressable === 0, "pressable=" + roadmap.pressable);
   check("the roadmap draws its four lanes", roadmap.lanes.join() === "in_progress,planned,done,declined", roadmap.lanes.join());
   check("what was just planned is on it", roadmap.planned === 1, `planned=${roadmap.planned}`);
   // The number on a tile is the length of its lane: two figures that could be

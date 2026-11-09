@@ -477,15 +477,15 @@ export function roadmap(
     lanes.find((l) => l.lane === key) ?? { lane: key, ideas: 0, bugs: 0, total: 0, items: [] };
   const everything = lanes.reduce((n, l) => n + l.total, 0);
 
-  const tile = (l: RoadmapLane, pressed: boolean) => `<button type="button" class="rm-tile rm-${escapeAttr(l.lane)}" data-rm-lane="${escapeAttr(l.lane)}"
-      data-ideas="${l.ideas}" data-bugs="${l.bugs}" aria-pressed="${pressed}">
+  const tile = (l: RoadmapLane) => `<div class="rm-tile rm-${escapeAttr(l.lane)}" data-rm-lane="${escapeAttr(l.lane)}"
+      data-ideas="${l.ideas}" data-bugs="${l.bugs}">
       <span class="rm-tile-top"><span class="rm-dot" aria-hidden="true"></span>${escapeHTML(text.t(`roadmap.${l.lane}`))}</span>
       <span class="rm-tile-n" data-rm-n>${escapeHTML(text.number(l.total))}</span>
       <span class="rm-tile-sub">
         <span title="${escapeAttr(text.t("overview.ideas"))}" aria-label="${escapeAttr(text.t("overview.ideas") + ": " + l.ideas)}">${icons.idea(12)} ${escapeHTML(text.number(l.ideas))}</span>
         <span title="${escapeAttr(text.t("overview.bugs"))}" aria-label="${escapeAttr(text.t("overview.bugs") + ": " + l.bugs)}">${icons.bug(12)} ${escapeHTML(text.number(l.bugs))}</span>
       </span>
-    </button>`;
+    </div>`;
 
   const pill = (l: RoadmapLane) =>
     `<h2 class="rm-pill"><span class="rm-dot" aria-hidden="true"></span>${escapeHTML(text.t(`roadmap.${l.lane}`))}<span class="rm-pill-n" data-rm-n>${escapeHTML(text.number(l.total))}</span></h2>`;
@@ -523,9 +523,8 @@ export function roadmap(
   const planned = lane("planned");
   const done = lane("done");
   const declined = lane("declined");
-  const firstWithItems = [inProgress, planned, done].find((l) => l.total > 0)?.lane ?? "in_progress";
 
-  const tiles = `<div class="rm-tiles">${[inProgress, planned, done, declined].map((l) => tile(l, l.lane === firstWithItems)).join("")}</div>`;
+  const tiles = `<div class="rm-tiles">${[inProgress, planned, done, declined].map((l) => tile(l)).join("")}</div>`;
 
   if (everything === 0) {
     return `<div class="page rm">${header}${tiles}
@@ -553,7 +552,7 @@ export function roadmap(
     </div>
 
     <div class="rm-lanes">
-      <section class="rm-box rm-lane rm-in_progress${firstWithItems === "in_progress" ? " on" : ""}" data-rm-box="in_progress" data-ideas="${inProgress.ideas}" data-bugs="${inProgress.bugs}" data-loaded="${inProgress.items.length}">
+      <section class="rm-box rm-lane rm-in_progress" data-rm-box="in_progress" data-ideas="${inProgress.ideas}" data-bugs="${inProgress.bugs}" data-loaded="${inProgress.items.length}">
         ${pill(inProgress)}
         <div class="rm-cards">${inProgress.items
           .map(
@@ -567,7 +566,7 @@ export function roadmap(
         ${more()}
       </section>
 
-      <section class="rm-box rm-lane rm-planned${firstWithItems === "planned" ? " on" : ""}" data-rm-box="planned" data-ideas="${planned.ideas}" data-bugs="${planned.bugs}" data-loaded="${planned.items.length}">
+      <section class="rm-box rm-lane rm-planned" data-rm-box="planned" data-ideas="${planned.ideas}" data-bugs="${planned.bugs}" data-loaded="${planned.items.length}">
         ${pill(planned)}
         <div class="rm-rows">${planned.items
           .map(
@@ -584,7 +583,7 @@ export function roadmap(
         ${more()}
       </section>
 
-      <section class="rm-box rm-lane rm-done${firstWithItems === "done" ? " on" : ""}" data-rm-box="done" data-ideas="${done.ideas}" data-bugs="${done.bugs}" data-loaded="${done.items.length}">
+      <section class="rm-box rm-lane rm-done" data-rm-box="done" data-ideas="${done.ideas}" data-bugs="${done.bugs}" data-loaded="${done.items.length}">
         ${pill(done)}
         ${history(done, "rm-check")}
         ${empty()}
