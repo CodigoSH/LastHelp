@@ -2396,7 +2396,7 @@ async function main() {
   `);
   check(
     "the overview is one screen, the same for everybody",
-    overview.cards === 12 && overview.draggable === 0 && overview.arrange === false,
+    overview.cards === 13 && overview.draggable === 0 && overview.arrange === false,
     JSON.stringify({ ...overview, desbordan: undefined }),
   );
   check(
@@ -3099,7 +3099,7 @@ async function main() {
       equipo: !!document.querySelector(".ov-head") && !document.querySelector('[data-ov="server"]'),
       personas: !!document.querySelector('[data-ov="server"], a[href="/panel/people"]'),
       pendientes: value("pending"),
-      servidor: me.pending?.reports ?? -1,
+      servidor: (me.pending?.reports ?? 0) + (me.pending?.messages ?? 0),
       tableros: [...document.querySelectorAll('[data-ov="boards"] a')].map(a => a.getAttribute("href")),
       offersToAdd: !!document.querySelector("[data-open-modal]"),
       role: document.querySelector(".side-head .side-role")?.textContent?.trim() ?? "",

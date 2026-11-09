@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, avatar, commentEditForm, itemTeamView, itemView, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
+import { accountRole, avatar, commentEditForm, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -362,6 +362,17 @@ function overview(over: Partial<OverviewData> = {}): OverviewData {
     statuses: { new: 21, done: 52 },
     moderation: { published: 148, pending: 12, rejected: 1, spam: 2 },
     last_report: 1000,
+    waiting_reports: 8,
+    waiting_messages: 4,
+    waiting_oldest: 1000,
+    unanswered: 7,
+    unanswered_oldest: 500,
+    unanswered_most_votes: 31,
+    answerable: 40,
+    answered: 36,
+    first_reply: 21600,
+    not_on_forge: 2,
+    failed_jobs: 3,
     series: [{ day: 1, reports: 3, bugs: 1, ideas: 2 }, { day: 2, reports: 0, bugs: 0, ideas: 0 }],
     top: [{ public_id: "a", title: "Dark mode", kind: "idea", status: "planned", votes: 31, created_at: 500 }],
     recent: [{ public_id: "b", title: "Crash <b>", kind: "bug", status: "new", moderation: "pending", votes: 0, created_at: 900 }],
@@ -373,33 +384,38 @@ function overview(over: Partial<OverviewData> = {}): OverviewData {
 describe("the overview", () => {
   test("every number it shows is the one the server counted", () => {
     const html = overviewScreen(overview(), text, 4600);
-    for (const [id, value] of [["pending", 12], ["reports", 161], ["published", 148], ["votes", 573]] as const) {
+    for (const [id, value] of [["pending", 12], ["unanswered", 7], ["reports", 161]] as const) {
       const tile = html.match(new RegExp(`data-ov="${id}">[\\s\\S]*?<div class="ov-kpi-main"><span class="ov-kpi-v">(\\d+)</span>`))?.[1];
       expect(Number(tile)).toBe(value);
     }
+    // The wait is a duration, said as one.
+    expect(html).toMatch(/data-ov="reply">[\s\S]*?ov-kpi-v">21600s</);
   });
 
   test("each tile is a way into the listing it counts", () => {
     const html = overviewScreen(overview(), text, 4600);
     expect(html).toContain('href="/review?mode=pending"');
     expect(html).toContain('href="/review?mode=all"');
-    expect(html).toContain('href="/review?mode=all&amp;moderation=published"');
-    expect(html).toContain('href="/review?mode=all&amp;kind=idea&amp;sort=votes"');
+    expect(html).toContain('href="/review?mode=all&amp;reply=none&amp;state=open"');
   });
 
-  test("how old the last report is comes from the clock it is given", () => {
-    const html = overviewScreen(overview({ last_report: 1000 }), text, 4600);
+  test("how long something has waited comes from the clock it is given", () => {
+    const html = overviewScreen(overview({ waiting_oldest: 1000 }), text, 4600);
     expect(html).toContain("&quot;age&quot;:&quot;3600s&quot;");
   });
 
   test("a new installation says so and draws no NaN", () => {
     const html = overviewScreen(
-      overview({ pending: 0, published: 0, votes: 0, kinds: {}, statuses: {}, moderation: {}, last_report: 0, series: [], top: [], recent: [], boards: [], repositories: 0 }),
+      overview({
+        pending: 0, published: 0, votes: 0, kinds: {}, statuses: {}, moderation: {}, last_report: 0, series: [], top: [], recent: [], boards: [], repositories: 0,
+        waiting_reports: 0, waiting_messages: 0, waiting_oldest: 0, unanswered: 0, unanswered_oldest: 0, unanswered_most_votes: 0,
+        answerable: 0, answered: 0, first_reply: 0, not_on_forge: 0, failed_jobs: 0,
+      }),
       text,
       4600,
     );
     expect(html).toContain("[overview.emptyLead]");
-    expect(html).toContain("[overview.noReportsYet]");
+    expect(html).toContain("[overview.nothingNeedsYou]");
     expect(html).not.toContain("NaN");
     expect(html).not.toContain("Infinity");
   });
@@ -472,5 +488,60 @@ describe("the overview", () => {
       4600,
     );
     expect(html).toContain("[overview.nothingPending]");
+  });
+});
+
+describe("what needs the person looking", () => {
+  const clear = { waiting_reports: 0, waiting_messages: 0, waiting_oldest: 0, unanswered: 0, unanswered_oldest: 0, unanswered_most_votes: 0, not_on_forge: 0, failed_jobs: 0 };
+
+  test("a thing that is zero is not drawn", () => {
+    expect(overviewNeeds(overview(clear), text, 4600)).toEqual([]);
+    const only = overviewNeeds(overview({ ...clear, not_on_forge: 3 }), text, 4600);
+    expect(only.length).toBe(1);
+    expect(only[0]!.href).toContain("kind=bug");
+  });
+
+  test("each one leads to the list it counted", () => {
+    const needs = overviewNeeds(overview(), text, 4600);
+    const href = (match: string) => needs.find((n) => n.title.includes(match))?.href;
+    expect(href("needsComments")).toBe("/review?mode=pending");
+    expect(href("needsReports")).toBe("/review?mode=pending");
+    expect(href("needsUnanswered")).toBe("/review?mode=all&reply=none&state=open");
+    expect(href("needsFailed")).toBe("/panel/notifications");
+  });
+
+  test("what has waited long is urgent and comes first", () => {
+    const day = 86400;
+    const now = 20 * day;
+    const needs = overviewNeeds(
+      overview({ ...{ waiting_reports: 0, waiting_messages: 0, waiting_oldest: 0, failed_jobs: 0, not_on_forge: 2 }, unanswered: 5, unanswered_oldest: now - 9 * day }),
+      text,
+      now,
+    );
+    expect(needs[0]!.tone).toBe("bad");
+    expect(needs[0]!.title).toContain("needsUnanswered");
+    expect(needs[1]!.tone).toBe("warn");
+
+    // A recent wait is listed before an old silence by the order things are
+    // checked in, and still comes after it: lateness decides, not the order.
+    const mixed = overviewNeeds(
+      overview({ ...clear, waiting_messages: 1, waiting_oldest: now - 3600, unanswered: 2, unanswered_oldest: now - 9 * day }),
+      text,
+      now,
+    );
+    expect(mixed.map((n) => n.tone)).toEqual(["bad", "warn"]);
+    expect(mixed[0]!.title).toContain("needsUnanswered");
+
+    // The same silence a day old is a thing to do, not a late one.
+    const fresh = overviewNeeds(overview({ ...{ waiting_reports: 0, waiting_messages: 0, waiting_oldest: 0, failed_jobs: 0, not_on_forge: 0 }, unanswered: 5, unanswered_oldest: now - day }), text, now);
+    expect(fresh[0]!.tone).toBe("warn");
+  });
+
+  test("a wait is late after two days", () => {
+    const day = 86400;
+    const late = overviewNeeds(overview({ ...clear, waiting_messages: 1, waiting_oldest: 10 * day - 3 * day }), text, 10 * day);
+    const fine = overviewNeeds(overview({ ...clear, waiting_messages: 1, waiting_oldest: 10 * day - day }), text, 10 * day);
+    expect(late[0]!.tone).toBe("bad");
+    expect(fine[0]!.tone).toBe("warn");
   });
 });

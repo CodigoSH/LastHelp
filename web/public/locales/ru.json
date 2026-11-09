@@ -424,7 +424,6 @@
   "overview.published": "Опубликовано",
   "overview.recent": "Последние сообщения",
   "overview.reports": "Сообщения",
-  "overview.votes": "Голоса",
   "panel.address": "Адрес",
   "notifications.lead": "Канал, который каждый репозиторий может выбрать в своих настройках. Тот, кто его не выбрал, не затрагивается.",
   "notifications.off": "Нет канала сервера",

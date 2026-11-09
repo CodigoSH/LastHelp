@@ -2446,6 +2446,7 @@ async function showReview(): Promise<void> {
     status: "",
     state: "",
     outcome: "",
+    reply: "",
     board: "",
     sort: "",
     q: "",
@@ -2715,6 +2716,9 @@ async function wireReview(
       narrowTo({ outcome: view.filters.outcome === el.dataset.routcome ? "" : (el.dataset.routcome ?? "") }),
     );
   }
+  root?.querySelector<HTMLElement>("[data-rreply]")?.addEventListener("click", () =>
+    narrowTo({ reply: view.filters.reply === "none" ? "" : "none" }),
+  );
   const search = root?.querySelector<HTMLInputElement>("[data-q]");
   if (search) {
     search.addEventListener(

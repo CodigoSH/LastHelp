@@ -1696,6 +1696,18 @@ export interface OverviewData {
   statuses_by_kind?: Record<string, Record<string, number>>;
   moderation: Record<string, number>;
   last_report: number;
+  /** What a team answering people needs: what waits, for how long, what nobody answered, how fast the team does. */
+  waiting_reports: number;
+  waiting_messages: number;
+  waiting_oldest: number;
+  unanswered: number;
+  unanswered_oldest: number;
+  unanswered_most_votes: number;
+  answerable: number;
+  answered: number;
+  first_reply: number;
+  not_on_forge: number;
+  failed_jobs: number;
   series: { day: number; reports: number; bugs: number; ideas: number }[];
   top: Brief[];
   recent: Brief[];
@@ -1780,7 +1792,7 @@ export function overviewActivity(data: OverviewData, text: Text): string {
   const days = series.length;
   const range = overviewRanges
     .map(
-      (n) => `<button type="button" class="ov-seg-btn" data-days="${n}" aria-pressed="${n === days}">${escapeHTML(text.age(n * 86400))}</button>`,
+      (n) => `<button type="button" class="ov-seg-btn" data-days="${n}" aria-pressed="${n === days}">${escapeHTML(text.t("overview.rangeDays", { count: n }))}</button>`,
     )
     .join("");
 
@@ -1810,6 +1822,86 @@ export function overviewActivity(data: OverviewData, text: Text): string {
       },
     )}
   </div>`;
+}
+
+/** One thing somebody can act on now, and where acting on it starts. */
+export interface Need {
+  tone: "bad" | "warn";
+  icon: "queue" | "idea" | "bug" | "bell";
+  title: string;
+  why: string;
+  action: string;
+  href: string;
+}
+
+/** How long a wait has to be before it is no longer ordinary, in seconds. */
+const LONG_WAIT = 2 * 86400;
+const LONG_SILENCE = 7 * 86400;
+
+/**
+ * What needs this person, most urgent first. Each is read from a number the
+ * server counted and leads to the list it counted, so that "7 have no reply"
+ * and the seven it opens cannot be two different sevens.
+ *
+ * Nothing is drawn for a thing that is zero: a list of "0 of this, 0 of that"
+ * is a list somebody has to read to learn that nothing is wrong.
+ */
+export function overviewNeeds(data: OverviewData, text: Text, now: number): Need[] {
+  const out: Need[] = [];
+  const age = (at: number) => text.age(Math.max(0, now - at));
+  const wait = (n: number, key: string, oldest: number, href: string, icon: Need["icon"], action: string) => {
+    if (n <= 0) return;
+    const late = oldest > 0 && now - oldest > LONG_WAIT;
+    out.push({
+      tone: late ? "bad" : "warn",
+      icon,
+      title: text.t(key, { count: text.number(n) }),
+      why: oldest > 0 ? text.t("overview.oldest", { age: age(oldest) }) : "",
+      action: text.t(action),
+      href,
+    });
+  };
+  wait(data.waiting_messages, "overview.needsComments", data.waiting_oldest, "/review?mode=pending", "queue", "overview.actReview");
+  wait(data.waiting_reports, "overview.needsReports", data.waiting_oldest, "/review?mode=pending", "queue", "overview.actReview");
+
+  if (data.unanswered > 0) {
+    const silent = data.unanswered_oldest > 0 && now - data.unanswered_oldest > LONG_SILENCE;
+    out.push({
+      tone: silent ? "bad" : "warn",
+      icon: "idea",
+      title: text.t("overview.needsUnanswered", { count: text.number(data.unanswered) }),
+      why: [
+        data.unanswered_oldest > 0 ? text.t("overview.oldest", { age: age(data.unanswered_oldest) }) : "",
+        data.unanswered_most_votes > 0 ? text.t("overview.mostVoted", { count: text.number(data.unanswered_most_votes) }) : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      action: text.t("overview.actAnswer"),
+      href: "/review?mode=all&reply=none&state=open",
+    });
+  }
+  if (data.not_on_forge > 0) {
+    out.push({
+      tone: "warn",
+      icon: "bug",
+      title: text.t("overview.needsForge", { count: text.number(data.not_on_forge) }),
+      why: "",
+      action: text.t("overview.actOpen"),
+      href: "/review?mode=all&kind=bug&status=confirmed",
+    });
+  }
+  if (data.failed_jobs > 0) {
+    out.push({
+      tone: "warn",
+      icon: "bell",
+      title: text.t("overview.needsFailed", { count: text.number(data.failed_jobs) }),
+      why: text.t("overview.needsFailedWhy"),
+      action: text.t("overview.actCheck"),
+      href: "/panel/notifications",
+    });
+  }
+  // The urgent ones first, and otherwise in the order above.
+  return out.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "bad" ? -1 : 1));
 }
 
 /**
@@ -1850,12 +1942,12 @@ export function overviewScreen(
       of > 0 ? Math.min(20, Math.max(0, Math.round((value / of) * 20))) : 0
     }"></span></span>`;
 
-  const kpi = (id: string, name: string, icon: string, value: number, sub: [string, string], link: string, meter = "") => `
+  const kpi = (id: string, name: string, icon: string, value: string, sub: string[], link: string, meter = "") => `
     <div class="ov-kpi" data-ov="${id}">
       <div class="ov-kpi-top"><span class="ov-lbl">${label(name)}</span>${icon}</div>
-      <div class="ov-kpi-main"><span class="ov-kpi-v">${number(value)}</span></div>
+      <div class="ov-kpi-main"><span class="ov-kpi-v">${value}</span></div>
       <div class="ov-meter">${meter}</div>
-      <div class="ov-kpi-sub">${sub[0]}${sub[1]}</div>
+      <div class="ov-kpi-sub">${sub.filter(Boolean).join("")}</div>
       ${link}
     </div>`;
 
@@ -1876,53 +1968,74 @@ export function overviewScreen(
       : `<div class="${cls}">${inner}</div>`;
   };
 
+  const age = (at: number) => text.age(Math.max(0, now - at));
+  const waiting = data.waiting_reports + data.waiting_messages;
   const kpis = `<div class="ov-kpis">
     ${kpi(
       "pending",
       "panel.queue",
       icons.queue(),
-      data.pending,
+      number(waiting),
       [
-        data.last_report > 0
-          ? `<span>${label("overview.lastReport", { age: text.age(Math.max(0, now - data.last_report)) })}</span>`
-          : `<span>${label("overview.noReportsYet")}</span>`,
-        "",
+        count("overview.reports", data.waiting_reports),
+        count("review.messages", data.waiting_messages),
+        data.waiting_oldest > 0 ? `<span>${label("overview.oldest", { age: age(data.waiting_oldest) })}</span>` : "",
       ],
       more("/review?mode=pending", "overview.openQueue"),
+    )}
+    ${kpi(
+      "unanswered",
+      "overview.unanswered",
+      icons.idea(),
+      number(data.unanswered),
+      [
+        data.unanswered_oldest > 0 ? `<span>${label("overview.oldest", { age: age(data.unanswered_oldest) })}</span>` : `<span>${label("overview.nothingYet")}</span>`,
+        data.unanswered_most_votes > 0 ? `<span>${label("overview.mostVoted", { count: text.number(data.unanswered_most_votes) })}</span>` : "",
+      ],
+      more("/review?mode=all&reply=none&state=open", "overview.seeUnanswered"),
+    )}
+    ${kpi(
+      "reply",
+      "overview.firstReply",
+      icons.check(),
+      data.answered > 0 ? escapeHTML(text.age(data.first_reply)) : "—",
+      [
+        data.answerable > 0
+          ? `<span>${label("overview.answeredOf", { answered: text.number(data.answered), total: text.number(data.answerable) })}</span>`
+          : `<span>${label("overview.nothingYet")}</span>`,
+      ],
+      more("/review?mode=all&moderation=published", "overview.openPublished"),
+      fill(data.answered, data.answerable, "published"),
     )}
     ${kpi(
       "reports",
       "overview.reports",
       icons.repository(),
-      total,
+      number(total),
       [count("overview.ideas", data.kinds.idea ?? 0), count("overview.bugs", data.kinds.bug ?? 0)],
       more("/review?mode=all", "overview.seeReports"),
-    )}
-    ${kpi(
-      "published",
-      "overview.published",
-      icons.check(),
-      data.published,
-      [count("moderation.rejected", data.moderation.rejected ?? 0), count("moderation.spam", data.moderation.spam ?? 0)],
-      more("/review?mode=all&moderation=published", "overview.openPublished"),
-      fill(data.published, total, "published"),
-    )}
-    ${kpi(
-      "votes",
-      "overview.votes",
-      icons.idea(),
-      data.votes,
-      [
-        (data.top ?? []).length > 0
-          ? `<span>${label("overview.mostVoted", { count: text.number(data.top[0]!.votes) })}</span>`
-          : `<span>${label("overview.nothingYet")}</span>`,
-        "",
-      ],
-      more("/review?mode=all&kind=idea&sort=votes", "overview.votedIdeas"),
     )}
   </div>`;
 
   const activity = overviewActivity(data, text);
+
+  const needs = overviewNeeds(data, text, now);
+  const needsBox = box(
+    "needs",
+    text.t("overview.needsYou"),
+    needs.length === 0
+      ? `<div class="ov-allok">${icons.check(22)}<span>${label("overview.nothingNeedsYou")}</span></div>`
+      : `<div class="ov-needs">${needs
+          .map(
+            (n) => `<a class="ov-need ${n.tone}" href="${escapeAttr(n.href)}">
+              <span class="ov-need-mark">${icons[n.icon](14)}</span>
+              <span class="ov-need-text"><b>${escapeHTML(n.title)}</b>${n.why ? `<span>${escapeHTML(n.why)}</span>` : ""}</span>
+              <span class="ov-chip">${escapeHTML(n.action)}</span>
+            </a>`,
+          )
+          .join("")}</div>`,
+    needs.length > 0 ? number(needs.length) : "",
+  );
 
   const recent = box(
     "recent",
@@ -2039,10 +2152,10 @@ export function overviewScreen(
     <div class="ov-body">
       ${total === 0 ? `<p class="ov-lead">${label("overview.emptyLead")}</p>` : ""}
       ${kpis}
-      <div class="ov-grid ov-main">${activity}${recent}</div>
+      <div class="ov-grid ov-main">${activity}${needsBox}</div>
       ${boards}
-      <div class="ov-grid ov-three">${top}${ideaStatuses}${bugStatuses}</div>
-      <div class="ov-grid ov-two">${moderation}${server}</div>
+      <div class="ov-grid ov-two">${recent}${top}</div>
+      <div class="ov-grid ov-four">${ideaStatuses}${bugStatuses}${moderation}${server}</div>
     </div>`;
 }
 
@@ -2094,6 +2207,8 @@ export interface ReportFilters {
   state: string;
   /** "", "done" or "undone", only with state "closed". */
   outcome: string;
+  /** "" or "none": of the published reports that are not finished, the ones no member of the team has written on. */
+  reply: string;
   board: string;
   sort: string;
   q: string;
@@ -2273,6 +2388,12 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         : ""
     }`;
 
+  // What nobody on the team has answered. Its own switch rather than a status:
+  // it is about whether the people who wrote heard anything, and a report can
+  // be in any state while it has not.
+  const unanswered = `<div class="tabs rev-sides"><button class="tab${filters.reply === "none" ? " on" : ""}" data-rreply
+      aria-pressed="${filters.reply === "none"}"><span class="rev-side-name">${escapeHTML(text.t("review.noReply"))}</span></button></div>`;
+
   return `<div class="rev-filter">
     <label class="search-box">
       ${icons.search(14)}
@@ -2280,6 +2401,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
     </label>
     ${sides}
+    ${unanswered}
     <div class="rev-narrow">${kind}${moderation}${status}${board}</div>
   </div>`;
 }

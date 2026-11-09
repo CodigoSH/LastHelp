@@ -8,17 +8,33 @@
 #
 # Regenerate with: bun run i18n:pending
 # Nothing here ships. The list has to be empty before a release.
+overview.actAnswer
+overview.actCheck
+overview.actOpen
+overview.actReview
+overview.answeredOf
 overview.bugs
 overview.bugsByStatus
+overview.firstReply
 overview.ideas
 overview.ideasByStatus
-overview.lastReport
 overview.mostVoted
-overview.noReportsYet
+overview.needsComments
+overview.needsFailed
+overview.needsFailedWhy
+overview.needsForge
+overview.needsReports
+overview.needsUnanswered
+overview.needsYou
+overview.nothingNeedsYou
 overview.nothingPending
+overview.oldest
 overview.openPublished
 overview.openQueue
 overview.range
+overview.rangeDays
 overview.seeReports
+overview.seeUnanswered
 overview.server
-overview.votedIdeas
+overview.unanswered
+review.noReply

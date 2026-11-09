@@ -5229,6 +5229,7 @@ form.merge { grid-template-columns: minmax(0, 1fr); }
 .ov-main { grid-template-columns: minmax(0, 1.9fr) minmax(300px, 1fr); }
 .ov-two { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block-start: 4px; }
 .ov-three { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-block-start: 4px; }
+.ov-four { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin-block-start: 4px; }
 
 .ov-chart { padding: 14px 16px 10px; }
 .ov-chart-head {
@@ -5407,6 +5408,44 @@ a.ov-row:hover { background: var(--surface-dim); }
 .ov-body .bar-track { block-size: 5px; }
 .ov-body .bar-fill { background: var(--hue, var(--hue-done)); min-inline-size: 5px; }
 .ov-row-main small { display: block; margin-block-start: 3px; }
+
+/* What needs somebody: one line each, the colour of how late it is, the whole line a way in. */
+.ov-needs { display: grid; gap: 6px; }
+
+.ov-need {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--sheet);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.ov-need.bad { border-color: rgba(var(--danger-rgb), 0.45); }
+.ov-need.warn { border-color: rgba(var(--warning-rgb), 0.45); }
+.ov-need:hover { border-color: rgba(var(--accent-rgb), 0.35); }
+
+.ov-need-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 22px;
+  block-size: 22px;
+  flex: none;
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  color: var(--text-dim);
+}
+
+.ov-need-text { min-inline-size: 0; flex: 1; }
+.ov-need-text b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; }
+.ov-need-text span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-dim); }
+
+.ov-allok { display: flex; align-items: center; gap: 12px; padding: 18px 14px; color: var(--text-dim); }
+.ov-allok .icon { color: var(--success-color); }
 
 .ov-score {
   min-inline-size: 2rem;

@@ -424,7 +424,6 @@
   "overview.published": "공개됨",
   "overview.recent": "최근 제보",
   "overview.reports": "제보",
-  "overview.votes": "투표",
   "panel.address": "주소",
   "notifications.lead": "각 저장소가 자체 설정에서 선택할 수 있는 채널입니다. 선택하지 않은 저장소는 영향을 받지 않습니다.",
   "notifications.off": "서버 채널 없음",
