@@ -32,15 +32,40 @@ jobs:
       # What the release publishes is built without cgo, and Go keeps a separate
       # build cache for each setting: vet, staticcheck and the build compile the
       # whole dependency graph once, here, instead of once for each. Building the
-      # binary alone took a minute and a half on the runner for that reason. Only
-      # the race detector needs cgo, and its step says so.
+      # binary alone took a minute and a half on the runner for that reason.
       CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v7
 
+      # setup-go's own cache stays off: its key is written with a capital "Linux" when it is
+      # saved and a lower case "linux" when it is looked for, so what one run saves the next
+      # never finds. The cache below has a key written here, in full.
       - uses: actions/setup-go@v7
+        id: setup-go
         with:
           go-version: '1.27.3'
+          cache: false
+
+      # The Go build cache and the module cache, so the dependency graph (SQLite alone is most
+      # of it) is compiled once and not on every push. The key is the Go version plus go.sum and
+      # has no commit in it on purpose: a hit restores and uploads nothing, and the entry is only
+      # written again when a dependency or the toolchain changes (the restore key then starts
+      # from the previous entry, so only what changed is compiled). Our own packages recompile
+      # either way, because Go keys them by content.
+      - name: Locate the Go caches
+        id: gocache
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ${{ steps.gocache.outputs.build }}
+            ${{ steps.gocache.outputs.mod }}
+          key: go-${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-${{ steps.setup-go.outputs.go-version }}-
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -77,7 +102,7 @@ jobs:
         run: bun run typecheck
 
       - name: Frontend tests
-        run: bun test
+        run: bun test --randomize
 
       - name: go vet
         run: go vet ./...
@@ -89,13 +114,16 @@ jobs:
           go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
           "$(go env GOPATH)/bin/staticcheck" ./...
 
-      # -race needs cgo. -count=1 is not optional: the architecture rules read
-      # the repository from disk, which the test cache does not track, so a cached
-      # pass there means nothing.
+      # The race detector is not run here: it made these tests three or four times slower
+      # on this runner and was half of every run. scripts/release.sh runs it before a
+      # release is tagged, which is when it has to hold. Everything else is the same.
+      # -count=1 is not optional: the architecture rules read the repository from disk,
+      # which the test cache does not track, so a cached pass there means nothing.
+      #
+      # -timeout 10m: Go's own default, spelled out so a package that hangs dies in a
+      # named test instead of at the end of the job.
       - name: Go tests
-        env:
-          CGO_ENABLED: "1"
-        run: go test -count=1 -race -cover ./...
+        run: go test -count=1 -timeout 10m -cover ./...
 
       # Blocking, and it blocks on one number: "your code is affected by N
       # vulnerabilities". The other figure it prints — advisories in modules this
