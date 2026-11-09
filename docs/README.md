@@ -15,6 +15,7 @@ One binary, one SQLite file, no external services.
 - [Install](getting-started/install.md)
 - [Your first repository](getting-started/first-repository.md)
 - [Connecting a forge](forges/connecting.md)
+- [The overview](administration/overview.md)
 - [Notifications](administration/notifications.md)
 - [Updating](administration/updating.md)
 - [Keeping the queue readable](administration/anti-abuse.md)
