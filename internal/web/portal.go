@@ -193,7 +193,7 @@ func (s *Server) handleRoadmap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	board, err := s.items().Roadmap(repo.ID, 25)
+	views, err := s.items().RoadmapLanes(repo.ID, roadmapPerLane)
 	if err != nil {
 		slog.Error("building the roadmap", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
@@ -201,18 +201,47 @@ func (s *Server) handleRoadmap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	voter := s.voterID(w, r)
+	lanes := make([]map[string]any, 0, len(views))
+	byLane := map[item.Lane][]map[string]any{}
+	for _, view := range views {
+		entries := make([]map[string]any, 0, len(view.Items))
+		for _, it := range view.Items {
+			entry := s.describeItem(it, voter)
+			// When it ended, for the lanes that read as a history. Not sent for an
+			// item that is still open: there is no such moment yet.
+			if view.Lane.Finished() && !it.ClosedAt.IsZero() {
+				entry["closed_at"] = it.ClosedAt.Unix()
+			}
+			entries = append(entries, entry)
+		}
+		byLane[view.Lane] = entries
+		// Every lane is sent even when empty: a page that draws some of them
+		// leaves the reader wondering which they are looking at.
+		lanes = append(lanes, map[string]any{
+			"lane": string(view.Lane), "ideas": view.Ideas, "bugs": view.Bugs,
+			"total": view.Total(), "items": entries,
+		})
+	}
+
+	// The three columns the page had before lanes, for a browser that has not
+	// reloaded since the update: it asks for them by name and must still get them.
 	columns := make([]map[string]any, 0, len(item.Columns))
 	for _, column := range item.Columns {
-		entries := make([]map[string]any, 0, len(board[column]))
-		for _, it := range board[column] {
-			entries = append(entries, s.describeItem(it, voter))
+		entries := byLane[item.Lane(column)]
+		if len(entries) > roadmapColumnItems {
+			entries = entries[:roadmapColumnItems]
 		}
-		// Every column is sent even when empty: a page that draws two columns
-		// leaves the reader wondering which two they are looking at.
 		columns = append(columns, map[string]any{"column": string(column), "items": entries})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"columns": columns})
+	writeJSON(w, http.StatusOK, map[string]any{"lanes": lanes, "columns": columns})
 }
+
+// roadmapPerLane bounds each lane of the roadmap page. A hundred is more than
+// anybody reads, and a lane that is longer says how many there are in all.
+const roadmapPerLane = 100
+
+// roadmapColumnItems is what the earlier three-column page showed per column.
+const roadmapColumnItems = 25
 
 // handleSimilar is the "this looks like these" hint, asked while somebody is
 // still typing the title. It includes what the team has closed — declined and

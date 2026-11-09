@@ -73,13 +73,14 @@ They are asked different things and treated differently, on purpose:
   every extra box on a public form is somebody deciding not to bother.
 - **A bug is not voted.** Two hundred people agreeing that something crashes
   does not make it crash harder; what it needs is somebody able to reproduce it.
-  Its statuses are *new, confirmed, fix in progress, fixed, couldn't reproduce*.
+  Its statuses are *new, confirmed, in progress, fixed, declined*.
 - **An idea is voted, and its value is not reaching your issue tracker yet.**
   That is what stops the tracker turning into a wishlist with a thousand open
   entries. Its statuses are *new, planned, in progress, shipped, declined*.
 
-Both land on the same three roadmap columns, because to somebody reading it a
-confirmed bug and a planned idea are the same news.
+Both land on the same roadmap lanes, because to somebody reading it a confirmed
+bug and a planned idea are the same news, and an idea and a bug the team turns
+down are both *declined*.
 
 ## Who can do what
 
@@ -191,8 +192,23 @@ personal data collected for one purpose, and a follow token is a credential.
 
 ## The roadmap
 
-Both journeys land on the same three columns, and all three are always drawn —
-showing only the ones with something in them leaves a reader working out which
-two of three they are looking at.
+The roadmap page is **in progress**, **planned**, **delivered** and **declined**,
+and all four are always drawn — showing only the ones with something in them
+leaves a reader working out which they are looking at. A confirmed bug and a
+planned idea share *planned*, and a fixed bug and a shipped idea share
+*delivered*.
+
+- Four tiles at the top count the lanes, with how many ideas and how many bugs.
+  On a phone they are the tabs between the lanes.
+- **Ideas** and **Bugs** narrow every lane at once.
+- *Planned* is ranked by votes and shows the first six; *delivered* is grouped by
+  the month each thing was delivered in and shows the latest two. Both open in
+  place, so the page stays a screen or two long however many reports there are.
+- **Declined** is shut until somebody asks for it: the page is about what is going
+  to happen. What was declined is public already, on the board under *Closed*, and
+  the reply on each report is where the team says why.
+
+The lanes hold the first hundred of each. The front page's roadmap module is
+unchanged and still shows the first three.
 
 ![The roadmap](../images/roadmap.png)

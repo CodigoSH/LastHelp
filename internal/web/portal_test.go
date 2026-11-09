@@ -1667,3 +1667,64 @@ func TestAReportAtEveryLimitInJapaneseIsTaken(t *testing.T) {
 		t.Fatalf("a Japanese report at every limit answered %d %v", resp.StatusCode, body)
 	}
 }
+
+// TestTheRoadmapPageGetsItsLanesAndTheOldPageItsColumns.
+//
+// The page asks for lanes; a browser that has not reloaded since the update
+// still asks for the three columns it was built for, and has to get them.
+func TestTheRoadmapPageGetsItsLanesAndTheOldPageItsColumns(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	public := team.anonymous()
+
+	move := func(title, status string) {
+		id, _ := public.submit("codigosh", "lastboard", "idea", title)
+		resp := team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+		_ = resp.Body.Close()
+		resp = team.do(http.MethodPost, "/api/items/"+id+"/status", map[string]string{"status": status})
+		_ = resp.Body.Close()
+	}
+	move("dark mode", "planned")
+	move("exports", "in_progress")
+	move("search", "done")
+	move("a thing nobody wants", "declined")
+
+	board := decode(t, public.do(http.MethodGet, "/api/orgs/codigosh/repos/lastboard/roadmap", nil))
+	lanes, _ := board["lanes"].([]any)
+	if len(lanes) != 4 {
+		t.Fatalf("%d lanes, want the four always sent", len(lanes))
+	}
+	want := []string{"in_progress", "planned", "done", "declined"}
+	for i, l := range lanes {
+		lane, _ := l.(map[string]any)
+		if lane["lane"] != want[i] {
+			t.Errorf("lane %d is %v, want %s", i, lane["lane"], want[i])
+		}
+		items, _ := lane["items"].([]any)
+		if len(items) != 1 || lane["total"] != float64(1) || lane["ideas"] != float64(1) || lane["bugs"] != float64(0) {
+			t.Errorf("lane %s: %v", want[i], lane)
+			continue
+		}
+		entry, _ := items[0].(map[string]any)
+		_, hasClosed := entry["closed_at"]
+		if finished := want[i] == "done" || want[i] == "declined"; hasClosed != finished {
+			t.Errorf("lane %s: closed_at present=%v", want[i], hasClosed)
+		}
+	}
+
+	columns, _ := board["columns"].([]any)
+	if len(columns) != 3 {
+		t.Fatalf("the earlier page's three columns came back as %d", len(columns))
+	}
+	for _, c := range columns {
+		column, _ := c.(map[string]any)
+		if column["column"] == "declined" {
+			t.Error("the earlier page's columns carry the declined lane")
+		}
+		if items, _ := column["items"].([]any); len(items) != 1 {
+			t.Errorf("column %v has %d items", column["column"], len(items))
+		}
+	}
+}
