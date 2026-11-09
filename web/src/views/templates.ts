@@ -2106,16 +2106,25 @@ export function overviewScreen(
   /** The order work moves in, so a list reads as a pipeline rather than as a ranking. */
   const flow: Record<string, string[]> = {
     idea: ["new", "planned", "in_progress", "done", "declined"],
-    bug: ["new", "confirmed", "in_forge", "in_progress", "closed", "not_reproducible", "declined"],
+    bug: ["new", "confirmed", "in_forge", "closed", "not_reproducible"],
   };
 
+  /**
+   * A list of counts. With a vocabulary it lists every state the kind can be
+   * in, the empty ones too: a team deciding what to tell people is working
+   * from the states that exist, and a state with nobody in it is a state that
+   * looks as if it were missing. Without one it lists what has something.
+   */
   const split = (id: string, title: string, counts: Record<string, number>, name: (key: string) => string, order: string[] = []) => {
     const rank = (key: string) => (order.includes(key) ? order.indexOf(key) : order.length);
-    const entries = Object.entries(counts)
-      .filter(([, n]) => n > 0)
+    const entries = [
+      ...order.map((key): [string, number] => [key, counts[key] ?? 0]),
+      ...Object.entries(counts).filter(([key, n]) => !order.includes(key) && n > 0),
+    ]
+      .filter(([, n]) => order.length > 0 || n > 0)
       .sort((a, b) => rank(a[0]) - rank(b[0]) || b[1] - a[1]);
     if (entries.length === 0) return box(id, title, nothing);
-    const most = Math.max(...entries.map(([, n]) => n));
+    const most = Math.max(1, ...entries.map(([, n]) => n));
     return box(
       id,
       title,

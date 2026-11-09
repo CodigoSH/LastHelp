@@ -2565,6 +2565,82 @@ async function main() {
     JSON.stringify(tiles.links),
   );
 
+  // 11e2. Nothing the product says is cut. This page was drawn in English and
+  //       a French or a Russian label did not fit the box it was given: one
+  //       read "Pending rev…" with the rest gone. English is no evidence that a
+  //       layout holds, so the overview is walked in every language the product
+  //       ships and every piece of text on it is measured: a label that is
+  //       clipped, or that pushes out of the card it sits in, is named.
+  //       What somebody wrote — a title, a repository's name — is the one thing
+  //       allowed to end in an ellipsis.
+  const languages = ["ar", "bn", "de", "el", "en", "es", "fa", "fr", "hi", "id", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "ur", "zh"];
+  // The language follows the account, so it is changed there — the way the
+  // appearance screen does — and put back at the end for the checks after.
+  const walked = await evaluate(`return (await fetch("/api/me").then(r => r.json())).language ?? "";`);
+  const speak = (code: string) => evaluate(`
+    const csrf = document.cookie.split(";").map(c => c.trim()).find(c => c.startsWith("lasthelp_csrf="))?.split("=")[1];
+    await fetch("/api/me/language", { method: "POST", headers: { "content-type": "application/json", "X-CSRF-Token": csrf },
+      body: JSON.stringify({ language: ${JSON.stringify(code)} }) });
+    localStorage.setItem("lasthelp_lang", ${JSON.stringify(code)});
+    return true;
+  `);
+  const measureCut = `
+    const mine = '[data-ov="recent"] .ov-row-main, [data-ov="top"] .ov-row-main, .ov-unit-head b, .ov-td.name, .ov-td.user';
+    const cut = [];
+    for (const root of [document.querySelector(".ov-body"), document.querySelector("#ov-modal[open]")].filter(Boolean)) {
+      const frame = root.matches(".ov-body") ? null : root.getBoundingClientRect();
+      for (const el of root.querySelectorAll("*")) {
+        if (el.closest("svg") || el.closest(mine)) continue;
+        const own = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim() !== "");
+        if (!own) continue;
+        const cs = getComputedStyle(el);
+        const box = el.getBoundingClientRect();
+        if (box.width === 0) continue;
+        const holder = el.closest(".ov-card, .ov-kpi, .ov-box, .ov-need, .ov-tbl, .ov-modal") ?? root;
+        const room = holder.getBoundingClientRect();
+        const clipped = (cs.overflowX !== "visible" || cs.textOverflow === "ellipsis") && el.scrollWidth > el.clientWidth + 1;
+        const spills = box.right > room.right + 1 || box.left < room.left - 1;
+        if (clipped || spills) cut.push((clipped ? "cut " : "spills ") + (el.className || el.tagName) + ": " + el.textContent.trim().slice(0, 40));
+      }
+    }
+    return cut;
+  `;
+  const cutIn: Record<string, string[]> = {};
+  let wrongLanguage: string[] = [];
+  for (const code of languages) {
+    await speak(code);
+    // A real load: the language is read when the page starts, and a route
+    // change inside the page keeps the one it had.
+    await page.send("Page.navigate", { url: `${BASE}/panel` });
+    await waitFor(".ov-kpis");
+    if ((await evaluate(`return document.documentElement.lang`)) !== code) wrongLanguage.push(code);
+    const found: string[] = [...(await evaluate(measureCut))];
+    for (const which of ["repo", "replies", "unanswered", "waiting"]) {
+      await evaluate(`
+        const opener = document.querySelector('[data-ov-open="${which}"]');
+        opener?.click();
+        for (let i = 0; i < 30 && !document.querySelector("#ov-modal[open]"); i++) await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 250));
+        return true;
+      `);
+      found.push(...(await evaluate(measureCut)).map((x: string) => which + " → " + x));
+      await evaluate(`document.querySelector("#ov-modal")?.close(); return true;`);
+    }
+    if (found.length > 0) cutIn[code] = found.slice(0, 4);
+    // Twenty languages of loads and dialogs is more than the server lets one
+    // address ask in a minute, and it is right to: the walk waits instead.
+    await sleep(6000);
+  }
+  await speak(walked);
+  if (walked === "") await evaluate(`localStorage.removeItem("lasthelp_lang"); return true;`);
+  await page.send("Page.navigate", { url: `${BASE}/panel` });
+  await waitFor(".ov-kpis");
+  check(
+    "the overview is walked in every language it ships, and nothing it says is cut off",
+    wrongLanguage.length === 0 && Object.keys(cutIn).length === 0,
+    JSON.stringify({ notSwitched: wrongLanguage, cut: cutIn }),
+  );
+
   // 11f. The listing itself: everything this account may triage, wherever it
   //      lives. The panel had a queue per board and nothing else, so somebody
   //      looking after four repositories had no screen that answered "what is

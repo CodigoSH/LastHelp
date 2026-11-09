@@ -5403,10 +5403,12 @@ button.ov-more { padding: 0; border: 0; background: none; cursor: pointer; }
 a.ov-row:hover { background: var(--surface-dim); }
 .ov-row-main { min-inline-size: 0; }
 .ov-row-main b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+/* A line that is only a name is a label somebody has to be able to read whole: it wraps instead of being cut. A title somebody wrote is the only thing that ends in an ellipsis. */
+.ov-row.bare .ov-row-main b { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
 .ov-row-r { display: inline-flex; align-items: center; gap: 10px; font: 500 11px/1.4 var(--font-mono); color: var(--text-dim); }
 .ov-row-r b { color: var(--text-main); font-size: 13px; }
 .ov-row.bare { grid-template-columns: minmax(0, 1fr) auto; }
-.ov-bar { display: block; inline-size: 9rem; }
+.ov-bar { display: block; inline-size: 4.5rem; }
 
 /* A meter is the colour of what it counts, flat and never the accent. */
 .ov-body .bar-track { block-size: 5px; }
@@ -5445,8 +5447,8 @@ a.ov-row:hover { background: var(--surface-dim); }
 }
 
 .ov-need-text { min-inline-size: 0; flex: 1; }
-.ov-need-text b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; }
-.ov-need-text span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--text-dim); }
+.ov-need-text b { display: block; font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+.ov-need-text span { display: block; font-size: 11.5px; color: var(--text-dim); overflow-wrap: anywhere; }
 
 .ov-allok { display: flex; align-items: center; gap: 12px; padding: 18px 14px; color: var(--text-dim); }
 .ov-allok .icon { color: var(--success-color); }
@@ -5497,37 +5499,32 @@ a.ov-row:hover { background: var(--surface-dim); }
 .ov-sub { margin: 4px 0 -4px; font: 700 10px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
 .ov-box-foot { display: flex; justify-content: flex-end; margin-block-start: 10px; }
 
-/* A table of lines. The columns are named by the class and the head is the first line. */
-.ov-tbl { overflow: hidden; border: 1px solid var(--card-border); border-radius: 8px; background: var(--sheet); }
-
-.ov-tr {
-  display: grid;
-  grid-template-columns: var(--cols);
-  align-items: center;
-  gap: 12px;
-  padding: 9px 14px;
-  border-block-start: 1px solid var(--card-border);
-}
-
-.ov-tr:first-child { border-block-start: 0; }
-.ov-tr.head { padding-block: 8px; background: var(--surface-dim); }
-.ov-tr.head span { font: 700 10px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
-.ov-td { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 11.5px/1.3 var(--font-mono); color: var(--text-dim); }
-.ov-td.name { font: 600 13px/1.3 var(--font); color: var(--text-main); }
+/* A table of lines, drawn as one grid so that columns sized to their content line up from the head to the last line. A column of words somebody translated is as wide as its longest word in any language; only the title, which somebody wrote, gives way. */
+.ov-tbl { display: grid; grid-template-columns: var(--cols); overflow: hidden; border: 1px solid var(--card-border); border-radius: 8px; background: var(--sheet); }
+.ov-tr { display: contents; }
+.ov-tr > * { padding: 9px 7px; border-block-start: 1px solid var(--card-border); }
+.ov-tr:first-child > * { border-block-start: 0; }
+.ov-tr > :first-child { padding-inline-start: 14px; }
+.ov-tr > :last-child { padding-inline-end: 14px; }
+.ov-tr.head > span { padding-block: 8px; background: var(--surface-dim); font: 700 10px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+.ov-td { min-inline-size: 0; font: 500 11.5px/1.3 var(--font-mono); color: var(--text-dim); white-space: nowrap; }
+/* What somebody wrote — a title, a repository's name — is the part that is cut, and cut short of pushing the rest away. */
+.ov-td.name { overflow: hidden; text-overflow: ellipsis; font: 600 13px/1.3 var(--font); color: var(--text-main); }
+.ov-td.label { white-space: normal; overflow-wrap: anywhere; font: 600 13px/1.3 var(--font); color: var(--text-main); }
 .ov-td.name a { color: inherit; text-decoration: none; }
 .ov-td.name a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ov-td.user { max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; }
 
-.cols-wait { --cols: minmax(0, 1fr) 120px 120px 64px; }
-.cols-unanswered { --cols: minmax(0, 1fr) 80px 120px 56px 56px; }
-.cols-replies { --cols: minmax(0, 1fr) 90px 150px 90px; }
-.cols-arrived { --cols: minmax(0, 1fr) 80px 80px 80px; }
-.cols-voted { --cols: minmax(0, 1fr) 120px 130px 56px; }
+.cols-wait { --cols: minmax(0, 1fr) auto auto auto; }
+.cols-unanswered { --cols: minmax(0, 1fr) auto auto auto auto; }
+.cols-replies { --cols: minmax(0, 1fr) auto auto auto; }
+.cols-arrived { --cols: minmax(0, 1fr) auto auto auto; }
+.cols-voted { --cols: minmax(0, 1fr) auto auto auto; }
 .cols-facts { --cols: minmax(0, 1fr) auto; }
 
 @media (max-width: 560px) {
   .cols-wait, .cols-unanswered, .cols-replies, .cols-arrived, .cols-voted { --cols: minmax(0, 1fr) auto; }
-  .ov-tr > .ov-td:nth-child(n + 3) { display: none; }
-  .ov-tr.head > span:nth-child(n + 3) { display: none; }
+  .ov-tr > :nth-child(n + 3) { display: none; }
 }
 
 .ov-score {

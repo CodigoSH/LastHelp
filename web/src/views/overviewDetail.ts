@@ -68,13 +68,15 @@ const table = (cols: string, head: string[], rows: string[][]) => `<div class="o
 
 const name = (html: string) => `<span class="ov-td name">${html}</span>`;
 const cell = (html: string) => `<span class="ov-td">${html}</span>`;
+/** A cell that holds a name somebody chose, which is the one kind that may be cut. */
+const user = (html: string) => `<span class="ov-td user">${html}</span>`;
 
 const empty = (text: Text) => `<p class="ov-empty">${escapeHTML(text.t("overview.nothingYet"))}</p>`;
 
 /** What is waiting for review: reports and comments together, the oldest first. */
 export function waitingDetail(data: ReportsData, now: number, text: Text): Filled {
   const rows: Array<{ at: number; cells: string[] }> = [];
-  const board = (b?: { name?: string }) => cell(escapeHTML(b?.name ?? ""));
+  const board = (b?: { name?: string }) => user(escapeHTML(b?.name ?? ""));
   const age = (at: number) => cell(escapeHTML(text.age(Math.max(0, now - at))));
 
   for (const r of data.items ?? []) {
@@ -120,7 +122,7 @@ export function unansweredDetail(data: ReportsData, now: number, total: number, 
             rows.map((r) => [
               name(escapeHTML(r.title)),
               cell(escapeHTML(text.t(`kind.${r.kind}`))),
-              cell(escapeHTML(r.board?.name ?? "")),
+              user(escapeHTML(r.board?.name ?? "")),
               cell(escapeHTML(text.number(r.votes))),
               cell(escapeHTML(text.age(Math.max(0, now - r.created_at)))),
             ]),
@@ -184,7 +186,7 @@ export function votedDetail(data: ReportsData, text: Text): Filled {
             [text.t("overview.colTitle"), text.t("overview.colRepository"), text.t("overview.colStatus"), text.t("overview.colVotes")],
             rows.map((r) => [
               name(`<a href="/i/${escapeAttr(r.public_id)}">${escapeHTML(r.title)}</a>`),
-              cell(escapeHTML(r.board?.name ?? "")),
+              user(escapeHTML(r.board?.name ?? "")),
               cell(escapeHTML(text.t(`status.${r.status}`))),
               cell(escapeHTML(text.number(r.votes))),
             ]),
@@ -198,7 +200,7 @@ const channelNames: Record<string, string> = { ntfy: "ntfy", gotify: "Gotify", w
 /** One repository: its figures, where its work goes and how far each kind has got. */
 export function repoDetail(b: BoardDetail, now: number, text: Text): Filled {
   const fact = (label: string, value: string) =>
-    `<div class="ov-tr"><span class="ov-td name">${escapeHTML(label)}</span><span class="ov-td">${value}</span></div>`;
+    `<div class="ov-tr"><span class="ov-td label">${escapeHTML(label)}</span><span class="ov-td">${value}</span></div>`;
   const age = (at: number) => (at > 0 ? escapeHTML(text.age(Math.max(0, now - at))) : "—");
   const forge = b.forge in forgeNames ? forgeNames[b.forge]! : text.t("overview.forgeNone");
   const channel = b.channel in channelNames ? channelNames[b.channel]! : b.channel === "server" ? text.t("overview.channelServer") : text.t("overview.channelNone");

@@ -478,6 +478,23 @@ describe("the overview", () => {
     expect(html).toContain("[overview.bugsByStatus]");
   });
 
+  test("every state a kind can be in is listed, the empty ones too", () => {
+    // A team deciding what to tell people works from the states that exist. A
+    // bug that is being fixed is "in progress" on the roadmap, and a list that
+    // only showed the states somebody was in hid that it could be.
+    const html = overviewScreen(overview({ statuses_by_kind: { idea: {}, bug: { new: 1 } } }), text, 4600);
+    const box = (id: string) => html.match(new RegExp(`data-ov="${id}">[\\s\\S]*?</section>`))?.[0] ?? "";
+    for (const state of ["new", "confirmed", "in_forge", "closed", "not_reproducible"]) {
+      expect(box("bug-statuses")).toContain(`[status.${state}]`);
+    }
+    for (const state of ["new", "planned", "in_progress", "done", "declined"]) {
+      expect(box("idea-statuses")).toContain(`[status.${state}]`);
+    }
+    // And only its own: an idea is never "fixed" and a bug is never "planned".
+    expect(box("bug-statuses")).not.toContain("[status.planned]");
+    expect(box("idea-statuses")).not.toContain("[status.closed]");
+  });
+
   test("a list of statuses reads in the order work moves, not by size", () => {
     const html = overviewScreen(
       overview({ statuses_by_kind: { idea: { done: 50, new: 1, planned: 9 }, bug: {} } }),
