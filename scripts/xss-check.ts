@@ -139,7 +139,7 @@ async function main() {
 
   await goTo(`/i/${id}`, ".detail");
   await scan("the team's page of the report", asText("title", "body", "steps", "visitor", "reporter", "reply"));
-  await goTo("/acme/atlas", ".items, .empty");
+  await goTo("/acme/atlas", ".bd-tiles");
   await scan("the board's list");
   await goTo("/panel", ".admin-main");
   await scan("the overview");
@@ -153,7 +153,7 @@ async function main() {
   `);
   await goTo(`/i/${id}`, ".detail");
   await scan("a visitor's page of the published report", asText("title", "body", "version", "steps", "visitor", "reporter", "reply"));
-  await goTo("/acme/atlas", ".items, .empty");
+  await goTo("/acme/atlas", ".bd-tiles");
   await scan("a visitor's board");
 
   // Every screen above has to have been scanned: a list that quietly shrank
