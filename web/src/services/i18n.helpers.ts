@@ -216,7 +216,10 @@ export function formatAge(code: string, seconds: number): string {
   const cacheKey = `${code}|${unit}`;
   let formatter = ageFormatters.get(cacheKey);
   if (!formatter) {
-    formatter = new Intl.NumberFormat(code, { style: "unit", unit, unitDisplay: "narrow" });
+    // Narrow, except for a month: narrow writes minutes and months with the
+    // same letter in English ("5m"), and a queue that says something waited
+    // "5m" is either five minutes or five months. Short says "5 mths".
+    formatter = new Intl.NumberFormat(code, { style: "unit", unit, unitDisplay: unit === "month" ? "short" : "narrow" });
     ageFormatters.set(cacheKey, formatter);
   }
   return formatter.format(Math.max(1, Math.floor(seconds / scale)));

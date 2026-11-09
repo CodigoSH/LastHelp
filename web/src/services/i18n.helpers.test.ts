@@ -4,6 +4,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
+  formatAge,
   formatDate,
   formatNumber,
   isolate,
@@ -149,5 +150,27 @@ describe("a sentence with a link in it", () => {
   test("a missing key falls back to English, then to the key", () => {
     expect(translateMarkup("made", {}, { made: "With {product}" }, { product: link }, esc)).toBe(`With ${isolate(link)}`);
     expect(translateMarkup("<nope>", {}, {}, { product: link }, esc)).toBe("&lt;nope&gt;");
+  });
+});
+
+describe("formatAge", () => {
+  const minute = 60;
+  const month = 86400 * 30;
+
+  test("a minute and a month are never written the same", () => {
+    // In English the narrow form of both is "5m": a queue that said something
+    // had waited "5m" meant five minutes or five months, and nothing said which.
+    for (const code of ["en", "es", "de", "fr", "ja", "ar"]) {
+      expect(formatAge(code, 5 * minute)).not.toBe(formatAge(code, 5 * month));
+    }
+  });
+
+  test("stays short for the rest", () => {
+    expect(formatAge("en", 3 * 86400)).toBe("3d");
+    expect(formatAge("en", 5 * 3600)).toBe("5h");
+  });
+
+  test("never says less than a minute", () => {
+    expect(formatAge("en", 10)).toBe(formatAge("en", minute));
   });
 });
