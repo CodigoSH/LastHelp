@@ -385,11 +385,11 @@ describe("the overview", () => {
   test("every number it shows is the one the server counted", () => {
     const html = overviewScreen(overview(), text, 4600);
     for (const [id, value] of [["pending", 12], ["unanswered", 7], ["reports", 161]] as const) {
-      const tile = html.match(new RegExp(`data-ov="${id}">[\\s\\S]*?<div class="ov-kpi-main"><span class="ov-kpi-v">(\\d+)</span>`))?.[1];
+      const tile = html.match(new RegExp(`data-ov="${id}"[^>]*>[\\s\\S]*?<div class="ov-kpi-main"><span class="ov-kpi-v">(\\d+)</span>`))?.[1];
       expect(Number(tile)).toBe(value);
     }
     // The wait is a duration, said as one.
-    expect(html).toMatch(/data-ov="reply">[\s\S]*?ov-kpi-v">21600s</);
+    expect(html).toMatch(/data-ov="reply"[^>]*>[\s\S]*?ov-kpi-v">21600s</);
   });
 
   test("each indicator opens the detail it summarises", () => {
@@ -399,6 +399,17 @@ describe("the overview", () => {
     }
     // One dialog for all of them, drawn with the page.
     expect(html.match(/id="ov-modal"/g)?.length).toBe(1);
+  });
+
+  test("the tile itself is the button, reachable from the keyboard, with no line of words to aim at", () => {
+    const html = overviewScreen(overview(), text, 4600);
+    for (const id of ["pending", "unanswered", "reply", "reports"]) {
+      const tile = html.match(new RegExp(`<div class="ov-kpi" data-ov="${id}"[^>]*>`))?.[0] ?? "";
+      expect(tile).toContain("data-ov-open=");
+      expect(tile).toContain('role="button"');
+      expect(tile).toContain('tabindex="0"');
+    }
+    expect(html.slice(html.indexOf('class="ov-kpis"'), html.indexOf('data-ov="activity"'))).not.toContain("ov-more");
   });
 
   test("a repository tile opens its own detail", () => {

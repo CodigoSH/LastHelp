@@ -1944,13 +1944,17 @@ export function overviewScreen(
       of > 0 ? Math.min(20, Math.max(0, Math.round((value / of) * 20))) : 0
     }"></span></span>`;
 
-  const kpi = (id: string, name: string, icon: string, value: string, sub: string[], link: string, meter = "") => `
-    <div class="ov-kpi" data-ov="${id}">
+  // The whole tile is what opens the detail: a line of "see more" under every
+  // figure was a second thing to aim at, and the figure itself is the thing
+  // somebody wants more of. A div that says it is a button and can be reached
+  // and pressed from the keyboard, because the tile holds blocks and a button
+  // element may not.
+  const kpi = (id: string, name: string, icon: string, value: string, sub: string[], detail: string, meter = "") => `
+    <div class="ov-kpi" data-ov="${id}" data-ov-open="${detail}" role="button" tabindex="0" aria-haspopup="dialog">
       <div class="ov-kpi-top"><span class="ov-lbl">${label(name)}</span>${icon}</div>
       <div class="ov-kpi-main"><span class="ov-kpi-v">${value}</span></div>
       <div class="ov-meter">${meter}</div>
       <div class="ov-kpi-sub">${sub.filter(Boolean).join("")}</div>
-      ${link}
     </div>`;
 
   const box = (id: string, title: string, body: string, tail = "") => `
@@ -1983,7 +1987,7 @@ export function overviewScreen(
         count("review.messages", data.waiting_messages),
         data.waiting_oldest > 0 ? `<span>${label("overview.oldest", { age: age(data.waiting_oldest) })}</span>` : "",
       ],
-      seeMore("waiting", "overview.seeWaiting"),
+      "waiting",
     )}
     ${kpi(
       "unanswered",
@@ -1994,7 +1998,7 @@ export function overviewScreen(
         data.unanswered_oldest > 0 ? `<span>${label("overview.oldest", { age: age(data.unanswered_oldest) })}</span>` : `<span>${label("overview.nothingYet")}</span>`,
         data.unanswered_most_votes > 0 ? `<span>${label("overview.mostVoted", { count: text.number(data.unanswered_most_votes) })}</span>` : "",
       ],
-      seeMore("unanswered", "overview.seeUnanswered"),
+      "unanswered",
     )}
     ${kpi(
       "reply",
@@ -2006,7 +2010,7 @@ export function overviewScreen(
           ? `<span>${label("overview.answeredOf", { answered: text.number(data.answered), total: text.number(data.answerable) })}</span>`
           : `<span>${label("overview.nothingYet")}</span>`,
       ],
-      seeMore("replies", "overview.byRepository"),
+      "replies",
       fill(data.answered, data.answerable, "published"),
     )}
     ${kpi(
@@ -2015,7 +2019,7 @@ export function overviewScreen(
       icons.repository(),
       number(total),
       [count("overview.ideas", data.kinds.idea ?? 0), count("overview.bugs", data.kinds.bug ?? 0)],
-      seeMore("arrived", "overview.byRepository"),
+      "arrived",
     )}
   </div>`;
 

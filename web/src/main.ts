@@ -2390,6 +2390,15 @@ function wireOverview(): void {
     if (event.target === dialog || (event.target as Element).closest("[data-ov-close]")) dialog.close();
   });
   const body = root?.querySelector<HTMLElement>(".ov-body");
+  // A tile that is a button for the eye is one for the keyboard too: Enter and
+  // Space press it, as they press the real thing.
+  body?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const tile = (event.target as Element).closest<HTMLElement>('[role="button"][data-ov-open]');
+    if (!tile) return;
+    event.preventDefault();
+    tile.click();
+  });
   body?.addEventListener("click", async (event) => {
     const opener = (event.target as Element).closest<HTMLElement>("[data-ov-open]");
     if (opener && dialog) {

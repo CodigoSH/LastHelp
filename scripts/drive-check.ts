@@ -2527,7 +2527,7 @@ async function main() {
     const cards = [...document.querySelectorAll('.ov-kpi')];
     const figure = (id) => Number(document.querySelector('[data-ov="' + id + '"] .ov-kpi-v')?.textContent ?? -1);
     const opens = async (id) => {
-      document.querySelector('[data-ov="' + id + '"] [data-ov-open]').click();
+      document.querySelector('[data-ov="' + id + '"][data-ov-open]').click();
       for (let i = 0; i < 40 && !document.querySelector("#ov-modal")?.open; i++) await new Promise(r => setTimeout(r, 100));
       const dialog = document.querySelector("#ov-modal");
       const out = {
@@ -2545,7 +2545,7 @@ async function main() {
     const arrived = await opens("reports");
     return {
       tiles: cards.length,
-      each: cards.every(c => !!c.querySelector("[data-ov-open]")),
+      each: cards.every(c => c.hasAttribute("data-ov-open") && c.getAttribute("role") === "button" && c.tabIndex === 0),
       pending: figure("pending"), unanswered: figure("unanswered"),
       waiting, unansweredDialog: unanswered, replies, arrived,
       links: [...document.querySelectorAll('[data-ov="needs"] a.ov-need')].map(a => a.getAttribute("href")),

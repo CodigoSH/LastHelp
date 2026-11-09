@@ -15,7 +15,6 @@ overview.actReview
 overview.answeredOf
 overview.bugs
 overview.bugsByStatus
-overview.byRepository
 overview.channel
 overview.channelNone
 overview.channelServer
@@ -59,7 +58,6 @@ overview.rangeDays
 overview.seeReports
 overview.seeTop
 overview.seeUnanswered
-overview.seeWaiting
 overview.server
 overview.typeComment
 overview.unanswered

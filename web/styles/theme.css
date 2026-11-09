@@ -5181,6 +5181,9 @@ form.merge { grid-template-columns: minmax(0, 1fr); }
   box-shadow: var(--card-shadow);
 }
 
+.ov-kpi[data-ov-open] { cursor: pointer; transition: border-color 0.15s; }
+.ov-kpi[data-ov-open]:hover { border-color: rgba(var(--accent-rgb), 0.3); }
+.ov-kpi[data-ov-open]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ov-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ov-kpi-top .icon { color: var(--text-dim); opacity: 0.8; }
 .ov-kpi-main { display: flex; align-items: center; min-block-size: 40px; }

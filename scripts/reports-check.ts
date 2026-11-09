@@ -115,7 +115,7 @@ async function main() {
   await goTo("/panel", ".ov-kpis");
   const overview = await evaluate(`
     const tile = Number(document.querySelector('[data-ov="pending"] .ov-kpi-v')?.textContent ?? -1);
-    document.querySelector('[data-ov="pending"] [data-ov-open]').click();
+    document.querySelector('[data-ov="pending"][data-ov-open]').click();
     for (let i = 0; i < 40 && !document.querySelector("#ov-modal")?.open; i++) await new Promise(r => setTimeout(r, 100));
     const dialog = document.querySelector("#ov-modal");
     const out = {
@@ -131,6 +131,24 @@ async function main() {
     "the overview's pending figure, the dialog's count and its lines are the same seven",
     overview.tile === expected && overview.count === expected && overview.rows === expected,
     JSON.stringify({ ...overview, bar: expected }),
+  );
+  // The tile is a button for the keyboard as well: focused, Enter opens its
+  // detail and Escape closes it. A real key through the protocol, because a
+  // dispatched event does not press a button.
+  await evaluate(`document.querySelector('[data-ov="unanswered"]').focus(); return true;`);
+  await key("Enter", "Enter", 13);
+  await sleep(1500);
+  const pressed = await evaluate(`
+    const dialog = document.querySelector("#ov-modal");
+    return { open: !!dialog?.open, title: dialog?.querySelector("#ov-modal-title")?.textContent?.trim() ?? "" };
+  `);
+  await key("Escape", "Escape", 27);
+  await sleep(400);
+  const closedAgain = await evaluate(`return !document.querySelector("#ov-modal")?.open;`);
+  check(
+    "a tile of the overview opens its detail with Enter and Escape closes it",
+    pressed.open === true && pressed.title.length > 0 && closedAgain === true,
+    JSON.stringify({ ...pressed, closedAgain }),
   );
   // Back on the list: what follows walks it, and a check that leaves the walk
   // on another screen breaks the next one rather than its own.
