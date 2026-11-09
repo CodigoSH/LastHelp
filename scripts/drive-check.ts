@@ -2615,6 +2615,15 @@ async function main() {
     await waitFor(".ov-kpis");
     if ((await evaluate(`return document.documentElement.lang`)) !== code) wrongLanguage.push(code);
     const found: string[] = [...(await evaluate(measureCut))];
+    // Narrower windows too: the boxes share the row, and a window of a laptop
+    // or half a screen gives each less room than the wide one measured above.
+    // It was at the narrow one that "Pending review" lost its end.
+    for (const width of [1180, 1000, 900]) {
+      await page.send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: false });
+      await sleep(350);
+      found.push(...(await evaluate(measureCut)).map((x: string) => `${width}px → ${x}`));
+    }
+    await page.send("Emulation.clearDeviceMetricsOverride", {});
     for (const which of ["repo", "replies", "unanswered", "waiting"]) {
       await evaluate(`
         const opener = document.querySelector('[data-ov-open="${which}"]');

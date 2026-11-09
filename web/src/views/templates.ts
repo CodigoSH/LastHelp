@@ -2106,7 +2106,7 @@ export function overviewScreen(
   /** The order work moves in, so a list reads as a pipeline rather than as a ranking. */
   const flow: Record<string, string[]> = {
     idea: ["new", "planned", "in_progress", "done", "declined"],
-    bug: ["new", "confirmed", "in_forge", "closed", "not_reproducible"],
+    bug: ["new", "confirmed", "in_progress", "closed", "declined"],
   };
 
   /**
@@ -2236,11 +2236,9 @@ const everyStatus = [
   "confirmed",
   "planned",
   "in_progress",
-  "in_forge",
   "done",
   "closed",
   "declined",
-  "not_reproducible",
 ];
 
 /** What the review screen is showing, all of it read from the address. */

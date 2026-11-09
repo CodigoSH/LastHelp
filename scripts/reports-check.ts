@@ -609,7 +609,7 @@ async function main() {
   const wait = `const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };`;
   const closedWords = await evaluate(`
     const words = await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json());
-    return ["status.done", "status.declined", "status.closed", "status.not_reproducible"].map(k => words[k]);
+    return ["status.done", "status.declined", "status.closed"].map(k => words[k]);
   `);
   const openSide = await evaluate(`
     ${wait}
@@ -734,13 +734,13 @@ async function main() {
   await goTo("/acme/atlas?state=closed", ".items, .empty, .rev-row, .board-row");
   const cerrados = await evaluate(`
     const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
-    await wait(() => document.querySelector(".status-declined, .status-not_reproducible"));
+    await wait(() => document.querySelector(".status-declined"));
     const look = (sel) => { const e = document.querySelector(sel); if (!e) return null; const c = getComputedStyle(e); return { border: c.borderTopStyle, color: c.color, text: e.textContent.trim() }; };
-    return { declined: look(".status-declined"), notRepro: look(".status-not_reproducible"), fixed: look(".status-closed"), shipped: look(".status-done") };
+    return { declined: look(".status-declined"), fixed: look(".status-closed"), shipped: look(".status-done") };
   `);
   check(
     "a closed report the team declined is kept in the closed tab, drawn apart from a delivered one",
-    cerrados.declined?.border === "dashed" && cerrados.notRepro?.border === "dashed" &&
+    cerrados.declined?.border === "dashed" &&
       cerrados.shipped?.border === "solid" && cerrados.fixed?.border === "solid" &&
       cerrados.fixed?.color === cerrados.shipped?.color && cerrados.declined?.color !== cerrados.shipped?.color,
     JSON.stringify(cerrados),
@@ -757,7 +757,7 @@ async function main() {
     await wait(() => document.querySelector('[data-outcome="undone"]')?.getAttribute("aria-pressed") === "true");
     await wait(() => rows() === out.undone);
     out.undoneRows = rows();
-    out.onlyNo = [...document.querySelectorAll("[data-items] .status")].every(e => e.classList.contains("status-declined") || e.classList.contains("status-not_reproducible"));
+    out.onlyNo = [...document.querySelectorAll("[data-items] .status")].every(e => e.classList.contains("status-declined"));
     out.address = location.search;
     document.querySelector('[data-outcome="undone"]').click();
     await wait(() => document.querySelector('[data-outcome="undone"]')?.getAttribute("aria-pressed") === "false");

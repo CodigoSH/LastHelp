@@ -484,7 +484,7 @@ describe("the overview", () => {
     // only showed the states somebody was in hid that it could be.
     const html = overviewScreen(overview({ statuses_by_kind: { idea: {}, bug: { new: 1 } } }), text, 4600);
     const box = (id: string) => html.match(new RegExp(`data-ov="${id}">[\\s\\S]*?</section>`))?.[0] ?? "";
-    for (const state of ["new", "confirmed", "in_forge", "closed", "not_reproducible"]) {
+    for (const state of ["new", "confirmed", "in_progress", "closed", "declined"]) {
       expect(box("bug-statuses")).toContain(`[status.${state}]`);
     }
     for (const state of ["new", "planned", "in_progress", "done", "declined"]) {
