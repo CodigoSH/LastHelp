@@ -129,12 +129,11 @@ same rule as the message they go on. You can still edit or delete what is
 already there.
 
 **What you close stays where people can read it.** A declined idea or a bug you
-could not reproduce moves to the board's **Closed** tab with its votes and its
+could not reproduce moves to the board's **Closed** view with its votes and its
 thread, and the status says what you decided: a delivered one is solid and green,
-a declined one has a dashed edge and a hollow dot. On the Closed tab, two switches,
-**Done** and **Not done**, narrow it to what was delivered or to what you turned down,
-each with its count; pressing the one that is on shows both again, and the choice is in
-the address, so it can be sent. It is also what somebody
+a declined one has a dashed edge and a hollow dot. The Closed view has two lanes,
+**Done** and **Not done**, each with its count; the **Closed** tile at the top of
+the board opens it, and the choice is in the address, so it can be sent. It is also what somebody
 sees when they start typing the same thing: the similar reports under the title
 include closed ones with that status, and the line beside them says a closed
 report takes no more votes, so they read what was decided before asking again.

@@ -147,6 +147,7 @@ export const icons = {
       s,
     ),
   close: (s?: number) => stroke(`<path d="M18 6L6 18M6 6l12 12"/>`, s),
+  arrow: (s?: number) => stroke(`<path d="M5 12h14M13 6l6 6-6 6"/>`, s),
   check: (s?: number) => stroke(`<path d="M20 6L9 17l-5-5"/>`, s),
 
   organization: (s?: number) =>

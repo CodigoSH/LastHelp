@@ -596,15 +596,16 @@ async function main() {
   const orgBack = await evaluate(`return { mark: !!document.querySelector(".page-head .head-mark"), title: document.querySelector(".page-head h1")?.textContent?.trim() }`);
   check("taken off, the organisation's page is its name alone again", orgBack.mark === false && orgBack.title === "Acme", JSON.stringify(orgBack));
 
-  // 9. The public list of a board: open first, a page at a time, closed on
-  //    request, all of it in the address. The numbers are the server's at
-  //    this point of the walk — earlier steps closed one report and published
-  //    another — and the open side has to run past one page, or the paging
-  //    would not be exercised.
-  await goTo("/acme/atlas", ".items, .empty");
+  // 9. The public page of a board: lanes, open first, each bounded and opening whole
+  //    in a dialog, closed on request, all of it in the address. The numbers are the
+  //    server's at this point of the walk — earlier steps closed one report and
+  //    published another — and the open side has to run past one lane's rows, or
+  //    the dialog would not be exercised.
+  await goTo("/acme/atlas", ".bd-row, .bd-quiet, .bd-empty");
   const server = await evaluate(`
-    const side = async (s) => (await fetch("/api/orgs/acme/repos/atlas/items?limit=1&state=" + s).then(r => r.json())).total;
-    return { open: await side("open"), closed: await side("closed") };
+    // One request: the counts the page itself is built from, so the check asks as little of the server as the page does.
+    const c = (await fetch("/api/orgs/acme/repos/atlas/items?limit=1&state=open").then(r => r.json())).counts;
+    return { open: c.open, closed: c.closed, ideas: c.open_idea, bugs: c.open_bug };
   `);
   const wait = `const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };`;
   const closedWords = await evaluate(`
@@ -613,57 +614,75 @@ async function main() {
   `);
   const openSide = await evaluate(`
     ${wait}
-    const chip = (s) => Number(document.querySelector('[data-state="' + s + '"] .count-chip')?.textContent ?? -1);
-    const rows = () => document.querySelectorAll(".items > li").length;
-    const before = { on: document.querySelector("[data-state].on")?.dataset.state, open: chip("open"), closed: chip("closed"),
-                     rows: rows(), foot: document.querySelector(".board-shown")?.textContent?.replace(/[\u2068\u2069]/g, "") ?? "" };
-    document.querySelector("[data-more]")?.click();
-    await wait(() => rows() > before.rows);
-    return { ...before, after: rows(), footAfter: !!document.querySelector("[data-board-foot]"),
-             states: [...document.querySelectorAll(".items .status")].map(e => e.textContent.trim()) };
+    const tile = (s) => Number(document.querySelector('[data-bd-state="' + s + '"] .bd-tile-n')?.textContent.replace(/\D/g, "") ?? -1);
+    const lane = (k) => document.querySelector('[data-bd-lane="' + k + '"]');
+    const pill = (k) => Number(lane(k)?.querySelector(".bd-pill-n")?.textContent.replace(/\D/g, "") ?? -1);
+    const rows = (k) => lane(k)?.querySelectorAll(".bd-row").length ?? -1;
+    const before = { on: document.querySelector('[data-bd-state][aria-pressed="true"]')?.dataset.bdState, open: tile("open"), closed: tile("closed"),
+                     ideas: pill("idea"), bugs: pill("bug"), ideaRows: rows("idea"), bugRows: rows("bug"),
+                     more: !!lane("bug")?.querySelector("[data-bd-open]") };
+    lane("bug").querySelector("[data-bd-open]")?.click();
+    await wait(() => document.querySelector("#bd-modal")?.open && document.querySelectorAll("#bd-modal .item").length > 0);
+    const first = document.querySelectorAll("#bd-modal .item").length;
+    const loadMore = document.querySelector("[data-bd-load]");
+    loadMore?.click();
+    await wait(() => document.querySelectorAll("#bd-modal .item").length > first);
+    return { ...before, dialogFirst: first, dialogAfter: document.querySelectorAll("#bd-modal .item").length,
+             dialogCount: Number(document.querySelector("[data-bd-count]")?.textContent.replace(/\D/g, "") ?? -1),
+             states: [...document.querySelectorAll("#bd-modal .item .status")].map(e => e.textContent.trim()) };
   `);
   check(
-    "a board opens on what is open, a page at a time, and says how much of it is shown",
+    "a board opens on what is open, as lanes that each hold their first rows, and says how much each has",
     server.open > 20 && openSide.on === "open" && openSide.open === server.open && openSide.closed === server.closed &&
-      openSide.rows === 20 && openSide.foot.includes("20") && openSide.foot.includes(String(server.open)) &&
-      openSide.after === server.open && openSide.footAfter === false &&
-      !openSide.states.some((w: string) => closedWords.includes(w)),
+      openSide.ideas === server.ideas && openSide.bugs === server.bugs && openSide.ideas + openSide.bugs === server.open &&
+      openSide.ideaRows <= 6 && openSide.bugRows <= 6 && openSide.more === true,
     JSON.stringify({ server, ...openSide, states: openSide.states.length }),
   );
+  check(
+    "and show more opens the lane whole in a dialog, a page at a time, holding only what is open",
+    openSide.dialogCount === server.bugs && openSide.dialogFirst > 0 && openSide.dialogFirst <= 12 &&
+      openSide.dialogAfter > openSide.dialogFirst && openSide.dialogAfter <= server.bugs &&
+      !openSide.states.some((w: string) => closedWords.includes(w)),
+    JSON.stringify({ ...openSide, states: openSide.states.length }),
+  );
+  await evaluate(`document.querySelector("[data-bd-close]").click();`);
 
   const closedSide = await evaluate(`
     ${wait}
-    document.querySelector('[data-state="closed"]').click();
-    await wait(() => document.querySelector('[data-state="closed"].on'));
-    await wait(() => document.querySelectorAll(".items > li").length === ${server.closed});
-    return { address: location.search, rows: document.querySelectorAll(".items > li").length,
-             states: [...document.querySelectorAll(".items .status")].map(e => e.textContent.trim()) };
+    document.querySelector('[data-bd-state="closed"]').click();
+    await wait(() => document.querySelector('[data-bd-state="closed"][aria-pressed="true"]'));
+    await wait(() => document.querySelector('[data-bd-lane="done"]'));
+    const lanes = [...document.querySelectorAll("[data-bd-lane]")];
+    return { address: location.search, lanes: lanes.map(l => l.dataset.bdLane),
+             total: lanes.reduce((n, l) => n + Number(l.querySelector(".bd-pill-n").textContent.replace(/\D/g, "")), 0),
+             states: [...document.querySelectorAll(".bd-row .status")].map(e => e.textContent.trim()) };
   `);
   check(
-    "closed is one click away, in the address, and holds only what has an answer",
-    closedSide.address.includes("state=closed") && closedSide.rows === server.closed &&
-      closedSide.states.length === server.closed && closedSide.states.every((w: string) => closedWords.includes(w)),
+    "closed is one click away, in the address, as done and not done, and holds only what has an answer",
+    closedSide.address.includes("state=closed") && closedSide.lanes.join() === "done,undone" && closedSide.total === server.closed &&
+      closedSide.states.every((w: string) => closedWords.includes(w)),
     JSON.stringify({ ...closedSide, states: [...new Set(closedSide.states)] }),
   );
 
   await page.send("Page.reload");
-  await waitFor(".items, .empty");
-  const reloaded = await evaluate(`return { on: document.querySelector("[data-state].on")?.dataset.state, rows: document.querySelectorAll(".items > li").length }`);
-  check("and a reload lands on the same side", reloaded.on === "closed" && reloaded.rows === server.closed, JSON.stringify(reloaded));
+  await waitFor(".bd-row, .bd-quiet, .bd-empty");
+  const reloaded = await evaluate(`return { on: document.querySelector("[data-bd-state][aria-pressed='true']")?.dataset.bdState, lanes: document.querySelectorAll("[data-bd-lane]").length }`);
+  check("and a reload lands on the same side", reloaded.on === "closed" && reloaded.lanes === 2, JSON.stringify(reloaded));
 
   const nothing = await evaluate(`
     ${wait}
     const words = await fetch("/locales/" + document.documentElement.lang + ".json").then(r => r.json());
-    const box = document.querySelector(".board-search input");
+    const box = document.querySelector("[data-bd-search]");
     box.value = "zzzz-nothing-says-this";
     box.dispatchEvent(new Event("input", { bubbles: true }));
-    await wait(() => new URLSearchParams(location.search).get("q") && document.querySelector(".empty"));
-    return { said: document.querySelector(".empty")?.textContent ?? "", expected: words["review.nothingMatches"] };
+    await wait(() => new URLSearchParams(location.search).get("q") && document.querySelector(".bd-empty"));
+    return { said: document.querySelector(".bd-empty")?.textContent ?? "", expected: words["review.nothingMatches"],
+             chip: !!document.querySelector("[data-bd-undo='q']"), clear: !!document.querySelector("[data-bd-clear]") };
   `);
-  check("a search that finds nothing says so, not that the board is empty", nothing.said.includes(nothing.expected), JSON.stringify(nothing));
+  check("a search that finds nothing says so, not that the board is empty, and can be undone", nothing.said.includes(nothing.expected) && nothing.chip && nothing.clear, JSON.stringify(nothing));
 
-  await goTo("/acme/orbit", ".items, .empty");
-  const nextBoard = await evaluate(`return { on: document.querySelector("[data-state].on")?.dataset.state, q: document.querySelector(".search")?.value ?? "", address: location.search }`);
+  await goTo("/acme/orbit", ".bd-row, .bd-quiet, .bd-empty");
+  const nextBoard = await evaluate(`return { on: document.querySelector("[data-bd-state][aria-pressed='true']")?.dataset.bdState, q: document.querySelector("[data-bd-search]")?.value ?? "", address: location.search }`);
   check("another board starts afresh, not with the last one's filters", nextBoard.on === "open" && nextBoard.q === "" && nextBoard.address === "", JSON.stringify(nextBoard));
 
   // 11. Last, because it turns a report down: the administrator is offered a field
@@ -731,12 +750,21 @@ async function main() {
   // closed tab shows a "no" apart from a delivered one (a dashed edge and a hollow
   // dot, not only a colour), and the suggestions under a new title carry the same
   // chip with the line that says a closed report takes no more votes.
-  await goTo("/acme/atlas?state=closed", ".items, .empty, .rev-row, .board-row");
+  // The review pane's walk above spends most of the server's per-address allowance, so
+  // this waits for some of it back: a page that is refused reads as a failure of what
+  // it shows, which it is not.
+  await sleep(15000);
+  await goTo("/acme/atlas?state=closed", ".bd-row, .bd-quiet, .bd-empty, .rev-row");
   const cerrados = await evaluate(`
     const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
     await wait(() => document.querySelector(".status-declined"));
+    // What was done is longer than a lane shows, so it is read whole in its dialog.
+    document.querySelector('[data-bd-open="done"]')?.click();
+    await wait(() => document.querySelectorAll("#bd-modal .item").length > 0);
     const look = (sel) => { const e = document.querySelector(sel); if (!e) return null; const c = getComputedStyle(e); return { border: c.borderTopStyle, color: c.color, text: e.textContent.trim() }; };
-    return { declined: look(".status-declined"), fixed: look(".status-closed"), shipped: look(".status-done") };
+    const seen = { declined: look(".status-declined"), fixed: look("#bd-modal .status-closed"), shipped: look("#bd-modal .status-done") };
+    document.querySelector("[data-bd-close]")?.click();
+    return seen;
   `);
   check(
     "a closed report the team declined is kept in the closed tab, drawn apart from a delivered one",
@@ -750,26 +778,28 @@ async function main() {
   // pressing the same one again.
   const resultado = await evaluate(`
     const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
-    const count = (v) => Number(document.querySelector('[data-outcome="' + v + '"] .count-chip')?.textContent.replace(/\D/g, "") ?? "-1");
-    const rows = () => document.querySelectorAll("[data-items] > li").length;
+    const count = (v) => Number(document.querySelector('.bd-out[data-outcome="' + v + '"] b')?.textContent.replace(/\D/g, "") ?? "-1");
+    const rows = () => document.querySelectorAll(".bd-row").length;
+    const pressed = (v) => document.querySelector('.bd-out[data-outcome="' + v + '"]')?.getAttribute("aria-pressed");
     const out = { done: count("done"), undone: count("undone") };
-    document.querySelector('[data-outcome="undone"]').click();
-    await wait(() => document.querySelector('[data-outcome="undone"]')?.getAttribute("aria-pressed") === "true");
-    await wait(() => rows() === out.undone);
-    out.undoneRows = rows();
-    out.onlyNo = [...document.querySelectorAll("[data-items] .status")].every(e => e.classList.contains("status-declined"));
+    document.querySelector('.bd-out[data-outcome="undone"]').click();
+    await wait(() => pressed("undone") === "true");
+    await wait(() => document.querySelectorAll("[data-bd-lane]").length === 1);
+    out.undoneLane = document.querySelectorAll("[data-bd-lane]").length;
+    out.undoneTotal = Number(document.querySelector("[data-bd-lane] .bd-pill-n").textContent.replace(/\D/g, ""));
+    out.onlyNo = [...document.querySelectorAll(".bd-row .status")].every(e => e.classList.contains("status-declined"));
     out.address = location.search;
-    document.querySelector('[data-outcome="undone"]').click();
-    await wait(() => document.querySelector('[data-outcome="undone"]')?.getAttribute("aria-pressed") === "false");
-    await wait(() => rows() === out.done + out.undone);
-    out.bothAgain = rows();
+    document.querySelector('.bd-out[data-outcome="undone"]').click();
+    await wait(() => pressed("undone") === "false");
+    await wait(() => document.querySelectorAll("[data-bd-lane]").length === 2);
+    out.bothAgain = document.querySelectorAll("[data-bd-lane]").length;
     out.cleared = !location.search.includes("outcome");
     return out;
   `);
   check(
     "the closed tab narrows to what was done or not done, the counts are what the list holds, and pressing again clears it",
-    resultado.undone > 0 && resultado.done > 0 && resultado.undoneRows === resultado.undone && resultado.onlyNo === true &&
-      resultado.address.includes("outcome=undone") && resultado.bothAgain === resultado.done + resultado.undone && resultado.cleared === true,
+    resultado.undone > 0 && resultado.done > 0 && resultado.undoneLane === 1 && resultado.undoneTotal === resultado.undone && resultado.onlyNo === true &&
+      resultado.address.includes("outcome=undone") && resultado.bothAgain === 2 && resultado.cleared === true,
     JSON.stringify(resultado),
   );
   // Open and closed on the archive: what a switch says is what pressing it draws,

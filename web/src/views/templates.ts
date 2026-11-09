@@ -18,6 +18,7 @@ import { escapeAttr, escapeHTML } from "../escape";
 import { trendChart } from "./charts";
 import { overviewDialog } from "./overviewDetail";
 import { monthGroups, roadmapDialog, roadmapKind, voteTile } from "./roadmapModal";
+import { laneCap, type LaneKey, type Tiles } from "../services/boardState";
 import { icons } from "./icons";
 import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
@@ -195,97 +196,136 @@ export interface BoardFilters {
   query: string;
 }
 
-/** How many there are: in the list as filtered, on each side of it, and in each way of being closed. */
-export interface BoardTotals {
+/** A lane of the board as it was read: how many there are in it, and the first of them. */
+export interface BoardLane {
+  key: LaneKey;
   total: number;
-  open: number;
-  closed: number;
-  done: number;
-  undone: number;
+  items: ItemSummary[];
+}
+
+/** What the roadmap's tile says: how much is under way and how much is coming. Absent when it could not be read. */
+export interface BoardRoadmap {
+  inProgress: number;
+  planned: number;
 }
 
 /**
- * A public board: open or closed first, the way every forge splits its issues,
- * then the kind, the order and the words, and the list — which says how much
- * of it is shown and fetches the rest on request, rather than stopping at
- * fifty without a word.
+ * A public board: what is open or what is closed, the way every forge splits its
+ * issues, as lanes.
+ *
+ * The page is the list of every report, and a list that grows with every report
+ * is a page that gets longer every week. So it is not one list: what is open
+ * splits into ideas — which are voted — and bugs — which are not —, and what is
+ * closed into what was done and what was not. Each lane shows its first rows and
+ * opens whole, with its own search, in a dialog. A filter that has chosen one
+ * side of the split leaves one lane, across the page.
+ *
+ * The tiles are the page's numbers and its first filter, and the last of them is
+ * the way to the roadmap.
  */
 export function board(
   org: OrganizationSummary,
   repo: RepositorySummary,
-  items: ItemSummary[],
+  lanes: BoardLane[],
   filters: BoardFilters,
-  totals: BoardTotals,
+  tiles: Tiles,
+  roadmap: BoardRoadmap | null,
+  pick: LaneKey,
   text: Text,
 ): string {
-  const tab = (value: string, label: string) =>
-    `<button class="tab${filters.kind === value ? " on" : ""}" data-kind="${escapeAttr(value)}">${escapeHTML(label)}</button>`;
-  const side = (value: "open" | "closed", label: string, count: number) =>
-    `<button class="tab${filters.state === value ? " on" : ""}" data-state="${value}" aria-pressed="${filters.state === value}">
-      ${escapeHTML(label)}<span class="count-chip">${escapeHTML(text.number(count))}</span></button>`;
-  const states = side("open", text.t("board.open"), totals.open) + side("closed", text.t("board.closed"), totals.closed);
+  const base = `/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}`;
+  const cap = laneCap(lanes.length);
+  const both = repo.accepts_bugs && repo.accepts_ideas;
+  const narrowed = filters.query.trim().length >= 2 || filters.kind !== "";
+  const empty = tiles.open + tiles.closed === 0 && !narrowed;
 
-  // What was done about the closed ones, as two switches that clear themselves:
-  // pressing the one that is on shows both again. Only on the closed side, which is
-  // where a "no" from the team and a delivery sit in the same list.
-  const outcome = (value: "done" | "undone", label: string, count: number) =>
-    `<button class="tab${filters.outcome === value ? " on" : ""}" data-outcome="${value}" aria-pressed="${filters.outcome === value}">
-      ${escapeHTML(label)}<span class="count-chip">${escapeHTML(text.number(count))}</span></button>`;
-  const outcomes =
-    filters.state === "closed"
-      ? `<div class="tabs outcomes">${outcome("done", text.t("board.outcomeDone"), totals.done)}${outcome("undone", text.t("board.outcomeUndone"), totals.undone)}</div>`
+  const laneName = (key: LaneKey) =>
+    key === "idea" ? text.t("overview.ideas") : key === "bug" ? text.t("overview.bugs") : key === "done" ? text.t("board.outcomeDone") : text.t("board.outcomeUndone");
+
+  const outcome = (value: "done" | "undone", count: number) =>
+    `<span class="bd-out" role="button" tabindex="0" data-outcome="${value}" aria-pressed="${filters.state === "closed" && filters.outcome === value}">
+      <i class="bd-dot${value === "undone" ? " no" : ""}" aria-hidden="true"></i>${escapeHTML(text.t(value === "done" ? "board.outcomeDone" : "board.outcomeUndone"))} <b>${escapeHTML(text.number(count))}</b></span>`;
+
+  const kinds = both
+    ? `<span class="bd-sub-kind"><span title="${escapeAttr(text.t("overview.ideas"))}">${icons.idea(12)} <b>${escapeHTML(text.number(tiles.ideas))}</b></span>
+       <span title="${escapeAttr(text.t("overview.bugs"))}">${icons.bug(12)} <b>${escapeHTML(text.number(tiles.bugs))}</b></span></span>`
+    : "";
+
+  const tileRow = `<div class="bd-tiles">
+    <button type="button" class="bd-tile" data-bd-state="open" aria-pressed="${filters.state === "open"}">
+      <span class="bd-tile-top">${escapeHTML(text.t("board.open"))}</span>
+      <span class="bd-tile-n">${escapeHTML(text.number(tiles.open))}</span>
+      <span class="bd-tile-sub">${kinds}</span>
+    </button>
+    <button type="button" class="bd-tile" data-bd-state="closed" aria-pressed="${filters.state === "closed"}">
+      <span class="bd-tile-top">${escapeHTML(text.t("board.closed"))}</span>
+      <span class="bd-tile-n">${escapeHTML(text.number(tiles.closed))}</span>
+      <span class="bd-tile-sub">${outcome("done", tiles.done)}${outcome("undone", tiles.undone)}</span>
+    </button>
+    <a class="bd-tile road" href="${base}/roadmap">
+      <span class="bd-tile-top">${escapeHTML(text.t("nav.roadmap"))}<span class="bd-tile-go" aria-hidden="true">${icons.arrow(14)}</span></span>
+      <span class="bd-tile-n">${roadmap ? escapeHTML(text.number(roadmap.inProgress + roadmap.planned)) : "&nbsp;"}</span>
+      <span class="bd-tile-sub">${
+        roadmap
+          ? `${escapeHTML(text.t("roadmap.in_progress"))} ${escapeHTML(text.number(roadmap.inProgress))} · ${escapeHTML(text.t("roadmap.planned"))} ${escapeHTML(text.number(roadmap.planned))}`
+          : ""
+      }</span>
+    </a>
+  </div>`;
+
+  const kindSeg = both
+    ? `<div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("overview.reports"))}">
+        <button type="button" data-bd-kind="" aria-pressed="${filters.kind === ""}">${escapeHTML(text.t("board.all"))}</button>
+        <button type="button" data-bd-kind="bug" aria-pressed="${filters.kind === "bug"}">${escapeHTML(text.t("overview.bugs"))}</button>
+        <button type="button" data-bd-kind="idea" aria-pressed="${filters.kind === "idea"}">${escapeHTML(text.t("overview.ideas"))}</button>
+      </div>`
+    : "";
+
+  const bar = `<div class="bd-bar">
+    <label class="search-box">
+      ${icons.search(14)}
+      <input type="search" data-bd-search value="${escapeAttr(filters.query)}" placeholder="${escapeAttr(text.t("board.searchBefore"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
+    </label>
+    ${kindSeg}
+    <div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("board.sortNew") + " / " + text.t("board.sortVotes"))}">
+      <button type="button" data-bd-sort="new" aria-pressed="${filters.sort !== "votes"}">${escapeHTML(text.t("board.sortNew"))}</button>
+      <button type="button" data-bd-sort="votes" aria-pressed="${filters.sort === "votes"}">${escapeHTML(text.t("board.sortVotes"))}</button>
+    </div>
+  </div>`;
+
+  // What narrows the list, said, and one press to undo it.
+  const chip = (what: string, label: string) =>
+    `<button type="button" class="bd-chip" data-bd-undo="${what}">${escapeHTML(label)}${icons.close(12)}</button>`;
+  const chips =
+    narrowed
+      ? `<div class="bd-narrow">${filters.kind ? chip("kind", text.t(`kind.${filters.kind}`)) : ""}${
+          filters.query.trim().length >= 2 ? chip("q", `«${filters.query.trim()}»`) : ""
+        }<button type="button" class="bd-clear" data-bd-clear>${escapeHTML(text.t("board.clear"))}</button></div>`
       : "";
 
-  const tabs = [
-    tab("", text.t("board.all")),
-    repo.accepts_bugs ? tab("bug", text.t("kind.bug")) : "",
-    repo.accepts_ideas ? tab("idea", text.t("kind.idea")) : "",
-  ].join("");
+  const picker =
+    lanes.length > 1
+      ? `<div class="bd-seg bd-pick" role="group">${lanes
+          .map((l) => `<button type="button" data-bd-pick="${l.key}" aria-pressed="${l.key === pick}">${escapeHTML(laneName(l.key))} · ${escapeHTML(text.number(l.total))}</button>`)
+          .join("")}</div>`
+      : "";
 
-  const sorts = `
-    <button class="sort${filters.sort !== "votes" ? " on" : ""}" data-sort="new">${escapeHTML(text.t("board.sortNew"))}</button>
-    <button class="sort${filters.sort === "votes" ? " on" : ""}" data-sort="votes">${escapeHTML(text.t("board.sortVotes"))}</button>`;
+  const box = (lane: BoardLane) => `<section class="bd-box${lane.key === "undone" ? " no" : ""}${lane.key === pick ? " on" : ""}" data-bd-lane="${lane.key}">
+      <h2 class="bd-pill">${lane.key === "idea" ? icons.idea(13) : lane.key === "bug" ? icons.bug(13) : ""}${escapeHTML(laneName(lane.key))}<span class="bd-pill-n">${escapeHTML(text.number(lane.total))}</span></h2>
+      ${
+        lane.items.length === 0
+          ? `<p class="bd-empty">${escapeHTML(text.t(narrowed ? "review.nothingMatches" : "overview.nothingYet"))}</p>`
+          : `<div class="bd-rows">${lane.items.slice(0, cap).map((i) => boardLaneRow(i, text)).join("")}</div>`
+      }
+      ${lane.total > Math.min(lane.items.length, cap) ? `<button type="button" class="bd-more" data-bd-open="${lane.key}">${escapeHTML(text.t("review.more"))}</button>` : ""}
+    </section>`;
 
-  const report = `/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/new`;
+  const content = empty
+    ? `<div class="bd-quiet"><p><b>${escapeHTML(text.t("board.empty"))}</b></p>
+        <a class="button primary with-icon" href="${base}/new">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a></div>`
+    : `${chips}${picker}<div class="bd-lanes${lanes.length === 1 ? " one" : ""}">${lanes.map(box).join("")}</div>`;
 
-  // An empty board is not a failure, and it is the state every board starts in.
-  // It carries the one thing to do about it rather than a grey sentence. And
-  // an empty list is not always an empty board: a search that finds nothing,
-  // or a side with nothing on it, says so rather than "no reports yet".
-  const narrowed = filters.query.trim() !== "" || filters.kind !== "" || filters.outcome !== "";
-  const emptyWords =
-    totals.open + totals.closed === 0 && !narrowed
-      ? text.t("board.empty")
-      : narrowed
-        ? text.t("review.nothingMatches")
-        : filters.state === "open"
-          ? text.t("board.noneOpen")
-          : text.t("board.noneClosed");
-  const list =
-    items.length === 0
-      ? emptyState(
-          emptyWords,
-          icons.queue(28),
-          `<a class="button primary with-icon" href="${report}">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>`,
-        )
-      : // The list lives inside a section of the board, and the house draws a
-        // section as a bordered box whose name rides on its border. The legend
-        // is the filter you are looking through and how many it found, which is
-        // the one sentence the list cannot say about itself.
-        `<section class="section">
-          ${sectionHead(
-            filters.kind === "bug"
-              ? text.t("kind.bug")
-              : filters.kind === "idea"
-                ? text.t("kind.idea")
-                : text.t("board.all"),
-            text.number(totals.total),
-          )}
-          <ul class="items" data-items>${boardRows(items, text)}</ul>
-          ${boardFoot(items.length, totals.total, text)}
-        </section>`;
-
-  return `<div class="page">
+  return `<div class="page bd">
     <header class="page-head board-head">
       <div class="head-text">
         <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
@@ -298,40 +338,61 @@ export function board(
       <div class="head-actions">
         <a class="icon-button" href="/feed/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/atom.xml"
            title="${escapeAttr(text.t("nav.feed"))}" aria-label="${escapeAttr(text.t("nav.feed"))}">${icons.feed(16)}</a>
-        <a class="button" href="/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}/roadmap">${escapeHTML(text.t("nav.roadmap"))}</a>
-        <a class="button primary with-icon" href="${report}">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>
+        <a class="button primary with-icon" href="${base}/new">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a>
       </div>
     </header>
-    <div class="controls">
-      <div class="tabs states">${states}</div>
-      ${outcomes}
-      <div class="tabs">${tabs}</div>
-      <div class="sorts">${sorts}</div>
-      <label class="search-box board-search">
-        ${icons.search(14)}
-        <input type="search" value="${escapeAttr(filters.query)}"
-               placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
-      </label>
-    </div>
-    ${list}
+    ${tileRow}
+    ${empty ? "" : bar}
+    ${content}
+    ${empty ? "" : boardDialog(text)}
   </div>`;
 }
 
-/** The rows of a board, on their own so a further page can be added to them. */
-export function boardRows(items: ItemSummary[], text: Text): string {
-  return items.map((i) => itemRow(i, text)).join("");
+/** A report in a lane. The kind is the lane's, so the line under the title is its state and its date. */
+export function boardLaneRow(item: ItemSummary, text: Text): string {
+  const lead =
+    item.kind === "idea"
+      ? `<span class="score${item.voted ? " voted" : ""}"><span class="count">${escapeHTML(text.number(item.votes))}</span><span class="label">${escapeHTML(text.t("item.votesLabel"))}</span></span>`
+      : `<span class="score mark kind-bug" aria-hidden="true">${icons.bug(20)}</span>`;
+  return `<a class="bd-row" href="/i/${escapeAttr(item.public_id)}">${lead}
+    <span class="bd-text"><span class="bd-title">${escapeHTML(item.title)}</span>
+      <span class="bd-meta"><span class="status status-${escapeAttr(item.status)}">${escapeHTML(text.t(`status.${item.status}`))}</span><span>${escapeHTML(text.date(item.created_at))}</span></span></span>
+  </a>`;
+}
+
+/** The frame of the dialog a lane opens in, drawn once with the page and filled for each lane. */
+export function boardDialog(text: Text): string {
+  return `<dialog class="modal ov-modal bd-modal" id="bd-modal" aria-labelledby="bd-modal-title">
+    <header class="ov-modal-head">
+      <h2 id="bd-modal-title"></h2>
+      <span class="ov-chip" data-bd-count></span>
+      <button type="button" class="icon-button" data-bd-close aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+    </header>
+    <div class="bd-tools">
+      <label class="search-box">
+        ${icons.search(14)}
+        <input type="search" data-bd-q placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
+      </label>
+      <div class="bd-seg" data-bd-statuses hidden></div>
+      <div class="bd-seg" role="group">
+        <button type="button" data-bd-dsort="new" aria-pressed="true">${escapeHTML(text.t("board.sortNew"))}</button>
+        <button type="button" data-bd-dsort="votes" aria-pressed="false">${escapeHTML(text.t("board.sortVotes"))}</button>
+      </div>
+    </div>
+    <div class="ov-modal-body" data-bd-modal-body></div>
+  </dialog>`;
 }
 
 /**
- * How much of the list is shown, and the way to the rest. Nothing when it is
- * all there: a counter that says "10 of 10" under ten rows is noise.
+ * The list inside a lane's dialog: what has been read so far, one full row for
+ * each, and what is left to read. The row is the one the board has always had,
+ * with its kind, because here the lane is the question and not the page.
  */
-export function boardFoot(shown: number, total: number, text: Text): string {
-  if (shown >= total) return "";
-  return `<div class="board-foot" data-board-foot>
-    <span class="board-shown">${escapeHTML(text.t("board.showing", { shown: text.number(shown), total: text.number(total) }))}</span>
-    <button type="button" class="button" data-more>${escapeHTML(text.t("review.more"))}</button>
-  </div>`;
+export function boardDialogList(items: ItemSummary[], total: number, text: Text): string {
+  if (items.length === 0) return `<p class="ov-empty">${escapeHTML(text.t("review.nothingMatches"))}</p>`;
+  return `<ul class="items bd-items">${items.map((i) => itemRow(i, text)).join("")}</ul>
+    <p class="bd-shown">${escapeHTML(text.t("board.showing", { shown: text.number(items.length), total: text.number(total) }))}</p>
+    ${items.length < total ? `<button type="button" class="bd-more" data-bd-load>${escapeHTML(text.t("review.more"))}</button>` : ""}`;
 }
 
 /**
@@ -349,7 +410,7 @@ export function boardFoot(shown: number, total: number, text: Text): string {
  * people agreeing that something crashes does not make it crash harder, so a
  * bug is not given a count.
  */
-function itemRow(item: ItemSummary, text: Text): string {
+export function itemRow(item: ItemSummary, text: Text): string {
   const lead =
     item.kind === "idea"
       ? `<span class="score${item.voted ? " voted" : ""}">

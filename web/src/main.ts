@@ -22,6 +22,7 @@ import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
+import { dialogParams, laneCap, lanePlan, laneStatuses, tileNumbers, type Counts, type LaneKey, type LaneSpec } from "./services/boardState";
 import { historyRows, rankedRows, titleHas, type RoadmapFilter } from "./services/roadmapState";
 import { disablePush, enablePush, loadPush, removePushDevice, testPush, type PushView } from "./services/pushClient";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
@@ -1312,14 +1313,16 @@ async function showRepositories(orgSlug: string): Promise<void> {
   show(views.repositoryList(body.organization, body.repositories ?? [], text));
 }
 
-/** Reports per page of a public board: enough to read, few enough to load at once. */
-const BOARD_PAGE = 20;
+/** Reports a lane's dialog reads at a time. */
+const BOARD_DIALOG_PAGE = 12;
 
 async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
   const base = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}`;
   const repo = await api.get<RepositorySummary>(base);
+  const org = repo.organization ?? { slug: orgSlug, name: orgSlug };
+  const accepts = { ideas: repo.accepts_ideas, bugs: repo.accepts_bugs };
 
-  // Everything the list is narrowed by lives in the address: it survives a
+  // Everything the lists are narrowed by lives in the address: it survives a
   // reload and the back button, it can be sent to somebody, and it belongs to
   // this board — a filter kept in a variable followed the visitor to the next
   // board they opened. Open is the default, and is left out of the address.
@@ -1347,34 +1350,43 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
   };
 
   let filters = read();
-  let shown: ItemSummary[] = [];
-  let totals: views.BoardTotals = { total: 0, open: 0, closed: 0, done: 0, undone: 0 };
+  let pick: LaneKey = "idea";
 
-  const load = async (offset: number) => {
-    const query = new URLSearchParams({ state: filters.state, limit: String(BOARD_PAGE), offset: String(offset) });
-    if (filters.state === "closed" && filters.outcome) query.set("outcome", filters.outcome);
-    if (filters.kind) query.set("kind", filters.kind);
-    if (filters.sort === "votes") query.set("sort", "votes");
-    if (filters.query) query.set("q", filters.query);
-    const body = await api.get<{
-      items: ItemSummary[];
-      total?: number;
-      counts?: { open?: number; closed?: number; done?: number; undone?: number };
-    }>(`${base}/items?${query}`);
-    totals = {
-      total: body.total ?? 0,
-      open: body.counts?.open ?? 0,
-      closed: body.counts?.closed ?? 0,
-      done: body.counts?.done ?? 0,
-      undone: body.counts?.undone ?? 0,
-    };
-    return body.items ?? [];
+  type Answer = { items: ItemSummary[]; total: number; counts?: Counts };
+  const readLane = async (params: Record<string, string>, limit: number, offset: number, sort: string, words: string): Promise<Answer> => {
+    const query = new URLSearchParams({ ...params, limit: String(limit), offset: String(offset) });
+    if (sort === "votes") query.set("sort", "votes");
+    // Under two characters is not a search: it would match half of everything.
+    if (words.trim().length >= 2) query.set("q", words.trim());
+    const body = await api.get<{ items?: ItemSummary[]; total?: number; counts?: Counts }>(`${base}/items?${query}`);
+    return { items: body.items ?? [], total: body.total ?? 0, counts: body.counts };
   };
 
+  // The roadmap's tile says what is under way and what is coming. It is read once and
+  // its failure is not the page's: the tile stays a link, with no numbers.
+  const roadmapRead: Promise<views.BoardRoadmap | null> = api
+    .get<{ lanes?: views.RoadmapLane[] }>(`${base}/roadmap`)
+    .then((board) => {
+      const total = (lane: string) => board.lanes?.find((l) => l.lane === lane)?.total ?? 0;
+      return { inProgress: total("in_progress"), planned: total("planned") };
+    })
+    .catch(() => null);
+
   const draw = async () => {
-    shown = await load(0);
-    show(views.board(repo.organization ?? { slug: orgSlug, name: orgSlug }, repo, shown, filters, totals, text));
-    wire();
+    const plan = lanePlan(filters, accepts);
+    const cap = laneCap(plan.length);
+    const [answers, roadmap] = await Promise.all([
+      Promise.all(plan.map((lane) => readLane(lane.params, cap, 0, filters.sort, filters.query))),
+      roadmapRead,
+    ]);
+    if (!plan.some((lane) => lane.key === pick)) pick = plan[0]?.key ?? "idea";
+    const lanes: views.BoardLane[] = plan.map((lane, i) => ({
+      key: lane.key,
+      total: answers[i]?.total ?? 0,
+      items: answers[i]?.items ?? [],
+    }));
+    show(views.board(org, repo, lanes, filters, tileNumbers(filters, answers), roadmap, pick, text));
+    wire(plan);
   };
 
   const change = (next: Partial<views.BoardFilters>) => {
@@ -1383,43 +1395,143 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
     return draw();
   };
 
-  // The next page, added under the rows already read: nothing is redrawn, so
-  // the place somebody was reading and the scroll stay where they were.
-  const more = async () => {
-    const page = await load(shown.length).catch((err) => {
-      report(err);
-      return null;
+  // A lane, whole, in a dialog: searched, narrowed by a state of its own and
+  // ordered, twelve at a time. Every question goes to the server, and an answer
+  // that arrives after a newer question was asked is dropped.
+  const wireDialog = (plan: LaneSpec[]) => {
+    const dialog = root?.querySelector<HTMLDialogElement>("#bd-modal");
+    const body = dialog?.querySelector<HTMLElement>("[data-bd-modal-body]");
+    const heading = dialog?.querySelector<HTMLElement>("#bd-modal-title");
+    const count = dialog?.querySelector<HTMLElement>("[data-bd-count]");
+    const input = dialog?.querySelector<HTMLInputElement>("[data-bd-q]");
+    const statuses = dialog?.querySelector<HTMLElement>("[data-bd-statuses]");
+    if (!dialog || !body || !heading || !count || !input || !statuses) return () => undefined;
+
+    const ask: { lane: LaneSpec | null; status: string; sort: string; q: string; items: ItemSummary[]; total: number; seq: number } = {
+      lane: null, status: "", sort: "new", q: "", items: [], total: 0, seq: 0,
+    };
+    const draw_ = () => {
+      count.textContent = text.number(ask.total);
+      dialog.querySelectorAll<HTMLElement>("[data-bd-dsort]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.bdDsort === ask.sort)));
+      const own = ask.lane ? laneStatuses(ask.lane.key) : [];
+      statuses.hidden = own.length === 0;
+      statuses.innerHTML = own.length
+        ? [["", text.t("board.all")], ...own.map((s) => [s, text.t(`status.${s}`)])]
+            .map(([value, label]) => `<button type="button" data-bd-status="${value}" aria-pressed="${ask.status === value}">${escapeHTML(label ?? "")}</button>`)
+            .join("")
+        : "";
+      body.innerHTML = views.boardDialogList(ask.items, ask.total, text);
+    };
+    const load = async (append: boolean) => {
+      if (!ask.lane) return;
+      const seq = ++ask.seq;
+      try {
+        const answer = await readLane(dialogParams(ask.lane, ask.status), BOARD_DIALOG_PAGE, append ? ask.items.length : 0, ask.sort, ask.q);
+        if (seq !== ask.seq) return;
+        ask.items = append ? [...ask.items, ...answer.items] : answer.items;
+        ask.total = answer.total;
+        draw_();
+      } catch {
+        if (seq === ask.seq) toast(i18n.t("error.internal"));
+      }
+    };
+
+    dialog.addEventListener("click", (event) => {
+      const target = event.target as Element;
+      // The backdrop is the dialog element itself; its content is its children.
+      if (target === dialog || target.closest("[data-bd-close]")) {
+        dialog.close();
+        return;
+      }
+      const status = target.closest<HTMLElement>("[data-bd-status]");
+      const sort = target.closest<HTMLElement>("[data-bd-dsort]");
+      if (status) {
+        ask.status = status.dataset.bdStatus ?? "";
+        void load(false);
+      } else if (sort) {
+        ask.sort = sort.dataset.bdDsort === "votes" ? "votes" : "new";
+        void load(false);
+      } else if (target.closest("[data-bd-load]")) {
+        void load(true);
+      }
     });
-    if (!page) return;
-    shown = [...shown, ...page];
-    root?.querySelector("[data-items]")?.insertAdjacentHTML("beforeend", views.boardRows(page, text));
-    const foot = root?.querySelector("[data-board-foot]");
-    if (foot) foot.outerHTML = views.boardFoot(shown.length, totals.total, text);
-    root?.querySelector<HTMLButtonElement>("[data-more]")?.addEventListener("click", () => void more());
+    let typing: ReturnType<typeof setTimeout> | undefined;
+    input.addEventListener("input", () => {
+      clearTimeout(typing);
+      typing = setTimeout(() => {
+        const next = input.value.trim().length >= 2 ? input.value.trim() : "";
+        if (next === ask.q) return;
+        ask.q = next;
+        void load(false);
+      }, 250);
+    });
+
+    return async (key: LaneKey) => {
+      const lane = plan.find((l) => l.key === key) ?? null;
+      if (!lane) return;
+      // It opens on what the page was showing: the words typed there are the question.
+      ask.lane = lane;
+      ask.status = "";
+      ask.sort = filters.sort;
+      ask.q = filters.query.trim().length >= 2 ? filters.query.trim() : "";
+      ask.items = [];
+      ask.total = 0;
+      heading.textContent = key === "idea" ? i18n.t("overview.ideas") : key === "bug" ? i18n.t("overview.bugs") : i18n.t(key === "done" ? "board.outcomeDone" : "board.outcomeUndone");
+      input.value = filters.query;
+      await load(false);
+      if (!dialog.open) dialog.showModal();
+      input.focus();
+    };
   };
 
-  const wire = () => {
-    root?.querySelectorAll<HTMLButtonElement>("[data-state]").forEach((b) =>
-      // Changing side starts from both again: the outcome is a question of the closed side.
-      b.addEventListener("click", () => void change({ state: b.dataset.state === "closed" ? "closed" : "open", outcome: "" })),
-    );
-    root?.querySelectorAll<HTMLButtonElement>("[data-outcome]").forEach((b) =>
-      b.addEventListener("click", () => {
-        const picked = b.dataset.outcome === "done" ? "done" : "undone";
-        void change({ outcome: filters.outcome === picked ? "" : picked });
+  const wire = (plan: LaneSpec[]) => {
+    const openLane = wireDialog(plan);
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-state]").forEach((tile) =>
+      tile.addEventListener("click", (event) => {
+        // The two ways of being closed live on the tile that holds them and answer for themselves.
+        if ((event.target as Element).closest(".bd-out")) return;
+        // Changing side starts from both again: the outcome is a question of the closed side.
+        void change({ state: tile.dataset.bdState === "closed" ? "closed" : "open", outcome: "" });
       }),
     );
-    root?.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach((b) =>
-      b.addEventListener("click", () => void change({ kind: b.dataset.kind ?? "" })),
+    root?.querySelectorAll<HTMLElement>(".bd-out").forEach((out) => {
+      const choose = () => {
+        const picked = out.dataset.outcome === "done" ? "done" : "undone";
+        void change({ state: "closed", outcome: filters.state === "closed" && filters.outcome === picked ? "" : picked });
+      };
+      out.addEventListener("click", choose);
+      out.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopPropagation();
+        choose();
+      });
+    });
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-kind]").forEach((b) =>
+      b.addEventListener("click", () => void change({ kind: b.dataset.bdKind ?? "" })),
     );
-    root?.querySelectorAll<HTMLButtonElement>(".sort").forEach((b) =>
-      b.addEventListener("click", () => void change({ sort: b.dataset.sort ?? "new" })),
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-sort]").forEach((b) =>
+      b.addEventListener("click", () => void change({ sort: b.dataset.bdSort ?? "new" })),
     );
-    root?.querySelector<HTMLButtonElement>("[data-more]")?.addEventListener("click", () => void more());
-    const search = root?.querySelector<HTMLInputElement>(".board-search input");
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-undo]").forEach((b) =>
+      b.addEventListener("click", () => void change(b.dataset.bdUndo === "kind" ? { kind: "" } : { query: "" })),
+    );
+    root?.querySelector<HTMLButtonElement>("[data-bd-clear]")?.addEventListener("click", () => void change({ kind: "", query: "" }));
+    // On a phone one lane shows at a time; the others are a press away.
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-pick]").forEach((b) =>
+      b.addEventListener("click", () => {
+        pick = (b.dataset.bdPick ?? "idea") as LaneKey;
+        root?.querySelectorAll<HTMLElement>("[data-bd-lane]").forEach((box) => box.classList.toggle("on", box.dataset.bdLane === pick));
+        root?.querySelectorAll<HTMLElement>("[data-bd-pick]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      }),
+    );
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-open]").forEach((b) =>
+      b.addEventListener("click", () => void openLane(b.dataset.bdOpen as LaneKey)),
+    );
+    const search = root?.querySelector<HTMLInputElement>("[data-bd-search]");
     search?.addEventListener("input", debounce(() => {
       void change({ query: search.value }).then(() => {
-        const box = root?.querySelector<HTMLInputElement>(".board-search input");
+        const box = root?.querySelector<HTMLInputElement>("[data-bd-search]");
         box?.focus();
         box?.setSelectionRange(box.value.length, box.value.length);
       });

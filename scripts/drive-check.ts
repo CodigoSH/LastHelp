@@ -620,8 +620,8 @@ async function main() {
   }
 
   // 6. Nothing waiting is on the public board.
-  await goTo("/codigosh/lastboard", ".items, .empty");
-  const beforeApproval = await evaluate(`return document.querySelectorAll(".items li").length`);
+  await goTo("/codigosh/lastboard", ".bd-row, .bd-quiet, .bd-empty");
+  const beforeApproval = await evaluate(`return document.querySelectorAll(".bd-row").length`);
   check("nothing waiting is public", beforeApproval === 0, `rows=${beforeApproval}`);
 
   // 7. The queue shows it, and publishing works from the panel. Through the
@@ -649,8 +649,8 @@ async function main() {
   check("publishing removes it from the queue", emptied === 0, `rows=${emptied}`);
 
   // 8. Now it is public and votable.
-  await goTo("/codigosh/lastboard", ".items, .empty");
-  const afterApproval = await evaluate(`return document.querySelectorAll(".items li").length`);
+  await goTo("/codigosh/lastboard", ".bd-row, .bd-quiet, .bd-empty");
+  const afterApproval = await evaluate(`return document.querySelectorAll(".bd-row").length`);
   check("it is on the public board", afterApproval === 1, `rows=${afterApproval}`);
 
   // 8a. The board, as a piece of design rather than as a list of strings.
@@ -674,9 +674,11 @@ async function main() {
   const grid = await evaluate(`
     const brand = document.querySelector("body > nav .brand").getBoundingClientRect();
     const heading = document.querySelector("h1").getBoundingClientRect();
-    const rows = [...document.querySelectorAll(".item")];
-    const leads = rows.map(r => Math.round(r.firstElementChild.getBoundingClientRect().width));
-    const titles = rows.map(r => Math.round(r.querySelector(".item-title").getBoundingClientRect().left));
+    // Per lane: two lanes side by side start at two different places, and what has to
+    // line up is the titles of one lane down its own column.
+    const lanes = [...document.querySelectorAll("[data-bd-lane]")].map(l => [...l.querySelectorAll(".bd-row")]);
+    const leads = lanes.map(rows => [...new Set(rows.map(r => Math.round(r.firstElementChild.getBoundingClientRect().width)))].length);
+    const titles = lanes.map(rows => [...new Set(rows.map(r => Math.round(r.querySelector(".bd-title").getBoundingClientRect().left)))].length);
     const inner = document.querySelector("body > nav .nav-inner").getBoundingClientRect();
     return {
       // The bar uses the window: its contents
@@ -686,8 +688,8 @@ async function main() {
       desdeElBorde: Math.round(brand.left),
       hastaElBorde: Math.round(innerWidth - inner.right),
       offset: Math.round(Math.abs(brand.left - heading.left)),
-      leads: [...new Set(leads)],
-      titles: [...new Set(titles)],
+      leads,
+      titles,
     };
   `);
   check(
@@ -697,13 +699,13 @@ async function main() {
   );
   check(
     "and every row leads with the same tile, so the titles line up",
-    grid.leads.length === 1 && grid.titles.length === 1,
+    grid.leads.some((n: number) => n === 1) && grid.leads.every((n: number) => n <= 1) && grid.titles.every((n: number) => n <= 1),
     `leads=${JSON.stringify(grid.leads)} titles=${JSON.stringify(grid.titles)}`,
   );
   await page.send("Emulation.clearDeviceMetricsOverride");
   await sleep(300);
 
-  const href = await evaluate(`return document.querySelector(".items a")?.getAttribute("href") ?? ""`);
+  const href = await evaluate(`return document.querySelector(".bd-row")?.getAttribute("href") ?? ""`);
   await goTo(String(href), "[data-vote]");
   await evaluate(`document.querySelector("[data-vote]")?.click()`);
   await sleep(500);
@@ -2379,7 +2381,7 @@ async function main() {
   // Back to the board, where a counter and a tab are on screen, and check for
   // strings only the Arabic catalogue has. Checking the brand would prove
   // nothing: "LastHelp" is the same word in all twenty.
-  await goTo("/codigosh/lastboard", ".items, .empty");
+  await goTo("/codigosh/lastboard", ".bd-row, .bd-quiet, .bd-empty");
   const arabic = await evaluate(`
     const body = document.body.textContent;
     return { votes: body.includes("الأصوات"), everything: body.includes("الكل"), sample: body.slice(0, 60) };
@@ -3129,7 +3131,7 @@ async function main() {
   // and goes back where you were; the panel's toggle is greyed, one mode at a
   // time. Opened from a public page, which is where this starts; from inside
   // the panel the icon answers too, and the reports pass checks that.
-  await goTo("/codigosh/lastboard", ".items, .empty");
+  await goTo("/codigosh/lastboard", ".bd-row, .bd-quiet, .bd-empty");
   await evaluate(`document.querySelector(".review-pill").click()`);
   await waitFor(".review");
   const barraEnRevision = await evaluate(`
@@ -3141,7 +3143,7 @@ async function main() {
     };
   `);
   await evaluate(`document.querySelector(".review-pill").click()`);
-  await waitFor(".items, .empty");
+  await waitFor(".bd-row, .bd-quiet, .bd-empty");
   const vuelta = await evaluate(`return location.pathname`);
   check(
     "while reviewing, the bar's icon is the way back and the panel toggle is greyed",

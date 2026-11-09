@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, avatar, commentEditForm, monthGroups, roadmap, roadmapDialogList, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
+import { accountRole, avatar, board, boardDialogList, commentEditForm, monthGroups, roadmap, roadmapDialogList, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
@@ -693,5 +693,123 @@ describe("the dialog behind a lane's show more", () => {
 
   test("a title is escaped", () => {
     expect(roadmapDialogList("planned", "votes", [item("a", "idea", { title: "<i>x</i>" })], 1, 1_800_000_000, text)).toContain("&lt;i&gt;x&lt;/i&gt;");
+  });
+});
+
+describe("the board page", () => {
+  const org = { slug: "acme", name: "Acme" };
+  const repo = { slug: "atlas", name: "Atlas", accepts_bugs: true, accepts_ideas: true };
+  const item = (id: string, kind: "idea" | "bug", over: Record<string, unknown> = {}) => ({
+    public_id: id, kind, title: `title ${id}`, status: "new", votes: 4, voted: false, created_at: 1_700_000_000, ...over,
+  });
+  const filters: { state: "open" | "closed"; outcome: "" | "done" | "undone"; kind: string; sort: string; query: string } = { state: "open", outcome: "", kind: "", sort: "new", query: "" };
+  const tiles = { open: 27, closed: 13, done: 11, undone: 2, ideas: 18, bugs: 9 };
+  const lanes = [
+    { key: "idea" as const, total: 18, items: [item("a", "idea"), item("b", "idea")] },
+    { key: "bug" as const, total: 9, items: [item("c", "bug")] },
+  ];
+  const html = (over: Partial<typeof filters> = {}, l = lanes, t = tiles, road: { inProgress: number; planned: number } | null = { inProgress: 3, planned: 14 }) =>
+    board(org as never, repo as never, l as never, { ...filters, ...over }, t, road, "idea", text);
+
+  test("draws two lanes while the view has a split, and one across when a filter chose", () => {
+    const two = html();
+    expect(two).toContain('data-bd-lane="idea"');
+    expect(two).toContain('data-bd-lane="bug"');
+    expect(two).toContain('class="bd-lanes"');
+    const one = html({ kind: "bug" }, [lanes[1]!]);
+    expect(one).toContain('class="bd-lanes one"');
+    expect(one).not.toContain('data-bd-lane="idea"');
+  });
+
+  test("the way to the roadmap is a link on a tile, and the header has no button for it", () => {
+    const page = html();
+    expect(page).toContain('<a class="bd-tile road" href="/acme/atlas/roadmap">');
+    // The page's actions are the feed and a new report: the roadmap is the tile.
+    const header = page.slice(page.indexOf("head-actions"), page.indexOf("</header>"));
+    expect(header).not.toContain("/roadmap");
+    expect(header).toContain("/new");
+    // It stays a link when the roadmap could not be read.
+    expect(html({}, lanes, tiles, null)).toContain('href="/acme/atlas/roadmap"');
+  });
+
+  test("says the roadmap's numbers when it has them, and what is coming as the big one", () => {
+    const page = html();
+    expect(page).toContain("<b>");
+    expect(page).toContain(">17<"); // 3 under way and 14 planned
+    expect(html({}, lanes, tiles, null)).not.toContain(">17<");
+  });
+
+  test("a lane with more than it shows offers the dialog", () => {
+    expect(html()).toContain('data-bd-open="idea"');
+    const all = html({}, [{ key: "idea", total: 2, items: [item("a", "idea"), item("b", "idea")] }, { key: "bug", total: 1, items: [item("c", "bug")] }]);
+    expect(all).not.toContain("data-bd-open");
+  });
+
+  test("the tile of what is closed holds the two switches, pressed when chosen", () => {
+    const page = html({ state: "closed", outcome: "undone" });
+    expect(page).toContain('data-outcome="done" aria-pressed="false"');
+    expect(page).toContain('data-outcome="undone" aria-pressed="true"');
+    // The outcome is a question of the closed side: on the open side neither is pressed.
+    const open = html({ state: "open", outcome: "undone" });
+    expect(open).toContain('data-outcome="undone" aria-pressed="false"');
+  });
+
+  test("only a board that takes both kinds offers a kind", () => {
+    expect(html()).toContain("data-bd-kind");
+    const bugs = board(org as never, { ...repo, accepts_ideas: false } as never, [lanes[1]!] as never, filters, tiles, null, "bug", text);
+    expect(bugs).not.toContain("data-bd-kind");
+  });
+
+  test("what narrows the list is said, with a way to undo each and to clear them all", () => {
+    expect(html()).not.toContain("data-bd-undo");
+    const narrowed = html({ kind: "bug", query: "csv" });
+    expect(narrowed).toContain('data-bd-undo="kind"');
+    expect(narrowed).toContain('data-bd-undo="q"');
+    expect(narrowed).toContain("data-bd-clear");
+    // One letter is not a search: it narrows nothing and says nothing.
+    expect(html({ query: "c" })).not.toContain("data-bd-undo");
+  });
+
+  test("an empty board says what it is for instead of drawing lanes", () => {
+    const page = html({}, [{ key: "idea", total: 0, items: [] }, { key: "bug", total: 0, items: [] }], { open: 0, closed: 0, done: 0, undone: 0, ideas: 0, bugs: 0 });
+    expect(page).toContain("bd-quiet");
+    expect(page).not.toContain("data-bd-lane");
+    expect(page).not.toContain("data-bd-search");
+  });
+
+  test("a lane that finds nothing under a filter says so, and a quiet one says nothing yet", () => {
+    const empty = [{ key: "idea" as const, total: 0, items: [] }, { key: "bug" as const, total: 0, items: [] }];
+    expect(html({ query: "zz" }, empty)).toContain("review.nothingMatches");
+    expect(html({}, empty)).toContain("overview.nothingYet");
+  });
+
+  test("a title is escaped and every row leads to its report", () => {
+    const page = html({}, [{ key: "idea", total: 1, items: [item("x", "idea", { title: "<b>x</b>" })] }, lanes[1]!]);
+    expect(page).toContain("&lt;b&gt;x&lt;/b&gt;");
+    expect(page).toContain('href="/i/x"');
+  });
+
+  test("a bug is not given a vote count, and an idea is", () => {
+    const page = html();
+    expect(page.match(/class="score mark kind-bug"/g)?.length).toBe(1);
+    expect(page).toContain('<span class="count">4</span>');
+  });
+
+  test("the lane picker for a phone names each lane and its count, only when there are two", () => {
+    expect(html()).toContain("data-bd-pick");
+    expect(html({ kind: "bug" }, [lanes[1]!])).not.toContain("data-bd-pick");
+  });
+});
+
+describe("the dialog of a board lane", () => {
+  const item = (id: string) => ({ public_id: id, kind: "idea" as const, title: `title ${id}`, status: "planned", votes: 2, voted: false, created_at: 1_700_000_000 });
+  test("says how much is shown and offers the rest only when there is some", () => {
+    const partial = boardDialogList([item("a"), item("b")], 5, text);
+    expect(partial).toContain("data-bd-load");
+    expect(partial).toContain("board.showing");
+    expect(boardDialogList([item("a")], 1, text)).not.toContain("data-bd-load");
+  });
+  test("says nothing matches rather than drawing an empty list", () => {
+    expect(boardDialogList([], 0, text)).toContain("review.nothingMatches");
   });
 });
