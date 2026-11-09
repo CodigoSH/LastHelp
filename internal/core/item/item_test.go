@@ -240,8 +240,8 @@ func TestAStatusOutsideItsKindIsRefused(t *testing.T) {
 	if err := s.SetStatus(bug.ID, StatusPlanned, epoch); err == nil {
 		t.Error("a bug was marked planned")
 	}
-	if err := s.SetStatus(idea.ID, StatusNotReproducible, epoch); err == nil {
-		t.Error("an idea was marked not reproducible")
+	if err := s.SetStatus(idea.ID, StatusConfirmed, epoch); err == nil {
+		t.Error("an idea was marked confirmed")
 	}
 	if err := s.SetStatus(bug.ID, StatusConfirmed, epoch); err != nil {
 		t.Errorf("a bug could not be confirmed: %v", err)
@@ -544,12 +544,12 @@ func TestClosedSplitsBothVocabulariesWithoutGapOrOverlap(t *testing.T) {
 			}
 		}
 	}
-	for _, st := range []Status{StatusDone, StatusDeclined, StatusClosed, StatusNotReproducible} {
+	for _, st := range []Status{StatusDone, StatusDeclined, StatusClosed} {
 		if !st.Closes() {
 			t.Errorf("%s is an answer and does not close", st)
 		}
 	}
-	for _, st := range []Status{StatusNew, StatusPlanned, StatusInProgress, StatusConfirmed, StatusInForge} {
+	for _, st := range []Status{StatusNew, StatusPlanned, StatusInProgress, StatusConfirmed} {
 		if st.Closes() {
 			t.Errorf("%s still waits and closes", st)
 		}
@@ -607,7 +607,7 @@ func TestAnAnsweredReportTakesCommentsOnlyFromWhoAnsweredFor(t *testing.T) {
 		answer Status
 	}{
 		{Idea, StatusDone}, {Idea, StatusDeclined},
-		{Bug, StatusClosed}, {Bug, StatusNotReproducible},
+		{Bug, StatusClosed}, {Bug, StatusDeclined},
 	} {
 		t.Run(string(tc.kind)+"/"+string(tc.answer), func(t *testing.T) {
 			s := store(t)
@@ -659,7 +659,7 @@ func TestTheWindowIsCountedFromTheLastAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	later := epoch.Add(40 * time.Hour)
-	if err := s.SetStatus(it.ID, StatusNotReproducible, later); err != nil {
+	if err := s.SetStatus(it.ID, StatusDeclined, later); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Comment(it.ID, AuthorReporter, "", "still here", later.Add(40*time.Hour)); err != nil {
@@ -818,7 +818,7 @@ func TestEveryClosingStatusIsDeliveredOrTurnedDown(t *testing.T) {
 			t.Errorf("%s is something done and is not counted as delivered", want)
 		}
 	}
-	for _, want := range []Status{StatusDeclined, StatusNotReproducible} {
+	for _, want := range []Status{StatusDeclined} {
 		if want.Delivered() {
 			t.Errorf("%s is the team saying no and is counted as delivered", want)
 		}

@@ -42,7 +42,7 @@ func TestWhatIsFinishedComesBackNewestFirst(t *testing.T) {
 	finish(second, StatusClosed, epoch.Add(2*time.Hour))
 	finish(first, StatusDone, epoch.Add(3*time.Hour))
 	finish(refused, StatusDeclined, epoch.Add(4*time.Hour))
-	finish(cannot, StatusNotReproducible, epoch.Add(5*time.Hour))
+	finish(cannot, StatusDeclined, epoch.Add(5*time.Hour))
 	finish(open, StatusPlanned, epoch.Add(6*time.Hour))
 
 	got, err := s.List(Filter{

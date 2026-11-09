@@ -33,7 +33,7 @@ func TestTheReportsScreenCanBeNarrowedToOpenAndClosed(t *testing.T) {
 	make("acme/atlas", "idea", "turned down idea", "rejected", "")
 	make("acme/atlas", "idea", "waiting idea", "", "")
 	make("acme/atlas", "bug", "fixed bug", "published", string(item.StatusClosed))
-	make("acme/atlas", "bug", "unreproducible bug", "published", string(item.StatusNotReproducible))
+	make("acme/atlas", "bug", "unreproducible bug", "published", string(item.StatusDeclined))
 	make("other/elsewhere", "bug", "somebody else's closed bug", "published", string(item.StatusClosed))
 
 	ask := func(who *instance, query string) (titles []string, counts map[string]any, code int) {
@@ -91,7 +91,8 @@ func TestTheReportsScreenCanBeNarrowedToOpenAndClosed(t *testing.T) {
 	none, _, _ := ask(admin, "state=open&status=done&board=acme/atlas")
 	same("an open side with a delivered status", none)
 	one, _, _ := ask(admin, "state=closed&status=declined&board=acme/atlas")
-	same("closed and declined", one, "declined idea")
+	// Declined is one word for both kinds now, so it finds a declined bug too.
+	same("closed and declined", one, "declined idea", "unreproducible bug")
 	// Open and closed are of what is published: turned down is reached by moderation.
 	turned, _, _ := ask(admin, "state=open&moderation=rejected&board=acme/atlas")
 	same("open and rejected", turned)

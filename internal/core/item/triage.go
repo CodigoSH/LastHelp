@@ -446,14 +446,18 @@ func (s Store) Count(repoIDs []int64) (Counts, error) {
 	for _, st := range []Status{StatusDone, StatusClosed} {
 		args = append(args, string(st))
 	}
-	for _, st := range []Status{StatusDone, StatusClosed, StatusDeclined, StatusNotReproducible} {
+	// Every state that is an answer, counted from the vocabulary rather than
+	// written out: a hand-counted list of placeholders is one status away from
+	// a query that no longer matches its arguments.
+	answers := ClosedStatuses()
+	for _, st := range answers {
 		args = append(args, string(st))
 	}
 
 	query := `SELECT
 			count(*),
 			sum(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END),
-			sum(CASE WHEN status NOT IN (?, ?, ?, ?) THEN 1 ELSE 0 END)
+			sum(CASE WHEN status NOT IN (` + placeholders(len(answers)) + `) THEN 1 ELSE 0 END)
 		FROM item
 		WHERE merged_into IS NULL AND moderation_state = '` + string(Published) + `'
 		  AND repo_id IN (` + placeholders(len(repoIDs)) + `)`

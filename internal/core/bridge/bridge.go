@@ -439,7 +439,7 @@ func (b Bridge) tellReporter(ctx context.Context, itemID int64, reason string) e
 
 func (b Bridge) forgetIfFinished(it item.Item) error {
 	switch it.Status {
-	case item.StatusDone, item.StatusClosed, item.StatusDeclined, item.StatusNotReproducible:
+	case item.StatusDone, item.StatusClosed, item.StatusDeclined:
 		return b.Items.ForgetEmail(it.ID)
 	}
 	return nil

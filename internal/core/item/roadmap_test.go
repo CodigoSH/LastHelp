@@ -17,7 +17,7 @@ func TestBothJourneysLandOnTheSameThreeColumns(t *testing.T) {
 		{Idea, StatusPlanned, ColumnPlanned, true},
 		{Bug, StatusConfirmed, ColumnPlanned, true},
 		{Idea, StatusInProgress, ColumnInProgress, true},
-		{Bug, StatusInForge, ColumnInProgress, true},
+		{Bug, StatusInProgress, ColumnInProgress, true},
 		{Idea, StatusDone, ColumnDone, true},
 		{Bug, StatusClosed, ColumnDone, true},
 
@@ -25,7 +25,7 @@ func TestBothJourneysLandOnTheSameThreeColumns(t *testing.T) {
 		{Idea, StatusNew, "", false},
 		{Bug, StatusNew, "", false},
 		{Idea, StatusDeclined, "", false},
-		{Bug, StatusNotReproducible, "", false},
+		{Bug, StatusDeclined, "", false},
 	}
 
 	for _, c := range cases {

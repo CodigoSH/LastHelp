@@ -72,17 +72,20 @@ const (
 	// Shared by both.
 	StatusNew Status = "new"
 
-	// Ideas.
-	StatusPlanned    Status = "planned"
+	// Shared by both: being worked on, and being turned down. A bug that is
+	// being fixed is "in progress" on the roadmap exactly as an idea is, and a
+	// report the team will not act on is "declined" whichever kind it is — the
+	// reason is a reply, not a status of its own.
 	StatusInProgress Status = "in_progress"
-	StatusDone       Status = "done"
 	StatusDeclined   Status = "declined"
 
+	// Ideas.
+	StatusPlanned Status = "planned"
+	StatusDone    Status = "done"
+
 	// Bugs.
-	StatusConfirmed       Status = "confirmed"
-	StatusInForge         Status = "in_forge"
-	StatusClosed          Status = "closed"
-	StatusNotReproducible Status = "not_reproducible"
+	StatusConfirmed Status = "confirmed"
+	StatusClosed    Status = "closed"
 )
 
 // StatusesFor is the whole vocabulary a kind may use. Anything outside it is
@@ -93,7 +96,7 @@ func StatusesFor(k Kind) []Status {
 	case Idea:
 		return []Status{StatusNew, StatusPlanned, StatusInProgress, StatusDone, StatusDeclined}
 	case Bug:
-		return []Status{StatusNew, StatusConfirmed, StatusInForge, StatusClosed, StatusNotReproducible}
+		return []Status{StatusNew, StatusConfirmed, StatusInProgress, StatusClosed, StatusDeclined}
 	}
 	return nil
 }
@@ -138,7 +141,7 @@ func (i Item) TakesCommentsFrom(author Author, now time.Time) bool {
 // is open. The one place that decides it.
 func (s Status) Closes() bool {
 	switch s {
-	case StatusDone, StatusDeclined, StatusClosed, StatusNotReproducible:
+	case StatusDone, StatusDeclined, StatusClosed:
 		return true
 	}
 	return false

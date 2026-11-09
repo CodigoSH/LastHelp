@@ -175,8 +175,8 @@ func TestReopeningBringsItBack(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := statusOf(t, b, it.ID); got != item.StatusInForge {
-		t.Errorf("a reopened bug is %q, want in_forge", got)
+	if got := statusOf(t, b, it.ID); got != item.StatusInProgress {
+		t.Errorf("a reopened bug is %q, want in_progress", got)
 	}
 }
 

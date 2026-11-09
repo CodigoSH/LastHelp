@@ -42,7 +42,7 @@ func ColumnFor(kind Kind, status Status) (Column, bool) {
 		switch status {
 		case StatusConfirmed:
 			return ColumnPlanned, true
-		case StatusInForge:
+		case StatusInProgress:
 			return ColumnInProgress, true
 		case StatusClosed:
 			return ColumnDone, true

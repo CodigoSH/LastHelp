@@ -369,3 +369,69 @@ func TestRepliesFromBeforeAreMatchedToTheAccountThatHasTheName(t *testing.T) {
 		t.Errorf("the name the reply was signed with is %q (%v)", kept, err)
 	}
 }
+
+// TestABugInTheOldStatesMovesToTheSharedOnes.
+//
+// A bug used to have words of its own for being worked on and for being turned
+// down, and an installation that ran then still has rows in them. They have to
+// follow the vocabulary — a row left in a state nothing draws is a blank chip —
+// and nothing else may move: an idea in "in_progress" and a bug that was
+// fixed stay exactly as they are.
+func TestABugInTheOldStatesMovesToTheSharedOnes(t *testing.T) {
+	db := open(t)
+
+	if _, err := db.Exec(`INSERT INTO organization (id, slug, name, forge_kind, base_url, forge_owner, created_at)
+		VALUES (1, 'acme', 'Acme', 'none', '', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO repository (id, org_id, slug, name, forge_repo, created_at)
+		VALUES (1, 1, 'atlas', 'Atlas', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	row := func(id int, kind, status string) {
+		t.Helper()
+		if _, err := db.Exec(`INSERT INTO item (id, public_id, repo_id, kind, title, body, status, moderation_state, follow_token_hash, created_at)
+			VALUES (?, ?, 1, ?, 't', 'b', ?, 'published', 'h', 0)`, id, "p"+itoa(id), kind, status); err != nil {
+			t.Fatal(err)
+		}
+	}
+	row(1, "bug", "in_forge")
+	row(2, "bug", "not_reproducible")
+	row(3, "bug", "closed")
+	row(4, "idea", "in_progress")
+	row(5, "bug", "confirmed")
+
+	// Back to the version before the move, as an installation that has not
+	// updated yet, and migrate.
+	if _, err := db.Exec("PRAGMA user_version = 13"); err != nil {
+		t.Fatal(err)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[int]string{}
+	rows, err := db.Query(`SELECT id, status FROM item`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var id int
+		var status string
+		if err := rows.Scan(&id, &status); err != nil {
+			t.Fatal(err)
+		}
+		got[id] = status
+	}
+	for id, want := range map[int]string{1: "in_progress", 2: "declined", 3: "closed", 4: "in_progress", 5: "confirmed"} {
+		if got[id] != want {
+			t.Errorf("item %d is %q after the move, want %q", id, got[id], want)
+		}
+	}
+
+	// And it is the last time: running it again moves nothing.
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+}

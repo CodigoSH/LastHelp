@@ -469,6 +469,29 @@ var migrations = []migration{
 			return err
 		},
 	},
+	{
+		version: 14,
+		name:    "a bug is in progress or declined like an idea",
+		// A bug had two states of its own for what an idea already said:
+		// "in_forge" for being worked on and "not_reproducible" for being turned
+		// down. Two words for one thing, on a page that lists both kinds side by
+		// side and a roadmap that shows both in one column. A bug now uses the
+		// states an idea does, and the rows that were in the old ones move to
+		// them. Nothing is lost: what a team meant by "could not reproduce" was
+		// always in its reply. Safe to run again — once the rows have moved there
+		// is nothing left to move.
+		fn: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`UPDATE item SET status = 'in_progress' WHERE status = 'in_forge'`,
+				`UPDATE item SET status = 'declined' WHERE status = 'not_reproducible'`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

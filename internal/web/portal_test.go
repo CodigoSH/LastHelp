@@ -399,7 +399,7 @@ func TestTheClosedTabCanBeNarrowedToWhatWasDoneOrNot(t *testing.T) {
 	answer("idea", "shipped one", string(item.StatusDone))
 	answer("bug", "fixed one", string(item.StatusClosed))
 	answer("idea", "declined one", string(item.StatusDeclined))
-	answer("bug", "unreproducible one", string(item.StatusNotReproducible))
+	answer("bug", "unreproducible one", string(item.StatusDeclined))
 	answer("idea", "still open", "")
 
 	list := func(query string) (map[string]any, int) {

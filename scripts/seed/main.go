@@ -90,7 +90,7 @@ var reports = []report{
 		[]line{{item.AuthorTeam, "Not for now: the list is short enough to use with the mouse.", false}}},
 	{"atlas", item.Bug, "Logo upload fails with large PNG files",
 		"A 6 MB PNG gives a generic error.",
-		95, item.Published, item.StatusNotReproducible, 1,
+		95, item.Published, item.StatusDeclined, 1,
 		[]line{{item.AuthorTeam, "Could not reproduce with a 6 MB file. Which browser?", false}}},
 	{"atlas", item.Idea, "Weekly summary by email",
 		"A short email every Monday with what changed.",

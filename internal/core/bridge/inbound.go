@@ -118,9 +118,6 @@ func statusFor(kind item.Kind, event forge.Event) (item.Status, bool) {
 		}
 		return item.StatusDone, true
 	case forge.EventReopened:
-		if kind == item.Bug {
-			return item.StatusInForge, true
-		}
 		return item.StatusInProgress, true
 	}
 	return "", false
