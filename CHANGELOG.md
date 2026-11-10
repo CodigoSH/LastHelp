@@ -10,6 +10,14 @@ file with the stable that carries them.
 
 1.0.0 is the first stable release, so its entry describes the whole product
 rather than a change from an earlier version.
+## [1.3.2] - 2026-11-10
+
+### Changed
+- Every list is searched and narrowed the same way, on the public pages and in the team's panel: the search box first, a Filters button that opens a menu of what can narrow the list and says how many filters are on, an order button where the list has one, and what is chosen shown underneath as chips that each come off with one press. It replaces the loose rows of buttons and selects, which crowded each other as soon as there were many. It is the board of a repository, the roadmap and the dialog each of their lanes opens, the team's Reports (type, moderation, status, repository, result and whether the team has replied, in one menu) and the word list of Anti-abuse.
+- On a repository's page, Open and Closed are two tabs above the search with how many each holds, instead of having to press the tile that counted them. The tiles only say the numbers now, and the one for the roadmap, which is the way to its page, stands out and leads with what was completed, so a board with work behind it no longer looks empty.
+- **Completed** is the word for what was done, in place of Shipped and Fixed, in the twenty languages, on the front page's sentence and in the documentation. What a closed board holds is called **Completed** and **Declined**.
+- The roadmap's completed and declined lanes show six rows in all while they are shut, newest first, however many fall in one month; Show more opens the lane whole. Planned and Completed share the width equally, and the boxes that hold the lanes are filled like every other card on the public pages.
+
 ## [1.3.1] - 2026-11-09
 
 ### Changed
