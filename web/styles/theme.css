@@ -8193,10 +8193,32 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 .fb-clear { border: 0; background: transparent; color: var(--text-dim); font: 600 11px var(--font-mono); text-decoration: underline; cursor: pointer; }
 .fb-clear:hover { color: var(--text-main); }
 .ov-modal .fb-chips { padding: 0 18px 10px; }
+/* On a phone a menu is a sheet from the bottom, the way phones do it: the whole width, reachable with a thumb, over a veil
+   that closes it when pressed. It no longer depends on where its button happens to be, so it cannot run off the screen. */
 @media (max-width: 640px) {
   .fb .search-box { flex-basis: 100%; }
-  .fb-pop { min-inline-size: min(15rem, calc(100vw - 32px)); }
+  .fb-menu:has(> .fb-pop:not([hidden]))::before { content: ""; position: fixed; inset: 0; z-index: 59; background: rgba(0, 0, 0, 0.45); }
+  .fb-pop, .fb-pop.end, .fb-pop.wide, .fb-pop.cols {
+    position: fixed;
+    inset-block: auto 0;
+    inset-inline: 0;
+    z-index: 60;
+    inline-size: auto;
+    min-inline-size: 0;
+    max-inline-size: none;
+    max-block-size: min(78vh, 36rem);
+    padding: 10px 10px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
+    animation: fb-sheet 0.2s ease-out;
+  }
+  .fb-pop.cols { display: block; }
+  .fb-opts, .fb-pop.cols .fb-opts { max-block-size: none; overflow: visible; }
+  .fb-opt { padding-block: 11px; }
+  .fb-group + .fb-group, .fb-pop.cols .fb-group + .fb-group { margin-block-start: 6px; padding-block-start: 6px; border-block-start: 1px solid var(--border); }
 }
+@keyframes fb-sheet { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fb-pop { animation: none; } }
 
 /* Open and closed: the way into the list, so tabs with what each holds, not one more filter. */
 .bd-tabs { display: flex; gap: 4px; border-block-end: 1px solid var(--border); }

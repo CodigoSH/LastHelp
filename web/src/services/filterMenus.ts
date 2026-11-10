@@ -78,6 +78,11 @@ export function installFilterMenus(): void {
       opt.dispatchEvent(new CustomEvent<FilterPick>("fb-pick", { bubbles: true, detail }));
       return;
     }
+    // On a phone the veil behind a sheet is the menu element itself, and pressing it closes the sheet.
+    if (target.matches(MENU)) {
+      closeMenus();
+      return;
+    }
     // A press anywhere else closes what is open.
     if (!target.closest(MENU)) closeMenus();
   });
