@@ -751,44 +751,57 @@ describe("the board page", () => {
     expect(tiles).toContain('data-tile="closed"');
   });
 
-  test("open and closed are chosen with a control in the bar, one pressed, each with its count", () => {
+  test("open and closed are tabs above the bar, one pressed, each with its count", () => {
     const open = html();
     expect(open).toContain('data-bd-state="open" aria-pressed="true"');
     expect(open).toContain('data-bd-state="closed" aria-pressed="false"');
-    expect(open.slice(open.indexOf('class="bd-bar"'))).toContain("data-bd-state");
-    const closed = html({ state: "closed" });
-    expect(closed).toContain('data-bd-state="closed" aria-pressed="true"');
+    // The tabs come before the bar, and are not part of it.
+    expect(open.indexOf("bd-tabs")).toBeLessThan(open.indexOf('class="fb"'));
+    expect(open.slice(open.indexOf('class="fb"'), open.indexOf("bd-lanes"))).not.toContain("data-bd-state");
+    expect(html({ state: "closed" })).toContain('data-bd-state="closed" aria-pressed="true"');
   });
 
-  test("a lane with more than it shows offers the dialog", () => {
-    expect(html()).toContain('data-bd-open="idea"');
-    const all = html({}, [{ key: "idea", total: 2, items: [item("a", "idea"), item("b", "idea")] }, { key: "bug", total: 1, items: [item("c", "bug")] }]);
-    expect(all).not.toContain("data-bd-open");
+  test("the bar is a search, a menu of filters and an order, in that order", () => {
+    const page = html();
+    // The lane picker for a phone follows the bar and is not part of it.
+    const bar = page.slice(page.indexOf('class="fb"'), page.indexOf("bd-seg bd-pick"));
+    expect(bar.indexOf("data-bd-search")).toBeLessThan(bar.indexOf("data-fb-toggle"));
+    expect(bar).toContain('data-fb-group="kind" data-fb-value="bug"');
+    expect(bar).toContain('data-fb-group="sort" data-fb-value="votes"');
+    // No loose row of segments any more: each choice is an option of a menu.
+    expect(bar).not.toContain("bd-seg");
+    expect(bar).not.toContain("data-bd-kind");
   });
 
   test("what is closed can be narrowed to what was done or what was not, and only while looking at it", () => {
     const page = html({ state: "closed", outcome: "undone" });
-    expect(page).toContain('data-bd-outcome="" aria-pressed="false"');
-    expect(page).toContain('data-bd-outcome="done" aria-pressed="false"');
-    expect(page).toContain('data-bd-outcome="undone" aria-pressed="true"');
+    expect(page).toContain('data-fb-group="outcome" data-fb-value="undone"');
+    expect(page).toMatch(/aria-checked="true" data-fb-group="outcome" data-fb-value="undone"/);
+    expect(page).toMatch(/aria-checked="false" data-fb-group="outcome" data-fb-value="done"/);
     // The outcome is a question of the closed side: on the open side there is nothing to choose.
-    expect(html({ state: "open", outcome: "undone" })).not.toContain("data-bd-outcome");
+    expect(html({ state: "open", outcome: "undone" })).not.toContain('data-fb-group="outcome"');
+  });
+
+  test("the filters button says how many are on", () => {
+    expect(html()).not.toContain("fb-count");
+    expect(html({ kind: "bug" })).toContain('<b class="fb-count">1</b>');
+    expect(html({ state: "closed", kind: "bug", outcome: "done" })).toContain('<b class="fb-count">2</b>');
   });
 
   test("only a board that takes both kinds offers a kind", () => {
-    expect(html()).toContain("data-bd-kind");
+    expect(html()).toContain('data-fb-group="kind"');
     const bugs = board(org as never, { ...repo, accepts_ideas: false } as never, [lanes[1]!] as never, filters, tiles, null, "bug", text);
-    expect(bugs).not.toContain("data-bd-kind");
+    expect(bugs).not.toContain('data-fb-group="kind"');
   });
 
   test("what narrows the list is said, with a way to undo each and to clear them all", () => {
-    expect(html()).not.toContain("data-bd-undo");
+    expect(html()).not.toContain("data-fb-undo");
     const narrowed = html({ kind: "bug", query: "csv" });
-    expect(narrowed).toContain('data-bd-undo="kind"');
-    expect(narrowed).toContain('data-bd-undo="q"');
-    expect(narrowed).toContain("data-bd-clear");
+    expect(narrowed).toContain('data-fb-undo="kind"');
+    expect(narrowed).toContain('data-fb-undo="q"');
+    expect(narrowed).toContain("data-fb-clear");
     // One letter is not a search: it narrows nothing and says nothing.
-    expect(html({ query: "c" })).not.toContain("data-bd-undo");
+    expect(html({ query: "c" })).not.toContain("data-fb-undo");
   });
 
   test("an empty board says what it is for instead of drawing lanes", () => {

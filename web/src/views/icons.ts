@@ -94,6 +94,13 @@ export const icons = {
      the line runs the other way in three of the twenty languages: the flip is
      done in the stylesheet with --rtl-flip rather than by drawing it twice. */
   chevron: (s?: number) => stroke(`<path d="m9 6 6 6-6 6"/>`, s),
+  /* A menu that opens downward: the caret on a button that holds a list. Not
+     flipped, because down is down in every direction of writing. */
+  caretDown: (s?: number) => stroke(`<path d="m6 9 6 6 6-6"/>`, s),
+  /* A funnel: what narrows a list. */
+  filter: (s?: number) => stroke(`<path d="M4 5h16l-6 7v6l-4 2v-8z"/>`, s),
+  /* Two arrows, one each way: what orders a list. */
+  sort: (s?: number) => stroke(`<path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"/>`, s),
   /* Leaving. It points at the door, so it is flipped where the line runs the
      other way — the stylesheet does that with --rtl-flip. */
   signOut: (s?: number) =>

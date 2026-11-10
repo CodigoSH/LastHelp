@@ -24,6 +24,8 @@ import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { dialogParams, laneCap, lanePlan, laneStatuses, tileNumbers, type Counts, type LaneKey, type LaneSpec } from "./services/boardState";
 import { historyRows, rankedRows, titleHas, type RoadmapFilter } from "./services/roadmapState";
+import { installFilterMenus, syncFilterBar, type FilterPick } from "./services/filterMenus";
+import { filterMenu } from "./views/filterBar";
 import { disablePush, enablePush, loadPush, removePushDevice, testPush, type PushView } from "./services/pushClient";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
@@ -1411,22 +1413,30 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
     const heading = dialog?.querySelector<HTMLElement>("#bd-modal-title");
     const count = dialog?.querySelector<HTMLElement>("[data-bd-count]");
     const input = dialog?.querySelector<HTMLInputElement>("[data-bd-q]");
-    const statuses = dialog?.querySelector<HTMLElement>("[data-bd-statuses]");
-    if (!dialog || !body || !heading || !count || !input || !statuses) return () => undefined;
+    const slot = dialog?.querySelector<HTMLElement>("[data-bd-filters]");
+    const bar = dialog?.querySelector<HTMLElement>(".fb");
+    if (!dialog || !body || !heading || !count || !input || !slot || !bar) return () => undefined;
 
     const ask: { lane: LaneSpec | null; status: string; sort: string; q: string; items: ItemSummary[]; total: number; seq: number } = {
       lane: null, status: "", sort: "new", q: "", items: [], total: 0, seq: 0,
     };
     const draw_ = () => {
       count.textContent = text.number(ask.total);
-      dialog.querySelectorAll<HTMLElement>("[data-bd-dsort]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.bdDsort === ask.sort)));
+      // What narrows this lane is its own states, so the menu is drawn for the lane that is open.
       const own = ask.lane ? laneStatuses(ask.lane.key) : [];
-      statuses.hidden = own.length === 0;
-      statuses.innerHTML = own.length
-        ? [["", text.t("board.all")], ...own.map((s) => [s, text.t(`status.${s}`)])]
-            .map(([value, label]) => `<button type="button" data-bd-status="${value}" aria-pressed="${ask.status === value}">${escapeHTML(label ?? "")}</button>`)
-            .join("")
-        : "";
+      slot.innerHTML = filterMenu(
+        [
+          {
+            name: "status",
+            label: text.t("overview.colStatus"),
+            value: ask.status,
+            options: own.length ? [{ value: "", label: text.t("board.all") }, ...own.map((st) => ({ value: st, label: text.t(`status.${st}`) }))] : [],
+          },
+        ],
+        text.t("board.filters"),
+        text,
+      );
+      syncFilterBar(bar, { sort: ask.sort, status: ask.status }, ask.q);
       body.innerHTML = views.boardDialogList(ask.items, ask.total, text);
     };
     const load = async (append: boolean) => {
@@ -1450,17 +1460,26 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
         dialog.close();
         return;
       }
-      const status = target.closest<HTMLElement>("[data-bd-status]");
-      const sort = target.closest<HTMLElement>("[data-bd-dsort]");
-      if (status) {
-        ask.status = status.dataset.bdStatus ?? "";
-        void load(false);
-      } else if (sort) {
-        ask.sort = sort.dataset.bdDsort === "votes" ? "votes" : "new";
+      const undo = target.closest<HTMLElement>("[data-fb-undo]")?.dataset.fbUndo;
+      const clear = target.closest("[data-fb-clear]") !== null;
+      if (undo || clear) {
+        if (clear || undo === "status") ask.status = "";
+        if (clear || undo === "q") {
+          ask.q = "";
+          input.value = "";
+        }
         void load(false);
       } else if (target.closest("[data-bd-load]")) {
         void load(true);
       }
+    });
+    // What the bar's menus choose: a state of the lane and the order, each a new question to the server.
+    bar.addEventListener("fb-pick", (event) => {
+      const { group, value } = (event as CustomEvent<FilterPick>).detail;
+      if (group === "status") ask.status = value;
+      else if (group === "sort") ask.sort = value === "votes" ? "votes" : "new";
+      else return;
+      void load(false);
     });
     let typing: ReturnType<typeof setTimeout> | undefined;
     input.addEventListener("input", () => {
@@ -1497,22 +1516,20 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
     root?.querySelectorAll<HTMLButtonElement>("[data-bd-state]").forEach((b) =>
       b.addEventListener("click", () => void change({ state: b.dataset.bdState === "closed" ? "closed" : "open", outcome: "" })),
     );
-    root?.querySelectorAll<HTMLButtonElement>("[data-bd-outcome]").forEach((b) =>
+    // What the bar's menus choose, and what its chips take off.
+    root?.querySelector<HTMLElement>(".bd")?.addEventListener("fb-pick", (event) => {
+      const { group, value } = (event as CustomEvent<FilterPick>).detail;
+      if (group === "kind") void change({ kind: value });
+      else if (group === "outcome") void change({ outcome: value === "done" || value === "undone" ? value : "" });
+      else if (group === "sort") void change({ sort: value === "votes" ? "votes" : "new" });
+    });
+    root?.querySelectorAll<HTMLButtonElement>("[data-fb-undo]").forEach((b) =>
       b.addEventListener("click", () => {
-        const picked = b.dataset.bdOutcome;
-        void change({ state: "closed", outcome: picked === "done" || picked === "undone" ? picked : "" });
+        const what = b.dataset.fbUndo;
+        void change(what === "kind" ? { kind: "" } : what === "outcome" ? { outcome: "" } : { query: "" });
       }),
     );
-    root?.querySelectorAll<HTMLButtonElement>("[data-bd-kind]").forEach((b) =>
-      b.addEventListener("click", () => void change({ kind: b.dataset.bdKind ?? "" })),
-    );
-    root?.querySelectorAll<HTMLButtonElement>("[data-bd-sort]").forEach((b) =>
-      b.addEventListener("click", () => void change({ sort: b.dataset.bdSort ?? "new" })),
-    );
-    root?.querySelectorAll<HTMLButtonElement>("[data-bd-undo]").forEach((b) =>
-      b.addEventListener("click", () => void change(b.dataset.bdUndo === "kind" ? { kind: "" } : { query: "" })),
-    );
-    root?.querySelector<HTMLButtonElement>("[data-bd-clear]")?.addEventListener("click", () => void change({ kind: "", query: "" }));
+    root?.querySelector<HTMLButtonElement>("[data-fb-clear]")?.addEventListener("click", () => void change({ kind: "", outcome: "", query: "" }));
     // On a phone one lane shows at a time; the others are a press away.
     root?.querySelectorAll<HTMLButtonElement>("[data-bd-pick]").forEach((b) =>
       b.addEventListener("click", () => {
@@ -1710,9 +1727,9 @@ function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string)
   };
   const url = `/api/orgs/${encodeURIComponent(orgSlug)}/repos/${encodeURIComponent(repoSlug)}/roadmap`;
 
+  const bar = dialog.querySelector<HTMLElement>(".fb");
   const draw = () => {
-    dialog.querySelectorAll<HTMLElement>("[data-rm-kind]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.rmKind === ask.kind)));
-    dialog.querySelectorAll<HTMLElement>("[data-rm-sort]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.rmSort === ask.sort)));
+    if (bar) syncFilterBar(bar, { kind: ask.kind, sort: ask.sort }, ask.q);
     count.textContent = text.number(ask.total);
     body.innerHTML = views.roadmapDialogList(ask.lane, ask.sort, ask.items, ask.total, Math.floor(Date.now() / 1000), text);
   };
@@ -1740,17 +1757,26 @@ function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string)
       dialog.close();
       return;
     }
-    const kindButton = target.closest<HTMLElement>("[data-rm-kind]");
-    const sortButton = target.closest<HTMLElement>("[data-rm-sort]");
-    if (kindButton) {
-      ask.kind = (kindButton.dataset.rmKind ?? "") as RoadmapFilter;
-      void read(false);
-    } else if (sortButton) {
-      ask.sort = sortButton.dataset.rmSort === "recent" ? "recent" : "votes";
+    const undo = target.closest<HTMLElement>("[data-fb-undo]")?.dataset.fbUndo;
+    const clear = target.closest("[data-fb-clear]") !== null;
+    if (undo || clear) {
+      if (clear || undo === "kind") ask.kind = "";
+      if (clear || undo === "q") {
+        ask.q = "";
+        input.value = "";
+      }
       void read(false);
     } else if (target.closest("[data-rm-load]")) {
       void read(true);
     }
+  });
+  // What the bar's menus choose: the kind and the order, each a new question to the server.
+  bar?.addEventListener("fb-pick", (event) => {
+    const { group, value } = (event as CustomEvent<FilterPick>).detail;
+    if (group === "kind") ask.kind = (value === "idea" || value === "bug" ? value : "") as RoadmapFilter;
+    else if (group === "sort") ask.sort = value === "recent" ? "recent" : "votes";
+    else return;
+    void read(false);
   });
   let typing: ReturnType<typeof setTimeout> | undefined;
   input.addEventListener("input", () => {
@@ -1856,18 +1882,37 @@ function wireRoadmap(orgSlug: string, repoSlug: string): void {
     });
   };
 
-  page.querySelectorAll<HTMLButtonElement>("[data-rm-filter]").forEach((button) =>
-    button.addEventListener("click", () => {
-      state.filter = (button.dataset.rmFilter ?? "") as RoadmapFilter;
-      page.querySelectorAll("[data-rm-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
-      apply();
-    }),
-  );
+  // The bar of the page, which is not the dialog's: the filter and the search narrow what the page holds.
+  const bar = page.querySelector<HTMLElement>(":scope > .fb");
+  const chips = page.querySelector<HTMLElement>(":scope > [data-fb-chips]");
+  const search = page.querySelector<HTMLInputElement>("[data-rm-search]");
+  const narrow = () => {
+    apply();
+    if (bar) syncFilterBar(bar, { kind: state.filter }, state.query);
+  };
+  bar?.addEventListener("fb-pick", (event) => {
+    const { group, value } = (event as CustomEvent<FilterPick>).detail;
+    if (group !== "kind") return;
+    state.filter = (value === "idea" || value === "bug" ? value : "") as RoadmapFilter;
+    narrow();
+  });
   // The search narrows what the page holds; the dialog, which reads the lane whole,
   // starts from the same words.
-  page.querySelector<HTMLInputElement>("[data-rm-search]")?.addEventListener("input", (event) => {
-    state.query = (event.currentTarget as HTMLInputElement).value;
-    apply();
+  search?.addEventListener("input", () => {
+    state.query = search.value;
+    narrow();
+  });
+  chips?.addEventListener("click", (event) => {
+    const target = event.target as Element;
+    const undo = target.closest<HTMLElement>("[data-fb-undo]")?.dataset.fbUndo;
+    const clear = target.closest("[data-fb-clear]") !== null;
+    if (!undo && !clear) return;
+    if (clear || undo === "kind") state.filter = "";
+    if (clear || undo === "q") {
+      state.query = "";
+      if (search) search.value = "";
+    }
+    narrow();
   });
 
   // "Show more" opens the lane whole, in a dialog with its own search and filters.
@@ -3940,5 +3985,7 @@ void (async () => {
   watchSelects();
   // Ctrl+K, to whichever search box the screen has.
   installSearchShortcut(document);
+  // The menus of every filter bar, once: a screen draws its bar again, the menus stay wired.
+  installFilterMenus();
   await render();
 })();

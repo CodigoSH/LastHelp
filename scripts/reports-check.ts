@@ -677,7 +677,7 @@ async function main() {
     box.dispatchEvent(new Event("input", { bubbles: true }));
     await wait(() => new URLSearchParams(location.search).get("q") && document.querySelector(".bd-empty"));
     return { said: document.querySelector(".bd-empty")?.textContent ?? "", expected: words["review.nothingMatches"],
-             chip: !!document.querySelector("[data-bd-undo='q']"), clear: !!document.querySelector("[data-bd-clear]") };
+             chip: !!document.querySelector("[data-fb-undo='q']"), clear: !!document.querySelector("[data-fb-clear]") };
   `);
   check("a search that finds nothing says so, not that the board is empty, and can be undone", nothing.said.includes(nothing.expected) && nothing.chip && nothing.clear, JSON.stringify(nothing));
 
@@ -778,18 +778,20 @@ async function main() {
   // choosing All.
   const resultado = await evaluate(`
     const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
-    const count = (v) => Number(document.querySelector('button[data-bd-outcome="' + v + '"] b')?.textContent.replace(/\D/g, "") ?? "-1");
+    const count = (v) => Number(document.querySelector('.fb-opt[data-fb-group="outcome"][data-fb-value="' + v + '"] b')?.textContent.replace(/\D/g, "") ?? "-1");
     const rows = () => document.querySelectorAll(".bd-row").length;
-    const pressed = (v) => document.querySelector('button[data-bd-outcome="' + v + '"]')?.getAttribute("aria-pressed");
+    const pressed = (v) => document.querySelector('.fb-opt[data-fb-group="outcome"][data-fb-value="' + v + '"]')?.getAttribute("aria-checked");
     const out = { done: count("done"), undone: count("undone") };
-    document.querySelector('button[data-bd-outcome="undone"]').click();
+    // The choice is made the way a person makes it: open the menu, press the option.
+    const choose = (v) => { document.querySelector('.fb-btn[data-fb-toggle]').click(); document.querySelector('.fb-opt[data-fb-group="outcome"][data-fb-value="' + v + '"]').click(); };
+    choose("undone");
     await wait(() => pressed("undone") === "true");
     await wait(() => document.querySelectorAll("[data-bd-lane]").length === 1);
     out.undoneLane = document.querySelectorAll("[data-bd-lane]").length;
     out.undoneTotal = Number(document.querySelector("[data-bd-lane] .bd-pill-n").textContent.replace(/\D/g, ""));
     out.onlyNo = [...document.querySelectorAll(".bd-row .status")].every(e => e.classList.contains("status-declined"));
     out.address = location.search;
-    document.querySelector('button[data-bd-outcome=""]').click();
+    choose("");
     await wait(() => pressed("undone") === "false");
     await wait(() => document.querySelectorAll("[data-bd-lane]").length === 2);
     out.bothAgain = document.querySelectorAll("[data-bd-lane]").length;

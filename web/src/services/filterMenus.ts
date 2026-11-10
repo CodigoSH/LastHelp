@@ -1,0 +1,163 @@
+/**
+ * What the menus of `views/filterBar.ts` do: open on a press, close on another
+ * press anywhere, on Escape or on choosing, move between their options with the
+ * arrow keys and give the focus back to the button that opened them.
+ *
+ * Installed once on the document, because the screens draw their bars again
+ * whenever they redraw and a listener on the bar would be lost with it. A choice
+ * leaves as an `fb-pick` event from the option, which bubbles to whoever drew
+ * the bar and which says the group and the value.
+ */
+
+export interface FilterPick {
+  group: string;
+  value: string;
+}
+
+import { escapeHTML } from "../escape";
+import { icons } from "../views/icons";
+
+const MENU = ".fb-menu";
+
+/** Close every open menu, or every one but `keep`. */
+export function closeMenus(keep?: Element | null): void {
+  document.querySelectorAll<HTMLElement>(`${MENU} .fb-pop:not([hidden])`).forEach((pop) => {
+    if (keep && pop.closest(MENU) === keep) return;
+    pop.hidden = true;
+    pop.closest(MENU)?.querySelector("[data-fb-toggle]")?.setAttribute("aria-expanded", "false");
+  });
+}
+
+const options = (menu: Element) => [...menu.querySelectorAll<HTMLButtonElement>(".fb-opt")];
+
+let installed = false;
+
+/** Wire the menus for the whole page. Safe to call more than once. */
+export function installFilterMenus(): void {
+  if (installed) return;
+  installed = true;
+
+  document.addEventListener("click", (event) => {
+    const target = event.target as Element | null;
+    if (!target) return;
+    const toggle = target.closest<HTMLElement>("[data-fb-toggle]");
+    const opt = target.closest<HTMLElement>(".fb-opt");
+    if (toggle) {
+      const menu = toggle.closest(MENU);
+      const pop = menu?.querySelector<HTMLElement>(".fb-pop");
+      if (!menu || !pop) return;
+      const open = pop.hidden;
+      closeMenus(open ? menu : null);
+      pop.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) {
+        const checked = options(menu).find((o) => o.getAttribute("aria-checked") === "true") ?? options(menu)[0];
+        checked?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    if (opt) {
+      const menu = opt.closest(MENU);
+      const button = menu?.querySelector<HTMLElement>("[data-fb-toggle]");
+      closeMenus();
+      button?.focus({ preventScroll: true });
+      const detail: FilterPick = { group: opt.dataset.fbGroup ?? "", value: opt.dataset.fbValue ?? "" };
+      opt.dispatchEvent(new CustomEvent<FilterPick>("fb-pick", { bubbles: true, detail }));
+      return;
+    }
+    // A press anywhere else closes what is open.
+    if (!target.closest(MENU)) closeMenus();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const target = event.target as Element | null;
+    const open = document.querySelector<HTMLElement>(`${MENU} .fb-pop:not([hidden])`);
+    if (!open) return;
+    const menu = open.closest(MENU);
+    if (!menu) return;
+    if (event.key === "Escape") {
+      // Closing the menu must not also close the dialog it may be in.
+      event.preventDefault();
+      event.stopPropagation();
+      closeMenus();
+      menu.querySelector<HTMLElement>("[data-fb-toggle]")?.focus({ preventScroll: true });
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (!target || !menu.contains(target)) return;
+    event.preventDefault();
+    const all = options(menu);
+    const at = all.indexOf(target as HTMLButtonElement);
+    const next = event.key === "ArrowDown" ? (at + 1) % all.length : (at - 1 + all.length) % all.length;
+    all[next]?.focus({ preventScroll: true });
+  }, true);
+}
+
+/**
+ * Bring a bar drawn once up to date with what a screen holds: the option each
+ * group has now, how many filters are on, the order the order button names, and
+ * the chips. For the screens that narrow their list in the browser, where the
+ * page is not drawn again with every choice.
+ *
+ * `values` has a value for each group by name; the first option of a group is
+ * "everything", so a group that holds it narrows nothing. `query` is the search
+ * as typed, which is a chip of its own once it is a search.
+ */
+export function syncFilterBar(bar: Element, values: Record<string, string>, query = ""): void {
+  const active: Array<{ name: string; label: string }> = [];
+  const groups = new Set<string>();
+  bar.querySelectorAll<HTMLElement>(".fb-opt").forEach((o) => groups.add(o.dataset.fbGroup ?? ""));
+  for (const group of groups) {
+    const all = [...bar.querySelectorAll<HTMLElement>(`.fb-opt[data-fb-group="${group}"]`)];
+    const value = values[group] ?? all[0]?.dataset.fbValue ?? "";
+    all.forEach((o) => o.setAttribute("aria-checked", String(o.dataset.fbValue === value)));
+    const chosen = all.find((o) => o.dataset.fbValue === value);
+    if (group === "sort") {
+      const label = chosen?.querySelector(".fb-opt-name")?.textContent ?? "";
+      const button = chosen?.closest(".fb-menu")?.querySelector<HTMLElement>("[data-fb-toggle] span");
+      if (button && label) button.textContent = label;
+      continue;
+    }
+    if (chosen && all[0] && chosen !== all[0]) active.push({ name: group, label: chosen.querySelector(".fb-opt-name")?.textContent ?? "" });
+  }
+
+  const button = bar.querySelector<HTMLElement>("[data-fb-filters]");
+  if (button) {
+    button.classList.toggle("on", active.length > 0);
+    let count = button.querySelector<HTMLElement>(".fb-count");
+    if (active.length > 0) {
+      if (!count) {
+        count = document.createElement("b");
+        count.className = "fb-count";
+        button.querySelector("svg:last-child")?.before(count);
+      }
+      count.textContent = new Intl.NumberFormat(document.documentElement.lang || undefined).format(active.length);
+    } else count?.remove();
+  }
+
+  // The chips sit right after the bar they belong to.
+  const next = bar.nextElementSibling;
+  const host = next?.matches("[data-fb-chips]") ? (next as HTMLElement) : bar.querySelector<HTMLElement>("[data-fb-chips]");
+  if (host) {
+    const chips = [...active, ...(query.trim().length >= 2 ? [{ name: "q", label: `«${query.trim()}»` }] : [])];
+    host.hidden = chips.length === 0;
+    host.replaceChildren();
+    for (const c of chips) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "fb-chip";
+      b.dataset.fbUndo = c.name;
+      b.setAttribute("aria-label", c.label);
+      b.innerHTML = `${escapeHTML(c.label)}${icons.close(12)}`;
+      host.append(b);
+    }
+    if (chips.length > 0) {
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "fb-clear";
+      clear.dataset.fbClear = "";
+      clear.textContent = host.dataset.fbClearLabel ?? "";
+      host.append(clear);
+    }
+  }
+}

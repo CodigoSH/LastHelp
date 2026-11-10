@@ -20,6 +20,8 @@ import { overviewDialog } from "./overviewDetail";
 import { monthGroups, roadmapDialog, roadmapKind, voteTile } from "./roadmapModal";
 import { laneCap, type LaneKey, type Tiles } from "../services/boardState";
 import { icons } from "./icons";
+import { filterChips, filterChipsHost, filterMenu, sortMenu, type FilterGroup } from "./filterBar";
+import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
@@ -238,7 +240,7 @@ export function board(
   const base = `/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}`;
   const cap = laneCap(lanes.length);
   const both = repo.accepts_bugs && repo.accepts_ideas;
-  const narrowed = filters.query.trim().length >= 2 || filters.kind !== "";
+  const narrowed = filters.query.trim().length >= 2 || filters.kind !== "" || (filters.state === "closed" && filters.outcome !== "");
   const empty = tiles.open + tiles.closed === 0 && !narrowed;
 
   const laneName = (key: LaneKey) =>
@@ -279,50 +281,67 @@ export function board(
     </a>
   </div>`;
 
-  // Open or closed is chosen where a control is looked for: in the bar, as two words that say what they do.
-  const stateSeg = `<div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("overview.reports"))}">
-      <button type="button" data-bd-state="open" aria-pressed="${filters.state === "open"}">${escapeHTML(text.t("board.open"))} <b>${escapeHTML(text.number(tiles.open))}</b></button>
-      <button type="button" data-bd-state="closed" aria-pressed="${filters.state === "closed"}">${escapeHTML(text.t("board.closed"))} <b>${escapeHTML(text.number(tiles.closed))}</b></button>
+  // Open or closed is the way into the list, not one more filter: two tabs with what each holds, above the bar.
+  const tabs = `<div class="bd-tabs" role="group" aria-label="${escapeAttr(text.t("overview.reports"))}">
+      <button type="button" data-bd-state="open" aria-pressed="${filters.state === "open"}">${escapeHTML(text.t("board.open"))}<b>${escapeHTML(text.number(tiles.open))}</b></button>
+      <button type="button" data-bd-state="closed" aria-pressed="${filters.state === "closed"}">${escapeHTML(text.t("board.closed"))}<b>${escapeHTML(text.number(tiles.closed))}</b></button>
     </div>`;
-  const outcomeSeg =
-    filters.state === "closed"
-      ? `<div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("board.closed"))}">
-      <button type="button" data-bd-outcome="" aria-pressed="${filters.outcome === ""}">${escapeHTML(text.t("board.all"))}</button>
-      <button type="button" data-bd-outcome="done" aria-pressed="${filters.outcome === "done"}">${escapeHTML(text.t("board.outcomeDone"))} <b>${escapeHTML(text.number(tiles.done))}</b></button>
-      <button type="button" data-bd-outcome="undone" aria-pressed="${filters.outcome === "undone"}">${escapeHTML(text.t("board.outcomeUndone"))} <b>${escapeHTML(text.number(tiles.undone))}</b></button>
-    </div>`
-      : "";
 
-  const kindSeg = both
-    ? `<div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("overview.reports"))}">
-        <button type="button" data-bd-kind="" aria-pressed="${filters.kind === ""}">${escapeHTML(text.t("board.all"))}</button>
-        <button type="button" data-bd-kind="bug" aria-pressed="${filters.kind === "bug"}">${escapeHTML(text.t("overview.bugs"))}</button>
-        <button type="button" data-bd-kind="idea" aria-pressed="${filters.kind === "idea"}">${escapeHTML(text.t("overview.ideas"))}</button>
-      </div>`
-    : "";
+  // What can narrow the list lives in one menu, the same on every screen; the order has its own button.
+  const groups: FilterGroup[] = [
+    {
+      name: "kind",
+      label: text.t("overview.colType"),
+      value: filters.kind,
+      options: both
+        ? [
+            { value: "", label: text.t("board.all") },
+            { value: "bug", label: text.t("overview.bugs") },
+            { value: "idea", label: text.t("overview.ideas") },
+          ]
+        : [],
+    },
+    {
+      name: "outcome",
+      label: text.t("board.result"),
+      value: filters.outcome,
+      options:
+        filters.state === "closed"
+          ? [
+              { value: "", label: text.t("board.all") },
+              { value: "done", label: text.t("board.outcomeDone"), count: tiles.done },
+              { value: "undone", label: text.t("board.outcomeUndone"), count: tiles.undone },
+            ]
+          : [],
+    },
+  ];
+  const sort: FilterGroup = {
+    name: "sort",
+    label: text.t("board.sort"),
+    value: filters.sort === "votes" ? "votes" : "new",
+    options: [
+      { value: "new", label: text.t("board.sortNew") },
+      { value: "votes", label: text.t("board.sortVotes") },
+    ],
+  };
 
-  const bar = `<div class="bd-bar">
-    <div class="bd-states">${stateSeg}${outcomeSeg}</div>
+  const bar = `<div class="fb">
     <label class="search-box">
       ${icons.search(14)}
       <input type="search" data-bd-search value="${escapeAttr(filters.query)}" placeholder="${escapeAttr(text.t("board.searchBefore"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
     </label>
-    ${kindSeg}
-    <div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("board.sortNew") + " / " + text.t("board.sortVotes"))}">
-      <button type="button" data-bd-sort="new" aria-pressed="${filters.sort !== "votes"}">${escapeHTML(text.t("board.sortNew"))}</button>
-      <button type="button" data-bd-sort="votes" aria-pressed="${filters.sort === "votes"}">${escapeHTML(text.t("board.sortVotes"))}</button>
-    </div>
+    ${filterMenu(groups, text.t("board.filters"), text)}${sortMenu(sort, text.t("board.sort"), text)}
   </div>`;
 
   // What narrows the list, said, and one press to undo it.
-  const chip = (what: string, label: string) =>
-    `<button type="button" class="bd-chip" data-bd-undo="${what}">${escapeHTML(label)}${icons.close(12)}</button>`;
-  const chips =
-    narrowed
-      ? `<div class="bd-narrow">${filters.kind ? chip("kind", text.t(`kind.${filters.kind}`)) : ""}${
-          filters.query.trim().length >= 2 ? chip("q", `«${filters.query.trim()}»`) : ""
-        }<button type="button" class="bd-clear" data-bd-clear>${escapeHTML(text.t("board.clear"))}</button></div>`
-      : "";
+  const chips = filterChips(
+    [
+      ...(filters.kind ? [{ name: "kind", label: text.t(`kind.${filters.kind}`) }] : []),
+      ...(filters.state === "closed" && filters.outcome ? [{ name: "outcome", label: text.t(filters.outcome === "done" ? "board.outcomeDone" : "board.outcomeUndone") }] : []),
+      ...(filters.query.trim().length >= 2 ? [{ name: "q", label: `«${filters.query.trim()}»` }] : []),
+    ],
+    text.t("board.clear"),
+  );
 
   const picker =
     lanes.length > 1
@@ -363,7 +382,7 @@ export function board(
       </div>
     </header>
     ${tileRow}
-    ${empty ? "" : bar}
+    ${empty ? "" : tabs + bar}
     ${content}
     ${empty ? "" : boardDialog(text)}
   </div>`;
@@ -389,17 +408,27 @@ export function boardDialog(text: Text): string {
       <span class="ov-chip" data-bd-count></span>
       <button type="button" class="icon-button" data-bd-close aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
     </header>
-    <div class="bd-tools">
+    <div class="fb bd-tools">
       <label class="search-box">
         ${icons.search(14)}
         <input type="search" data-bd-q placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
       </label>
-      <div class="bd-seg" data-bd-statuses hidden></div>
-      <div class="bd-seg" role="group">
-        <button type="button" data-bd-dsort="new" aria-pressed="true">${escapeHTML(text.t("board.sortNew"))}</button>
-        <button type="button" data-bd-dsort="votes" aria-pressed="false">${escapeHTML(text.t("board.sortVotes"))}</button>
-      </div>
+      <span class="fb-slot" data-bd-filters></span>
+      ${sortMenu(
+        {
+          name: "sort",
+          label: text.t("board.sort"),
+          value: "new",
+          options: [
+            { value: "new", label: text.t("board.sortNew") },
+            { value: "votes", label: text.t("board.sortVotes") },
+          ],
+        },
+        text.t("board.sort"),
+        text,
+      )}
     </div>
+    ${filterChipsHost(text.t("board.clear"))}
     <div class="ov-modal-body" data-bd-modal-body></div>
   </dialog>`;
 }
@@ -562,17 +591,14 @@ export function roadmap(
   return `<div class="page rm" data-rm data-planned-rows="${ROADMAP_PLANNED_ROWS}" data-months="${ROADMAP_MONTHS}" data-history-rows="${ROADMAP_HISTORY_ROWS}" data-now-cards="${ROADMAP_NOW_CARDS}">
     ${header}
     ${tiles}
-    <div class="rm-bar">
-      <div class="rm-seg" role="group" aria-label="${escapeAttr(text.t("roadmap.show"))}">
-        <button type="button" data-rm-filter="" aria-pressed="true">${escapeHTML(text.t("board.all"))}</button>
-        <button type="button" data-rm-filter="idea" aria-pressed="false">${escapeHTML(text.t("overview.ideas"))}</button>
-        <button type="button" data-rm-filter="bug" aria-pressed="false">${escapeHTML(text.t("overview.bugs"))}</button>
-      </div>
-      <label class="search-box rm-search">
+    <div class="fb">
+      <label class="search-box">
         ${icons.search(14)}
         <input type="search" data-rm-search placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
       </label>
+      ${filterMenu([roadmapKindGroup("", text)], text.t("board.filters"), text)}
     </div>
+    ${filterChipsHost(text.t("board.clear"))}
 
     <div class="rm-lanes">
       <section class="rm-box rm-lane rm-in_progress" data-rm-box="in_progress" data-ideas="${inProgress.ideas}" data-bugs="${inProgress.bugs}" data-loaded="${inProgress.items.length}">

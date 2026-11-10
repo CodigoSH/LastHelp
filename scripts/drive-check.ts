@@ -914,7 +914,8 @@ async function main() {
   check("what was declined is shut until it is asked for", roadmap.declinedShut === true);
   // The filter hides rows, and says so rather than leaving a lane blank.
   const filtered = await evaluate(`
-    document.querySelector('[data-rm-filter="bug"]').click();
+    document.querySelector('[data-rm] > .fb .fb-btn[data-fb-toggle]').click();
+    document.querySelector('[data-rm] > .fb .fb-opt[data-fb-value="bug"]').click();
     const box = document.querySelector('[data-rm-box="planned"]');
     return {
       rows: [...box.querySelectorAll("[data-rm-row]")].filter(r => !r.hidden).length,
@@ -923,7 +924,7 @@ async function main() {
     };
   `);
   check("the bug filter empties a lane of ideas and the lane says so", filtered.rows === 0 && filtered.said === true && filtered.tile === "0", JSON.stringify(filtered));
-  await evaluate(`document.querySelector('[data-rm-filter=""]').click();`);
+  await evaluate(`document.querySelector('[data-rm] > .fb .fb-btn[data-fb-toggle]').click(); document.querySelector('[data-rm] > .fb .fb-opt[data-fb-value=""]').click();`);
   // The search narrows what the page holds, and says so when nothing is left.
   const searched = await evaluate(`
     const input = document.querySelector("[data-rm-search]");

@@ -10,6 +10,7 @@ import { escapeAttr, escapeHTML } from "../escape";
 import type { ItemSummary } from "../api";
 import { icons } from "./icons";
 import type { Text } from "./templates";
+import { filterChipsHost, filterMenu, sortMenu, type FilterGroup } from "./filterBar";
 
 /** Rows that ended, grouped by the month they ended in, newest first. A month is the reader's own, local. */
 export function monthGroups(items: ItemSummary[]): Array<{ at: number; items: ItemSummary[] }> {
@@ -40,6 +41,20 @@ export function voteTile(text: Text, item: ItemSummary): string {
 /** What marks a finished row: a tick for what was delivered, a dashed ring for what was declined. */
 const marker = (lane: string) => (lane === "declined" ? `<span class="rm-dismissed" aria-hidden="true"></span>` : `<span class="rm-check" aria-hidden="true">${icons.check(14)}</span>`);
 
+/** What a report is, as the filter of the roadmap's lists: everything, ideas or bugs. */
+export function roadmapKindGroup(value: string, text: Text): FilterGroup {
+  return {
+    name: "kind",
+    label: text.t("overview.colType"),
+    value,
+    options: [
+      { value: "", label: text.t("board.all") },
+      { value: "idea", label: text.t("overview.ideas") },
+      { value: "bug", label: text.t("overview.bugs") },
+    ],
+  };
+}
+
 /** The frame, drawn once with the page and filled for each lane. */
 export function roadmapDialog(text: Text): string {
   return `<dialog class="modal ov-modal rm-modal" id="rm-modal" aria-labelledby="rm-modal-title">
@@ -48,21 +63,27 @@ export function roadmapDialog(text: Text): string {
       <span class="ov-chip" data-rm-count></span>
       <button type="button" class="icon-button" data-rm-close aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
     </header>
-    <div class="rm-tools">
+    <div class="fb rm-tools">
       <label class="search-box">
         ${icons.search(14)}
         <input type="search" data-rm-q placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
       </label>
-      <div class="rm-seg" role="group" aria-label="${escapeAttr(text.t("roadmap.show"))}">
-        <button type="button" data-rm-kind="" aria-pressed="true">${escapeHTML(text.t("board.all"))}</button>
-        <button type="button" data-rm-kind="idea" aria-pressed="false">${escapeHTML(text.t("overview.ideas"))}</button>
-        <button type="button" data-rm-kind="bug" aria-pressed="false">${escapeHTML(text.t("overview.bugs"))}</button>
-      </div>
-      <div class="rm-seg" role="group">
-        <button type="button" data-rm-sort="votes" aria-pressed="false">${escapeHTML(text.t("board.sortVotes"))}</button>
-        <button type="button" data-rm-sort="recent" aria-pressed="false">${escapeHTML(text.t("board.sortNew"))}</button>
-      </div>
+      ${filterMenu([roadmapKindGroup("", text)], text.t("board.filters"), text)}
+      ${sortMenu(
+        {
+          name: "sort",
+          label: text.t("board.sort"),
+          value: "votes",
+          options: [
+            { value: "votes", label: text.t("board.sortVotes") },
+            { value: "recent", label: text.t("board.sortNew") },
+          ],
+        },
+        text.t("board.sort"),
+        text,
+      )}
     </div>
+    ${filterChipsHost(text.t("board.clear"))}
     <div class="ov-modal-body" data-rm-modal-body></div>
   </dialog>`;
 }
