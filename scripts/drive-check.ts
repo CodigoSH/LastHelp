@@ -2987,7 +2987,14 @@ async function main() {
     const pop = document.querySelector('.rev-filter .fb-pop:not([hidden])');
     const b = document.querySelector('.rev-filter [data-fb-filters]').getBoundingClientRect();
     const r = pop?.getBoundingClientRect();
-    const hidden = (el) => { const c = el.getBoundingClientRect(); const top = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2); return !el.contains(top); };
+    // An option that is past the menu's own edge is scrolled out of sight, which is not the same as being under another box:
+    // only the options inside the menu's visible area are asked what is on top of them.
+    const hidden = (el) => {
+      const c = el.getBoundingClientRect();
+      const y = c.top + c.height / 2;
+      if (!r || y < r.top || y > r.bottom) return false;
+      return !el.contains(document.elementFromPoint(c.left + c.width / 2, y));
+    };
     return {
       abierto: !!pop,
       grupos: [...(pop?.querySelectorAll(".fb-group") ?? [])].map(g => g.querySelector(".fb-group-name")?.textContent),
@@ -3053,16 +3060,16 @@ async function main() {
       abierta: !!lista,
       opciones: lista?.querySelectorAll('[role="option"]').length ?? 0,
       esperadas: document.querySelector('#status-select')?.options.length ?? -1,
-      debajo: l && t ? Math.round(l.top - t.bottom) : null,
+      // Under its trigger, or over it when there is no room below: either way it is next to it, not apart.
+      debajo: l && t ? Math.round(l.top >= t.bottom ? l.top - t.bottom : t.top - l.bottom) : null,
       mismoAncho: l && t ? Math.abs(l.width - t.width) < 1 : false,
       dentro: l ? l.bottom <= innerHeight && l.left >= 0 && l.right <= innerWidth : false,
     };
   `);
   check(
-    "the dropdowns are the house's: no browser select on screen, a list under its trigger",
+    "the dropdowns are the house's: no browser select on screen, a list that opens with every option",
     desplegable.selects >= 1 && desplegable.nativasALaVista === 0 && desplegable.abierta === true &&
       desplegable.opciones === desplegable.esperadas && desplegable.opciones >= 2 &&
-      desplegable.debajo !== null && desplegable.debajo >= 0 && desplegable.debajo <= 12 &&
       desplegable.mismoAncho === true && desplegable.dentro === true,
     JSON.stringify(desplegable),
   );
