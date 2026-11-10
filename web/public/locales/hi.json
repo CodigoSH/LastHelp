@@ -60,6 +60,7 @@
   "board.moderation": "जाँच",
   "board.reply": "जवाब",
   "board.results": "परिणाम: {count}",
+  "board.apply": "लागू करें",
   "board.showing": "{total} में से {shown} दिखाए जा रहे हैं",
   "board.sortNew": "सबसे नए",
   "board.sortOldest": "सबसे पुराने पहले",

@@ -20,7 +20,7 @@ import { overviewDialog } from "./overviewDetail";
 import { monthGroups, roadmapDialog, roadmapKind, voteTile } from "./roadmapModal";
 import { laneCap, type LaneKey, type Tiles } from "../services/boardState";
 import { icons } from "./icons";
-import { choiceMenu, filterChips, filterChipsHost, filterMenu, segmented, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
+import { choiceMenu, chosenValues, filterChips, filterChipsHost, filterMenu, segmented, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
 import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
@@ -2578,7 +2578,7 @@ export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): s
 function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): string {
   const counts = data.counts ?? { moderation: {}, status: {}, kind: {} };
   const states = counts.state ?? {};
-  const some = (values: FilterOption[], chosen: string) => values.filter((v) => v.count === undefined || v.count > 0 || v.value === chosen);
+  const some = (values: FilterOption[], chosen: string) => values.filter((v) => v.count === undefined || v.count > 0 || chosen.split(",").includes(v.value));
   const all = { value: "", label: text.t("board.all") };
 
   const groups: FilterGroup[] = [
@@ -2591,6 +2591,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
     {
       name: "moderation",
       label: text.t("board.moderation"),
+      multi: true,
       value: filters.moderation,
       options: [
         all,
@@ -2602,14 +2603,15 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
       label: text.t("overview.colStatus"),
       // Shipped and fixed are one word, completed, so they are one option that finds both and counts both.
       // An old address that asks for fixed shows completed as the one chosen.
-      value: filters.status === "closed" ? "done" : filters.status,
+      multi: true,
+      value: filters.status.split(",").map((v) => (v === "closed" ? "done" : v)).join(","),
       options: [
         all,
         ...some(
           everyStatus
             .filter((s) => s !== "closed")
             .map((s) => ({ value: s, label: text.t(`status.${s}`), count: (counts.status[s] ?? 0) + (s === "done" ? (counts.status.closed ?? 0) : 0) })),
-          filters.status === "closed" ? "done" : filters.status,
+          filters.status.split(",").map((v) => (v === "closed" ? "done" : v)).join(","),
         ),
       ],
     },
@@ -2653,10 +2655,13 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
     </div>`;
 
   const chips = filterChips(
-    [...groups, repository].flatMap((g) => {
-      const chosen = g.options.find((o) => o.value === g.value);
-      return chosen && g.value !== "" ? [{ name: g.name, label: chosen.label }] : [];
-    }),
+    [...groups, repository].flatMap((g) =>
+      // One chip for each thing chosen, and each comes off by itself.
+      chosenValues(g).flatMap((v) => {
+        const chosen = g.options.find((o) => o.value === v);
+        return chosen ? [{ name: g.multi ? `${g.name}:${v}` : g.name, label: chosen.label }] : [];
+      }),
+    ),
     text.t("board.clear"),
   );
 

@@ -60,6 +60,7 @@
   "board.moderation": "Değerlendirme",
   "board.reply": "Yanıt",
   "board.results": "Sonuç: {count}",
+  "board.apply": "Uygula",
   "board.showing": "{total} içinden {shown} gösteriliyor",
   "board.sortNew": "En yeni",
   "board.sortOldest": "Önce en eski",

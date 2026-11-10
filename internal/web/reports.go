@@ -141,20 +141,41 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 	// how many rows pressing it would show.
 	narrowed := func(state, outcome string) (item.Filter, bool) {
 		f := base
-		f.Status = item.Status(query.Get("status"))
-		moderation := query.Get("moderation")
-		f.Moderation, f.AnyModeration = item.Moderation(moderation), moderation == ""
-		if state == "" {
-			// No side chosen: "completed" is still both ways of being done.
-			if f.Status != "" {
-				f.Statuses, f.Status = item.Alike(f.Status), ""
+		// Several of each may be asked at once, comma-separated: "completed" is both ways of being done,
+		// so every status named stands for what it is alike to.
+		var wanted []item.Status
+		seenStatus := map[item.Status]bool{}
+		for _, raw := range splitList(query.Get("status")) {
+			for _, st := range item.Alike(item.Status(raw)) {
+				if !seenStatus[st] {
+					seenStatus[st] = true
+					wanted = append(wanted, st)
+				}
 			}
+		}
+		var moderations []item.Moderation
+		for _, raw := range splitList(query.Get("moderation")) {
+			moderations = append(moderations, item.Moderation(raw))
+		}
+		f.AnyModeration = len(moderations) == 0
+		f.Moderations = moderations
+		if state == "" {
+			f.Statuses = wanted
 			return f, true
 		}
-		if moderation != "" && moderation != string(item.Published) {
-			return f, false
+		// Open and closed are of what is published: asking for states that leave it out leaves nothing.
+		if len(moderations) > 0 {
+			published := false
+			for _, m := range moderations {
+				if m == item.Published {
+					published = true
+				}
+			}
+			if !published {
+				return f, false
+			}
 		}
-		f.Moderation, f.AnyModeration = item.Published, false
+		f.Moderations, f.AnyModeration, f.Moderation = nil, false, item.Published
 		allowed := item.OpenStatuses()
 		switch {
 		case outcome == "done":
@@ -164,18 +185,15 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		case state == "closed":
 			allowed = item.ClosedStatuses()
 		}
-		if f.Status == "" {
+		if len(wanted) == 0 {
 			f.Statuses = allowed
 			return f, true
 		}
-		// The status picked has to be one of this side's, or nothing is left. "Completed"
-		// is both of the ways to be done, so it keeps whichever of them this side has.
+		// The statuses picked have to be of this side's, or nothing is left.
 		var kept []item.Status
 		for _, st := range allowed {
-			for _, want := range item.Alike(f.Status) {
-				if st == want {
-					kept = append(kept, st)
-				}
+			if seenStatus[st] {
+				kept = append(kept, st)
 			}
 		}
 		if len(kept) == 0 {
@@ -270,4 +288,18 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 			"state":      states,
 		},
 	})
+}
+
+// splitList reads a comma-separated list of values from an address: no blanks, none twice.
+func splitList(raw string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, v := range strings.Split(raw, ",") {
+		v = strings.TrimSpace(v)
+		if v != "" && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
 }

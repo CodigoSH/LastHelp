@@ -113,10 +113,12 @@ publish, reject, and spam. The arrow keys move down the list. It opens on what
 is waiting when something is, and on **History**, every report, otherwise.
 
 The **History** tab is the archive: every report ever sent, found by its words or
-narrowed with the **Filters** menu: type, moderation, status and whether the team
-has replied, spread across columns so they are all in sight, and with the
-**Repository** button beside it, where you choose one repository among many, or all, and can search for it
-by name. **All / Open / Closed**
+narrowed in four ways that sit together above the list: **No team reply**, a button that is always in sight; the
+**Filters** menu, where you tick as many moderation states and statuses as you want, choose a type and,
+under Closed, a result, and press **Apply** to apply them together; the **Repository** button, to choose one
+repository among many, or all, and search for it by name; and an order button (newest, oldest first, or most voted).
+What is chosen shows under them as chips, each of which comes off by itself, and a line says how many reports
+the list holds. On a phone the menus open as a sheet from the bottom. **All / Open / Closed**
 splits the published reports the way the public board does, each with how many
 it would show; under **Closed**, the menu adds **Completed** and **Declined**, which tell a delivery from a
 report the team turned down. What is chosen shows under the menu as chips that come off with one press. In the archive the list is grouped by repository,

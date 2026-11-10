@@ -116,6 +116,17 @@ func TestTheReportsScreenCanBeNarrowedToOpenAndClosed(t *testing.T) {
 	rejected, _, _ := ask(admin, "moderation=rejected&board=acme/atlas")
 	same("rejected, without a side", rejected, "turned down idea")
 
+	// Several statuses and several states of moderation at once, comma-separated.
+	many, _, _ := ask(admin, "status=done,declined&board=acme/atlas")
+	same("completed or declined", many, "shipped idea", "fixed bug", "declined idea", "unreproducible bug")
+	onOpenSide, _, _ := ask(admin, "state=open&status=declined,new&board=acme/atlas")
+	same("declined or new on the open side", onOpenSide, "open idea")
+	waitingOrTurnedDown, _, _ := ask(admin, "moderation=pending,rejected&board=acme/atlas")
+	same("pending or rejected", waitingOrTurnedDown, "waiting idea", "turned down idea")
+	both, _, _ := ask(admin, "state=closed&moderation=published,rejected&board=acme/atlas")
+	same("a side with published among the states", both, "shipped idea", "declined idea", "fixed bug", "unreproducible bug")
+	neither, _, _ := ask(admin, "state=closed&moderation=pending,rejected&board=acme/atlas")
+	same("a side without published among the states", neither)
 	// The order: newest first by default, the longest-waiting first when asked, and nothing else.
 	newest, _, _ := askOrdered(admin, "board=acme/atlas")
 	oldest, _, _ := askOrdered(admin, "board=acme/atlas&sort=oldest")

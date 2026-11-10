@@ -60,6 +60,7 @@
   "board.moderation": "Modération",
   "board.reply": "Réponse",
   "board.results": "Résultats : {count}",
+  "board.apply": "Appliquer",
   "board.showing": "Affichage de {shown} sur {total}",
   "board.sortNew": "Les plus récents",
   "board.sortOldest": "Plus anciens d'abord",

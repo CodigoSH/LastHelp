@@ -60,6 +60,7 @@
   "board.moderation": "Penyaringan",
   "board.reply": "Balasan",
   "board.results": "Hasil: {count}",
+  "board.apply": "Terapkan",
   "board.showing": "Menampilkan {shown} dari {total}",
   "board.sortNew": "Terbaru",
   "board.sortOldest": "Terlama dulu",

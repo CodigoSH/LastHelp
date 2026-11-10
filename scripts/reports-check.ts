@@ -829,6 +829,8 @@ async function main() {
       // An option of the menu is pressed the way a person does it: the menu is opened first.
       if (sel.includes(".fb-opt")) document.querySelector(".rev-filter [data-fb-filters]")?.click();
       document.querySelector(sel)?.click();
+      // The filters menu is staged: what is chosen in it is applied together, with its button.
+      if (sel.includes(".fb-opt")) document.querySelector(".rev-filter [data-fb-apply]")?.click();
       await wait(() => !document.querySelector("[data-leaving]") && document.querySelector(".rev-row, .rev-empty"));
       await new Promise(r => setTimeout(r, 300));
     };

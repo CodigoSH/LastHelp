@@ -776,8 +776,8 @@ describe("the board page", () => {
   test("what is closed can be narrowed to what was done or what was not, and only while looking at it", () => {
     const page = html({ state: "closed", outcome: "undone" });
     expect(page).toContain('data-fb-group="outcome" data-fb-value="undone"');
-    expect(page).toMatch(/aria-checked="true" data-fb-group="outcome" data-fb-value="undone"/);
-    expect(page).toMatch(/aria-checked="false" data-fb-group="outcome" data-fb-value="done"/);
+    expect(page).toMatch(/aria-checked="true" data-fb-was="true" data-fb-group="outcome" data-fb-value="undone"/);
+    expect(page).toMatch(/aria-checked="false" data-fb-was="false" data-fb-group="outcome" data-fb-value="done"/);
     // The outcome is a question of the closed side: on the open side there is nothing to choose.
     expect(html({ state: "open", outcome: "undone" })).not.toContain('data-fb-group="outcome"');
   });

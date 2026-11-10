@@ -24,21 +24,31 @@ export interface FilterGroup {
   name: string;
   label: string;
   options: FilterOption[];
+  /** What is chosen. For a group that takes several, the values joined by commas, as the address has them. */
   value: string;
+  /** Several options can be on at once: they are boxes to tick, and are applied together. */
+  multi?: boolean;
+}
+
+/** The values a group has on: one for a choice, any number for a group that takes several, none for "everything". */
+export function chosenValues(g: FilterGroup): string[] {
+  return g.value === "" ? [] : g.multi ? g.value.split(",").filter((v) => v !== "") : [g.value];
 }
 
 /** From this many options a group has a box to find one in: a list of thirty is not read, it is searched. */
 export const FIND_FROM = 10;
 
-const option = (group: FilterGroup, o: FilterOption, text: Text) =>
-  `<button type="button" class="fb-opt" role="menuitemradio" aria-checked="${group.value === o.value}" data-fb-group="${escapeAttr(group.name)}" data-fb-value="${escapeAttr(o.value)}">
+const option = (group: FilterGroup, o: FilterOption, text: Text) => {
+  const on = group.multi ? (o.value === "" ? chosenValues(group).length === 0 : chosenValues(group).includes(o.value)) : group.value === o.value;
+  return `<button type="button" class="fb-opt${group.multi ? " box" : ""}" role="${group.multi ? "menuitemcheckbox" : "menuitemradio"}" aria-checked="${on}" data-fb-was="${on}" data-fb-group="${escapeAttr(group.name)}" data-fb-value="${escapeAttr(o.value)}"${group.multi ? " data-fb-multi" : ""}>
       <span class="fb-opt-mark" aria-hidden="true"></span><span class="fb-opt-name">${escapeHTML(o.label)}</span>${
         o.count === undefined ? "" : `<b class="fb-opt-n">${escapeHTML(text.number(o.count))}</b>`
       }</button>`;
+};
 
 /** How many of the groups hold something other than their first option, which is "everything". */
 export function activeFilters(groups: FilterGroup[]): number {
-  return groups.filter((g) => g.options.length > 0 && g.value !== g.options[0]!.value).length;
+  return groups.filter((g) => g.options.length > 0 && (g.multi ? chosenValues(g).length > 0 : g.value !== g.options[0]!.value)).length;
 }
 
 /**
@@ -50,11 +60,13 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
   const usable = groups.filter((g) => g.options.length > 1);
   if (usable.length === 0) return "";
   const on = activeFilters(usable);
+  // A menu with a group that takes several is staged: what is ticked is applied together, with one button.
+  const staged = usable.some((g) => g.multi);
   return `<div class="fb-menu">
     <button type="button" class="fb-btn${on > 0 ? " on" : ""}" data-fb-toggle data-fb-filters aria-haspopup="menu" aria-expanded="false">
       ${icons.filter(14)}<span>${escapeHTML(label)}</span>${on > 0 ? `<b class="fb-count">${escapeHTML(text.number(on))}</b>` : ""}${icons.caretDown(12)}
     </button>
-    <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu" hidden>${usable
+    <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu"${staged ? " data-fb-staged" : ""} hidden>${usable
       .map(
         (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name">${escapeHTML(g.label)}</p>${
           g.options.length >= FIND_FROM
@@ -62,7 +74,7 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
             : ""
         }<div class="fb-opts">${g.options.map((o) => option(g, o, text)).join("")}</div></div>`,
       )
-      .join("")}</div>
+      .join("")}${staged ? `<div class="fb-apply"><button type="button" class="fb-apply-btn" data-fb-apply>${escapeHTML(text.t("board.apply"))}</button></div>` : ""}</div>
   </div>`;
 }
 

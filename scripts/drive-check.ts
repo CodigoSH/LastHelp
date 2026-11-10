@@ -2937,6 +2937,7 @@ async function main() {
     document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
     document.querySelector('.rev-filter [data-fb-filters]').click();
     document.querySelector('.rev-filter .fb-opt[data-fb-group="kind"][data-fb-value="bug"]').click();
+    document.querySelector('.rev-filter [data-fb-apply]').click();
   `);
   await waitFor("#app > :not([data-leaving]) .rev-filter");
   const porTipo = await evaluate(`
@@ -3010,7 +3011,9 @@ async function main() {
   );
   await evaluate(`
     document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
+    document.querySelector('.rev-filter [data-fb-filters]').click();
     document.querySelector('.rev-filter .fb-opt[data-fb-group="moderation"][data-fb-value="published"]').click();
+    document.querySelector('.rev-filter [data-fb-apply]').click();
   `);
   await waitFor("#app > :not([data-leaving]) .rev-filter");
   const elegida = await evaluate(`
@@ -3025,6 +3028,33 @@ async function main() {
     elegida.direccion === "published" && elegida.cuenta === "2" && elegida.etiquetas === 2,
     JSON.stringify(elegida),
   );
+  // Several statuses at once: ticked together, applied together, and each has a chip of its own that comes off by itself.
+  await evaluate(`
+    document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
+    document.querySelector('.rev-filter [data-fb-filters]').click();
+    document.querySelector('.rev-filter .fb-opt[data-fb-group="status"][data-fb-value="new"]').click();
+    document.querySelector('.rev-filter .fb-opt[data-fb-group="status"][data-fb-value="planned"]').click();
+    document.querySelector('.rev-filter [data-fb-apply]').click();
+  `);
+  await waitFor("#app > :not([data-leaving]) .rev-filter");
+  const variosEstados = await evaluate(`
+    const q = new URLSearchParams(location.search);
+    return { status: q.get("status"), chips: [...document.querySelectorAll('.rev-filter .fb-chip')].map(c => c.dataset.fbUndo),
+      marcados: [...document.querySelectorAll('.rev-filter .fb-opt[data-fb-group="status"][aria-checked="true"]')].length };
+  `);
+  check(
+    "several statuses can be ticked in the menu and applied together, each with its own chip",
+    variosEstados.status === "new,planned" && variosEstados.chips.includes("status:new") && variosEstados.chips.includes("status:planned") && variosEstados.marcados === 2,
+    JSON.stringify(variosEstados),
+  );
+  await evaluate(`
+    document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
+    document.querySelector('.rev-filter .fb-chip[data-fb-undo="status:new"]').click();
+  `);
+  await waitFor("#app > :not([data-leaving]) .rev-filter");
+  const unoMenos = await evaluate(`return { status: new URLSearchParams(location.search).get("status") };`);
+  check("a chip takes off its own status and leaves the other", unoMenos.status === "planned", JSON.stringify(unoMenos));
+
   // A chip comes off with one press, and "clear" takes every one off.
   await evaluate(`
     document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");

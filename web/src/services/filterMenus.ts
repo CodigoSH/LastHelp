@@ -9,6 +9,11 @@
  * the bar and which says the group and the value.
  */
 
+/** What a staged menu says when it is applied: the value of every group in it, by name. Several values are joined by commas. */
+export interface FilterApply {
+  values: Record<string, string>;
+}
+
 export interface FilterPick {
   group: string;
   value: string;
@@ -60,13 +65,53 @@ export function installFilterMenus(): void {
       // A menu opens with every option in sight, whatever was typed into a group's box the last time.
       if (open) {
         menu.querySelectorAll<HTMLInputElement>("[data-fb-find]").forEach((f) => (f.value = ""));
-        options(menu).forEach((o) => (o.hidden = false));
+        // And with what is applied ticked, not what was ticked and never applied the last time.
+        options(menu).forEach((o) => {
+          o.hidden = false;
+          if (o.dataset.fbWas) o.setAttribute("aria-checked", o.dataset.fbWas);
+        });
       }
       toggle.setAttribute("aria-expanded", String(open));
       if (open) {
         const checked = options(menu).find((o) => o.getAttribute("aria-checked") === "true") ?? options(menu)[0];
         checked?.focus({ preventScroll: true });
       }
+      return;
+    }
+    // The button of a staged menu: everything ticked is applied together, and the menu closes.
+    const apply = target.closest<HTMLElement>("[data-fb-apply]");
+    if (apply) {
+      const pop = apply.closest(".fb-pop");
+      const values: Record<string, string> = {};
+      pop?.querySelectorAll<HTMLElement>(".fb-group").forEach((group) => {
+        const all = [...group.querySelectorAll<HTMLElement>(".fb-opt")];
+        const name = all[0]?.dataset.fbGroup;
+        if (!name) return;
+        const on = all.filter((o) => o.getAttribute("aria-checked") === "true" && (o.dataset.fbValue ?? "") !== "").map((o) => o.dataset.fbValue ?? "");
+        // A group that takes several gives every value; one that takes a single answer gives that one, or nothing for "everything".
+        values[name] = all[0]?.hasAttribute("data-fb-multi") ? on.join(",") : (on[0] ?? "");
+      });
+      const button = apply.closest(MENU)?.querySelector<HTMLElement>("[data-fb-toggle]");
+      closeMenus();
+      button?.focus({ preventScroll: true });
+      apply.dispatchEvent(new CustomEvent<FilterApply>("fb-apply", { bubbles: true, detail: { values } }));
+      return;
+    }
+    // In a staged menu an option is ticked or chosen, not sent: the menu stays open until it is applied.
+    if (opt && opt.closest(".fb-pop")?.hasAttribute("data-fb-staged")) {
+      const group = opt.closest(".fb-group");
+      const all = [...(group?.querySelectorAll<HTMLElement>(".fb-opt") ?? [])];
+      const set = (o: HTMLElement, on: boolean) => o.setAttribute("aria-checked", String(on));
+      if (opt.hasAttribute("data-fb-multi")) {
+        const everything = (opt.dataset.fbValue ?? "") === "";
+        if (everything) all.forEach((o) => set(o, o === opt));
+        else {
+          set(opt, opt.getAttribute("aria-checked") !== "true");
+          const real = all.filter((o) => (o.dataset.fbValue ?? "") !== "");
+          // "Everything" is on exactly when nothing else is.
+          all.filter((o) => (o.dataset.fbValue ?? "") === "").forEach((o) => set(o, !real.some((r) => r.getAttribute("aria-checked") === "true")));
+        }
+      } else all.forEach((o) => set(o, o === opt));
       return;
     }
     if (opt) {

@@ -60,6 +60,7 @@
   "board.moderation": "بررسی",
   "board.reply": "پاسخ",
   "board.results": "نتایج: {count}",
+  "board.apply": "اعمال",
   "board.showing": "نمایش {shown} از {total}",
   "board.sortNew": "جدیدترین",
   "board.sortOldest": "قدیمی‌ترین‌ها اول",

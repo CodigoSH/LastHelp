@@ -60,6 +60,7 @@
   "board.moderation": "الإشراف",
   "board.reply": "الرد",
   "board.results": "النتائج: {count}",
+  "board.apply": "تطبيق",
   "board.showing": "عرض {shown} من {total}",
   "board.sortNew": "الأحدث",
   "board.sortOldest": "الأقدم أولاً",

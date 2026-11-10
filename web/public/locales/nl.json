@@ -60,6 +60,7 @@
   "board.moderation": "Beoordeling",
   "board.reply": "Reactie",
   "board.results": "Resultaten: {count}",
+  "board.apply": "Toepassen",
   "board.showing": "{shown} van {total} getoond",
   "board.sortNew": "Nieuwste",
   "board.sortOldest": "Oudste eerst",

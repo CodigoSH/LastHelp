@@ -24,7 +24,7 @@ import { escapeAttr, escapeHTML } from "./escape";
 import { toast, toastError } from "./services/toast";
 import { dialogParams, laneCap, lanePlan, laneStatuses, tileNumbers, type Counts, type LaneKey, type LaneSpec } from "./services/boardState";
 import { historyRows, rankedRows, titleHas, type RoadmapFilter } from "./services/roadmapState";
-import { installFilterMenus, syncFilterBar, type FilterPick } from "./services/filterMenus";
+import { installFilterMenus, syncFilterBar, type FilterApply, type FilterPick } from "./services/filterMenus";
 import { filterMenu } from "./views/filterBar";
 import { disablePush, enablePush, loadPush, removePushDevice, testPush, type PushView } from "./services/pushClient";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
@@ -3220,8 +3220,19 @@ async function wireReview(
     const { group, value } = (event as CustomEvent<FilterPick>).detail;
     narrowTo({ [group]: value });
   });
+  // A menu with boxes to tick sends everything at once, when it is applied.
+  filterBox?.addEventListener("fb-apply", (event) => narrowTo((event as CustomEvent<FilterApply>).detail.values));
+  // A chip comes off by itself: one of several values of a group, or the group's only one.
   filterBox?.querySelectorAll<HTMLElement>("[data-fb-undo]").forEach((b) =>
-    b.addEventListener("click", () => narrowTo({ [b.dataset.fbUndo ?? ""]: "" })),
+    b.addEventListener("click", () => {
+      const [name = "", value] = (b.dataset.fbUndo ?? "").split(":");
+      if (value === undefined) return narrowTo({ [name]: "" });
+      const rest = String(view.filters[name as keyof views.ReportFilters] ?? "")
+        .split(",")
+        .map((v) => (name === "status" && v === "closed" ? "done" : v))
+        .filter((v) => v !== "" && v !== value);
+      narrowTo({ [name]: rest.join(",") });
+    }),
   );
   // What the team asks all the time stays in sight: whoever has had no reply.
   filterBox?.querySelector<HTMLElement>("[data-rreply]")?.addEventListener("click", () => narrowTo({ reply: view.filters.reply === "none" ? "" : "none" }));

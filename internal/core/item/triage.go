@@ -130,6 +130,9 @@ type Filter struct {
 	// different vocabularies — an idea is done, a bug is closed.
 	Statuses   []Status
 	Moderation Moderation // empty for published only
+	// Moderations is several at once, for the team's archive. When it is set Moderation and AnyModeration are
+	// ignored; the caller has said exactly which states it means.
+	Moderations []Moderation
 	// AnyModeration returns every state, including what is still waiting for a
 	// person. It has to be asked for by name: the public listing leaves the
 	// zero value alone and therefore cannot show something unreviewed by
@@ -233,6 +236,11 @@ func (f Filter) where() (string, []any) {
 	}
 
 	switch {
+	case len(f.Moderations) > 0:
+		where = append(where, "moderation_state IN ("+placeholders(len(f.Moderations))+")")
+		for _, m := range f.Moderations {
+			args = append(args, string(m))
+		}
 	case f.AnyModeration:
 		// Every state, asked for by name.
 	case f.Moderation == "":
