@@ -59,6 +59,7 @@
   "board.result": "결과",
   "board.moderation": "검토 상태",
   "board.reply": "답변",
+  "board.results": "결과: {count}",
   "board.showing": "{total}개 중 {shown}개 표시",
   "board.sortNew": "최신순",
   "board.sortOldest": "오래된 순",

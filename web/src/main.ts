@@ -3223,6 +3223,8 @@ async function wireReview(
   filterBox?.querySelectorAll<HTMLElement>("[data-fb-undo]").forEach((b) =>
     b.addEventListener("click", () => narrowTo({ [b.dataset.fbUndo ?? ""]: "" })),
   );
+  // What the team asks all the time stays in sight: whoever has had no reply.
+  filterBox?.querySelector<HTMLElement>("[data-rreply]")?.addEventListener("click", () => narrowTo({ reply: view.filters.reply === "none" ? "" : "none" }));
   filterBox?.querySelector<HTMLElement>("[data-fb-clear]")?.addEventListener("click", () =>
     narrowTo({ kind: "", moderation: "", status: "", board: "", outcome: "", reply: "" }),
   );

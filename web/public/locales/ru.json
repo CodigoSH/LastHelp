@@ -59,6 +59,7 @@
   "board.result": "Результат",
   "board.moderation": "Разбор",
   "board.reply": "Ответ",
+  "board.results": "Результатов: {count}",
   "board.showing": "Показано {shown} из {total}",
   "board.sortNew": "Новые",
   "board.sortOldest": "Сначала старые",

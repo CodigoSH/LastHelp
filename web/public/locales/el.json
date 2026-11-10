@@ -59,6 +59,7 @@
   "board.result": "Αποτέλεσμα",
   "board.moderation": "Διαλογή",
   "board.reply": "Απάντηση",
+  "board.results": "Αποτελέσματα: {count}",
   "board.showing": "Εμφανίζονται {shown} από {total}",
   "board.sortNew": "Νεότερα",
   "board.sortOldest": "Πρώτα τα παλαιότερα",

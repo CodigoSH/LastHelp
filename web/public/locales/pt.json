@@ -59,6 +59,7 @@
   "board.result": "Resultado",
   "board.moderation": "Triagem",
   "board.reply": "Resposta",
+  "board.results": "Resultados: {count}",
   "board.showing": "A mostrar {shown} de {total}",
   "board.sortNew": "Mais recentes",
   "board.sortOldest": "Mais antigos primeiro",

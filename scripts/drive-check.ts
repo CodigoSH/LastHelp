@@ -3004,7 +3004,7 @@ async function main() {
   `);
   check(
     "the filters menu opens under its button, inside the window, with every group and nothing under another box",
-    menuDeFiltros.abierto === true && menuDeFiltros.grupos.length >= 4 && menuDeFiltros.debajo !== null && menuDeFiltros.debajo >= 0 && menuDeFiltros.debajo <= 12 &&
+    menuDeFiltros.abierto === true && menuDeFiltros.grupos.length >= 3 && menuDeFiltros.debajo !== null && menuDeFiltros.debajo >= 0 && menuDeFiltros.debajo <= 12 &&
       menuDeFiltros.dentro === true && menuDeFiltros.tapadas === 0,
     JSON.stringify(menuDeFiltros),
   );

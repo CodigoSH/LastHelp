@@ -884,6 +884,31 @@ async function main() {
       sides.everyRows === sides.everyChip,
     JSON.stringify(sides),
   );
+  // What the screen says about how many is what it draws. "No team reply" is read as what is still open,
+  // so the tab that is on, the count and the rows have to agree on that side, as the numbers once did not.
+  const unansweredView = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 60 && !f(); i++) await new Promise(r => setTimeout(r, 100)); };
+    document.getElementById("app").firstElementChild.setAttribute("data-leaving", "1");
+    document.querySelector("[data-rreply]").click();
+    await wait(() => !document.querySelector("[data-leaving]") && document.querySelector(".rev-row, .rev-empty"));
+    await new Promise(r => setTimeout(r, 300));
+    for (let i = 0; i < 6; i++) { const more = document.querySelector(".rev-list [data-more]"); if (!more) break; more.click(); await new Promise(r => setTimeout(r, 500)); }
+    const said = Number((document.querySelector(".fb-results")?.textContent ?? "").replace(/\\D/g, ""));
+    const rows = document.querySelectorAll('[data-what="report"]').length;
+    const tab = document.querySelector(".rev-sides .tab.on")?.getAttribute("data-rstate");
+    const live = document.querySelector(".fb-results")?.getAttribute("aria-live");
+    // Put it back: the toggle off again.
+    document.getElementById("app").firstElementChild.setAttribute("data-leaving", "1");
+    document.querySelector("[data-rreply]").click();
+    await wait(() => !document.querySelector("[data-leaving]") && document.querySelector(".rev-row, .rev-empty"));
+    return { said, rows, tab, live, pressed: document.querySelector("[data-rreply]")?.getAttribute("aria-pressed") };
+  `);
+  check(
+    "the count says how many the list holds, on the side the rows are really of, and is announced",
+    unansweredView.said === unansweredView.rows && unansweredView.said > 0 && unansweredView.tab === "open" &&
+      unansweredView.live === "polite" && unansweredView.pressed === "false",
+    JSON.stringify(unansweredView),
+  );
   await shoot("review-sides");
   await goTo("/review?mode=all&state=closed&outcome=done", ".rev-row");
   await shoot("review-closed");

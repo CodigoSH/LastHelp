@@ -8060,6 +8060,12 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 .fb { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
 .fb .search-box { flex: 1 1 16rem; min-inline-size: 0; }
 .fb-menu { position: relative; }
+/* A yes-or-no that is asked all the time, in sight: it looks like the buttons beside it and says it is on. */
+.fb-toggle { block-size: 34px; padding: 0 11px; border: 1px solid var(--card-border); border-radius: 9px; background: var(--sheet); color: var(--text-dim); font: 600 12px/1 var(--font-mono); white-space: nowrap; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.fb-toggle:hover { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.3); }
+.fb-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fb-toggle[aria-pressed="true"] { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.45); background: rgba(var(--accent-rgb), 0.1); }
+.fb-results { margin: 0; font: 11px var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
 /* A choice of a few answers, in sight: the same look as the buttons beside it, joined. */
 .fb-seg { display: inline-flex; border: 1px solid var(--card-border); border-radius: 9px; background: var(--sheet); overflow: hidden; }
 .fb-seg button { block-size: 32px; padding: 0 13px; border: 0; background: transparent; color: var(--text-dim); font: 600 12px/1 var(--font-mono); white-space: nowrap; cursor: pointer; transition: color 0.15s; }

@@ -59,6 +59,7 @@
   "board.result": "Ergebnis",
   "board.moderation": "Sichtung",
   "board.reply": "Antwort",
+  "board.results": "Ergebnisse: {count}",
   "board.showing": "{shown} von {total} angezeigt",
   "board.sortNew": "Neueste",
   "board.sortOldest": "Älteste zuerst",

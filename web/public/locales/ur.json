@@ -59,6 +59,7 @@
   "board.result": "نتیجہ",
   "board.moderation": "جانچ",
   "board.reply": "جواب",
+  "board.results": "نتائج: {count}",
   "board.showing": "{total} میں سے {shown} دکھائے جا رہے ہیں",
   "board.sortNew": "تازہ ترین",
   "board.sortOldest": "پرانے پہلے",

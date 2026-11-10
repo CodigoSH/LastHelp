@@ -59,6 +59,7 @@
   "board.result": "结果",
   "board.moderation": "审核状态",
   "board.reply": "回复",
+  "board.results": "结果：{count}",
   "board.showing": "显示 {shown} / {total}",
   "board.sortNew": "最新",
   "board.sortOldest": "最早优先",

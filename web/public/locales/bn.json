@@ -59,6 +59,7 @@
   "board.result": "ফলাফল",
   "board.moderation": "মডারেশন",
   "board.reply": "উত্তর",
+  "board.results": "ফলাফল: {count}",
   "board.showing": "{total}-এর মধ্যে {shown} দেখানো হচ্ছে",
   "board.sortNew": "নতুন",
   "board.sortOldest": "পুরোনোগুলো আগে",

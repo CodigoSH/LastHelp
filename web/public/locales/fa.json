@@ -59,6 +59,7 @@
   "board.result": "نتیجه",
   "board.moderation": "بررسی",
   "board.reply": "پاسخ",
+  "board.results": "نتایج: {count}",
   "board.showing": "نمایش {shown} از {total}",
   "board.sortNew": "جدیدترین",
   "board.sortOldest": "قدیمی‌ترین‌ها اول",

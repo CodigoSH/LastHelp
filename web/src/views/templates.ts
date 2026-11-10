@@ -2627,15 +2627,13 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
             ]
           : [],
     },
-    {
-      // What nobody on the team has answered. Its own question rather than a status: it is about
-      // whether the people who wrote heard anything, and a report can be in any state while it has not.
-      name: "reply",
-      label: text.t("board.reply"),
-      value: filters.reply,
-      options: [all, { value: "none", label: text.t("review.noReply") }],
-    },
   ];
+
+  // The side the list is really on. What nobody has answered means what is still open, and the server reads
+  // it so even with no side chosen: the tab that is on and the count have to say the side the rows are of.
+  const onSide = filters.state || (filters.reply === "none" ? "open" : "");
+  // How many the list holds under everything chosen: the number on the tab that is on, or on its outcome.
+  const shown = states[onSide === "closed" && filters.outcome ? filters.outcome : onSide || "all"] ?? 0;
 
   // The repository is a control of its own beside the filters: it has the most answers and is chosen the most.
   const repository: FilterGroup = {
@@ -2648,7 +2646,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
   // Open and closed as the public board has them, with what each would show.
   const count = (key: string) => `<span class="count-chip">${escapeHTML(text.number(states[key] ?? 0))}</span>`;
   const side = (value: string, icon: string, label: string, key: string) =>
-    `<button class="tab${filters.state === value ? " on" : ""}" data-rstate="${value}" aria-pressed="${filters.state === value}">
+    `<button class="tab${onSide === value ? " on" : ""}" data-rstate="${value}" aria-pressed="${onSide === value}">
       ${icon}<span class="rev-side-name">${escapeHTML(label)}</span>${count(key)}</button>`;
   const sides = `<div class="tabs rev-sides">
       ${side("", icons.bullets(14), text.t("board.all"), "all")}${side("open", icons.circle(14), text.t("board.open"), "open")}${side("closed", icons.circleCheck(14), text.t("board.closed"), "closed")}
@@ -2669,7 +2667,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
     </label>
     ${sides}
-    <div class="fb">${filterMenu(groups, text.t("board.filters"), text)}${choiceMenu(repository, text, icons.repository(14))}${sortMenu(
+    <div class="fb"><button type="button" class="fb-toggle" data-rreply aria-pressed="${filters.reply === "none"}">${escapeHTML(text.t("review.noReply"))}</button>${filterMenu(groups, text.t("board.filters"), text)}${choiceMenu(repository, text, icons.repository(14))}${sortMenu(
       {
         name: "sort",
         label: text.t("board.sort"),
@@ -2684,6 +2682,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
       text,
     )}</div>
     ${chips}
+    <p class="fb-results" role="status" aria-live="polite">${escapeHTML(text.t("board.results", { count: text.number(shown) }))}</p>
   </div>`;
 }
 

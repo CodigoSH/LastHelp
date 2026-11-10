@@ -59,6 +59,7 @@
   "board.result": "結果",
   "board.moderation": "確認状況",
   "board.reply": "返信",
+  "board.results": "結果: {count}",
   "board.showing": "{total} 件中 {shown} 件を表示",
   "board.sortNew": "新しい順",
   "board.sortOldest": "古い順",
