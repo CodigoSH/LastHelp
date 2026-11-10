@@ -113,10 +113,11 @@ publish, reject, and spam. The arrow keys move down the list. It opens on what
 is waiting when something is, and on **History**, every report, otherwise.
 
 The **History** tab is the archive: every report ever sent, found by its words or
-narrowed by type, moderation, status and repository. **All / Open / Closed**
+narrowed with the **Filters** menu: type, moderation, status, repository, and
+whether the team has replied. **All / Open / Closed**
 splits the published reports the way the public board does, each with how many
-it would show; under **Closed**, **Completed** and **Declined** tell a delivery from a
-report the team turned down. In the archive the list is grouped by repository,
+it would show; under **Closed**, the menu adds **Completed** and **Declined**, which tell a delivery from a
+report the team turned down. What is chosen shows under the menu as chips that come off with one press. In the archive the list is grouped by repository,
 and a repository's heading folds its reports away and opens them again; the
 choice is kept in your browser. The queue tab has none of these: whatever waits is
 shown, closed or not. Whatever you choose opens

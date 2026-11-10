@@ -205,13 +205,13 @@ planned idea share *planned*, and a fixed bug and a shipped idea share
 *completed*.
 
 - Four tiles at the top count the lanes, with how many ideas and how many bugs.
-  On a phone they are the tabs between the lanes.
-- A search box and **Ideas** / **Bugs** narrow every lane at once, and the dialog a lane opens starts from the same words and filter.
+  They only say the numbers: on a phone the lanes follow one another.
+- A search box and the **Filters** menu (**All**, **Ideas** or **Bugs**) narrow every lane at once, what is chosen shows underneath as a chip that comes off with one press, and the dialog a lane opens starts from the same words and filter.
 - *Planned* is ranked by votes and shows the first six; *completed* is grouped by
-  the month each thing was completed in and shows the latest two; what is in
-  progress shows six cards. Each lane that has more has a **Show
+  the month each thing was completed in and shows the newest six, within the
+  latest two months; what is in progress shows six cards. Each lane that has more has a **Show
   more** button, which opens the lane whole in a dialog, with a search over every item in it,
-  an Ideas/Bugs filter and a choice of order (most voted, or newest), a page at
+  the same **Filters** menu, an order menu (most voted, or newest), a page at
   a time. The page itself stays a screen or two long however many reports
   there are.
 - **Declined** is shut until somebody asks for it: the page is about what is going
