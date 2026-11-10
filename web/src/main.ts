@@ -1368,7 +1368,7 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
     .get<{ lanes?: views.RoadmapLane[] }>(`${base}/roadmap`)
     .then((board) => {
       const total = (lane: string) => board.lanes?.find((l) => l.lane === lane)?.total ?? 0;
-      return { inProgress: total("in_progress"), planned: total("planned") };
+      return { inProgress: total("in_progress"), planned: total("planned"), done: total("done") };
     })
     .catch(() => null);
 
@@ -1493,27 +1493,16 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
 
   const wire = (plan: LaneSpec[]) => {
     const openLane = wireDialog(plan);
-    root?.querySelectorAll<HTMLButtonElement>("[data-bd-state]").forEach((tile) =>
-      tile.addEventListener("click", (event) => {
-        // The two ways of being closed live on the tile that holds them and answer for themselves.
-        if ((event.target as Element).closest(".bd-out")) return;
-        // Changing side starts from both again: the outcome is a question of the closed side.
-        void change({ state: tile.dataset.bdState === "closed" ? "closed" : "open", outcome: "" });
+    // Open or closed starts from both ways of being closed again: the outcome is a question of the closed side.
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-state]").forEach((b) =>
+      b.addEventListener("click", () => void change({ state: b.dataset.bdState === "closed" ? "closed" : "open", outcome: "" })),
+    );
+    root?.querySelectorAll<HTMLButtonElement>("[data-bd-outcome]").forEach((b) =>
+      b.addEventListener("click", () => {
+        const picked = b.dataset.bdOutcome;
+        void change({ state: "closed", outcome: picked === "done" || picked === "undone" ? picked : "" });
       }),
     );
-    root?.querySelectorAll<HTMLElement>(".bd-out").forEach((out) => {
-      const choose = () => {
-        const picked = out.dataset.outcome === "done" ? "done" : "undone";
-        void change({ state: "closed", outcome: filters.state === "closed" && filters.outcome === picked ? "" : picked });
-      };
-      out.addEventListener("click", choose);
-      out.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        event.stopPropagation();
-        choose();
-      });
-    });
     root?.querySelectorAll<HTMLButtonElement>("[data-bd-kind]").forEach((b) =>
       b.addEventListener("click", () => void change({ kind: b.dataset.bdKind ?? "" })),
     );

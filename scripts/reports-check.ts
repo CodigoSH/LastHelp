@@ -614,7 +614,7 @@ async function main() {
   `);
   const openSide = await evaluate(`
     ${wait}
-    const tile = (s) => Number(document.querySelector('[data-bd-state="' + s + '"] .bd-tile-n')?.textContent.replace(/\D/g, "") ?? -1);
+    const tile = (s) => Number(document.querySelector('[data-tile="' + s + '"] .bd-tile-n')?.textContent.replace(/\D/g, "") ?? -1);
     const lane = (k) => document.querySelector('[data-bd-lane="' + k + '"]');
     const pill = (k) => Number(lane(k)?.querySelector(".bd-pill-n")?.textContent.replace(/\D/g, "") ?? -1);
     const rows = (k) => lane(k)?.querySelectorAll(".bd-row").length ?? -1;
@@ -775,21 +775,21 @@ async function main() {
   );
   // And the closed tab can be narrowed to what was done or what was not, the numbers
   // on the switches being what the list then holds, in the address and cleared by
-  // pressing the same one again.
+  // choosing All.
   const resultado = await evaluate(`
     const wait = async (f) => { for (let i = 0; i < 50 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
-    const count = (v) => Number(document.querySelector('.bd-out[data-outcome="' + v + '"] b')?.textContent.replace(/\D/g, "") ?? "-1");
+    const count = (v) => Number(document.querySelector('button[data-bd-outcome="' + v + '"] b')?.textContent.replace(/\D/g, "") ?? "-1");
     const rows = () => document.querySelectorAll(".bd-row").length;
-    const pressed = (v) => document.querySelector('.bd-out[data-outcome="' + v + '"]')?.getAttribute("aria-pressed");
+    const pressed = (v) => document.querySelector('button[data-bd-outcome="' + v + '"]')?.getAttribute("aria-pressed");
     const out = { done: count("done"), undone: count("undone") };
-    document.querySelector('.bd-out[data-outcome="undone"]').click();
+    document.querySelector('button[data-bd-outcome="undone"]').click();
     await wait(() => pressed("undone") === "true");
     await wait(() => document.querySelectorAll("[data-bd-lane]").length === 1);
     out.undoneLane = document.querySelectorAll("[data-bd-lane]").length;
     out.undoneTotal = Number(document.querySelector("[data-bd-lane] .bd-pill-n").textContent.replace(/\D/g, ""));
     out.onlyNo = [...document.querySelectorAll(".bd-row .status")].every(e => e.classList.contains("status-declined"));
     out.address = location.search;
-    document.querySelector('.bd-out[data-outcome="undone"]').click();
+    document.querySelector('button[data-bd-outcome=""]').click();
     await wait(() => pressed("undone") === "false");
     await wait(() => document.querySelectorAll("[data-bd-lane]").length === 2);
     out.bothAgain = document.querySelectorAll("[data-bd-lane]").length;
@@ -797,7 +797,7 @@ async function main() {
     return out;
   `);
   check(
-    "the closed tab narrows to what was done or not done, the counts are what the list holds, and pressing again clears it",
+    "the closed tab narrows to what was done or not done, the counts are what the list holds, and All clears it",
     resultado.undone > 0 && resultado.done > 0 && resultado.undoneLane === 1 && resultado.undoneTotal === resultado.undone && resultado.onlyNo === true &&
       resultado.address.includes("outcome=undone") && resultado.bothAgain === 2 && resultado.cleared === true,
     JSON.stringify(resultado),

@@ -132,8 +132,12 @@ already there.
 could not reproduce moves to the board's **Closed** view with its votes and its
 thread, and the status says what you decided: a delivered one is solid and green,
 a declined one has a dashed edge and a hollow dot. The Closed view has two lanes,
-**Done** and **Not done**, each with its count; the **Closed** tile at the top of
-the board opens it, and the choice is in the address, so it can be sent. It is also what somebody
+**Done** and **Not done**, each with its count. **Open** and **Closed** are two
+buttons beside the search box, and once you are looking at Closed a second row of
+buttons, **All**, **Done** and **Not done**, narrows it. The choice is in the
+address, so it can be sent. The tiles above only say the numbers; the one for
+the roadmap is the way to its page, and it says how much was delivered, because
+that is the work somebody new wants to see. It is also what somebody
 sees when they start typing the same thing: the similar reports under the title
 include closed ones with that status, and the line beside them says a closed
 report takes no more votes, so they read what was decided before asking again.

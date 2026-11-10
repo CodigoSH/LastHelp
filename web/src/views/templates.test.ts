@@ -708,7 +708,7 @@ describe("the board page", () => {
     { key: "idea" as const, total: 18, items: [item("a", "idea"), item("b", "idea")] },
     { key: "bug" as const, total: 9, items: [item("c", "bug")] },
   ];
-  const html = (over: Partial<typeof filters> = {}, l = lanes, t = tiles, road: { inProgress: number; planned: number } | null = { inProgress: 3, planned: 14 }) =>
+  const html = (over: Partial<typeof filters> = {}, l = lanes, t = tiles, road: { inProgress: number; planned: number; done: number } | null = { inProgress: 3, planned: 14, done: 11 }) =>
     board(org as never, repo as never, l as never, { ...filters, ...over }, t, road, "idea", text);
 
   test("draws two lanes while the view has a split, and one across when a filter chose", () => {
@@ -732,11 +732,32 @@ describe("the board page", () => {
     expect(html({}, lanes, tiles, null)).toContain('href="/acme/atlas/roadmap"');
   });
 
-  test("says the roadmap's numbers when it has them, and what is coming as the big one", () => {
+  test("the roadmap tile says what was delivered as the big number, and what is under way and coming under it", () => {
     const page = html();
-    expect(page).toContain("<b>");
-    expect(page).toContain(">17<"); // 3 under way and 14 planned
-    expect(html({}, lanes, tiles, null)).not.toContain(">17<");
+    const tile = page.slice(page.indexOf('<a class="bd-tile road"'), page.indexOf("</a>", page.indexOf('<a class="bd-tile road"')));
+    expect(tile).toContain(">11<span"); // delivered
+    expect(tile).toContain("3 · "); // in progress
+    expect(tile).toContain(" 14"); // planned
+    expect(html({}, lanes, tiles, null)).not.toContain(">11<span");
+  });
+
+  test("only the roadmap tile is a control: the two that count open and closed are information", () => {
+    const page = html();
+    const tiles = page.slice(page.indexOf('<div class="bd-tiles">'), page.indexOf('<a class="bd-tile road"'));
+    expect(tiles).not.toContain("<button");
+    expect(tiles).not.toContain("data-bd-state");
+    expect(tiles).not.toContain("aria-pressed");
+    expect(tiles).toContain('data-tile="open"');
+    expect(tiles).toContain('data-tile="closed"');
+  });
+
+  test("open and closed are chosen with a control in the bar, one pressed, each with its count", () => {
+    const open = html();
+    expect(open).toContain('data-bd-state="open" aria-pressed="true"');
+    expect(open).toContain('data-bd-state="closed" aria-pressed="false"');
+    expect(open.slice(open.indexOf('class="bd-bar"'))).toContain("data-bd-state");
+    const closed = html({ state: "closed" });
+    expect(closed).toContain('data-bd-state="closed" aria-pressed="true"');
   });
 
   test("a lane with more than it shows offers the dialog", () => {
@@ -745,13 +766,13 @@ describe("the board page", () => {
     expect(all).not.toContain("data-bd-open");
   });
 
-  test("the tile of what is closed holds the two switches, pressed when chosen", () => {
+  test("what is closed can be narrowed to what was done or what was not, and only while looking at it", () => {
     const page = html({ state: "closed", outcome: "undone" });
-    expect(page).toContain('data-outcome="done" aria-pressed="false"');
-    expect(page).toContain('data-outcome="undone" aria-pressed="true"');
-    // The outcome is a question of the closed side: on the open side neither is pressed.
-    const open = html({ state: "open", outcome: "undone" });
-    expect(open).toContain('data-outcome="undone" aria-pressed="false"');
+    expect(page).toContain('data-bd-outcome="" aria-pressed="false"');
+    expect(page).toContain('data-bd-outcome="done" aria-pressed="false"');
+    expect(page).toContain('data-bd-outcome="undone" aria-pressed="true"');
+    // The outcome is a question of the closed side: on the open side there is nothing to choose.
+    expect(html({ state: "open", outcome: "undone" })).not.toContain("data-bd-outcome");
   });
 
   test("only a board that takes both kinds offers a kind", () => {

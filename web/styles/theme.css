@@ -1639,12 +1639,17 @@ summary:focus-visible,
   font: inherit;
   text-align: start;
   text-decoration: none;
-  cursor: pointer;
   transition: border-color 0.15s;
 }
-.bd-tile:hover { border-color: rgba(var(--accent-rgb), 0.3); }
-.bd-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.bd-tile[aria-pressed="true"] { border-color: rgba(var(--accent-rgb), 0.45); }
+/* The way to the roadmap is the only tile that does something, so it is the one that stands out:
+   tinted with the accent, an arrow, and a stronger edge on hover. */
+.bd-tile.road {
+  background: color-mix(in srgb, var(--accent) 9%, var(--sheet));
+  border-color: rgba(var(--accent-rgb), 0.45);
+  cursor: pointer;
+}
+.bd-tile.road:hover { border-color: var(--accent); }
+.bd-tile.road:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bd-tile-top {
   display: flex;
   align-items: center;
@@ -1657,6 +1662,7 @@ summary:focus-visible,
 }
 .bd-tile-go { display: inline-flex; margin-inline-start: auto; color: var(--accent); }
 .bd-tile-go svg { transform: scaleX(var(--rtl-flip, 1)); }
+.bd-tile-unit { margin-inline-start: 8px; font: 700 0.65rem/1.4 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
 .bd-tile-n { font-size: 2rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .bd-tile-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-block-size: 1.4em; font: 11px var(--font-mono); color: var(--text-dim); }
 .bd-sub-kind { display: inline-flex; gap: 12px; }
@@ -1675,9 +1681,6 @@ summary:focus-visible,
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s, color 0.15s;
 }
-.bd-out:hover { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.35); }
-.bd-out:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.bd-out[aria-pressed="true"] { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.5); background: rgba(var(--accent-rgb), 0.1); }
 .bd-dot { inline-size: 8px; block-size: 8px; flex: none; border-radius: 50%; background: var(--hue-done); }
 .bd-dot.no { background: transparent; border: 1.5px dashed var(--hue-off); }
 
@@ -1700,6 +1703,7 @@ summary:focus-visible,
   cursor: pointer;
 }
 .bd-seg button:hover { color: var(--text-main); }
+.bd-seg button b { margin-inline-start: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .bd-seg button[aria-pressed="true"] { background: var(--surface-active); color: var(--text-main); }
 .bd-seg[hidden] { display: none; }
 

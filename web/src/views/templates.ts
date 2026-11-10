@@ -203,10 +203,12 @@ export interface BoardLane {
   items: ItemSummary[];
 }
 
-/** What the roadmap's tile says: how much is under way and how much is coming. Absent when it could not be read. */
+/** What the roadmap's tile says: what was delivered, how much is under way and how much is coming. Absent when it could not be read. */
 export interface BoardRoadmap {
   inProgress: number;
   planned: number;
+  /** What was delivered: the work that was done, which is what a newcomer wants to see. */
+  done: number;
 }
 
 /**
@@ -242,29 +244,33 @@ export function board(
   const laneName = (key: LaneKey) =>
     key === "idea" ? text.t("overview.ideas") : key === "bug" ? text.t("overview.bugs") : key === "done" ? text.t("board.outcomeDone") : text.t("board.outcomeUndone");
 
+  // Said, not pressed: the numbers of the tiles are information, and what narrows the list is the control in the bar.
   const outcome = (value: "done" | "undone", count: number) =>
-    `<span class="bd-out" role="button" tabindex="0" data-outcome="${value}" aria-pressed="${filters.state === "closed" && filters.outcome === value}">
-      <i class="bd-dot${value === "undone" ? " no" : ""}" aria-hidden="true"></i>${escapeHTML(text.t(value === "done" ? "board.outcomeDone" : "board.outcomeUndone"))} <b>${escapeHTML(text.number(count))}</b></span>`;
+    `<span class="bd-out" data-outcome="${value}"><i class="bd-dot${value === "undone" ? " no" : ""}" aria-hidden="true"></i>${escapeHTML(text.t(value === "done" ? "board.outcomeDone" : "board.outcomeUndone"))} <b>${escapeHTML(text.number(count))}</b></span>`;
 
   const kinds = both
     ? `<span class="bd-sub-kind"><span title="${escapeAttr(text.t("overview.ideas"))}">${icons.idea(12)} <b>${escapeHTML(text.number(tiles.ideas))}</b></span>
        <span title="${escapeAttr(text.t("overview.bugs"))}">${icons.bug(12)} <b>${escapeHTML(text.number(tiles.bugs))}</b></span></span>`
     : "";
 
+  // Two tiles that say how much is open and how much is closed, and one that is a way
+  // to somewhere else: the roadmap, which is where the work that was done is seen.
   const tileRow = `<div class="bd-tiles">
-    <button type="button" class="bd-tile" data-bd-state="open" aria-pressed="${filters.state === "open"}">
+    <div class="bd-tile" data-tile="open">
       <span class="bd-tile-top">${escapeHTML(text.t("board.open"))}</span>
       <span class="bd-tile-n">${escapeHTML(text.number(tiles.open))}</span>
       <span class="bd-tile-sub">${kinds}</span>
-    </button>
-    <button type="button" class="bd-tile" data-bd-state="closed" aria-pressed="${filters.state === "closed"}">
+    </div>
+    <div class="bd-tile" data-tile="closed">
       <span class="bd-tile-top">${escapeHTML(text.t("board.closed"))}</span>
       <span class="bd-tile-n">${escapeHTML(text.number(tiles.closed))}</span>
       <span class="bd-tile-sub">${outcome("done", tiles.done)}${outcome("undone", tiles.undone)}</span>
-    </button>
+    </div>
     <a class="bd-tile road" href="${base}/roadmap">
       <span class="bd-tile-top">${escapeHTML(text.t("nav.roadmap"))}<span class="bd-tile-go" aria-hidden="true">${icons.arrow(14)}</span></span>
-      <span class="bd-tile-n">${roadmap ? escapeHTML(text.number(roadmap.inProgress + roadmap.planned)) : "&nbsp;"}</span>
+      <span class="bd-tile-n">${
+        roadmap ? `${escapeHTML(text.number(roadmap.done))}<span class="bd-tile-unit">${escapeHTML(text.t("roadmap.done"))}</span>` : "&nbsp;"
+      }</span>
       <span class="bd-tile-sub">${
         roadmap
           ? `${escapeHTML(text.t("roadmap.in_progress"))} ${escapeHTML(text.number(roadmap.inProgress))} · ${escapeHTML(text.t("roadmap.planned"))} ${escapeHTML(text.number(roadmap.planned))}`
@@ -272,6 +278,20 @@ export function board(
       }</span>
     </a>
   </div>`;
+
+  // Open or closed is chosen where a control is looked for: in the bar, as two words that say what they do.
+  const stateSeg = `<div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("overview.reports"))}">
+      <button type="button" data-bd-state="open" aria-pressed="${filters.state === "open"}">${escapeHTML(text.t("board.open"))} <b>${escapeHTML(text.number(tiles.open))}</b></button>
+      <button type="button" data-bd-state="closed" aria-pressed="${filters.state === "closed"}">${escapeHTML(text.t("board.closed"))} <b>${escapeHTML(text.number(tiles.closed))}</b></button>
+    </div>`;
+  const outcomeSeg =
+    filters.state === "closed"
+      ? `<div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("board.closed"))}">
+      <button type="button" data-bd-outcome="" aria-pressed="${filters.outcome === ""}">${escapeHTML(text.t("board.all"))}</button>
+      <button type="button" data-bd-outcome="done" aria-pressed="${filters.outcome === "done"}">${escapeHTML(text.t("board.outcomeDone"))} <b>${escapeHTML(text.number(tiles.done))}</b></button>
+      <button type="button" data-bd-outcome="undone" aria-pressed="${filters.outcome === "undone"}">${escapeHTML(text.t("board.outcomeUndone"))} <b>${escapeHTML(text.number(tiles.undone))}</b></button>
+    </div>`
+      : "";
 
   const kindSeg = both
     ? `<div class="bd-seg" role="group" aria-label="${escapeAttr(text.t("overview.reports"))}">
@@ -282,6 +302,7 @@ export function board(
     : "";
 
   const bar = `<div class="bd-bar">
+    ${stateSeg}${outcomeSeg}
     <label class="search-box">
       ${icons.search(14)}
       <input type="search" data-bd-search value="${escapeAttr(filters.query)}" placeholder="${escapeAttr(text.t("board.searchBefore"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
