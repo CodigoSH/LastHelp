@@ -782,10 +782,20 @@ describe("the board page", () => {
     expect(html({ state: "open", outcome: "undone" })).not.toContain('data-fb-group="outcome"');
   });
 
-  test("the filters button says how many are on", () => {
-    expect(html()).not.toContain("fb-count");
-    expect(html({ kind: "bug" })).toContain('<b class="fb-count">1</b>');
-    expect(html({ state: "closed", kind: "bug", outcome: "done" })).toContain('<b class="fb-count">2</b>');
+  test("the type is in sight, not in the menu, and the filters button counts what is in the menu", () => {
+    const page = html();
+    // Three answers asked all the time: a segmented choice beside the search, one press.
+    expect(page).toContain('class="fb-seg"');
+    expect(page).toContain('data-fb-group="kind" data-fb-value="" aria-pressed="true"'); // one of them is on
+    // And it is not also a group of the menu.
+    expect(page).not.toContain('<p class="fb-group-name">[overview.colType]</p>');
+    // With nothing but the type to choose there is no menu to open, and no button for it.
+    expect(page).not.toContain("data-fb-filters");
+    expect(html({ kind: "bug" })).not.toContain("fb-count");
+    // Closed has a result to choose, so it has the menu, and the button counts it.
+    const closed = html({ state: "closed", kind: "bug", outcome: "done" });
+    expect(closed).toContain("data-fb-filters");
+    expect(closed).toContain('<b class="fb-count">1</b>');
   });
 
   test("only a board that takes both kinds offers a kind", () => {
@@ -796,10 +806,12 @@ describe("the board page", () => {
 
   test("what narrows the list is said, with a way to undo each and to clear them all", () => {
     expect(html()).not.toContain("data-fb-undo");
-    const narrowed = html({ kind: "bug", query: "csv" });
-    expect(narrowed).toContain('data-fb-undo="kind"');
+    const narrowed = html({ state: "closed", outcome: "done", query: "csv" });
+    expect(narrowed).toContain('data-fb-undo="outcome"');
     expect(narrowed).toContain('data-fb-undo="q"');
     expect(narrowed).toContain("data-fb-clear");
+    // The type is already on show in its own control, so it is not said twice.
+    expect(html({ kind: "bug" })).not.toContain('data-fb-undo="kind"');
     // One letter is not a search: it narrows nothing and says nothing.
     expect(html({ query: "c" })).not.toContain("data-fb-undo");
   });

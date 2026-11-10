@@ -78,6 +78,20 @@ export function sortMenu(group: FilterGroup, label: string, text: Text): string 
 }
 
 /**
+ * A choice of a few answers, all in sight: "All / Bugs / Ideas" is one press, not a menu to open and
+ * an option to find. For a question with three answers or fewer that is asked all the time; what has
+ * more answers is a menu.
+ */
+export function segmented(group: FilterGroup): string {
+  if (group.options.length < 2) return "";
+  return `<div class="fb-seg" role="group" aria-label="${escapeAttr(group.label)}">${group.options
+    .map(
+      (o) => `<button type="button" data-fb-group="${escapeAttr(group.name)}" data-fb-value="${escapeAttr(o.value)}" aria-pressed="${group.value === o.value}">${escapeHTML(o.label)}</button>`,
+    )
+    .join("")}</div>`;
+}
+
+/**
  * A choice that is a control of its own, beside the filters: one question with a button that
  * says the answer it has now ("All" until something is chosen) and a menu of the others. For
  * what has many answers and is chosen often — a repository among thirty — where one more group

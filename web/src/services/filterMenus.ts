@@ -40,6 +40,14 @@ export function installFilterMenus(): void {
   document.addEventListener("click", (event) => {
     const target = event.target as Element | null;
     if (!target) return;
+    // A choice drawn in sight is a choice of the same kind as one in a menu: it says the same thing, with no menu to close.
+    const seg = target.closest<HTMLElement>(".fb-seg button");
+    if (seg) {
+      closeMenus();
+      const detail: FilterPick = { group: seg.dataset.fbGroup ?? "", value: seg.dataset.fbValue ?? "" };
+      seg.dispatchEvent(new CustomEvent<FilterPick>("fb-pick", { bubbles: true, detail }));
+      return;
+    }
     const toggle = target.closest<HTMLElement>("[data-fb-toggle]");
     const opt = target.closest<HTMLElement>(".fb-opt");
     if (toggle) {
@@ -128,6 +136,8 @@ export function installFilterMenus(): void {
  */
 export function syncFilterBar(bar: Element, values: Record<string, string>, query = ""): void {
   const active: Array<{ name: string; label: string }> = [];
+  // The choices in sight follow what the screen holds, and are not chips: they are already on show.
+  bar.querySelectorAll<HTMLElement>(".fb-seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.fbValue === (values[b.dataset.fbGroup ?? ""] ?? ""))));
   const groups = new Set<string>();
   bar.querySelectorAll<HTMLElement>(".fb-opt").forEach((o) => groups.add(o.dataset.fbGroup ?? ""));
   for (const group of groups) {

@@ -10,7 +10,7 @@ import { escapeAttr, escapeHTML } from "../escape";
 import type { ItemSummary } from "../api";
 import { icons } from "./icons";
 import type { Text } from "./templates";
-import { filterChipsHost, filterMenu, sortMenu, type FilterGroup } from "./filterBar";
+import { filterChipsHost, segmented, sortMenu, type FilterGroup } from "./filterBar";
 
 /** Rows that ended, grouped by the month they ended in, newest first. A month is the reader's own, local. */
 export function monthGroups(items: ItemSummary[]): Array<{ at: number; items: ItemSummary[] }> {
@@ -68,7 +68,7 @@ export function roadmapDialog(text: Text): string {
         ${icons.search(14)}
         <input type="search" data-rm-q placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
       </label>
-      ${filterMenu([roadmapKindGroup("", text)], text.t("board.filters"), text)}
+      ${segmented(roadmapKindGroup("", text))}
       ${sortMenu(
         {
           name: "sort",

@@ -20,7 +20,7 @@ import { overviewDialog } from "./overviewDetail";
 import { monthGroups, roadmapDialog, roadmapKind, voteTile } from "./roadmapModal";
 import { laneCap, type LaneKey, type Tiles } from "../services/boardState";
 import { icons } from "./icons";
-import { choiceMenu, filterChips, filterChipsHost, filterMenu, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
+import { choiceMenu, filterChips, filterChipsHost, filterMenu, segmented, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
 import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
@@ -288,19 +288,20 @@ export function board(
     </div>`;
 
   // What can narrow the list lives in one menu, the same on every screen; the order has its own button.
+  // The type has three answers and is asked all the time, so it is in sight and not in the menu.
+  const kind: FilterGroup = {
+    name: "kind",
+    label: text.t("overview.colType"),
+    value: filters.kind,
+    options: both
+      ? [
+          { value: "", label: text.t("board.all") },
+          { value: "bug", label: text.t("overview.bugs") },
+          { value: "idea", label: text.t("overview.ideas") },
+        ]
+      : [],
+  };
   const groups: FilterGroup[] = [
-    {
-      name: "kind",
-      label: text.t("overview.colType"),
-      value: filters.kind,
-      options: both
-        ? [
-            { value: "", label: text.t("board.all") },
-            { value: "bug", label: text.t("overview.bugs") },
-            { value: "idea", label: text.t("overview.ideas") },
-          ]
-        : [],
-    },
     {
       name: "outcome",
       label: text.t("board.result"),
@@ -330,13 +331,12 @@ export function board(
       ${icons.search(14)}
       <input type="search" data-bd-search value="${escapeAttr(filters.query)}" placeholder="${escapeAttr(text.t("board.searchBefore"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
     </label>
-    ${filterMenu(groups, text.t("board.filters"), text)}${sortMenu(sort, text.t("board.sort"), text)}
+    ${segmented(kind)}${filterMenu(groups, text.t("board.filters"), text)}${sortMenu(sort, text.t("board.sort"), text)}
   </div>`;
 
   // What narrows the list, said, and one press to undo it.
   const chips = filterChips(
     [
-      ...(filters.kind ? [{ name: "kind", label: text.t(`kind.${filters.kind}`) }] : []),
       ...(filters.state === "closed" && filters.outcome ? [{ name: "outcome", label: text.t(filters.outcome === "done" ? "board.outcomeDone" : "board.outcomeUndone") }] : []),
       ...(filters.query.trim().length >= 2 ? [{ name: "q", label: `«${filters.query.trim()}»` }] : []),
     ],
@@ -596,7 +596,7 @@ export function roadmap(
         ${icons.search(14)}
         <input type="search" data-rm-search placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
       </label>
-      ${filterMenu([roadmapKindGroup("", text)], text.t("board.filters"), text)}
+      ${segmented(roadmapKindGroup("", text))}
     </div>
     ${filterChipsHost(text.t("board.clear"))}
 
