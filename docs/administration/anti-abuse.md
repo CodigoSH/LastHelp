@@ -121,7 +121,7 @@ What is chosen shows under them as chips, each of which comes off by itself, and
 the list holds. On a phone the menus open as a sheet from the bottom. **All / Open / Closed**
 splits the published reports the way the public board does, each with how many
 it would show; under **Closed**, the menu adds **Completed** and **Declined**, which tell a delivery from a
-report the team turned down. What is chosen shows under the menu as chips that come off with one press. In the archive the list is grouped by repository,
+report the team turned down. In the archive the list is grouped by repository,
 and a repository's heading folds its reports away and opens them again; the
 choice is kept in your browser. The queue tab has none of these: whatever waits is
 shown, closed or not. Whatever you choose opens
