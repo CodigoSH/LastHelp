@@ -76,7 +76,7 @@ They are asked different things and treated differently, on purpose:
   Its statuses are *new, confirmed, in progress, fixed, declined*.
 - **An idea is voted, and its value is not reaching your issue tracker yet.**
   That is what stops the tracker turning into a wishlist with a thousand open
-  entries. Its statuses are *new, planned, in progress, shipped, declined*.
+  entries. Its statuses are *new, planned, in progress, completed, declined*.
 
 Both land on the same roadmap lanes, because to somebody reading it a confirmed
 bug and a planned idea are the same news, and an idea and a bug the team turns
@@ -130,13 +130,13 @@ already there.
 
 **What you close stays where people can read it.** A declined idea or a bug you
 could not reproduce moves to the board's **Closed** view with its votes and its
-thread, and the status says what you decided: a delivered one is solid and green,
+thread, and the status says what you decided: a completed one is solid and green,
 a declined one has a dashed edge and a hollow dot. The Closed view has two lanes,
 **Done** and **Not done**, each with its count. **Open** and **Closed** are two
 buttons beside the search box, and once you are looking at Closed a second row of
 buttons, **All**, **Done** and **Not done**, narrows it. The choice is in the
 address, so it can be sent. The tiles above only say the numbers; the one for
-the roadmap is the way to its page, and it says how much was delivered, because
+the roadmap is the way to its page, and it says how much was completed, because
 that is the work somebody new wants to see. It is also what somebody
 sees when they start typing the same thing: the similar reports under the title
 include closed ones with that status, and the line beside them says a closed
@@ -195,17 +195,17 @@ personal data collected for one purpose, and a follow token is a credential.
 
 ## The roadmap
 
-The roadmap page is **in progress**, **planned**, **delivered** and **declined**,
+The roadmap page is **in progress**, **planned**, **completed** and **declined**,
 and all four are always drawn — showing only the ones with something in them
 leaves a reader working out which they are looking at. A confirmed bug and a
 planned idea share *planned*, and a fixed bug and a shipped idea share
-*delivered*.
+*completed*.
 
 - Four tiles at the top count the lanes, with how many ideas and how many bugs.
   On a phone they are the tabs between the lanes.
 - A search box and **Ideas** / **Bugs** narrow every lane at once, and the dialog a lane opens starts from the same words and filter.
-- *Planned* is ranked by votes and shows the first six; *delivered* is grouped by
-  the month each thing was delivered in and shows the latest two; what is in
+- *Planned* is ranked by votes and shows the first six; *completed* is grouped by
+  the month each thing was completed in and shows the latest two; what is in
   progress shows six cards. Each lane that has more has a **Show
   more** button, which opens the lane whole in a dialog, with a search over every item in it,
   an Ideas/Bugs filter and a choice of order (most voted, or newest), a page at
