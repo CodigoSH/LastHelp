@@ -302,7 +302,7 @@ export function board(
     : "";
 
   const bar = `<div class="bd-bar">
-    ${stateSeg}${outcomeSeg}
+    <div class="bd-states">${stateSeg}${outcomeSeg}</div>
     <label class="search-box">
       ${icons.search(14)}
       <input type="search" data-bd-search value="${escapeAttr(filters.query)}" placeholder="${escapeAttr(text.t("board.searchBefore"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />

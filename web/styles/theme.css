@@ -1685,6 +1685,7 @@ summary:focus-visible,
 .bd-dot.no { background: transparent; border: 1.5px dashed var(--hue-off); }
 
 .bd-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.bd-states { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; flex: 1 1 100%; }
 .bd-bar .search-box { flex: 1 1 18rem; min-inline-size: 0; }
 .bd-seg {
   display: inline-flex;
