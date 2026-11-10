@@ -115,7 +115,7 @@ is waiting when something is, and on **History**, every report, otherwise.
 The **History** tab is the archive: every report ever sent, found by its words or
 narrowed by type, moderation, status and repository. **All / Open / Closed**
 splits the published reports the way the public board does, each with how many
-it would show; under **Closed**, **Done** and **Not done** tell a delivery from a
+it would show; under **Closed**, **Completed** and **Declined** tell a delivery from a
 report the team turned down. In the archive the list is grouped by repository,
 and a repository's heading folds its reports away and opens them again; the
 choice is kept in your browser. The queue tab has none of these: whatever waits is
