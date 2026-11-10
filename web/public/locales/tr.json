@@ -61,6 +61,7 @@
   "board.reply": "Yanıt",
   "board.showing": "{total} içinden {shown} gösteriliyor",
   "board.sortNew": "En yeni",
+  "board.sortOldest": "Önce en eski",
   "board.sortVotes": "En çok oy alan",
   "comment.reporter": "Bildiren",
   "comment.team": "Ekip",

@@ -2669,7 +2669,20 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
     </label>
     ${sides}
-    <div class="fb">${filterMenu(groups, text.t("board.filters"), text)}${choiceMenu(repository, text, icons.repository(14))}</div>
+    <div class="fb">${filterMenu(groups, text.t("board.filters"), text)}${choiceMenu(repository, text, icons.repository(14))}${sortMenu(
+      {
+        name: "sort",
+        label: text.t("board.sort"),
+        value: filters.sort,
+        options: [
+          { value: "", label: text.t("board.sortNew") },
+          { value: "oldest", label: text.t("board.sortOldest") },
+          { value: "votes", label: text.t("board.sortVotes") },
+        ],
+      },
+      text.t("board.sort"),
+      text,
+    )}</div>
     ${chips}
   </div>`;
 }

@@ -61,6 +61,7 @@
   "board.reply": "Απάντηση",
   "board.showing": "Εμφανίζονται {shown} από {total}",
   "board.sortNew": "Νεότερα",
+  "board.sortOldest": "Πρώτα τα παλαιότερα",
   "board.sortVotes": "Περισσότερες ψήφοι",
   "comment.reporter": "Αναφέρων",
   "comment.team": "Ομάδα",

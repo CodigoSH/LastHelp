@@ -49,6 +49,14 @@ func TestTheReportsScreenCanBeNarrowedToOpenAndClosed(t *testing.T) {
 		counts, _ = body["counts"].(map[string]any)["state"].(map[string]any)
 		return titles, counts, resp.StatusCode
 	}
+	askOrdered := func(who *instance, query string) (titles []string, counts map[string]any, code int) {
+		resp := who.do(http.MethodGet, "/api/reports?"+query, nil)
+		body := decode(t, resp)
+		for _, raw := range body["items"].([]any) {
+			titles = append(titles, raw.(map[string]any)["title"].(string))
+		}
+		return titles, nil, resp.StatusCode
+	}
 	same := func(label string, got []string, want ...string) {
 		t.Helper()
 		sort.Strings(want)
@@ -107,6 +115,22 @@ func TestTheReportsScreenCanBeNarrowedToOpenAndClosed(t *testing.T) {
 	same("open and rejected", turned)
 	rejected, _, _ := ask(admin, "moderation=rejected&board=acme/atlas")
 	same("rejected, without a side", rejected, "turned down idea")
+
+	// The order: newest first by default, the longest-waiting first when asked, and nothing else.
+	newest, _, _ := askOrdered(admin, "board=acme/atlas")
+	oldest, _, _ := askOrdered(admin, "board=acme/atlas&sort=oldest")
+	if len(newest) < 2 || len(oldest) != len(newest) {
+		t.Fatalf("order: %v and %v", newest, oldest)
+	}
+	for i := range newest {
+		if newest[i] != oldest[len(oldest)-1-i] {
+			t.Errorf("oldest first should be the newest list reversed: %v and %v", newest, oldest)
+			break
+		}
+	}
+	if _, _, code := ask(admin, "sort=sideways"); code != http.StatusBadRequest {
+		t.Errorf("an order that does not exist answered %d, want 400", code)
+	}
 
 	// The questions that make no sense are refused rather than read as "both".
 	for _, query := range []string{"state=maybe", "outcome=done", "state=open&outcome=done", "state=closed&outcome=perhaps"} {

@@ -61,6 +61,7 @@
   "board.reply": "উত্তর",
   "board.showing": "{total}-এর মধ্যে {shown} দেখানো হচ্ছে",
   "board.sortNew": "নতুন",
+  "board.sortOldest": "পুরোনোগুলো আগে",
   "board.sortVotes": "সবচেয়ে বেশি ভোট",
   "comment.reporter": "প্রতিবেদনকারী",
   "comment.team": "দল",

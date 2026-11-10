@@ -61,6 +61,7 @@
   "board.reply": "الرد",
   "board.showing": "عرض {shown} من {total}",
   "board.sortNew": "الأحدث",
+  "board.sortOldest": "الأقدم أولاً",
   "board.sortVotes": "الأكثر تصويتًا",
   "comment.reporter": "صاحب البلاغ",
   "comment.team": "الفريق",

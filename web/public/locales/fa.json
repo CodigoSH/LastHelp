@@ -61,6 +61,7 @@
   "board.reply": "پاسخ",
   "board.showing": "نمایش {shown} از {total}",
   "board.sortNew": "جدیدترین",
+  "board.sortOldest": "قدیمی‌ترین‌ها اول",
   "board.sortVotes": "بیشترین رأی",
   "comment.reporter": "گزارش‌دهنده",
   "comment.team": "تیم",

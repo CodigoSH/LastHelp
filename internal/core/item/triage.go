@@ -143,6 +143,9 @@ type Filter struct {
 	// question does not.
 	AsTyped    bool
 	SortByVote bool
+	// SortOldest is the report that has waited longest first. For a team working through a queue the
+	// useful question is not what arrived last but what has been left the longest.
+	SortOldest bool
 	// Unanswered keeps what no member of the team has written on. Asked for by
 	// name, and the caller says which states it means: a report that was closed
 	// without a word is a different question from one still waiting for one.
@@ -166,11 +169,14 @@ func (s Store) List(f Filter) ([]Item, error) {
 
 	switch {
 	case f.SortByVote:
-		query += ` ORDER BY vote_count DESC, created_at DESC`
+		query += ` ORDER BY vote_count DESC, created_at DESC, id DESC`
 	case f.SortByClosed:
 		query += ` ORDER BY closed_at DESC, id DESC`
+	case f.SortOldest:
+		query += ` ORDER BY created_at ASC, id ASC`
 	default:
-		query += ` ORDER BY created_at DESC`
+		// With the id to break a tie: two reports made in the same second must not swap places between two requests.
+		query += ` ORDER BY created_at DESC, id DESC`
 	}
 
 	limit := f.Limit

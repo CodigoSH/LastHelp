@@ -61,6 +61,7 @@
   "board.reply": "जवाब",
   "board.showing": "{total} में से {shown} दिखाए जा रहे हैं",
   "board.sortNew": "सबसे नए",
+  "board.sortOldest": "सबसे पुराने पहले",
   "board.sortVotes": "सबसे ज़्यादा वोट",
   "comment.reporter": "रिपोर्ट करने वाला",
   "comment.team": "टीम",

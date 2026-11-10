@@ -61,6 +61,7 @@
   "board.reply": "Balasan",
   "board.showing": "Menampilkan {shown} dari {total}",
   "board.sortNew": "Terbaru",
+  "board.sortOldest": "Terlama dulu",
   "board.sortVotes": "Suara terbanyak",
   "comment.reporter": "Pelapor",
   "comment.team": "Tim",

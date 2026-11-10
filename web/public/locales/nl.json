@@ -61,6 +61,7 @@
   "board.reply": "Reactie",
   "board.showing": "{shown} van {total} getoond",
   "board.sortNew": "Nieuwste",
+  "board.sortOldest": "Oudste eerst",
   "board.sortVotes": "Meeste stemmen",
   "comment.reporter": "Melder",
   "comment.team": "Team",

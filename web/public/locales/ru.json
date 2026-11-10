@@ -61,6 +61,7 @@
   "board.reply": "Ответ",
   "board.showing": "Показано {shown} из {total}",
   "board.sortNew": "Новые",
+  "board.sortOldest": "Сначала старые",
   "board.sortVotes": "Больше голосов",
   "comment.reporter": "Автор обращения",
   "comment.team": "Команда",

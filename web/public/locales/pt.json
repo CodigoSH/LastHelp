@@ -61,6 +61,7 @@
   "board.reply": "Resposta",
   "board.showing": "A mostrar {shown} de {total}",
   "board.sortNew": "Mais recentes",
+  "board.sortOldest": "Mais antigos primeiro",
   "board.sortVotes": "Mais votados",
   "comment.reporter": "Quem relatou",
   "comment.team": "Equipa",

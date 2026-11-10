@@ -108,6 +108,13 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The order: newest first unless asked, the longest-waiting first, or the most voted.
+	order := query.Get("sort")
+	if order != "" && order != "votes" && order != "oldest" {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
 	// What nobody on the team has answered. It means published and not finished,
 	// as the overview counts it: a report closed without a word is a different
 	// question from one still waiting for one.
@@ -124,7 +131,8 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		RepoIDs:    ids,
 		Kind:       item.Kind(query.Get("kind")),
 		Search:     query.Get("q"),
-		SortByVote: query.Get("sort") == "votes",
+		SortByVote: order == "votes",
+		SortOldest: order == "oldest",
 		Unanswered: reply == "none",
 	}
 	// narrowed is the list as asked for one choice of state and outcome, and
