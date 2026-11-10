@@ -57,6 +57,8 @@
   "board.filters": "Filters",
   "board.sort": "Sorteren op",
   "board.result": "Resultaat",
+  "board.moderation": "Beoordeling",
+  "board.reply": "Reactie",
   "board.showing": "{shown} van {total} getoond",
   "board.sortNew": "Nieuwste",
   "board.sortVotes": "Meeste stemmen",

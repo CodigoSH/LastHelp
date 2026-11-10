@@ -57,6 +57,8 @@
   "board.filters": "ফিল্টার",
   "board.sort": "সাজান",
   "board.result": "ফলাফল",
+  "board.moderation": "মডারেশন",
+  "board.reply": "উত্তর",
   "board.showing": "{total}-এর মধ্যে {shown} দেখানো হচ্ছে",
   "board.sortNew": "নতুন",
   "board.sortVotes": "সবচেয়ে বেশি ভোট",

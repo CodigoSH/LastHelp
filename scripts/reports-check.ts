@@ -812,7 +812,7 @@ async function main() {
   await goTo("/review?mode=all", ".rev-row");
   const sides = await evaluate(`
     const wait = async (test) => { for (let i = 0; i < 60 && !test(); i++) await new Promise(r => setTimeout(r, 100)); };
-    const chip = (sel) => Number(document.querySelector(sel + " .count-chip")?.textContent.replace(/\\D/g, "") ?? NaN);
+    const chip = (sel) => Number(document.querySelector(sel + " .count-chip, " + sel + " .fb-opt-n")?.textContent.replace(/\\D/g, "") ?? NaN);
     const ids = async () => {
       for (let i = 0; i < 5; i++) {
         const more = document.querySelector(".rev-list [data-more]");
@@ -826,6 +826,8 @@ async function main() {
     // is marked first and the wait is for the mark to go and rows to be there.
     const press = async (sel) => {
       document.getElementById("app").firstElementChild.setAttribute("data-leaving", "1");
+      // An option of the menu is pressed the way a person does it: the menu is opened first.
+      if (sel.includes(".fb-opt")) document.querySelector(".rev-filter [data-fb-filters]")?.click();
       document.querySelector(sel)?.click();
       await wait(() => !document.querySelector("[data-leaving]") && document.querySelector(".rev-row, .rev-empty"));
       await new Promise(r => setTimeout(r, 300));
@@ -850,8 +852,8 @@ async function main() {
     }
     // Under closed: the two outcomes, each as many as it draws.
     for (const [name, sel, query] of [
-      ["done", '[data-routcome="done"]', "state=closed&outcome=done"],
-      ["undone", '[data-routcome="undone"]', "state=closed&outcome=undone"],
+      ["done", '.fb-opt[data-fb-group="outcome"][data-fb-value="done"]', "state=closed&outcome=done"],
+      ["undone", '.fb-opt[data-fb-group="outcome"][data-fb-value="undone"]', "state=closed&outcome=undone"],
     ]) {
       const n = chip(sel);
       await press(sel);
@@ -859,13 +861,13 @@ async function main() {
       const theirs = await fromServer(query);
       out[name] = { chip: n, rows: rows.length, same: JSON.stringify(rows) === JSON.stringify(theirs), server: theirs.length > 3 ? theirs.length : theirs, address: location.search };
     }
-    out.outcomeIsOn = document.querySelector('[data-routcome="undone"]')?.getAttribute("aria-pressed");
-    // Pressing the one that is on shows both closed sides again.
-    await press('[data-routcome="undone"]');
+    out.outcomeIsOn = document.querySelector('.fb-opt[data-fb-group="outcome"][data-fb-value="undone"]')?.getAttribute("aria-checked");
+    // Choosing All shows both closed sides again.
+    await press('.fb-opt[data-fb-group="outcome"][data-fb-value=""]');
     out.bothAgain = (await ids()).length === out.closed.rows && !location.search.includes("outcome");
     // Leaving the closed side takes the outcome row with it; "All" takes the filter off.
     await press('[data-rstate="open"]');
-    out.outcomesGone = document.querySelector("[data-routcome]") === null;
+    out.outcomesGone = document.querySelector('.fb-opt[data-fb-group="outcome"]') === null;
     await press('[data-rstate=""]');
     out.everyRows = (await ids()).length;
     return out;
@@ -891,11 +893,11 @@ async function main() {
     const langs = "ar bn de el en es fa fr hi id it ja ko nl pl pt ru tr ur zh".split(" ");
     const dicts = await Promise.all(langs.map(l => fetch("/locales/" + l + ".json").then(r => r.json())));
     const longest = (key) => dicts.map(d => d[key] ?? "").sort((a, b) => b.length - a.length)[0];
-    const wanted = { "": "board.all", open: "board.open", closed: "board.closed", done: "board.outcomeDone", undone: "board.outcomeUndone" };
+    const wanted = { "": "board.all", open: "board.open", closed: "board.closed" };
     const cut = [];
     const kept = [];
     for (const [value, key] of Object.entries(wanted)) {
-      const btn = document.querySelector('[data-rstate="' + value + '"], [data-routcome="' + value + '"]');
+      const btn = document.querySelector('[data-rstate="' + value + '"]');
       const name = btn?.querySelector(".rev-side-name");
       if (!name) { cut.push("missing " + value); continue; }
       kept.push([name, name.textContent]);

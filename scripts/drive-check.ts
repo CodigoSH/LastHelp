@@ -2933,16 +2933,16 @@ async function main() {
   // Waiting for the screen to be redrawn, not for the select to look chosen:
   // if the narrowing were ignored it would never look chosen, and the pass
   // would stop on a timeout instead of on this check.
+  // The way a person does it: open the menu of filters and press the option.
   await evaluate(`
     document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
-    const s = document.querySelector('[data-f="kind"]');
-    s.value = "bug";
-    s.dispatchEvent(new Event("change"));
+    document.querySelector('.rev-filter [data-fb-filters]').click();
+    document.querySelector('.rev-filter .fb-opt[data-fb-group="kind"][data-fb-value="bug"]').click();
   `);
   await waitFor("#app > :not([data-leaving]) .rev-filter");
   const porTipo = await evaluate(`
     return {
-      puesto: document.querySelector('[data-f="kind"]')?.classList.contains("set") ?? false,
+      puesto: document.querySelector('.rev-filter [data-fb-filters] .fb-count')?.textContent === "1" && !!document.querySelector('.rev-filter .fb-chip[data-fb-undo="kind"]'),
       direccion: new URLSearchParams(location.search).get("kind"),
       filas: document.querySelectorAll('[data-what="report"]').length,
       noSonFallos: document.querySelectorAll('[data-what="report"] .rev-dot:not(.bug)').length,
@@ -2979,53 +2979,69 @@ async function main() {
     JSON.stringify(buscando),
   );
 
-  // Every select's label fits, in the longest of the twenty languages. The
-  // pass reads English, where three to a row fitted; Greek and Japanese did
-  // not, and a select cuts its label short without a word. Measured against
-  // the catalogues rather than by switching language, so nothing downstream
-  // changes.
-  const labelsFit = `
-    const langs = ["ar","bn","de","el","en","es","fa","fr","hi","id","it","ja","ko","nl","pl","pt","ru","tr","ur","zh"];
-    const cats = {};
-    for (const l of langs) cats[l] = await fetch("/locales/" + l + ".json").then(r => r.json());
-    const keys = { kind: "review.anyKind", moderation: "review.anyModeration", status: "review.anyStatus" };
-    const cortas = [];
-    let medidas = 0;
-    for (const [f, key] of Object.entries(keys)) {
-      // The control people see: the house dropdown's trigger, not the select
-      // it stands over, which is out of sight.
-      const sel = document.querySelector('[data-f="' + f + '"]')?.closest(".sel")?.querySelector(".sel-trigger");
-      if (!sel) { cortas.push(f + ": no dropdown"); continue; }
-      const cs = getComputedStyle(sel);
-      const ctx = document.createElement("canvas").getContext("2d");
-      ctx.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
-      // The chevron and its gap take 24 pixels of what the padding leaves.
-      const room = sel.clientWidth - parseFloat(cs.paddingInlineStart) - parseFloat(cs.paddingInlineEnd) - 24;
-      for (const l of langs) {
-        medidas++;
-        const w = ctx.measureText(cats[l][key]).width;
-        if (w > room) cortas.push(l + " " + f + " " + Math.round(w) + ">" + Math.round(room));
-      }
-    }
-    return { medidas, cortas };
-  `;
-  const caben = await evaluate(labelsFit);
+  // The menu of filters opens under its button, inside the window, with a group for
+  // every question the archive can ask, and a press on an option is the question asked.
+  const menuDeFiltros = await evaluate(`
+    document.querySelector('.rev-filter [data-fb-filters]').click();
+    await new Promise(r => setTimeout(r, 350));
+    const pop = document.querySelector('.rev-filter .fb-pop:not([hidden])');
+    const b = document.querySelector('.rev-filter [data-fb-filters]').getBoundingClientRect();
+    const r = pop?.getBoundingClientRect();
+    const hidden = (el) => { const c = el.getBoundingClientRect(); const top = document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2); return !el.contains(top); };
+    return {
+      abierto: !!pop,
+      grupos: [...(pop?.querySelectorAll(".fb-group") ?? [])].map(g => g.querySelector(".fb-group-name")?.textContent),
+      debajo: r ? Math.round(r.top - b.bottom) : null,
+      dentro: r ? r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth : false,
+      tapadas: [...(pop?.querySelectorAll(".fb-opt") ?? [])].filter(hidden).length,
+    };
+  `);
   check(
-    "every archive filter's label fits in all twenty languages",
-    caben.medidas === 60 && caben.cortas.length === 0,
-    JSON.stringify(caben),
+    "the filters menu opens under its button, inside the window, with every group and nothing under another box",
+    menuDeFiltros.abierto === true && menuDeFiltros.grupos.length >= 4 && menuDeFiltros.debajo !== null && menuDeFiltros.debajo >= 0 && menuDeFiltros.debajo <= 12 &&
+      menuDeFiltros.dentro === true && menuDeFiltros.tapadas === 0,
+    JSON.stringify(menuDeFiltros),
   );
+  await evaluate(`
+    document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
+    document.querySelector('.rev-filter .fb-opt[data-fb-group="moderation"][data-fb-value="published"]').click();
+  `);
+  await waitFor("#app > :not([data-leaving]) .rev-filter");
+  const elegida = await evaluate(`
+    return {
+      direccion: new URLSearchParams(location.search).get("moderation"),
+      cuenta: document.querySelector('.rev-filter [data-fb-filters] .fb-count')?.textContent,
+      etiquetas: [...document.querySelectorAll('.rev-filter .fb-chip')].length,
+    };
+  `);
+  check(
+    "and choosing in it narrows the archive, says how many filters are on and puts each one in a chip",
+    elegida.direccion === "published" && elegida.cuenta === "2" && elegida.etiquetas === 2,
+    JSON.stringify(elegida),
+  );
+  // A chip comes off with one press, and "clear" takes every one off.
+  await evaluate(`
+    document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
+    document.querySelector('.rev-filter [data-fb-clear]').click();
+  `);
+  await waitFor("#app > :not([data-leaving]) .rev-filter");
+  const limpio = await evaluate(`
+    const q = new URLSearchParams(location.search);
+    return { kind: q.get("kind"), moderation: q.get("moderation"), chips: document.querySelectorAll('.rev-filter .fb-chip').length };
+  `);
+  check("clear takes off every filter, and keeps the search", !limpio.kind && !limpio.moderation && limpio.chips === 0, JSON.stringify(limpio));
 
-  // The house dropdown, not the browser's. No select is left on screen, and
-  // the one that is drawn opens a list under its trigger, inside the window,
-  // with every option — and a choice made in it is the select's choice.
+  // The house dropdown, not the browser's: the one select left, the status of a report on its own
+  // page. No select is on screen, and the one that is drawn opens a list under its trigger.
+  const unaId = await evaluate(`const r = await fetch("/api/reports?limit=1").then(x => x.json()); return r.items?.[0]?.public_id ?? ""`);
+  await goTo(`/i/${unaId}`, "#status-select");
   const desplegable = await evaluate(`
     const selects = [...document.querySelectorAll("select")];
     const nativasALaVista = selects.filter(s => {
       const r = s.getBoundingClientRect();
       return r.width > 1 || r.height > 1;
     }).length;
-    const trigger = document.querySelector('[data-f="moderation"]')?.closest(".sel")?.querySelector(".sel-trigger");
+    const trigger = document.querySelector('#status-select')?.closest(".sel")?.querySelector(".sel-trigger");
     trigger?.click();
     await new Promise(r => setTimeout(r, 350));
     const lista = document.querySelector(".sel-list.open");
@@ -3036,42 +3052,22 @@ async function main() {
       nativasALaVista,
       abierta: !!lista,
       opciones: lista?.querySelectorAll('[role="option"]').length ?? 0,
-      esperadas: document.querySelector('[data-f="moderation"]')?.options.length ?? -1,
+      esperadas: document.querySelector('#status-select')?.options.length ?? -1,
       debajo: l && t ? Math.round(l.top - t.bottom) : null,
       mismoAncho: l && t ? Math.abs(l.width - t.width) < 1 : false,
       dentro: l ? l.bottom <= innerHeight && l.left >= 0 && l.right <= innerWidth : false,
     };
   `);
   check(
-    "the archive's dropdowns are the house's: no browser select on screen, a list under its trigger",
-    desplegable.selects >= 3 && desplegable.nativasALaVista === 0 && desplegable.abierta === true &&
+    "the dropdowns are the house's: no browser select on screen, a list under its trigger",
+    desplegable.selects >= 1 && desplegable.nativasALaVista === 0 && desplegable.abierta === true &&
       desplegable.opciones === desplegable.esperadas && desplegable.opciones >= 2 &&
       desplegable.debajo !== null && desplegable.debajo >= 0 && desplegable.debajo <= 12 &&
       desplegable.mismoAncho === true && desplegable.dentro === true,
     JSON.stringify(desplegable),
   );
-  await evaluate(`
-    document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
-    // By value, not by words: by this point the pass reads Arabic.
-    const nativa = document.querySelector('[data-f="moderation"]');
-    const i = [...nativa.options].findIndex(o => o.value === "published");
-    document.querySelector('.sel-list.open [data-i="' + i + '"]')?.click();
-  `);
-  await waitFor("#app > :not([data-leaving]) .rev-filter");
-  const elegida = await evaluate(`
-    return {
-      direccion: new URLSearchParams(location.search).get("moderation"),
-      rotulo: document.querySelector('[data-f="moderation"]')?.closest(".sel")?.querySelector(".sel-value")?.textContent?.trim() ?? "",
-      esperado: document.querySelector('[data-f="moderation"]')?.selectedOptions[0]?.textContent?.trim() ?? "(none)",
-      encendida: document.querySelector('[data-f="moderation"]')?.closest(".sel")?.classList.contains("set") ?? false,
-    };
-  `);
-  check(
-    "and choosing from its list narrows the archive like the select would",
-    elegida.direccion === "published" && elegida.rotulo !== "" && elegida.rotulo === elegida.esperado &&
-      elegida.encendida === true,
-    JSON.stringify(elegida),
-  );
+  await evaluate(`document.querySelector(".sel-list.open")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));`);
+  await goTo("/review?mode=all", ".rev-filter");
 
   // Scrollbars: a thin, border-coloured one inside the product, and
   // none on the public pages, where the page is the product and a gutter down
@@ -3161,10 +3157,19 @@ async function main() {
   // "open" and still off the edge is the failure this is for.
   await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });
   await goTo("/review?mode=all", ".rev-row");
-  const cabenEnElMovil = await evaluate(labelsFit);
+  // The menu of filters on a phone: it opens inside the window, whatever the language, and none of its options is cut.
+  const cabenEnElMovil = await evaluate(`
+    document.querySelector('.rev-filter [data-fb-filters]').click();
+    await new Promise(r => setTimeout(r, 350));
+    const pop = document.querySelector('.rev-filter .fb-pop:not([hidden])');
+    const r = pop?.getBoundingClientRect();
+    const cortadas = [...(pop?.querySelectorAll(".fb-opt-name") ?? [])].filter(n => n.scrollWidth > n.clientWidth).length;
+    document.querySelector('.rev-filter [data-fb-filters]').click();
+    return { abierto: !!pop, dentro: r ? r.left >= 0 && r.right <= innerWidth : false, cortadas };
+  `);
   check(
     "and on a phone",
-    cabenEnElMovil.medidas === 60 && cabenEnElMovil.cortas.length === 0,
+    cabenEnElMovil.abierto === true && cabenEnElMovil.dentro === true && cabenEnElMovil.cortadas === 0,
     JSON.stringify(cabenEnElMovil),
   );
   // Off the screen means past the TRAILING edge, which depends on the

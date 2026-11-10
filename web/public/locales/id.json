@@ -57,6 +57,8 @@
   "board.filters": "Filter",
   "board.sort": "Urutkan",
   "board.result": "Hasil",
+  "board.moderation": "Penyaringan",
+  "board.reply": "Balasan",
   "board.showing": "Menampilkan {shown} dari {total}",
   "board.sortNew": "Terbaru",
   "board.sortVotes": "Suara terbanyak",

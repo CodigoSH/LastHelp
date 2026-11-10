@@ -57,6 +57,8 @@
   "board.filters": "فلٹر",
   "board.sort": "ترتیب",
   "board.result": "نتیجہ",
+  "board.moderation": "جانچ",
+  "board.reply": "جواب",
   "board.showing": "{total} میں سے {shown} دکھائے جا رہے ہیں",
   "board.sortNew": "تازہ ترین",
   "board.sortVotes": "سب سے زیادہ ووٹ",

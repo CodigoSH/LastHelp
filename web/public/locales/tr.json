@@ -57,6 +57,8 @@
   "board.filters": "Filtreler",
   "board.sort": "Sırala",
   "board.result": "Sonuç",
+  "board.moderation": "Değerlendirme",
+  "board.reply": "Yanıt",
   "board.showing": "{total} içinden {shown} gösteriliyor",
   "board.sortNew": "En yeni",
   "board.sortVotes": "En çok oy alan",

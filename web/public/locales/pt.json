@@ -57,6 +57,8 @@
   "board.filters": "Filtros",
   "board.sort": "Ordenar por",
   "board.result": "Resultado",
+  "board.moderation": "Triagem",
+  "board.reply": "Resposta",
   "board.showing": "A mostrar {shown} de {total}",
   "board.sortNew": "Mais recentes",
   "board.sortVotes": "Mais votados",

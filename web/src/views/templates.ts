@@ -20,7 +20,7 @@ import { overviewDialog } from "./overviewDetail";
 import { monthGroups, roadmapDialog, roadmapKind, voteTile } from "./roadmapModal";
 import { laneCap, type LaneKey, type Tiles } from "../services/boardState";
 import { icons } from "./icons";
-import { filterChips, filterChipsHost, filterMenu, sortMenu, type FilterGroup } from "./filterBar";
+import { filterChips, filterChipsHost, filterMenu, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
 import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
@@ -2568,85 +2568,87 @@ export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): s
 }
 
 /**
- * The archive's controls: a search box and four narrowings.
+ * The archive's controls: a search box, the sides, and one menu for everything
+ * else that narrows the list, the same menu every list has.
  *
- * The four selects are what the screen this replaced offered as tabs and selects on a
- * row of their own; in a column of 545px they have to be compact, and a select
- * carries its own label as the first option, so nothing is spent on captions.
- * An option that would find nothing is not offered.
+ * It used to be four selects, two rows of tabs and a switch in a column of
+ * 545px, and was the screen where the filters crowded each other most. An option
+ * that would find nothing is not offered.
  */
 function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): string {
   const counts = data.counts ?? { moderation: {}, status: {}, kind: {} };
-  const option = (value: string, label: string, selected: boolean) =>
-    `<option value="${escapeAttr(value)}"${selected ? " selected" : ""}>${escapeHTML(label)}</option>`;
-  const choices = (
-    name: keyof ReportFilters,
-    any: string,
-    values: { value: string; label: string; count?: number }[],
-  ) => {
-    const chosen = filters[name];
-    return `<select data-f="${escapeAttr(name)}" aria-label="${escapeAttr(any)}"
-        class="${chosen ? "set" : ""}">
-      ${option("", any, chosen === "")}
-      ${values
-        .filter((v) => v.count === undefined || v.count > 0 || v.value === chosen)
-        .map((v) => option(v.value, v.label, v.value === chosen))
-        .join("")}
-    </select>`;
-  };
-
-  const kind = choices("kind", text.t("review.anyKind"), [
-    { value: "bug", label: text.t("kind.bug"), count: counts.kind.bug ?? 0 },
-    { value: "idea", label: text.t("kind.idea"), count: counts.kind.idea ?? 0 },
-  ]);
-  const moderation = choices(
-    "moderation",
-    text.t("review.anyModeration"),
-    ["pending", "published", "rejected", "spam"].map((m) => ({
-      value: m,
-      label: text.t(`moderation.${m}`),
-      count: counts.moderation[m] ?? 0,
-    })),
-  );
-  const status = choices(
-    "status",
-    text.t("review.anyStatus"),
-    everyStatus.map((s) => ({ value: s, label: text.t(`status.${s}`), count: counts.status[s] ?? 0 })),
-  );
-  const board =
-    data.boards.length < 2
-      ? ""
-      : choices(
-          "board",
-          text.t("review.anyBoard"),
-          data.boards.map((b) => ({ value: `${b.org}/${b.repo}`, label: `${b.organization} / ${b.name}` })),
-        );
-
-  // Open and closed as the public board has them, with what each would show;
-  // under "Closed", the same two outcomes. The counts come from the server, which
-  // counts them the way it lists them.
   const states = counts.state ?? {};
+  const some = (values: FilterOption[], chosen: string) => values.filter((v) => v.count === undefined || v.count > 0 || v.value === chosen);
+  const all = { value: "", label: text.t("board.all") };
+
+  const groups: FilterGroup[] = [
+    {
+      name: "kind",
+      label: text.t("overview.colType"),
+      value: filters.kind,
+      options: [all, ...some([{ value: "bug", label: text.t("kind.bug"), count: counts.kind.bug ?? 0 }, { value: "idea", label: text.t("kind.idea"), count: counts.kind.idea ?? 0 }], filters.kind)],
+    },
+    {
+      name: "moderation",
+      label: text.t("board.moderation"),
+      value: filters.moderation,
+      options: [
+        all,
+        ...some(["pending", "published", "rejected", "spam"].map((m) => ({ value: m, label: text.t(`moderation.${m}`), count: counts.moderation[m] ?? 0 })), filters.moderation),
+      ],
+    },
+    {
+      name: "status",
+      label: text.t("overview.colStatus"),
+      value: filters.status,
+      options: [all, ...some(everyStatus.map((s) => ({ value: s, label: text.t(`status.${s}`), count: counts.status[s] ?? 0 })), filters.status)],
+    },
+    {
+      name: "board",
+      label: text.t("overview.colRepository"),
+      value: filters.board,
+      options: data.boards.length < 2 ? [] : [all, ...data.boards.map((b) => ({ value: `${b.org}/${b.repo}`, label: `${b.organization} / ${b.name}` }))],
+    },
+    {
+      // Under "Closed", what the team decided; the other sides have nothing to choose here.
+      name: "outcome",
+      label: text.t("board.result"),
+      value: filters.outcome,
+      options:
+        filters.state === "closed"
+          ? [
+              all,
+              { value: "done", label: text.t("board.outcomeDone"), count: states.done ?? 0 },
+              { value: "undone", label: text.t("board.outcomeUndone"), count: states.undone ?? 0 },
+            ]
+          : [],
+    },
+    {
+      // What nobody on the team has answered. Its own question rather than a status: it is about
+      // whether the people who wrote heard anything, and a report can be in any state while it has not.
+      name: "reply",
+      label: text.t("board.reply"),
+      value: filters.reply,
+      options: [all, { value: "none", label: text.t("review.noReply") }],
+    },
+  ];
+
+  // Open and closed as the public board has them, with what each would show.
   const count = (key: string) => `<span class="count-chip">${escapeHTML(text.number(states[key] ?? 0))}</span>`;
   const side = (value: string, icon: string, label: string, key: string) =>
     `<button class="tab${filters.state === value ? " on" : ""}" data-rstate="${value}" aria-pressed="${filters.state === value}">
       ${icon}<span class="rev-side-name">${escapeHTML(label)}</span>${count(key)}</button>`;
-  const outcome = (value: "done" | "undone", label: string) =>
-    `<button class="tab${filters.outcome === value ? " on" : ""}" data-routcome="${value}" aria-pressed="${filters.outcome === value}">
-      <span class="rev-side-name">${escapeHTML(label)}</span>${count(value)}</button>`;
   const sides = `<div class="tabs rev-sides">
       ${side("", icons.bullets(14), text.t("board.all"), "all")}${side("open", icons.circle(14), text.t("board.open"), "open")}${side("closed", icons.circleCheck(14), text.t("board.closed"), "closed")}
-    </div>
-    ${
-      filters.state === "closed"
-        ? `<div class="tabs outcomes rev-sides">${outcome("done", text.t("board.outcomeDone"))}${outcome("undone", text.t("board.outcomeUndone"))}</div>`
-        : ""
-    }`;
+    </div>`;
 
-  // What nobody on the team has answered. Its own switch rather than a status:
-  // it is about whether the people who wrote heard anything, and a report can
-  // be in any state while it has not.
-  const unanswered = `<div class="tabs rev-sides"><button class="tab${filters.reply === "none" ? " on" : ""}" data-rreply
-      aria-pressed="${filters.reply === "none"}"><span class="rev-side-name">${escapeHTML(text.t("review.noReply"))}</span></button></div>`;
+  const chips = filterChips(
+    groups.flatMap((g) => {
+      const chosen = g.options.find((o) => o.value === g.value);
+      return chosen && g.value !== "" ? [{ name: g.name, label: chosen.label }] : [];
+    }),
+    text.t("board.clear"),
+  );
 
   return `<div class="rev-filter">
     <label class="search-box">
@@ -2655,8 +2657,8 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
     </label>
     ${sides}
-    ${unanswered}
-    <div class="rev-narrow">${kind}${moderation}${status}${board}</div>
+    <div class="fb">${filterMenu(groups, text.t("board.filters"), text)}</div>
+    ${chips}
   </div>`;
 }
 

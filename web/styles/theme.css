@@ -6455,31 +6455,6 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
 
 .search-box:focus-within { border-color: var(--accent); box-shadow: var(--ring); }
 
-.rev-narrow { display: flex; flex-wrap: wrap; gap: 6px; }
-
-/* Two to a row, at every width. Three fitted in English and not in Greek or
-   Japanese — "Οποιαδήποτε κατάσταση" is 141px where a third of the column
-   leaves 130 — and a label that does not fit is cut short. Two also make the
-   four of them a square rather than three and a stray.
- *
- * The house dropdown at its compact size: the same control on the same line as a search
- * box, at the search box's height. */
-.rev-narrow {
-  --sel-padding: 5px 10px;
-  --sel-font-size: 12px;
-  --sel-radius: var(--radius-sm);
-}
-
-.rev-narrow .sel { flex: 1 1 calc(50% - 3px); inline-size: auto; }
-.rev-narrow .sel-trigger { color: var(--text-dim); }
-
-/* A narrowing that is on says so: the same accent a chosen row carries. */
-.rev-narrow .sel.set .sel-trigger {
-  color: var(--text-main);
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
-}
-
 .rev-more,
 .rev-unfilter { display: flex; justify-content: center; margin: 12px 0 4px; }
 
@@ -7444,8 +7419,8 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
 .settings-row.decide { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 32px; }
 .settings-row.decide .settings-info { flex: 1 1 14rem; }
 .settings-card .settings-row + .add-word { margin-block-start: 16px; padding-block-start: 16px; border-block-start: 1px solid var(--border); }
-/* Narrow and at the end of the line: it narrows a list, it is not the card's main act. */
-.word-search { flex: 0 0 auto; align-self: flex-end; inline-size: min(100%, 18rem); margin-block-start: 16px; }
+/* Where every list has it: first, and the width of the list it narrows. */
+.word-search { flex: 0 0 auto; inline-size: 100%; margin-block-start: 16px; }
 .word-results { margin-block-start: 4px; }
 .pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-block-start: 12px; }
 .pager-range { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
@@ -8121,6 +8096,9 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   z-index: 40;
   min-inline-size: 15rem;
   max-inline-size: min(22rem, calc(100vw - 32px));
+  /* However many groups a screen has, the menu stays inside the window and scrolls. */
+  max-block-size: min(26rem, calc(100vh - 160px));
+  overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--card-border);
   border-radius: 12px;

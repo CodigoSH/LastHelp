@@ -57,6 +57,8 @@
   "board.filters": "Φίλτρα",
   "board.sort": "Ταξινόμηση κατά",
   "board.result": "Αποτέλεσμα",
+  "board.moderation": "Διαλογή",
+  "board.reply": "Απάντηση",
   "board.showing": "Εμφανίζονται {shown} από {total}",
   "board.sortNew": "Νεότερα",
   "board.sortVotes": "Περισσότερες ψήφοι",

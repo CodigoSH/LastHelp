@@ -146,17 +146,17 @@ async function main() {
     JSON.stringify(paged),
   );
 
-  // The search is narrow and sits at the end of its line, under the form, in the
-  // house's search box; not a bar across the whole card.
+  // The search is where every list has it, first and the width of the list it narrows, in the
+  // house's search box.
   const box = await evaluate(`
     const b = document.querySelector(".word-search").getBoundingClientRect();
     const rows = document.querySelector(".word-add").getBoundingClientRect();
-    return { width: Math.round(b.width), card: Math.round(rows.width), atEnd: Math.abs(b.right - rows.right) <= 1,
+    return { width: Math.round(b.width), card: Math.round(rows.width), same: Math.abs(b.width - rows.width) <= 1,
       house: getComputedStyle(document.querySelector(".word-search")).borderRadius };
   `);
   check(
-    "the search is a narrow box at the end of its line, not a bar across the card",
-    box.width <= 290 && box.width < box.card / 2 && box.atEnd === true && box.house === "12px",
+    "the search is the width of the list it narrows, in the house's search box",
+    box.same === true && box.house === "12px",
     JSON.stringify(box),
   );
 

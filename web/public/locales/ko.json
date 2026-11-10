@@ -57,6 +57,8 @@
   "board.filters": "필터",
   "board.sort": "정렬",
   "board.result": "결과",
+  "board.moderation": "검토 상태",
+  "board.reply": "답변",
   "board.showing": "{total}개 중 {shown}개 표시",
   "board.sortNew": "최신순",
   "board.sortVotes": "최다 득표",

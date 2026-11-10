@@ -57,6 +57,8 @@
   "board.filters": "フィルター",
   "board.sort": "並べ替え",
   "board.result": "結果",
+  "board.moderation": "確認状況",
+  "board.reply": "返信",
   "board.showing": "{total} 件中 {shown} 件を表示",
   "board.sortNew": "新しい順",
   "board.sortVotes": "投票数順",

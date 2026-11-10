@@ -57,6 +57,8 @@
   "board.filters": "عوامل التصفية",
   "board.sort": "ترتيب حسب",
   "board.result": "النتيجة",
+  "board.moderation": "الإشراف",
+  "board.reply": "الرد",
   "board.showing": "عرض {shown} من {total}",
   "board.sortNew": "الأحدث",
   "board.sortVotes": "الأكثر تصويتًا",

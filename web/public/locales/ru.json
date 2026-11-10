@@ -57,6 +57,8 @@
   "board.filters": "Фильтры",
   "board.sort": "Сортировка",
   "board.result": "Результат",
+  "board.moderation": "Разбор",
+  "board.reply": "Ответ",
   "board.showing": "Показано {shown} из {total}",
   "board.sortNew": "Новые",
   "board.sortVotes": "Больше голосов",

@@ -57,6 +57,8 @@
   "board.filters": "筛选",
   "board.sort": "排序",
   "board.result": "结果",
+  "board.moderation": "审核状态",
+  "board.reply": "回复",
   "board.showing": "显示 {shown} / {total}",
   "board.sortNew": "最新",
   "board.sortVotes": "票数最多",

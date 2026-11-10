@@ -3209,21 +3209,22 @@ async function wireReview(
     }
     go(`/review?${next.toString()}`);
   };
-  for (const el of root?.querySelectorAll<HTMLSelectElement>("[data-f]") ?? []) {
-    el.addEventListener("change", () => narrowTo({ [el.dataset.f ?? ""]: el.value }));
-  }
   // Open and closed. Changing side drops the outcome and the status, which belong
-  // to the side they were chosen on; pressing the outcome that is on shows both.
+  // to the side they were chosen on.
   for (const el of root?.querySelectorAll<HTMLElement>("[data-rstate]") ?? []) {
     el.addEventListener("click", () => narrowTo({ state: el.dataset.rstate ?? "", outcome: "", status: "" }));
   }
-  for (const el of root?.querySelectorAll<HTMLElement>("[data-routcome]") ?? []) {
-    el.addEventListener("click", () =>
-      narrowTo({ outcome: view.filters.outcome === el.dataset.routcome ? "" : (el.dataset.routcome ?? "") }),
-    );
-  }
-  root?.querySelector<HTMLElement>("[data-rreply]")?.addEventListener("click", () =>
-    narrowTo({ reply: view.filters.reply === "none" ? "" : "none" }),
+  // Everything else is the menu's: one question at a time, each written to the address.
+  const filterBox = root?.querySelector<HTMLElement>(".rev-filter");
+  filterBox?.addEventListener("fb-pick", (event) => {
+    const { group, value } = (event as CustomEvent<FilterPick>).detail;
+    narrowTo({ [group]: value });
+  });
+  filterBox?.querySelectorAll<HTMLElement>("[data-fb-undo]").forEach((b) =>
+    b.addEventListener("click", () => narrowTo({ [b.dataset.fbUndo ?? ""]: "" })),
+  );
+  filterBox?.querySelector<HTMLElement>("[data-fb-clear]")?.addEventListener("click", () =>
+    narrowTo({ kind: "", moderation: "", status: "", board: "", outcome: "", reply: "" }),
   );
   const search = root?.querySelector<HTMLInputElement>("[data-q]");
   if (search) {

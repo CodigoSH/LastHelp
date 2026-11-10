@@ -57,6 +57,8 @@
   "board.filters": "فیلترها",
   "board.sort": "مرتب‌سازی بر اساس",
   "board.result": "نتیجه",
+  "board.moderation": "بررسی",
+  "board.reply": "پاسخ",
   "board.showing": "نمایش {shown} از {total}",
   "board.sortNew": "جدیدترین",
   "board.sortVotes": "بیشترین رأی",
