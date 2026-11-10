@@ -3009,6 +3009,36 @@ async function main() {
       menuDeFiltros.dentro === true && menuDeFiltros.tapadas === 0,
     JSON.stringify(menuDeFiltros),
   );
+  // The order's menu hangs from a button that is at the start of a narrow column here and at the end of a bar on the
+  // board: whichever side it opens toward, every option is in the window and none is cut at its edge.
+  const menuDeOrden = await evaluate(`
+    const out = {};
+    const original = document.documentElement.dir;
+    // In both directions of writing: by this point the pass reads Arabic, where the button sits at the other end of the column and the bug is not there.
+    // And with the bar made narrow enough that the order's button falls at the start of a row, which is where it was seen to run off the column.
+    const bar = document.querySelector(".rev-filter .fb");
+    bar.style.inlineSize = "230px";
+    for (const dir of ["ltr", "rtl"]) {
+      document.documentElement.dir = dir;
+      const sortButton = [...document.querySelectorAll('.rev-filter .fb .fb-btn')].find(b => !b.hasAttribute("data-fb-filters") && b.querySelector(".fb-btn-name") === null);
+      sortButton.click();
+      await new Promise(r => setTimeout(r, 350));
+      const pop = sortButton.closest(".fb-menu").querySelector(".fb-pop");
+      const r = pop.getBoundingClientRect();
+      out[dir] = { abierto: !pop.hidden, left: Math.round(r.left), right: Math.round(r.right), opciones: pop.querySelectorAll(".fb-opt").length,
+        cortadas: [...pop.querySelectorAll(".fb-opt")].filter(o => { const c = o.getBoundingClientRect(); return c.left < 0 || c.right > innerWidth; }).length };
+      sortButton.click();
+    }
+    document.documentElement.dir = original;
+    bar.style.inlineSize = "";
+    out.ancho = innerWidth;
+    return out;
+  `);
+  check(
+    "the order's menu opens inside the window, whichever side it hangs from and whichever way the language is written, with every option in view",
+    ["ltr", "rtl"].every((d) => menuDeOrden[d].abierto === true && menuDeOrden[d].left >= 0 && menuDeOrden[d].right <= menuDeOrden.ancho && menuDeOrden[d].opciones === 3 && menuDeOrden[d].cortadas === 0),
+    JSON.stringify(menuDeOrden),
+  );
   await evaluate(`
     document.getElementById("app")?.firstElementChild?.setAttribute("data-leaving", "1");
     document.querySelector('.rev-filter [data-fb-filters]').click();

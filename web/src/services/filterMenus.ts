@@ -33,6 +33,25 @@ export function closeMenus(keep?: Element | null): void {
   });
 }
 
+/**
+ * Open toward the side where there is room. A menu hangs from the start of its button; if that runs
+ * past the window's end it hangs from the button's end instead. Where a button sits depends on the
+ * screen — at the far end of a bar on one, at the start of a narrow column on another — so which side
+ * has room is asked when it opens, not decided when it was written.
+ */
+function place(pop: HTMLElement): void {
+  pop.classList.remove("end");
+  const r = pop.getBoundingClientRect();
+  const rtl = getComputedStyle(pop).direction === "rtl";
+  const past = rtl ? r.left < 8 : r.right > innerWidth - 8;
+  if (!past) return;
+  pop.classList.add("end");
+  const after = pop.getBoundingClientRect();
+  // If hanging from the other side is worse, stay where it was.
+  const worse = rtl ? after.right > innerWidth - 8 : after.left < 8;
+  if (worse) pop.classList.remove("end");
+}
+
 const options = (menu: Element) => [...menu.querySelectorAll<HTMLButtonElement>(".fb-opt")];
 
 let installed = false;
@@ -62,6 +81,7 @@ export function installFilterMenus(): void {
       const open = pop.hidden;
       closeMenus(open ? menu : null);
       pop.hidden = !open;
+      if (open) place(pop);
       // A menu opens with every option in sight, whatever was typed into a group's box the last time.
       if (open) {
         menu.querySelectorAll<HTMLInputElement>("[data-fb-find]").forEach((f) => (f.value = ""));

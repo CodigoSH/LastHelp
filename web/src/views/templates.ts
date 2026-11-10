@@ -2672,7 +2672,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
     </label>
     ${sides}
-    <div class="fb"><button type="button" class="fb-toggle" data-rreply aria-pressed="${filters.reply === "none"}">${escapeHTML(text.t("review.noReply"))}</button>${filterMenu(groups, text.t("board.filters"), text)}${choiceMenu(repository, text, icons.repository(14))}${sortMenu(
+    <div class="fb">${filterMenu(groups, text.t("board.filters"), text)}${choiceMenu(repository, text, icons.repository(14))}${sortMenu(
       {
         name: "sort",
         label: text.t("board.sort"),
@@ -2685,7 +2685,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
       },
       text.t("board.sort"),
       text,
-    )}</div>
+    )}<button type="button" class="fb-toggle" data-rreply aria-pressed="${filters.reply === "none"}">${escapeHTML(text.t("review.noReply"))}</button></div>
     ${chips}
     <p class="fb-results" role="status" aria-live="polite">${escapeHTML(text.t("board.results", { count: text.number(shown) }))}</p>
   </div>`;

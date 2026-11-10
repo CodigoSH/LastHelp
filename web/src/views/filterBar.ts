@@ -85,7 +85,7 @@ export function sortMenu(group: FilterGroup, label: string, text: Text): string 
     <button type="button" class="fb-btn" data-fb-toggle aria-haspopup="menu" aria-expanded="false" aria-label="${escapeAttr(label)}">
       ${icons.sort(14)}<span>${escapeHTML(current?.label ?? label)}</span>${icons.caretDown(12)}
     </button>
-    <div class="fb-pop end" role="menu" hidden><div class="fb-group" role="group" aria-label="${escapeAttr(label)}"><div class="fb-opts">${group.options.map((o) => option(group, o, text)).join("")}</div></div></div>
+    <div class="fb-pop" role="menu" hidden><div class="fb-group" role="group" aria-label="${escapeAttr(label)}"><div class="fb-opts">${group.options.map((o) => option(group, o, text)).join("")}</div></div></div>
   </div>`;
 }
 
