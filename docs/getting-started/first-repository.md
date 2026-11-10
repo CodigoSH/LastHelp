@@ -134,8 +134,8 @@ thread, and the status says what you decided: a completed one is solid and green
 a declined one has a dashed edge and a hollow dot. The Closed view has two lanes,
 **Completed** and **Declined**, each with its count. **Open** and **Closed** are
 two tabs above the search box, each with how many it holds. Beside the search box
-the **Filters** button opens a menu to narrow the list by type and, once you are
-looking at Closed, by **Completed** or **Declined**, and the next button orders
+**All**, **Bugs** and **Ideas** choose the type in one press, once you are
+looking at Closed the **Filters** button offers **Completed** or **Declined**, and the last button orders
 it by newest or by votes. What is chosen shows underneath as chips that come off
 with one press, and the choice is in the address, so it can be sent. The tiles
 above only say the numbers; the one for the roadmap is the way to its page, and
@@ -206,12 +206,12 @@ planned idea share *planned*, and a fixed bug and a shipped idea share
 
 - Four tiles at the top count the lanes, with how many ideas and how many bugs.
   They only say the numbers: on a phone the lanes follow one another.
-- A search box and the **Filters** menu (**All**, **Ideas** or **Bugs**) narrow every lane at once, what is chosen shows underneath as a chip that comes off with one press, and the dialog a lane opens starts from the same words and filter.
+- A search box and **All**, **Ideas** and **Bugs**, in one press, narrow every lane at once, and the dialog a lane opens starts from the same words and filter.
 - *Planned* is ranked by votes and shows the first six; *completed* is grouped by
   the month each thing was completed in and shows the newest six, within the
   latest two months; what is in progress shows six cards. Each lane that has more has a **Show
   more** button, which opens the lane whole in a dialog, with a search over every item in it,
-  the same **Filters** menu, an order menu (most voted, or newest), a page at
+  the same **All** / **Ideas** / **Bugs** choice, an order menu (most voted, or newest), a page at
   a time. The page itself stays a screen or two long however many reports
   there are.
 - **Declined** is shut until somebody asks for it: the page is about what is going
