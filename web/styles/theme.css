@@ -8106,6 +8106,20 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
 }
 .fb-pop.end { inset-inline-start: auto; inset-inline-end: 0; }
+/* A menu with three groups or more spreads them across columns, so the team sees every filter at once, side by side,
+   instead of scrolling down one long list. Each column is a group; they wrap onto a second row when the window is narrow. */
+.fb-pop.cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 6px 4px;
+  inline-size: min(46rem, calc(100vw - 32px));
+  max-inline-size: none;
+  max-block-size: calc(100vh - 160px);
+  align-items: start;
+}
+.fb-pop.cols .fb-group + .fb-group { margin: 0; padding: 0; border: 0; }
+.fb-pop.cols .fb-group { min-inline-size: 0; }
+@media (max-width: 640px) { .fb-pop.cols { grid-template-columns: minmax(0, 1fr); } }
 .fb-pop[hidden] { display: none; }
 .fb-group + .fb-group { margin-block-start: 4px; padding-block-start: 4px; border-block-start: 1px solid var(--border); }
 .fb-group-name { margin: 0; padding: 6px 10px 4px; font: 700 0.62rem/1.4 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }

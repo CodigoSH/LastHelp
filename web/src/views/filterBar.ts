@@ -51,7 +51,7 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
     <button type="button" class="fb-btn${on > 0 ? " on" : ""}" data-fb-toggle data-fb-filters aria-haspopup="menu" aria-expanded="false">
       ${icons.filter(14)}<span>${escapeHTML(label)}</span>${on > 0 ? `<b class="fb-count">${escapeHTML(text.number(on))}</b>` : ""}${icons.caretDown(12)}
     </button>
-    <div class="fb-pop" role="menu" hidden>${usable
+    <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu" hidden>${usable
       .map(
         (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name">${escapeHTML(g.label)}</p>${g.options.map((o) => option(g, o, text)).join("")}</div>`,
       )
