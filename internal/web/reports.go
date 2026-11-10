@@ -137,6 +137,10 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		moderation := query.Get("moderation")
 		f.Moderation, f.AnyModeration = item.Moderation(moderation), moderation == ""
 		if state == "" {
+			// No side chosen: "completed" is still both ways of being done.
+			if f.Status != "" {
+				f.Statuses, f.Status = item.Alike(f.Status), ""
+			}
 			return f, true
 		}
 		if moderation != "" && moderation != string(item.Published) {
@@ -156,14 +160,21 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 			f.Statuses = allowed
 			return f, true
 		}
-		// The status picked has to be one of this side's, or nothing is left.
+		// The status picked has to be one of this side's, or nothing is left. "Completed"
+		// is both of the ways to be done, so it keeps whichever of them this side has.
+		var kept []item.Status
 		for _, st := range allowed {
-			if st == f.Status {
-				f.Statuses = []item.Status{st}
-				return f, true
+			for _, want := range item.Alike(f.Status) {
+				if st == want {
+					kept = append(kept, st)
+				}
 			}
 		}
-		return f, false
+		if len(kept) == 0 {
+			return f, false
+		}
+		f.Statuses = kept
+		return f, true
 	}
 
 	filter, holds := narrowed(state, outcome)

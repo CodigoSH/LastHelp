@@ -91,6 +91,15 @@ func TestTheReportsScreenCanBeNarrowedToOpenAndClosed(t *testing.T) {
 	none, _, _ := ask(admin, "state=open&status=done&board=acme/atlas")
 	same("an open side with a delivered status", none)
 	one, _, _ := ask(admin, "state=closed&status=declined&board=acme/atlas")
+	// Completed is one word for both kinds too: it finds the idea that shipped and the bug
+	// that was fixed, and nothing the team turned down.
+	completed, _, _ := ask(admin, "state=closed&status=done&board=acme/atlas")
+	same("closed and completed", completed, "shipped idea", "fixed bug")
+	// And on "all", where no side was chosen: the same two, not only the ideas.
+	anySide, _, _ := ask(admin, "status=done&board=acme/atlas")
+	same("completed on every side", anySide, "shipped idea", "fixed bug")
+	viaFixed, _, _ := ask(admin, "state=closed&status=closed&board=acme/atlas")
+	same("closed and fixed", viaFixed, "shipped idea", "fixed bug")
 	// Declined is one word for both kinds now, so it finds a declined bug too.
 	same("closed and declined", one, "declined idea", "unreproducible bug")
 	// Open and closed are of what is published: turned down is reached by moderation.

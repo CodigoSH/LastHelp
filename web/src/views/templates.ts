@@ -20,7 +20,7 @@ import { overviewDialog } from "./overviewDetail";
 import { monthGroups, roadmapDialog, roadmapKind, voteTile } from "./roadmapModal";
 import { laneCap, type LaneKey, type Tiles } from "../services/boardState";
 import { icons } from "./icons";
-import { filterChips, filterChipsHost, filterMenu, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
+import { choiceMenu, filterChips, filterChipsHost, filterMenu, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
 import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
@@ -2600,14 +2600,18 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
     {
       name: "status",
       label: text.t("overview.colStatus"),
-      value: filters.status,
-      options: [all, ...some(everyStatus.map((s) => ({ value: s, label: text.t(`status.${s}`), count: counts.status[s] ?? 0 })), filters.status)],
-    },
-    {
-      name: "board",
-      label: text.t("overview.colRepository"),
-      value: filters.board,
-      options: data.boards.length < 2 ? [] : [all, ...data.boards.map((b) => ({ value: `${b.org}/${b.repo}`, label: `${b.organization} / ${b.name}` }))],
+      // Shipped and fixed are one word, completed, so they are one option that finds both and counts both.
+      // An old address that asks for fixed shows completed as the one chosen.
+      value: filters.status === "closed" ? "done" : filters.status,
+      options: [
+        all,
+        ...some(
+          everyStatus
+            .filter((s) => s !== "closed")
+            .map((s) => ({ value: s, label: text.t(`status.${s}`), count: (counts.status[s] ?? 0) + (s === "done" ? (counts.status.closed ?? 0) : 0) })),
+          filters.status === "closed" ? "done" : filters.status,
+        ),
+      ],
     },
     {
       // Under "Closed", what the team decided; the other sides have nothing to choose here.
@@ -2633,6 +2637,14 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
     },
   ];
 
+  // The repository is a control of its own beside the filters: it has the most answers and is chosen the most.
+  const repository: FilterGroup = {
+    name: "board",
+    label: text.t("overview.colRepository"),
+    value: filters.board,
+    options: data.boards.length < 2 ? [] : [all, ...data.boards.map((b) => ({ value: `${b.org}/${b.repo}`, label: `${b.organization} / ${b.name}` }))],
+  };
+
   // Open and closed as the public board has them, with what each would show.
   const count = (key: string) => `<span class="count-chip">${escapeHTML(text.number(states[key] ?? 0))}</span>`;
   const side = (value: string, icon: string, label: string, key: string) =>
@@ -2643,7 +2655,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
     </div>`;
 
   const chips = filterChips(
-    groups.flatMap((g) => {
+    [...groups, repository].flatMap((g) => {
       const chosen = g.options.find((o) => o.value === g.value);
       return chosen && g.value !== "" ? [{ name: g.name, label: chosen.label }] : [];
     }),
@@ -2657,7 +2669,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
         placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" />
     </label>
     ${sides}
-    <div class="fb">${filterMenu(groups, text.t("board.filters"), text)}</div>
+    <div class="fb">${filterMenu(groups, text.t("board.filters"), text)}${choiceMenu(repository, text, icons.repository(14))}</div>
     ${chips}
   </div>`;
 }

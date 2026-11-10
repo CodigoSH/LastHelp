@@ -157,6 +157,17 @@ func (s Status) Delivered() bool {
 
 // ClosedStatuses and OpenStatuses split both vocabularies by Closes, for a
 // filter that asks for one side without naming every status on it.
+// Alike is what a filter means by asking for a status. Shipped and fixed are one word on
+// every screen, completed, so asking for either asks for both: a list of what was
+// completed holds the ideas that shipped and the bugs that were fixed. Every other status
+// stands for itself.
+func Alike(s Status) []Status {
+	if s.Delivered() {
+		return DeliveredStatuses()
+	}
+	return []Status{s}
+}
+
 func ClosedStatuses() []Status { return statusesWhere(true) }
 func OpenStatuses() []Status   { return statusesWhere(false) }
 

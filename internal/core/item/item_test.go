@@ -873,3 +873,22 @@ func TestAReplyFollowsItsAuthorsName(t *testing.T) {
 		t.Errorf("after the account was deleted the reply says %v, want the name it was written under", got)
 	}
 }
+
+// TestAskingForCompletedAsksForBothWaysOfBeingDone: shipped and fixed are one word, so a
+// filter that asks for either has to find both, and every other status stands for itself.
+func TestAskingForCompletedAsksForBothWaysOfBeingDone(t *testing.T) {
+	for _, asked := range []Status{StatusDone, StatusClosed} {
+		got := map[Status]bool{}
+		for _, st := range Alike(asked) {
+			got[st] = true
+		}
+		if len(got) != 2 || !got[StatusDone] || !got[StatusClosed] {
+			t.Errorf("asking for %s finds %v, want shipped and fixed", asked, Alike(asked))
+		}
+	}
+	for _, asked := range []Status{StatusNew, StatusDeclined, StatusInProgress} {
+		if got := Alike(asked); len(got) != 1 || got[0] != asked {
+			t.Errorf("asking for %s finds %v, want only itself", asked, got)
+		}
+	}
+}

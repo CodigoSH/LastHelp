@@ -49,6 +49,11 @@ export function installFilterMenus(): void {
       const open = pop.hidden;
       closeMenus(open ? menu : null);
       pop.hidden = !open;
+      // A menu opens with every option in sight, whatever was typed into a group's box the last time.
+      if (open) {
+        menu.querySelectorAll<HTMLInputElement>("[data-fb-find]").forEach((f) => (f.value = ""));
+        options(menu).forEach((o) => (o.hidden = false));
+      }
       toggle.setAttribute("aria-expanded", String(open));
       if (open) {
         const checked = options(menu).find((o) => o.getAttribute("aria-checked") === "true") ?? options(menu)[0];
@@ -69,6 +74,18 @@ export function installFilterMenus(): void {
     if (!target.closest(MENU)) closeMenus();
   });
 
+  // A group's own box narrows its options to the ones that hold what was typed. The first option
+  // is "everything" and stays, so a search never leaves a group with no way back.
+  document.addEventListener("input", (event) => {
+    const box = (event.target as Element | null)?.closest<HTMLInputElement>("[data-fb-find]");
+    if (!box) return;
+    const words = box.value.trim().toLocaleLowerCase();
+    const group = box.closest(".fb-group");
+    group?.querySelectorAll<HTMLElement>(".fb-opt").forEach((o, i) => {
+      o.hidden = i > 0 && words !== "" && !(o.querySelector(".fb-opt-name")?.textContent ?? "").toLocaleLowerCase().includes(words);
+    });
+  });
+
   document.addEventListener("keydown", (event) => {
     const target = event.target as Element | null;
     const open = document.querySelector<HTMLElement>(`${MENU} .fb-pop:not([hidden])`);
@@ -86,7 +103,13 @@ export function installFilterMenus(): void {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
     if (!target || !menu.contains(target)) return;
     event.preventDefault();
-    const all = options(menu);
+    // Only what is in sight: an option a search has hidden is not somewhere the arrows stop.
+    const all = options(menu).filter((o) => !o.hidden);
+    // From a group's box, down goes to the first option of that group.
+    if (target.matches("[data-fb-find]")) {
+      if (event.key === "ArrowDown") target.closest(".fb-group")?.querySelector<HTMLButtonElement>(".fb-opt:not([hidden])")?.focus({ preventScroll: true });
+      return;
+    }
     const at = all.indexOf(target as HTMLButtonElement);
     const next = event.key === "ArrowDown" ? (at + 1) % all.length : (at - 1 + all.length) % all.length;
     all[next]?.focus({ preventScroll: true });

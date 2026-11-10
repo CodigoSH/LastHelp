@@ -8106,6 +8106,9 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
 }
 .fb-pop.end { inset-inline-start: auto; inset-inline-end: 0; }
+/* The pop of a choice with many answers, often long names: wider than a menu of filters, and its box to find one in. */
+.fb-pop.wide { min-inline-size: 18rem; max-inline-size: min(26rem, calc(100vw - 32px)); }
+.fb-btn-name { display: inline-block; max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 /* A menu with three groups or more spreads them across columns, so the team sees every filter at once, side by side,
    instead of scrolling down one long list. Each column is a group; they wrap onto a second row when the window is narrow. */
 .fb-pop.cols {
@@ -8123,6 +8126,21 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 .fb-pop[hidden] { display: none; }
 .fb-group + .fb-group { margin-block-start: 4px; padding-block-start: 4px; border-block-start: 1px solid var(--border); }
 .fb-group-name { margin: 0; padding: 6px 10px 4px; font: 700 0.62rem/1.4 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+/* However many options a group has, it scrolls inside itself: one long list must not stretch the whole menu off the screen. */
+.fb-opts { max-block-size: 15rem; overflow-y: auto; }
+.fb-pop.cols .fb-opts { max-block-size: 16rem; }
+.fb-find {
+  display: block;
+  inline-size: calc(100% - 12px);
+  margin: 2px 6px 6px;
+  padding: 6px 9px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-main);
+  font: 12px var(--font-mono);
+}
+.fb-find:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .fb-opt {
   display: flex;
   align-items: center;

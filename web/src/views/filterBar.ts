@@ -27,6 +27,9 @@ export interface FilterGroup {
   value: string;
 }
 
+/** From this many options a group has a box to find one in: a list of thirty is not read, it is searched. */
+export const FIND_FROM = 10;
+
 const option = (group: FilterGroup, o: FilterOption, text: Text) =>
   `<button type="button" class="fb-opt" role="menuitemradio" aria-checked="${group.value === o.value}" data-fb-group="${escapeAttr(group.name)}" data-fb-value="${escapeAttr(o.value)}">
       <span class="fb-opt-mark" aria-hidden="true"></span><span class="fb-opt-name">${escapeHTML(o.label)}</span>${
@@ -53,7 +56,11 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
     </button>
     <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu" hidden>${usable
       .map(
-        (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name">${escapeHTML(g.label)}</p>${g.options.map((o) => option(g, o, text)).join("")}</div>`,
+        (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name">${escapeHTML(g.label)}</p>${
+          g.options.length >= FIND_FROM
+            ? `<input type="search" class="fb-find" data-fb-find placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(g.label + ": " + text.t("board.search"))}" autocomplete="off" />`
+            : ""
+        }<div class="fb-opts">${g.options.map((o) => option(g, o, text)).join("")}</div></div>`,
       )
       .join("")}</div>
   </div>`;
@@ -66,7 +73,28 @@ export function sortMenu(group: FilterGroup, label: string, text: Text): string 
     <button type="button" class="fb-btn" data-fb-toggle aria-haspopup="menu" aria-expanded="false" aria-label="${escapeAttr(label)}">
       ${icons.sort(14)}<span>${escapeHTML(current?.label ?? label)}</span>${icons.caretDown(12)}
     </button>
-    <div class="fb-pop end" role="menu" hidden><div class="fb-group" role="group" aria-label="${escapeAttr(label)}">${group.options.map((o) => option(group, o, text)).join("")}</div></div>
+    <div class="fb-pop end" role="menu" hidden><div class="fb-group" role="group" aria-label="${escapeAttr(label)}"><div class="fb-opts">${group.options.map((o) => option(group, o, text)).join("")}</div></div></div>
+  </div>`;
+}
+
+/**
+ * A choice that is a control of its own, beside the filters: one question with a button that
+ * says the answer it has now ("All" until something is chosen) and a menu of the others. For
+ * what has many answers and is chosen often — a repository among thirty — where one more group
+ * in the filters menu would make it long and hide the one thing people reach for first.
+ */
+export function choiceMenu(group: FilterGroup, text: Text, icon: string): string {
+  if (group.options.length < 2) return "";
+  const chosen = group.value !== "" && group.value !== group.options[0]!.value ? group.options.find((o) => o.value === group.value) : undefined;
+  return `<div class="fb-menu">
+    <button type="button" class="fb-btn${chosen ? " on" : ""}" data-fb-toggle aria-haspopup="menu" aria-expanded="false" aria-label="${escapeAttr(group.label)}">
+      ${icon}<span class="fb-btn-name"${chosen ? ` title="${escapeAttr(chosen.label)}"` : ""}>${escapeHTML(chosen?.label ?? group.label)}</span>${icons.caretDown(12)}
+    </button>
+    <div class="fb-pop wide" role="menu" hidden><div class="fb-group" role="group" aria-label="${escapeAttr(group.label)}">${
+      group.options.length >= FIND_FROM
+        ? `<input type="search" class="fb-find" data-fb-find placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(group.label + ": " + text.t("board.search"))}" autocomplete="off" />`
+        : ""
+    }<div class="fb-opts">${group.options.map((o) => option(group, o, text)).join("")}</div></div></div>
   </div>`;
 }
 
