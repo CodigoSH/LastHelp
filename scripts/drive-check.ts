@@ -3001,12 +3001,14 @@ async function main() {
       debajo: r ? Math.round(r.top - b.bottom) : null,
       dentro: r ? r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth : false,
       tapadas: [...(pop?.querySelectorAll(".fb-opt") ?? [])].filter(hidden).length,
+      // The cards of the menu all have the same height, whatever each holds.
+      alturas: [...new Set([...(pop?.querySelectorAll(".fb-cards > .fb-group") ?? [])].map(g => Math.round(g.getBoundingClientRect().height)))].length,
     };
   `);
   check(
     "the filters menu opens under its button, inside the window, with every group and nothing under another box",
     menuDeFiltros.abierto === true && menuDeFiltros.grupos.length >= 3 && menuDeFiltros.debajo !== null && menuDeFiltros.debajo >= 0 && menuDeFiltros.debajo <= 12 &&
-      menuDeFiltros.dentro === true && menuDeFiltros.tapadas === 0,
+      menuDeFiltros.dentro === true && menuDeFiltros.tapadas === 0 && menuDeFiltros.alturas === 1,
     JSON.stringify(menuDeFiltros),
   );
   // The order's menu hangs from a button that is at the start of a narrow column here and at the end of a bar on the

@@ -8136,24 +8136,31 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 /* A menu with three groups or more spreads them across columns, so the team sees every filter at once, side by side,
    instead of scrolling down one long list. Each column is a group; they wrap onto a second row when the window is narrow. */
 .fb-pop.cols {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 8px;
-  inline-size: min(46rem, calc(100vw - 32px));
+  display: block;
+  inline-size: min(52rem, calc(100vw - 32px));
   max-inline-size: none;
   max-block-size: calc(100vh - 160px);
-  align-items: start;
+}
+/* The cards are in a grid of their own, every row as tall as the tallest, so they all have the same height whatever they hold:
+   one that has fewer options than its neighbour is not shorter for it. The footer is outside, and keeps its own height. */
+.fb-pop.cols .fb-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 8px;
+  align-items: stretch;
 }
 .fb-pop.cols .fb-group + .fb-group { margin: 0; }
 /* Each group of a menu spread across columns is a card of its own, so where one ends and the next begins is plain. */
 .fb-pop.cols .fb-group {
   min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--text-main) 3%, transparent);
 }
-@media (max-width: 640px) { .fb-pop.cols { grid-template-columns: minmax(0, 1fr); } }
 .fb-pop[hidden] { display: none; }
 .fb-grab { display: none; }
 .fb-group + .fb-group { margin-block-start: 6px; padding-block-start: 6px; border-block-start: 1px solid var(--border); }
@@ -8289,7 +8296,7 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   .fb-grab { display: block; position: sticky; inset-block-start: -10px; z-index: 3; margin: -10px -10px 2px; padding: 12px 0 8px; background: var(--sheet); border-radius: 18px 18px 0 0; cursor: grab; touch-action: none; }
   .fb-grab::before { content: ""; display: block; inline-size: 40px; block-size: 5px; margin-inline: auto; border-radius: 999px; background: color-mix(in srgb, var(--text-main) 28%, transparent); }
   .fb-grab:active { cursor: grabbing; }
-  .fb-pop.cols { display: block; }
+  .fb-pop.cols .fb-cards { display: block; }
   .fb-opts, .fb-pop.cols .fb-opts { max-block-size: none; overflow: visible; }
   .fb-opt { padding-block: 11px; }
   .fb-pop.cols .fb-group { padding: 0; border: 0; border-radius: 0; background: none; }

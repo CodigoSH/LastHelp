@@ -66,7 +66,7 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
     <button type="button" class="fb-btn${on > 0 ? " on" : ""}" data-fb-toggle data-fb-filters aria-haspopup="menu" aria-expanded="false">
       ${icons.filter(14)}<span>${escapeHTML(label)}</span>${on > 0 ? `<b class="fb-count">${escapeHTML(text.number(on))}</b>` : ""}${icons.caretDown(12)}
     </button>
-    <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu"${staged ? " data-fb-staged" : ""} hidden><span class="fb-grab" aria-hidden="true"></span>${usable
+    <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu"${staged ? " data-fb-staged" : ""} hidden><span class="fb-grab" aria-hidden="true"></span><div class="fb-cards">${usable
       .map(
         (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name"><span>${escapeHTML(g.label)}</span>${g.multi ? `<b class="fb-group-on" data-fb-on${chosenValues(g).length > 0 ? "" : " hidden"}>${escapeHTML(text.number(chosenValues(g).length))}</b>` : ""}</p>${
           g.options.length >= FIND_FROM
@@ -74,7 +74,7 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
             : ""
         }<div class="fb-opts">${g.options.map((o) => option(g, o, text)).join("")}</div></div>`,
       )
-      .join("")}${staged ? `<div class="fb-apply"><button type="button" class="fb-reset" data-fb-reset>${escapeHTML(text.t("board.clear"))}</button><button type="button" class="fb-apply-btn" data-fb-apply>${escapeHTML(text.t("board.apply"))}</button></div>` : ""}</div>
+      .join("")}</div>${staged ? `<div class="fb-apply"><button type="button" class="fb-reset" data-fb-reset>${escapeHTML(text.t("board.clear"))}</button><button type="button" class="fb-apply-btn" data-fb-apply>${escapeHTML(text.t("board.apply"))}</button></div>` : ""}</div>
   </div>`;
 }
 
