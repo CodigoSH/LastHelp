@@ -167,3 +167,108 @@ func splitBoard(board string) (string, string, bool) {
 	}
 	return board, "", false
 }
+
+// TestSeveralReportsCanBeDecidedAtOnce: publishing, rejecting or marking as spam many reports in one request, each one asked
+// about on its own — a report of a board the actor does not work on is skipped and counted, and nothing else is touched.
+func TestSeveralReportsCanBeDecidedAtOnce(t *testing.T) {
+	admin, _, collaborator := teamSetup(t)
+	public := admin.anonymous()
+
+	idsOf := func(board string, titles ...string) []string {
+		org, repo, _ := splitBoard(board)
+		var ids []string
+		for _, title := range titles {
+			id, _ := public.submit(org, repo, "idea", title)
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	mine := idsOf("acme/atlas", "one", "two", "three")
+	foreign := idsOf("other/elsewhere", "not theirs")
+
+	moderationOf := func(id string) string {
+		resp := admin.do(http.MethodGet, "/api/items/"+id, nil)
+		return decode(t, resp)["moderation"].(string)
+	}
+	bulk := func(who *instance, state string, ids ...string) (map[string]any, int) {
+		resp := who.do(http.MethodPost, "/api/reports/bulk", map[string]any{"ids": ids, "state": state})
+		code := resp.StatusCode
+		return decode(t, resp), code
+	}
+
+	// A collaborator decides what they work on and skips what they do not.
+	got, code := bulk(collaborator, "published", append(append([]string{}, mine...), foreign...)...)
+	if code != http.StatusOK || got["done"] != float64(3) || got["skipped"] != float64(1) || got["failed"] != float64(0) {
+		t.Fatalf("a mix of their board and another: %d %v", code, got)
+	}
+	for _, id := range mine {
+		if moderationOf(id) != "published" {
+			t.Errorf("%s is %s, want published", id, moderationOf(id))
+		}
+	}
+	if moderationOf(foreign[0]) != "pending" {
+		t.Errorf("a report of a board they do not work on moved to %s", moderationOf(foreign[0]))
+	}
+
+	// The administrator can decide everything, and rejecting and spam are decisions of the same kind.
+	if got, _ := bulk(admin, "rejected", mine[0], mine[1]); got["done"] != float64(2) {
+		t.Errorf("rejecting two: %v", got)
+	}
+	if got, _ := bulk(admin, "spam", mine[2]); got["done"] != float64(1) || moderationOf(mine[2]) != "spam" {
+		t.Errorf("marking one as spam: %v, now %s", got, moderationOf(mine[2]))
+	}
+
+	// What makes no sense is refused, and nothing is guessed.
+	for name, body := range map[string]map[string]any{
+		"an unknown state": {"ids": mine, "state": "pending"},
+		"no reports":       {"ids": []string{}, "state": "published"},
+		"too many":         {"ids": manyIDs(101), "state": "published"},
+	} {
+		resp := admin.do(http.MethodPost, "/api/reports/bulk", body)
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s answered %d, want 400", name, resp.StatusCode)
+		}
+		_ = resp.Body.Close()
+	}
+	// A visitor cannot.
+	if resp := public.do(http.MethodPost, "/api/reports/bulk", map[string]any{"ids": mine, "state": "published"}); resp.StatusCode == http.StatusOK {
+		t.Error("an anonymous visitor decided reports")
+	}
+}
+
+func manyIDs(n int) []string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = "x" + string(rune('a'+i%26)) + string(rune('a'+(i/26)%26))
+	}
+	return out
+}
+
+// TestTheReportsScreenCanBeNarrowedToHowOldReportsAre: the date filter, by name, and a refusal for an age that does not exist.
+func TestTheReportsScreenCanBeNarrowedToHowOldReportsAre(t *testing.T) {
+	admin, _, _ := teamSetup(t)
+	public := admin.anonymous()
+	org, repo, _ := splitBoard("acme/atlas")
+	id, _ := public.submit(org, repo, "idea", "made just now")
+	resp := admin.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"})
+	_ = resp.Body.Close()
+
+	count := func(query string) int {
+		resp := admin.do(http.MethodGet, "/api/reports?"+query, nil)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("%s answered %d", query, resp.StatusCode)
+		}
+		return len(decode(t, resp)["items"].([]any))
+	}
+	for _, query := range []string{"age=day", "age=week", "age=month"} {
+		if count(query+"&board=acme/atlas") != 1 {
+			t.Errorf("%s did not find what was made just now", query)
+		}
+	}
+	if count("age=older&board=acme/atlas") != 0 {
+		t.Error("what was made just now is older than a month")
+	}
+	if resp := admin.do(http.MethodGet, "/api/reports?age=yesterday", nil); resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("an age that does not exist answered %d, want 400", resp.StatusCode)
+	}
+}

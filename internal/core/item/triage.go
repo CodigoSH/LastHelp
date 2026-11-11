@@ -149,6 +149,10 @@ type Filter struct {
 	// SortOldest is the report that has waited longest first. For a team working through a queue the
 	// useful question is not what arrived last but what has been left the longest.
 	SortOldest bool
+	// CreatedSince keeps what was made at or after this moment (seconds), and CreatedBefore what was made before it.
+	// For "the last week" and for "what has been there more than a month"; zero means no limit on that side.
+	CreatedSince  int64
+	CreatedBefore int64
 	// Unanswered keeps what no member of the team has written on. Asked for by
 	// name, and the caller says which states it means: a report that was closed
 	// without a word is a different question from one still waiting for one.
@@ -263,6 +267,14 @@ func (f Filter) where() (string, []any) {
 	case f.Status != "":
 		where = append(where, "status = ?")
 		args = append(args, string(f.Status))
+	}
+	if f.CreatedSince > 0 {
+		where = append(where, "created_at >= ?")
+		args = append(args, f.CreatedSince)
+	}
+	if f.CreatedBefore > 0 {
+		where = append(where, "created_at < ?")
+		args = append(args, f.CreatedBefore)
 	}
 	if f.SortByClosed {
 		where = append(where, "closed_at IS NOT NULL")

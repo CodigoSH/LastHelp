@@ -892,3 +892,41 @@ func TestAskingForCompletedAsksForBothWaysOfBeingDone(t *testing.T) {
 		}
 	}
 }
+
+// TestAListCanBeNarrowedToHowOldItIs: the last week and what has been there longer than a month are two questions about the
+// same date, and an item made exactly on the line belongs to the side that starts there, never to both and never to neither.
+func TestAListCanBeNarrowedToHowOldItIs(t *testing.T) {
+	s := store(t)
+	day := 24 * time.Hour
+	now := epoch.Add(100 * day)
+	made := map[string]time.Time{"today": now, "last week": now.Add(-3 * day), "two months": now.Add(-60 * day), "on the line": now.Add(-30 * day)}
+	for title, at := range made {
+		if _, _, err := s.Create(New{RepoID: 1, Kind: Bug, Title: title}, Published, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	titles := func(f Filter) map[string]bool {
+		f.RepoID = 1
+		list, err := s.List(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]bool{}
+		for _, it := range list {
+			out[it.Title] = true
+		}
+		return out
+	}
+	week := titles(Filter{CreatedSince: now.Add(-7 * day).Unix()})
+	if len(week) != 2 || !week["today"] || !week["last week"] {
+		t.Errorf("the last week: %v", week)
+	}
+	month := titles(Filter{CreatedSince: now.Add(-30 * day).Unix()})
+	older := titles(Filter{CreatedBefore: now.Add(-30 * day).Unix()})
+	if !month["on the line"] || older["on the line"] || len(older) != 1 || !older["two months"] {
+		t.Errorf("the line of a month: last month %v, older %v", month, older)
+	}
+	if got := len(titles(Filter{})); got != 4 {
+		t.Errorf("no limit holds %d, want all 4", got)
+	}
+}

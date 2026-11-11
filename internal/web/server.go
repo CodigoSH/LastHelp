@@ -249,6 +249,7 @@ func (s *Server) routes() {
 	private("GET /api/orgs/{org}/repos/{repo}/export", s.handleExport)
 
 	private("POST /api/items/{id}/moderation", s.handleModerate)
+	private("POST /api/reports/bulk", s.handleBulkModerate)
 
 	// Separate from moderation on purpose: one endpoint that could change the
 	// text and the state is one where an authorisation mistake costs both.

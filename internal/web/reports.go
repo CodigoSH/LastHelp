@@ -1,9 +1,11 @@
 package web
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
@@ -115,6 +117,24 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// How old: the last day, week or month, or what has been there longer than a month.
+	age := query.Get("age")
+	var since, before int64
+	switch age {
+	case "":
+	case "day":
+		since = s.now().Add(-24 * time.Hour).Unix()
+	case "week":
+		since = s.now().Add(-7 * 24 * time.Hour).Unix()
+	case "month":
+		since = s.now().Add(-30 * 24 * time.Hour).Unix()
+	case "older":
+		before = s.now().Add(-30 * 24 * time.Hour).Unix()
+	default:
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
 	// What nobody on the team has answered. It means published and not finished,
 	// as the overview counts it: a report closed without a word is a different
 	// question from one still waiting for one.
@@ -128,12 +148,14 @@ func (s *Server) handleReports(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := item.Filter{
-		RepoIDs:    ids,
-		Kind:       item.Kind(query.Get("kind")),
-		Search:     query.Get("q"),
-		SortByVote: order == "votes",
-		SortOldest: order == "oldest",
-		Unanswered: reply == "none",
+		RepoIDs:       ids,
+		Kind:          item.Kind(query.Get("kind")),
+		Search:        query.Get("q"),
+		SortByVote:    order == "votes",
+		SortOldest:    order == "oldest",
+		CreatedSince:  since,
+		CreatedBefore: before,
+		Unanswered:    reply == "none",
 	}
 	// narrowed is the list as asked for one choice of state and outcome, and
 	// whether that choice can hold anything at all given the other filters. The
@@ -295,6 +317,95 @@ func splitList(raw string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, v := range strings.Split(raw, ",") {
+		v = strings.TrimSpace(v)
+		if v != "" && !seen[v] {
+			seen[v] = true
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// bulkLimit is how many reports one request may decide: enough for a page of a queue, and a bound so a mistake cannot
+// reach every report there is.
+const bulkLimit = 100
+
+type bulkModeration struct {
+	IDs   []string `json:"ids"`
+	State string   `json:"state"`
+}
+
+// handleBulkModerate publishes, rejects or marks as spam several reports in one request.
+//
+// Each report is asked about on its own, the way the single decision is: the actor has to be able to triage the board it
+// belongs to. One they cannot is skipped and counted, not refused for the lot, so a team that works on three of five boards
+// can select across a screen without it failing for the sake of one row. Nothing is guessed about what was not decided: the
+// answer says how many were done, how many skipped and how many failed.
+func (s *Server) handleBulkModerate(w http.ResponseWriter, r *http.Request) {
+	actor, ok := middleware.ActorFrom(r)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "error.unauthorized")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, panelBodyLimit)
+	var in bulkModeration
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+	state := item.Moderation(in.State)
+	if state != item.Published && state != item.Rejected && state != item.Spam {
+		writeError(w, http.StatusBadRequest, "error.unknown_state")
+		return
+	}
+	ids := splitUnique(in.IDs)
+	if len(ids) == 0 || len(ids) > bulkLimit {
+		writeError(w, http.StatusBadRequest, "error.bad_request")
+		return
+	}
+
+	done, skipped, failed := 0, 0, 0
+	for _, id := range ids {
+		it, err := s.items().ByPublicID(id)
+		if err != nil {
+			skipped++
+			continue
+		}
+		repo, err := s.orgs().RepositoryByID(it.RepoID)
+		if err != nil || !actor.Can(authz.Triage, authz.Repository(repo.ID, repo.OrgID)) {
+			skipped++
+			continue
+		}
+		var apply error
+		switch state {
+		case item.Published:
+			apply = s.items().Approve(it.ID, s.now())
+		case item.Rejected:
+			apply = s.items().Reject(it.ID, s.now())
+		default:
+			apply = s.items().MarkSpam(it.ID, s.now())
+		}
+		if apply != nil {
+			slog.Error("moderating in bulk", "error", apply)
+			failed++
+			continue
+		}
+		// As the single decision does: only a published report is told to its reporter.
+		if state == item.Published {
+			if err := s.bridge().RequestTellReporter(it.ID, "is now public", s.now()); err != nil {
+				slog.Error("queueing a reporter notification", "error", err)
+			}
+		}
+		done++
+	}
+	writeJSON(w, http.StatusOK, map[string]int{"done": done, "skipped": skipped, "failed": failed})
+}
+
+// splitUnique drops blanks and repeats, keeping the order.
+func splitUnique(in []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, v := range in {
 		v = strings.TrimSpace(v)
 		if v != "" && !seen[v] {
 			seen[v] = true
