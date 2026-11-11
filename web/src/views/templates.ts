@@ -2685,7 +2685,7 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
       },
       text.t("board.sort"),
       text,
-    )}<button type="button" class="fb-toggle" data-rreply aria-pressed="${filters.reply === "none"}">${escapeHTML(text.t("review.noReply"))}</button></div>
+    )}<button type="button" class="fb-switch" role="switch" data-rreply aria-checked="${filters.reply === "none"}"><span>${escapeHTML(text.t("overview.colUnanswered"))}</span><i class="fb-switch-track" aria-hidden="true"><i class="fb-switch-knob"></i></i></button></div>
     ${chips}
     <p class="fb-results" role="status" aria-live="polite">${escapeHTML(text.t("board.results", { count: text.number(shown) }))}</p>
   </div>`;

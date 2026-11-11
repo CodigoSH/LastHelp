@@ -8060,12 +8060,24 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 .fb { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
 .fb .search-box { flex: 1 1 16rem; min-inline-size: 0; }
 .fb-menu { position: relative; }
-/* A yes-or-no that is asked all the time, in sight: it looks like the buttons beside it and says it is on. */
-.fb-toggle { block-size: 34px; padding: 0 11px; border: 1px solid var(--card-border); border-radius: 9px; background: var(--sheet); color: var(--text-dim); font: 600 12px/1 var(--font-mono); white-space: nowrap; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
-.fb-toggle:hover { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.3); }
-.fb-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.fb-toggle[aria-pressed="true"] { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.45); background: rgba(var(--accent-rgb), 0.1); }
 .fb-results { margin: 0; font: 11px var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+/* In the archive's narrow column the controls are two to a row and share the whole width, so their edges line up with the search box and the tabs
+   above them, with no gaps left at the end of a row: Filters and Repository, then the order and the yes-or-no. */
+.rev-filter .fb { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rev-filter .fb > .fb-menu { min-inline-size: 0; }
+.rev-filter .fb > .fb-menu > .fb-btn { inline-size: 100%; justify-content: space-between; }
+.rev-filter .fb .fb-btn > span:not(.fb-count) { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+.rev-filter .fb .fb-btn .fb-btn-name { max-inline-size: none; }
+/* A yes-or-no, drawn as one: the words and a switch that says whether it is on. It is not a menu and must not look like one. */
+.fb-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; block-size: 36px; padding: 0 12px; border: 1px solid var(--card-border); border-radius: 9px; background: var(--sheet); color: var(--text-dim); font: 600 12px/1 var(--font-mono); cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.fb-switch:hover { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.3); }
+.fb-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.fb-switch[aria-checked="true"] { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.45); }
+.fb-switch-track { position: relative; flex: none; inline-size: 34px; block-size: 20px; border-radius: 999px; background: color-mix(in srgb, var(--text-main) 22%, transparent); transition: background-color 0.18s; }
+.fb-switch-knob { position: absolute; inset-block-start: 2px; inset-inline-start: 2px; inline-size: 16px; block-size: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); transition: inset-inline-start 0.18s; }
+.fb-switch[aria-checked="true"] .fb-switch-track { background: var(--accent); }
+.fb-switch[aria-checked="true"] .fb-switch-knob { inset-inline-start: 16px; }
+@media (prefers-reduced-motion: reduce) { .fb-switch-track, .fb-switch-knob { transition: none; } }
 /* A choice of a few answers, in sight: the same look as the buttons beside it, joined. */
 .fb-seg { display: inline-flex; border: 1px solid var(--card-border); border-radius: 9px; background: var(--sheet); overflow: hidden; }
 .fb-seg button { block-size: 32px; padding: 0 13px; border: 0; background: transparent; color: var(--text-dim); font: 600 12px/1 var(--font-mono); white-space: nowrap; cursor: pointer; transition: color 0.15s; }
@@ -8143,6 +8155,7 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 }
 @media (max-width: 640px) { .fb-pop.cols { grid-template-columns: minmax(0, 1fr); } }
 .fb-pop[hidden] { display: none; }
+.fb-grab { display: none; }
 .fb-group + .fb-group { margin-block-start: 6px; padding-block-start: 6px; border-block-start: 1px solid var(--border); }
 .fb-group-name {
   display: flex;
@@ -8257,7 +8270,7 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
    that closes it when pressed. It no longer depends on where its button happens to be, so it cannot run off the screen. */
 @media (max-width: 640px) {
   .fb .search-box { flex-basis: 100%; }
-  .fb-menu:has(> .fb-pop:not([hidden]))::before { content: ""; position: fixed; inset: 0; z-index: 59; background: rgba(0, 0, 0, 0.45); }
+  .fb-menu:has(> .fb-pop:not([hidden]))::before { content: ""; position: fixed; inset: 0; z-index: 59; background: rgba(0, 0, 0, calc(0.45 * var(--fb-veil, 1))); transition: background-color 0.2s; }
   .fb-pop, .fb-pop.end, .fb-pop.wide, .fb-pop.cols {
     position: fixed;
     inset-block: auto 0;
@@ -8272,6 +8285,10 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
     box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
     animation: fb-sheet 0.2s ease-out;
   }
+  /* The handle of the sheet: a bar to take hold of, kept at the top while the options scroll under it. */
+  .fb-grab { display: block; position: sticky; inset-block-start: -10px; z-index: 3; margin: -10px -10px 2px; padding: 12px 0 8px; background: var(--sheet); border-radius: 18px 18px 0 0; cursor: grab; touch-action: none; }
+  .fb-grab::before { content: ""; display: block; inline-size: 40px; block-size: 5px; margin-inline: auto; border-radius: 999px; background: color-mix(in srgb, var(--text-main) 28%, transparent); }
+  .fb-grab:active { cursor: grabbing; }
   .fb-pop.cols { display: block; }
   .fb-opts, .fb-pop.cols .fb-opts { max-block-size: none; overflow: visible; }
   .fb-opt { padding-block: 11px; }

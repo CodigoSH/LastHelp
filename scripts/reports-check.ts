@@ -903,7 +903,7 @@ async function main() {
     document.getElementById("app").firstElementChild.setAttribute("data-leaving", "1");
     document.querySelector("[data-rreply]").click();
     await wait(() => !document.querySelector("[data-leaving]") && document.querySelector(".rev-row, .rev-empty"));
-    return { said, rows, tab, live, pressed: document.querySelector("[data-rreply]")?.getAttribute("aria-pressed") };
+    return { said, rows, tab, live, pressed: document.querySelector("[data-rreply]")?.getAttribute("aria-checked") };
   `);
   check(
     "the count says how many the list holds, on the side the rows are really of, and is announced",

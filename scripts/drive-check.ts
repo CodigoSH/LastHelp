@@ -3238,6 +3238,30 @@ async function main() {
     cabenEnElMovil.abierto === true && cabenEnElMovil.dentro === true && cabenEnElMovil.cortadas === 0,
     JSON.stringify(cabenEnElMovil),
   );
+  // The sheet is dragged by its handle like a phone's own: a short pull springs back, a long one closes it. With real mouse
+  // events through the protocol, which are what a finger becomes when it reaches the page.
+  const dragSheet = async (dy: number) => {
+    const at = await evaluate(`
+      const btn = document.querySelector('.rev-filter [data-fb-filters]');
+      if (document.querySelector('.rev-filter .fb-pop:not([hidden])') === null) btn.click();
+      await new Promise(r => setTimeout(r, 450));
+      const grab = document.querySelector('.rev-filter .fb-pop:not([hidden]) .fb-grab').getBoundingClientRect();
+      return { x: Math.round(grab.left + grab.width / 2), y: Math.round(grab.top + grab.height / 2) };
+    `);
+    await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
+    await page.send("Input.dispatchMouseEvent", { type: "mousePressed", x: at.x, y: at.y, button: "left", buttons: 1, clickCount: 1 });
+    for (let i = 1; i <= 6; i++) await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y + (dy * i) / 6, button: "left", buttons: 1 });
+    await page.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: at.x, y: at.y + dy, button: "left", buttons: 0, clickCount: 1 });
+    await sleep(500);
+    return evaluate(`const pop = document.querySelector('.rev-filter .fb-pop'); return { open: !pop.hidden, left: pop.style.transform };`);
+  };
+  const tirónCorto = await dragSheet(40);
+  const tirónLargo = await dragSheet(300);
+  check(
+    "the sheet follows the handle: a short pull springs back, a long pull closes it and leaves nothing behind",
+    tirónCorto.open === true && tirónCorto.left === "" && tirónLargo.open === false && tirónLargo.left === "",
+    JSON.stringify({ corto: tirónCorto, largo: tirónLargo }),
+  );
   // Off the screen means past the TRAILING edge, which depends on the
   // direction: by this point the pass reads Arabic, and the drawer rightly
   // comes in from the left.

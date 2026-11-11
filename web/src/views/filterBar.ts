@@ -66,7 +66,7 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
     <button type="button" class="fb-btn${on > 0 ? " on" : ""}" data-fb-toggle data-fb-filters aria-haspopup="menu" aria-expanded="false">
       ${icons.filter(14)}<span>${escapeHTML(label)}</span>${on > 0 ? `<b class="fb-count">${escapeHTML(text.number(on))}</b>` : ""}${icons.caretDown(12)}
     </button>
-    <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu"${staged ? " data-fb-staged" : ""} hidden>${usable
+    <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu"${staged ? " data-fb-staged" : ""} hidden><span class="fb-grab" aria-hidden="true"></span>${usable
       .map(
         (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name"><span>${escapeHTML(g.label)}</span>${g.multi ? `<b class="fb-group-on" data-fb-on${chosenValues(g).length > 0 ? "" : " hidden"}>${escapeHTML(text.number(chosenValues(g).length))}</b>` : ""}</p>${
           g.options.length >= FIND_FROM
@@ -85,7 +85,7 @@ export function sortMenu(group: FilterGroup, label: string, text: Text): string 
     <button type="button" class="fb-btn" data-fb-toggle aria-haspopup="menu" aria-expanded="false" aria-label="${escapeAttr(label)}">
       ${icons.sort(14)}<span>${escapeHTML(current?.label ?? label)}</span>${icons.caretDown(12)}
     </button>
-    <div class="fb-pop" role="menu" hidden><div class="fb-group" role="group" aria-label="${escapeAttr(label)}"><div class="fb-opts">${group.options.map((o) => option(group, o, text)).join("")}</div></div></div>
+    <div class="fb-pop" role="menu" hidden><span class="fb-grab" aria-hidden="true"></span><div class="fb-group" role="group" aria-label="${escapeAttr(label)}"><div class="fb-opts">${group.options.map((o) => option(group, o, text)).join("")}</div></div></div>
   </div>`;
 }
 
@@ -116,7 +116,7 @@ export function choiceMenu(group: FilterGroup, text: Text, icon: string): string
     <button type="button" class="fb-btn${chosen ? " on" : ""}" data-fb-toggle aria-haspopup="menu" aria-expanded="false" aria-label="${escapeAttr(group.label)}">
       ${icon}<span class="fb-btn-name"${chosen ? ` title="${escapeAttr(chosen.label)}"` : ""}>${escapeHTML(chosen?.label ?? group.label)}</span>${icons.caretDown(12)}
     </button>
-    <div class="fb-pop wide" role="menu" hidden><div class="fb-group" role="group" aria-label="${escapeAttr(group.label)}">${
+    <div class="fb-pop wide" role="menu" hidden><span class="fb-grab" aria-hidden="true"></span><div class="fb-group" role="group" aria-label="${escapeAttr(group.label)}">${
       group.options.length >= FIND_FROM
         ? `<input type="search" class="fb-find" data-fb-find placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(group.label + ": " + text.t("board.search"))}" autocomplete="off" />`
         : ""

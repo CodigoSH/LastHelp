@@ -65,12 +65,64 @@ function refreshTicked(pop: Element): void {
 
 const options = (menu: Element) => [...menu.querySelectorAll<HTMLButtonElement>(".fb-opt")];
 
+/**
+ * The sheet a menu is on a phone moves with the finger, the way the sheets of the phone's own apps do: dragged down by
+ * its handle it follows, the veil behind it clears as it goes, and let go it closes if it was taken far enough or flung,
+ * and springs back if not. Pointer events, so a finger and a mouse do the same.
+ */
+function installSheetDrag(): void {
+  document.addEventListener("pointerdown", (event) => {
+    if (!matchMedia("(max-width: 640px)").matches) return;
+    const grab = (event.target as Element | null)?.closest<HTMLElement>(".fb-grab");
+    const pop = grab?.closest<HTMLElement>(".fb-pop");
+    const menu = pop?.closest<HTMLElement>(MENU);
+    if (!grab || !pop || !menu) return;
+    const height = pop.getBoundingClientRect().height;
+    const startY = event.clientY;
+    let dy = 0;
+    let last = { y: event.clientY, t: event.timeStamp };
+    let speed = 0;
+    grab.setPointerCapture(event.pointerId);
+    // While it is held it is the finger's, not the stylesheet's.
+    pop.style.animation = "none";
+    pop.style.transition = "none";
+
+    const move = (m: PointerEvent) => {
+      dy = Math.max(0, m.clientY - startY);
+      speed = (m.clientY - last.y) / Math.max(1, m.timeStamp - last.t);
+      last = { y: m.clientY, t: m.timeStamp };
+      pop.style.transform = `translateY(${dy}px)`;
+      menu.style.setProperty("--fb-veil", String(Math.max(0, 1 - dy / height)));
+    };
+    const settle = () => {
+      grab.removeEventListener("pointermove", move);
+      grab.removeEventListener("pointerup", settle);
+      grab.removeEventListener("pointercancel", settle);
+      const dismiss = dy > height * 0.3 || speed > 0.6;
+      pop.style.transition = "transform 0.2s ease-out";
+      pop.style.transform = dismiss ? `translateY(${height}px)` : "translateY(0)";
+      menu.style.setProperty("--fb-veil", dismiss ? "0" : "1");
+      window.setTimeout(() => {
+        if (dismiss) closeMenus();
+        pop.style.transform = "";
+        pop.style.transition = "";
+        pop.style.animation = "";
+        menu.style.removeProperty("--fb-veil");
+      }, 210);
+    };
+    grab.addEventListener("pointermove", move);
+    grab.addEventListener("pointerup", settle);
+    grab.addEventListener("pointercancel", settle);
+  });
+}
+
 let installed = false;
 
 /** Wire the menus for the whole page. Safe to call more than once. */
 export function installFilterMenus(): void {
   if (installed) return;
   installed = true;
+  installSheetDrag();
 
   document.addEventListener("click", (event) => {
     const target = event.target as Element | null;
