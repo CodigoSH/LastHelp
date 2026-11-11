@@ -114,8 +114,8 @@ is waiting when something is, and on **History**, every report, otherwise.
 
 The **History** tab is the archive: every report ever sent, found by its words or
 narrowed in four ways that sit together above the list: **No team reply**, a button that is always in sight; the
-**Filters** menu, where you tick as many moderation states and statuses as you want, choose a type and,
-under Closed, a result, and press **Apply** to apply them together; the **Repository** button, to choose one
+**Filters** menu, where you tick as many moderation states and statuses as you want, choose a type, a date
+(the last day, week or month, or older than a month) and, under Closed, a result, and press **Apply** to apply them together; the **Repository** button, to choose one
 repository among many, or all, and search for it by name; and an order button (newest, oldest first, or most voted).
 What is chosen shows under them as chips, each of which comes off by itself, and a line says how many reports
 the list holds. On a phone the menus open as a sheet from the bottom. **All / Open / Closed**
@@ -129,6 +129,13 @@ beside the list as the whole report — edit its words, change its status, open
 or link an issue, reply, edit or delete any comment on it, and, for the
 organisation's leads and the administrator, delete the report itself. Each repository's page in the
 panel opens the same screen filtered to that repository.
+
+To decide many at once, press **Select** above the list: the reports that are waiting get a box, a row is ticked
+instead of opened, and a bar at the foot of the list says how many are chosen and offers **Publish**, **Reject** and **Spam**
+for all of them (**Select all** ticks every one in view). Rejecting and marking as spam ask once more before they act.
+Only what is waiting can be ticked; a board you do not work on is skipped, and the notice says how many were
+applied and how many skipped. Together with the filters it is the way through a long queue: filter to a repository or to what
+is older than a month, tick the lot, and decide it.
 
 With four repositories you will see between zero and five things a week, which
 is why there are no bulk actions: anything that assumes scale on this side is

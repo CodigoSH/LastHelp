@@ -2955,6 +2955,7 @@ async function showReview(): Promise<void> {
     reply: "",
     board: "",
     sort: "",
+    age: "",
     q: "",
   };
   if (mode === "all") {
@@ -3147,6 +3148,7 @@ async function wireReview(
     const top = list.scrollTop;
     list.innerHTML = views.reviewList(data, view, text);
     list.scrollTop = top;
+    bulk.repaint();
   };
 
   const select = (id: string, settle = false) => {
@@ -3163,10 +3165,110 @@ async function wireReview(
     void draw(id, settle);
   };
 
+  // Deciding many at once. A mode the person enters with "Select": the rows that are waiting get a box, a row is ticked rather than
+  // opened, and a bar at the foot of the list says how many and offers the three decisions. Rejecting and marking as spam ask once
+  // more, because they are the ones that are hard to take back from a list.
+  const bulk = (() => {
+    const bar = root?.querySelector<HTMLElement>("[data-bulk]") ?? null;
+    const toggle = root?.querySelector<HTMLElement>("[data-bulk-toggle]") ?? null;
+    const counter = bar?.querySelector<HTMLElement>("[data-bulk-n]") ?? null;
+    const all = bar?.querySelector<HTMLElement>("[data-bulk-all]") ?? null;
+    const buttons = [...(bar?.querySelectorAll<HTMLButtonElement>("[data-bulk-do]") ?? [])];
+    const picked = new Set<string>();
+    let asking = "";
+    let asked: ReturnType<typeof setTimeout> | undefined;
+    const rows = () => [...(list?.querySelectorAll<HTMLElement>("[data-pending]") ?? [])];
+    const label = (state: string) => (state === "published" ? "panel.approve" : state === "rejected" ? "panel.reject" : "panel.spam");
+    const paint = () => {
+      for (const el of rows()) {
+        const on = picked.has(el.dataset.pick ?? "");
+        el.classList.toggle("picked", on);
+        el.setAttribute("aria-pressed", String(bulk.on && on));
+      }
+      const every = rows().length > 0 && rows().every((el) => picked.has(el.dataset.pick ?? ""));
+      all?.setAttribute("aria-checked", String(every));
+      if (counter) counter.textContent = text.t("board.selected", { count: text.number(picked.size) });
+      for (const b of buttons) {
+        b.disabled = picked.size === 0;
+        const state = b.dataset.bulkDo ?? "";
+        b.textContent = text.t(asking === state ? "board.confirm" : label(state));
+        b.classList.toggle("confirming", asking === state);
+      }
+    };
+    const stopAsking = () => {
+      clearTimeout(asked);
+      asking = "";
+    };
+    const api_ = {
+      on: false,
+      tick(id: string) {
+        if (picked.has(id)) picked.delete(id);
+        else picked.add(id);
+        stopAsking();
+        paint();
+      },
+      enter(on: boolean) {
+        api_.on = on;
+        picked.clear();
+        stopAsking();
+        list?.classList.toggle("selecting", on);
+        if (bar) bar.hidden = !on;
+        toggle?.setAttribute("aria-pressed", String(on));
+        paint();
+      },
+      repaint: paint,
+    };
+    toggle?.addEventListener("click", () => api_.enter(!api_.on));
+    bar?.querySelector("[data-bulk-cancel]")?.addEventListener("click", () => api_.enter(false));
+    all?.addEventListener("click", () => {
+      const every = rows().length > 0 && rows().every((el) => picked.has(el.dataset.pick ?? ""));
+      if (every) picked.clear();
+      else for (const el of rows()) picked.add(el.dataset.pick ?? "");
+      stopAsking();
+      paint();
+    });
+    for (const b of buttons) {
+      b.addEventListener("click", async () => {
+        const state = b.dataset.bulkDo ?? "";
+        if (picked.size === 0) return;
+        // Publishing is easy to undo; turning down is not, so it asks once more.
+        if (state !== "published" && asking !== state) {
+          asking = state;
+          paint();
+          asked = setTimeout(() => {
+            asking = "";
+            paint();
+          }, 4000);
+          return;
+        }
+        stopAsking();
+        try {
+          const done = await api.post<{ done: number; skipped: number; failed: number }>("/api/reports/bulk", { ids: [...picked], state });
+          toast(
+            [text.t("board.bulkDone", { count: text.number(done.done) }), ...(done.skipped + done.failed > 0 ? [text.t("board.bulkSkipped", { count: text.number(done.skipped + done.failed) })] : [])].join(" · "),
+          );
+        } catch (err) {
+          report(err);
+          return;
+        }
+        api_.enter(false);
+        if (me) me = await api.get<Me>("/api/me").catch(() => me);
+        renderNav();
+        go(`/review${location.search || "?mode=pending"}`);
+      });
+    }
+    return api_;
+  })();
+
   // Delegated to the list, which survives a further page being drawn into it.
   list?.addEventListener("click", (event) => {
     const target = event.target as HTMLElement;
     const row = target.closest<HTMLElement>("[data-pick]");
+    // Selecting many: a row that is waiting is ticked, not opened, and one that is not waiting does nothing.
+    if (row && bulk.on) {
+      if (row.hasAttribute("data-pending")) bulk.tick(row.dataset.pick ?? "");
+      return;
+    }
     if (row) {
       select(row.dataset.pick ?? "");
       if (narrow()) reading(true);
@@ -3237,7 +3339,7 @@ async function wireReview(
   // What the team asks all the time stays in sight: whoever has had no reply.
   filterBox?.querySelector<HTMLElement>("[data-rreply]")?.addEventListener("click", () => narrowTo({ reply: view.filters.reply === "none" ? "" : "none" }));
   filterBox?.querySelector<HTMLElement>("[data-fb-clear]")?.addEventListener("click", () =>
-    narrowTo({ kind: "", moderation: "", status: "", board: "", outcome: "", reply: "" }),
+    narrowTo({ kind: "", moderation: "", status: "", board: "", outcome: "", reply: "", age: "" }),
   );
   const search = root?.querySelector<HTMLInputElement>("[data-q]");
   if (search) {
@@ -3278,6 +3380,7 @@ async function wireReview(
     const top = list.scrollTop;
     list.innerHTML = views.reviewList(data, view, text);
     list.scrollTop = top;
+    bulk.repaint();
   };
 
   if (view.chosen) void draw(view.chosen);
@@ -3367,11 +3470,12 @@ async function wireReview(
   reviewKeys?.();
   reviewKeys = keyboardFor({
     step,
-    decide,
+    // While many are being selected a key is not a decision about the one that is open.
+    decide: (state: string) => (bulk.on ? Promise.resolve() : decide(state)),
     // Escape closes the drawer first when one is open: on a phone it is the
     // thing in front, and leaving the whole screen from inside it would skip
     // a step the person can see.
-    leave: () => (screen?.classList.contains("reading") ? reading(false) : leaveReview()),
+    leave: () => (bulk.on ? bulk.enter(false) : screen?.classList.contains("reading") ? reading(false) : leaveReview()),
   });
 }
 

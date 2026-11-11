@@ -8319,3 +8319,22 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 .bd-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
 .bd-tabs button[aria-pressed="true"] { color: var(--text-main); border-block-end-color: var(--accent); }
 .bd-tabs button b { padding: 2px 7px; border-radius: 999px; background: var(--surface-active); font: 600 11px/1.2 var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------ deciding many at once */
+
+/* "Select" opens a mode: the rows that are waiting get a box, and the bar at the foot of the list says how many are chosen and what can be done with them. */
+.rev-select { display: flex; justify-content: flex-end; padding: 6px 14px 0; }
+.rev-select .fb-reset[aria-pressed="true"] { color: var(--accent); }
+.rev-check { flex: none; inline-size: 16px; block-size: 16px; margin-block-start: 3px; border: 1.5px solid var(--text-dim); border-radius: 5px; position: relative; transition: border-color 0.12s, background-color 0.12s; }
+.rev-list:not(.selecting) .rev-check { display: none; }
+.rev-row.picked { background: rgba(var(--accent-rgb), 0.12); }
+.rev-row.picked .rev-check, .rev-bulk-all[aria-checked="true"] .rev-check { border-color: var(--accent); background: var(--accent); }
+.rev-row.picked .rev-check::after, .rev-bulk-all[aria-checked="true"] .rev-check::after { content: ""; position: absolute; inset-inline-start: 4.5px; inset-block-start: 1px; inline-size: 4px; block-size: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.rev-bulk { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px)); border-block-start: 1px solid var(--border); background: var(--sheet); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.12); }
+.rev-bulk[hidden] { display: none; }
+.rev-bulk-all { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: var(--text-main); font: 600 12px/1 var(--font-mono); cursor: pointer; }
+.rev-bulk-all .rev-check { margin: 0; display: inline-block; }
+.rev-bulk-n { margin-inline-start: auto; font: 600 11px var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.rev-bulk-do { display: inline-flex; align-items: center; gap: 6px; flex-basis: 100%; justify-content: flex-end; }
+.rev-bulk-do .confirming { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rev-bulk-do button[disabled] { opacity: 0.45; cursor: default; }

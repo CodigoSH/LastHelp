@@ -2467,6 +2467,8 @@ export interface ReportFilters {
   reply: string;
   board: string;
   sort: string;
+  /** "", "day", "week", "month" or "older": how old a report is, by when it was made. */
+  age: string;
   q: string;
 }
 
@@ -2546,7 +2548,22 @@ export function reviewScreen(data: ReportsData, view: ReviewView, text: Text): s
     <div class="rev-body">
       <aside class="rev-side">
         ${view.mode === "all" ? reviewFilters(data, view.filters, text) : ""}
+        ${
+          (data.items ?? []).some((r) => r.moderation === "pending")
+            ? `<div class="rev-select"><button type="button" class="fb-reset" data-bulk-toggle aria-pressed="false">${escapeHTML(text.t("board.select"))}</button></div>`
+            : ""
+        }
         <div class="rev-list" data-list>${reviewList(data, view, text)}</div>
+        <div class="rev-bulk" data-bulk hidden>
+          <button type="button" class="rev-bulk-all" role="checkbox" aria-checked="false" data-bulk-all><span class="rev-check" aria-hidden="true"></span><span>${escapeHTML(text.t("board.selectAll"))}</span></button>
+          <span class="rev-bulk-n" data-bulk-n role="status" aria-live="polite"></span>
+          <span class="rev-bulk-do">
+            <button type="button" class="button small primary" data-bulk-do="published" disabled>${escapeHTML(text.t("panel.approve"))}</button>
+            <button type="button" class="button small" data-bulk-do="rejected" disabled>${escapeHTML(text.t("panel.reject"))}</button>
+            <button type="button" class="button small danger" data-bulk-do="spam" disabled>${escapeHTML(text.t("panel.spam"))}</button>
+            <button type="button" class="icon-button" data-bulk-cancel aria-label="${escapeAttr(text.t("action.close"))}">${icons.close(16)}</button>
+          </span>
+        </div>
       </aside>
       <div class="rev-veil" data-shut></div>
       <section class="rev-detail">
@@ -2613,6 +2630,19 @@ function reviewFilters(data: ReportsData, filters: ReportFilters, text: Text): s
             .map((s) => ({ value: s, label: text.t(`status.${s}`), count: (counts.status[s] ?? 0) + (s === "done" ? (counts.status.closed ?? 0) : 0) })),
           filters.status.split(",").map((v) => (v === "closed" ? "done" : v)).join(","),
         ),
+      ],
+    },
+    {
+      // How old: the last day, week or month, or what has been there longer than a month.
+      name: "age",
+      label: text.t("board.date"),
+      value: filters.age,
+      options: [
+        all,
+        { value: "day", label: text.t("board.ageDay") },
+        { value: "week", label: text.t("board.ageWeek") },
+        { value: "month", label: text.t("board.ageMonth") },
+        { value: "older", label: text.t("board.ageOlder") },
       ],
     },
     {
@@ -2744,14 +2774,16 @@ export function reviewList(data: ReportsData, view: ReviewView, text: Text): str
 
   const reportRow = (r: ReportRow) => {
     const kids = under.get(r.public_id) ?? [];
+    // Only what is waiting can be decided, one by one or many: a report that is already published or turned down has no box.
+    const box = r.moderation === "pending" ? `<span class="rev-check" aria-hidden="true"></span>` : "";
     return `<button type="button" class="rev-row${r.public_id === chosen ? " on" : ""}${
       // In the archive, what was turned away is dimmed rather than hidden:
       // it is what somebody searches the archive for, and it should still
       // read as not part of the product's public face.
       r.moderation === "rejected" || r.moderation === "spam" ? " out" : ""
     }"
-        data-pick="${escapeAttr(r.public_id)}" data-what="report">
-        <span class="rev-dot ${escapeAttr(r.kind)}"></span>
+        data-pick="${escapeAttr(r.public_id)}" data-what="report"${r.moderation === "pending" ? " data-pending" : ""}>
+        ${box}<span class="rev-dot ${escapeAttr(r.kind)}"></span>
         <span class="rev-main">
           <span class="rev-t">${escapeHTML(r.title)}</span>
           ${preview(r.body ?? "")}

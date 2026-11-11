@@ -1066,6 +1066,62 @@ async function main() {
     JSON.stringify(parecidos),
   );
 
+  // How old a report is: the last month and what is older than a month are the two halves of the archive, so what the
+  // screen says for each, and what the server holds, have to add up to everything.
+  await goTo("/review?mode=all&age=older", ".rev-row, .rev-empty");
+  const porEdad = await evaluate(`
+    const said = () => Number((document.querySelector(".fb-results")?.textContent ?? "").replace(/\\D/g, ""));
+    const held = async (q) => (await (await fetch("/api/reports?limit=200" + q)).json()).items.length;
+    const older = said();
+    const out = { older, serverOlder: await held("&age=older"), month: await held("&age=month"), all: await held(""), refused: (await fetch("/api/reports?age=yesterday")).status };
+    return out;
+  `);
+  check(
+    "the archive is narrowed by how old a report is, the screen says what the server holds, and the two halves add up",
+    porEdad.older === porEdad.serverOlder && porEdad.older + porEdad.month === porEdad.all && porEdad.refused === 400,
+    JSON.stringify(porEdad),
+  );
+
+  // Deciding many at once: "Select" opens a mode where a row is ticked and not opened, turning down asks once more, and
+  // publishing two leaves the queue and the tab two lighter, with the reports published on the server.
+  await goTo("/review?mode=pending", ".rev-row");
+  const enBloque = await evaluate(`
+    const wait = async (f) => { for (let i = 0; i < 80 && !f(); i++) await new Promise(r => setTimeout(r, 100)); return f(); };
+    const waiting = () => document.querySelectorAll("[data-pending]").length;
+    const tab = () => Number((document.querySelector(".rev-modes .tab.on .count-chip")?.textContent ?? "").replace(/\\D/g, ""));
+    const before = { rows: waiting(), tab: tab() };
+    document.querySelector("[data-bulk-toggle]").click();
+    const open = document.querySelector("[data-pick].on")?.dataset.pick;
+    const rows = [...document.querySelectorAll("[data-pending]")].slice(0, 2);
+    const ids = rows.map(r => r.dataset.pick);
+    rows.forEach(r => r.click());
+    const ticked = document.querySelectorAll(".rev-row.picked").length;
+    const said = Number((document.querySelector("[data-bulk-n]")?.textContent ?? "").replace(/\\D/g, ""));
+    const stillOpen = document.querySelector("[data-pick].on")?.dataset.pick === open;
+    const reject = document.querySelector('[data-bulk-do="rejected"]');
+    const first = reject.textContent;
+    reject.click();
+    const asked = reject.textContent !== first && waiting() === before.rows;
+    document.querySelector("[data-bulk-cancel]").click();
+    const left = !document.querySelector("[data-list]").classList.contains("selecting") && document.querySelectorAll(".rev-row.picked").length === 0;
+    // And again, to publish them.
+    document.querySelector("[data-bulk-toggle]").click();
+    [...document.querySelectorAll("[data-pending]")].filter(r => ids.includes(r.dataset.pick)).forEach(r => r.click());
+    document.querySelector('[data-bulk-do="published"]').click();
+    await wait(() => waiting() === before.rows - 2);
+    const after = { rows: waiting(), tab: tab() };
+    const states = [];
+    for (const id of ids) states.push((await (await fetch("/api/items/" + id)).json()).moderation);
+    return { before, after, ticked, said, stillOpen, asked, left, states };
+  `);
+  check(
+    "many reports are decided at once: ticked and not opened, turning down asks again, and publishing two takes them out of the queue",
+    enBloque.ticked === 2 && enBloque.said === 2 && enBloque.stillOpen === true && enBloque.asked === true && enBloque.left === true &&
+      enBloque.after.rows === enBloque.before.rows - 2 && enBloque.after.tab === enBloque.before.tab - 2 &&
+      enBloque.states.length === 2 && enBloque.states.every((m: string) => m === "published"),
+    JSON.stringify(enBloque),
+  );
+
   check("no console errors", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
   check("and the content policy refused nothing", refusedByPolicy.length === 0, refusedByPolicy.slice(0, 3).join(" | "));
   await close();
