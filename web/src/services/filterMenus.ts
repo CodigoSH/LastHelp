@@ -52,6 +52,17 @@ function place(pop: HTMLElement): void {
   if (worse) pop.classList.remove("end");
 }
 
+/** How many boxes are ticked in each group that takes several, shown on its heading. */
+function refreshTicked(pop: Element): void {
+  pop.querySelectorAll<HTMLElement>(".fb-group").forEach((group) => {
+    const badge = group.querySelector<HTMLElement>("[data-fb-on]");
+    if (!badge) return;
+    const n = [...group.querySelectorAll<HTMLElement>(".fb-opt")].filter((o) => (o.dataset.fbValue ?? "") !== "" && o.getAttribute("aria-checked") === "true").length;
+    badge.textContent = new Intl.NumberFormat(document.documentElement.lang || undefined).format(n);
+    badge.hidden = n === 0;
+  });
+}
+
 const options = (menu: Element) => [...menu.querySelectorAll<HTMLButtonElement>(".fb-opt")];
 
 let installed = false;
@@ -90,12 +101,21 @@ export function installFilterMenus(): void {
           o.hidden = false;
           if (o.dataset.fbWas) o.setAttribute("aria-checked", o.dataset.fbWas);
         });
+        refreshTicked(pop);
       }
       toggle.setAttribute("aria-expanded", String(open));
       if (open) {
         const checked = options(menu).find((o) => o.getAttribute("aria-checked") === "true") ?? options(menu)[0];
         checked?.focus({ preventScroll: true });
       }
+      return;
+    }
+    // Clear: every group back to "everything", still staged until it is applied.
+    const reset = target.closest<HTMLElement>("[data-fb-reset]");
+    if (reset) {
+      const pop = reset.closest(".fb-pop");
+      pop?.querySelectorAll<HTMLElement>(".fb-opt").forEach((o) => o.setAttribute("aria-checked", String((o.dataset.fbValue ?? "") === "")));
+      if (pop) refreshTicked(pop);
       return;
     }
     // The button of a staged menu: everything ticked is applied together, and the menu closes.
@@ -132,6 +152,7 @@ export function installFilterMenus(): void {
           all.filter((o) => (o.dataset.fbValue ?? "") === "").forEach((o) => set(o, !real.some((r) => r.getAttribute("aria-checked") === "true")));
         }
       } else all.forEach((o) => set(o, o === opt));
+      refreshTicked(opt.closest(".fb-pop") as Element);
       return;
     }
     if (opt) {

@@ -8111,11 +8111,11 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   /* However many groups a screen has, the menu stays inside the window and scrolls. */
   max-block-size: min(26rem, calc(100vh - 160px));
   overflow-y: auto;
-  padding: 6px;
+  padding: 8px;
   border: 1px solid var(--card-border);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--sheet);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.12);
 }
 .fb-pop.end { inset-inline-start: auto; inset-inline-end: 0; }
 /* The pop of a choice with many answers, often long names: wider than a menu of filters, and its box to find one in. */
@@ -8126,18 +8126,40 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 .fb-pop.cols {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 6px 4px;
+  gap: 8px;
   inline-size: min(46rem, calc(100vw - 32px));
   max-inline-size: none;
   max-block-size: calc(100vh - 160px);
   align-items: start;
 }
-.fb-pop.cols .fb-group + .fb-group { margin: 0; padding: 0; border: 0; }
-.fb-pop.cols .fb-group { min-inline-size: 0; }
+.fb-pop.cols .fb-group + .fb-group { margin: 0; }
+/* Each group of a menu spread across columns is a card of its own, so where one ends and the next begins is plain. */
+.fb-pop.cols .fb-group {
+  min-inline-size: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-main) 3%, transparent);
+}
 @media (max-width: 640px) { .fb-pop.cols { grid-template-columns: minmax(0, 1fr); } }
 .fb-pop[hidden] { display: none; }
-.fb-group + .fb-group { margin-block-start: 4px; padding-block-start: 4px; border-block-start: 1px solid var(--border); }
-.fb-group-name { margin: 0; padding: 6px 10px 4px; font: 700 0.62rem/1.4 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+.fb-group + .fb-group { margin-block-start: 6px; padding-block-start: 6px; border-block-start: 1px solid var(--border); }
+.fb-group-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding: 6px 10px 8px;
+  border-block-end: 1px solid var(--border);
+  font: 700 0.64rem/1.4 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+/* How many boxes of the group are ticked. */
+.fb-group-on { min-inline-size: 18px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: #fff; font: 700 10px/1.3 var(--font-mono); text-align: center; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.fb-group-on[hidden] { display: none; }
 /* However many options a group has, it scrolls inside itself: one long list must not stretch the whole menu off the screen. */
 .fb-opts { max-block-size: 15rem; overflow-y: auto; }
 .fb-pop.cols .fb-opts { max-block-size: 16rem; }
@@ -8154,11 +8176,13 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 }
 .fb-find:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .fb-opt {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   inline-size: 100%;
-  padding: 8px 10px;
+  min-block-size: 34px;
+  padding: 7px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -8169,19 +8193,48 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   line-height: 1.3;
   text-align: start;
   cursor: pointer;
+  transition: background-color 0.12s;
 }
-.fb-opt:hover { background: rgba(var(--accent-rgb), 0.07); }
-.fb-opt-mark { flex: none; inline-size: 14px; block-size: 14px; border: 1.5px solid var(--text-dim); border-radius: 50%; }
-.fb-opt[aria-checked="true"] .fb-opt-mark { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 38%, transparent 42%); }
+/* A hairline between one option and the next, inset so it does not touch the edges. */
+.fb-opt + .fb-opt::before { content: ""; position: absolute; inset-inline: 10px; inset-block-start: 0; block-size: 1px; background: var(--border); opacity: 0.7; pointer-events: none; }
+/* "Everything" is not one answer among the others: it is bolder, and a firmer line sets it apart from them. */
+.fb-opt[data-fb-value=""] { font-weight: 600; }
+.fb-opt[data-fb-value=""] + .fb-opt::before { opacity: 1; inset-inline: 0; }
+.fb-opt:hover { background: rgba(var(--accent-rgb), 0.08); }
+.fb-opt:hover::before, .fb-opt:hover + .fb-opt::before { opacity: 0; }
+.fb-opt[aria-checked="true"] { background: rgba(var(--accent-rgb), 0.12); font-weight: 600; }
+.fb-opt[aria-checked="true"]::before, .fb-opt[aria-checked="true"] + .fb-opt::before { opacity: 0; }
+.fb-opt-mark { position: relative; flex: none; inline-size: 16px; block-size: 16px; border: 1.5px solid var(--text-dim); border-radius: 50%; transition: border-color 0.12s, background-color 0.12s; }
+.fb-opt[aria-checked="true"] .fb-opt-mark { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 36%, transparent 40%); }
 .fb-opt-name { flex: 1 1 auto; min-inline-size: 0; }
-/* A box to tick, in a group that takes several: square where the choice of one is round. */
-.fb-opt.box .fb-opt-mark { border-radius: 4px; }
-.fb-opt.box[aria-checked="true"] .fb-opt-mark { border-color: var(--accent); background: var(--accent); box-shadow: inset 0 0 0 2px var(--sheet); }
-.fb-apply { grid-column: 1 / -1; display: flex; justify-content: flex-end; margin-block-start: 6px; padding-block-start: 8px; border-block-start: 1px solid var(--border); }
-.fb-apply-btn { padding: 8px 18px; border: 1px solid var(--accent); border-radius: 9px; background: var(--accent); color: #fff; font: 700 12px/1 var(--font-mono); cursor: pointer; }
+/* A box to tick, in a group that takes several: square where the choice of one is round, and ticked with a tick. */
+.fb-opt.box .fb-opt-mark { border-radius: 5px; }
+.fb-opt.box[aria-checked="true"] .fb-opt-mark { border-color: var(--accent); background: var(--accent); }
+.fb-opt.box[aria-checked="true"] .fb-opt-mark::after { content: ""; position: absolute; inset-inline-start: 4.5px; inset-block-start: 1px; inline-size: 4px; block-size: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+/* The footer of a menu with boxes: a way to clear, and the button that applies, kept in sight while the groups scroll. */
+.fb-apply {
+  grid-column: 1 / -1;
+  position: sticky;
+  inset-block-end: -8px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px -8px -8px;
+  padding: 10px 12px;
+  border-block-start: 1px solid var(--border);
+  border-radius: 0 0 14px 14px;
+  background: var(--sheet);
+}
+.fb-reset { border: 0; background: transparent; color: var(--text-dim); font: 600 11px var(--font-mono); text-decoration: underline; cursor: pointer; }
+.fb-reset:hover { color: var(--text-main); }
+.fb-reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.fb-apply-btn { padding: 9px 20px; border: 1px solid var(--accent); border-radius: 9px; background: var(--accent); color: #fff; font: 700 12px/1 var(--font-mono); cursor: pointer; }
 .fb-apply-btn:hover { filter: brightness(1.08); }
 .fb-apply-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.fb-opt-n { font: 600 11px var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.fb-opt-n { min-inline-size: 24px; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text-main) 8%, transparent); font: 600 11px/1.4 var(--font-mono); color: var(--text-dim); text-align: center; font-variant-numeric: tabular-nums; }
+.fb-opt[aria-checked="true"] .fb-opt-n { background: rgba(var(--accent-rgb), 0.18); color: var(--text-main); }
 .fb-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
 .fb-chip {
   display: inline-flex;
@@ -8222,7 +8275,9 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   .fb-pop.cols { display: block; }
   .fb-opts, .fb-pop.cols .fb-opts { max-block-size: none; overflow: visible; }
   .fb-opt { padding-block: 11px; }
-  .fb-group + .fb-group, .fb-pop.cols .fb-group + .fb-group { margin-block-start: 6px; padding-block-start: 6px; border-block-start: 1px solid var(--border); }
+  .fb-pop.cols .fb-group { padding: 0; border: 0; border-radius: 0; background: none; }
+  .fb-group + .fb-group, .fb-pop.cols .fb-group + .fb-group { margin-block-start: 8px; padding-block-start: 8px; border-block-start: 1px solid var(--border); }
+  .fb-apply { inset-block-end: calc(-14px - env(safe-area-inset-bottom, 0px)); margin-inline: -10px; margin-block-end: calc(-14px - env(safe-area-inset-bottom, 0px)); padding-block-end: calc(12px + env(safe-area-inset-bottom, 0px)); border-radius: 0; }
 }
 @keyframes fb-sheet { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .fb-pop { animation: none; } }

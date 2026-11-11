@@ -68,13 +68,13 @@ export function filterMenu(groups: FilterGroup[], label: string, text: Text): st
     </button>
     <div class="fb-pop${usable.length >= 3 ? " cols" : ""}" role="menu"${staged ? " data-fb-staged" : ""} hidden>${usable
       .map(
-        (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name">${escapeHTML(g.label)}</p>${
+        (g) => `<div class="fb-group" role="group" aria-label="${escapeAttr(g.label)}"><p class="fb-group-name"><span>${escapeHTML(g.label)}</span>${g.multi ? `<b class="fb-group-on" data-fb-on${chosenValues(g).length > 0 ? "" : " hidden"}>${escapeHTML(text.number(chosenValues(g).length))}</b>` : ""}</p>${
           g.options.length >= FIND_FROM
             ? `<input type="search" class="fb-find" data-fb-find placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(g.label + ": " + text.t("board.search"))}" autocomplete="off" />`
             : ""
         }<div class="fb-opts">${g.options.map((o) => option(g, o, text)).join("")}</div></div>`,
       )
-      .join("")}${staged ? `<div class="fb-apply"><button type="button" class="fb-apply-btn" data-fb-apply>${escapeHTML(text.t("board.apply"))}</button></div>` : ""}</div>
+      .join("")}${staged ? `<div class="fb-apply"><button type="button" class="fb-reset" data-fb-reset>${escapeHTML(text.t("board.clear"))}</button><button type="button" class="fb-apply-btn" data-fb-apply>${escapeHTML(text.t("board.apply"))}</button></div>` : ""}</div>
   </div>`;
 }
 
