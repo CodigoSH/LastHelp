@@ -542,6 +542,8 @@ describe("the overview", () => {
     expect(html).toMatch(/data-ov-ideas title="\[overview\.ideas\]" aria-label="\[overview\.ideas\]: 7"><svg[^]*?<\/svg> 7</);
     expect(html).toMatch(/data-ov-bugs title="\[overview\.bugs\]" aria-label="\[overview\.bugs\]: 4"><svg[^]*?<\/svg> 4</);
     const card = html.slice(html.indexOf("ov-kpi-sub"), html.indexOf("</button>", html.indexOf("ov-kpi-sub")));
+    expect(html.indexOf("data-ov-bugs")).toBeLessThan(html.indexOf("data-ov-ideas")); // bugs first, then ideas
+    expect(html).toMatch(/data-ov="reports"[^]*?\[overview\.bugs\]: \d+<\/span><span>\[overview\.ideas\]: \d+/); // and the same on the reports tile
     expect(card).not.toContain("item.votesLabel");
     expect(card).not.toContain("overview.published");
   });

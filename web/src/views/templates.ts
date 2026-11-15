@@ -2260,7 +2260,7 @@ export function overviewScreen(
       "overview.reports",
       icons.repository(),
       number(total),
-      [count("overview.ideas", data.kinds.idea ?? 0), count("overview.bugs", data.kinds.bug ?? 0)],
+      [count("overview.bugs", data.kinds.bug ?? 0), count("overview.ideas", data.kinds.idea ?? 0)],
       "arrived",
     )}
   </div>`;
@@ -2320,7 +2320,7 @@ export function overviewScreen(
                   b.pending > 0 ? `${label("panel.queue")}: ${number(b.pending)}` : label("overview.nothingPending")
                 }</span></span>
               <span class="ov-unit-org">${escapeHTML(b.organization)}</span>
-              <span class="ov-kpi-sub"><span data-ov-ideas title="${label("overview.ideas")}" aria-label="${label("overview.ideas")}: ${number(b.ideas)}">${icons.idea(12)} ${number(b.ideas)}</span><span data-ov-bugs title="${label("overview.bugs")}" aria-label="${label("overview.bugs")}: ${number(b.bugs)}">${icons.bug(12)} ${number(b.bugs)}</span></span>
+              <span class="ov-kpi-sub"><span data-ov-bugs title="${label("overview.bugs")}" aria-label="${label("overview.bugs")}: ${number(b.bugs)}">${icons.bug(12)} ${number(b.bugs)}</span><span data-ov-ideas title="${label("overview.ideas")}" aria-label="${label("overview.ideas")}: ${number(b.ideas)}">${icons.idea(12)} ${number(b.ideas)}</span></span>
             </button>`,
           )
           .join("")}</div>`,
