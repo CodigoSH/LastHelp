@@ -507,7 +507,7 @@
   "overview.typeComment": "Reactie",
   "overview.unanswered": "Onbeantwoord",
   "panel.address": "Adres",
-  "notifications.lead": "Een kanaal dat elke repository in zijn eigen instellingen kan kiezen. Wie het niet kiest, merkt er niets van.",
+  "notifications.lead": "Een kanaal dat elke repository in zijn eigen instellingen kan kiezen. Een repository die na het instellen wordt gemaakt, begint ermee; bestaande merken er niets van.",
   "notifications.off": "Geen serverkanaal",
   "antiabuse.lead": "Woorden die een rapport weigeren voordat het je wachtrij bereikt. Eén lijst voor de hele server, in elke taal.",
   "antiabuse.wordsTitle": "Woordenlijst",

@@ -507,7 +507,7 @@
   "overview.typeComment": "Komentarz",
   "overview.unanswered": "Bez odpowiedzi",
   "panel.address": "Adres",
-  "notifications.lead": "Kanał, który każde repozytorium może wybrać we własnych ustawieniach. Kto go nie wybierze, nie jest nim objęty.",
+  "notifications.lead": "Kanał, który każde repozytorium może wybrać we własnych ustawieniach. Repozytorium utworzone po jego ustawieniu zaczyna od niego; istniejące nie są nim objęte.",
   "notifications.off": "Brak kanału serwera",
   "antiabuse.lead": "Słowa, które odrzucają zgłoszenie, zanim trafi do Twojej kolejki. Jedna lista dla całego serwera, w dowolnym języku.",
   "antiabuse.wordsTitle": "Lista słów",

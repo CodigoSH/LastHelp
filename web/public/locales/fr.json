@@ -507,7 +507,7 @@
   "overview.typeComment": "Commentaire",
   "overview.unanswered": "Sans réponse",
   "panel.address": "Adresse",
-  "notifications.lead": "Un canal que chaque dépôt peut choisir dans ses propres réglages. Celui qui ne le choisit pas n’est pas concerné.",
+  "notifications.lead": "Un canal que chaque dépôt peut choisir dans ses propres réglages. Un dépôt créé après sa définition commence avec lui ; ceux qui existent déjà ne sont pas concernés.",
   "notifications.off": "Aucun canal du serveur",
   "antiabuse.lead": "Des mots qui refusent un rapport avant qu’il n’atteigne votre file. Une seule liste pour tout le serveur, dans n’importe quelle langue.",
   "antiabuse.wordsTitle": "Liste de mots",

@@ -507,7 +507,7 @@
   "overview.typeComment": "댓글",
   "overview.unanswered": "미답변",
   "panel.address": "주소",
-  "notifications.lead": "각 저장소가 자체 설정에서 선택할 수 있는 채널입니다. 선택하지 않은 저장소는 영향을 받지 않습니다.",
+  "notifications.lead": "각 저장소가 자체 설정에서 선택할 수 있는 채널입니다. 설정한 뒤에 만든 저장소는 이 채널로 시작하며, 이미 있는 저장소는 영향을 받지 않습니다.",
   "notifications.off": "서버 채널 없음",
   "antiabuse.lead": "보고서가 대기열에 도착하기 전에 거부하는 단어입니다. 서버 전체에 목록 하나이며 언어는 상관없습니다.",
   "antiabuse.wordsTitle": "단어 목록",

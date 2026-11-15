@@ -507,7 +507,7 @@
   "overview.typeComment": "コメント",
   "overview.unanswered": "未返信",
   "panel.address": "アドレス",
-  "notifications.lead": "各リポジトリが自分の設定で選べるチャンネルです。選ばないリポジトリには影響しません。",
+  "notifications.lead": "各リポジトリが自分の設定で選べるチャンネルです。設定した後に作成したリポジトリはこのチャンネルで始まり、既存のリポジトリには影響しません。",
   "notifications.off": "サーバーのチャンネルなし",
   "antiabuse.lead": "報告がキューに届く前に断る単語です。サーバー全体で1つのリストで、言語は問いません。",
   "antiabuse.wordsTitle": "単語リスト",

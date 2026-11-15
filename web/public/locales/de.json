@@ -507,7 +507,7 @@
   "overview.typeComment": "Kommentar",
   "overview.unanswered": "Unbeantwortet",
   "panel.address": "Adresse",
-  "notifications.lead": "Ein Kanal, den jedes Repository in seinen eigenen Einstellungen wählen kann. Wer ihn nicht wählt, bleibt unberührt.",
+  "notifications.lead": "Ein Kanal, den jedes Repository in seinen eigenen Einstellungen wählen kann. Ein Repository, das nach dem Einrichten angelegt wird, startet damit; bestehende bleiben unberührt.",
   "notifications.off": "Kein Serverkanal",
   "antiabuse.lead": "Wörter, die einen Bericht abweisen, bevor er deine Warteschlange erreicht. Eine Liste für den ganzen Server, in jeder Sprache.",
   "antiabuse.wordsTitle": "Wortliste",

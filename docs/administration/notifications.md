@@ -14,8 +14,15 @@ review** (a visitor's, or the reporter's own follow-up), so nothing sits in the 
 unseen. A team reply does not notify the team: it was written by the team.
 
 Configured **per repository**, so one repository can go to one room and another somewhere
-else. Nothing applies to every repository by itself: a channel everybody is
-signed up to without choosing it is a channel everybody eventually silences.
+else. Nothing applies to a repository that already exists by itself: a channel everybody is
+signed up to without choosing it is a channel everybody eventually silences, and an
+installation that updates does not start telling a team something it never chose to hear.
+
+The one exception is a repository made **after** the administrator has set a channel for the
+server (under **Notifications**, **The server's channel**): it is created already using
+that channel, and its page shows it chosen, so the repository can keep it, pick another
+or pick none. If the server has no channel when a repository is made, the repository has none.
+Repositories that existed before are not moved.
 
 Choose it in the panel, on the repository's page (**Organisations**, the
 organisation, then the repository): pick a channel, and it asks only for what
@@ -107,12 +114,13 @@ and `POST /api/push/test`.
 
 ### One channel for the whole server
 
-An administrator can set a channel once, under **Notifications** in the **This server**
-group of the menu, and repositories that want it pick **The server's channel** in their own
-list. It is still opt-in: a repository that does not choose it is not touched,
-and one that does is told where its messages go. Change the server's channel
-and every repository that chose it follows; remove it and they send nothing
-until it is set again. A repository's own channel is never replaced by it.
+An administrator can set a channel once, under **Notifications** in the **Your account**
+group of the menu, in the card **The server's channel**, and repositories that want it pick
+**The server's channel** in their own list. For a repository that already exists it is still
+opt-in: one that does not choose it is not touched, and one that does is told where its
+messages go. A repository made after the channel was set starts on it, as described above.
+Change the server's channel and every repository that chose it follows; remove it and they
+send nothing until it is set again. A repository's own channel is never replaced by it.
 
 Over the API, administrators only: `GET` and `PUT /api/notifications` (same
 fields as above, and no `server` kind), and `POST /api/notifications/test`.

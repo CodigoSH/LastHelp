@@ -507,7 +507,7 @@
   "overview.typeComment": "Comentario",
   "overview.unanswered": "Sin respuesta",
   "panel.address": "Dirección",
-  "notifications.lead": "Un canal que cada repositorio puede elegir en sus propios ajustes. El que no lo elige no se ve afectado.",
+  "notifications.lead": "Un canal que cada repositorio puede elegir en sus propios ajustes. Un repositorio creado después de fijarlo empieza con él; los que ya existen no se ven afectados.",
   "notifications.off": "Sin canal del servidor",
   "antiabuse.lead": "Palabras que rechazan un reporte antes de que llegue a tu cola. Una lista para todo el servidor, en cualquier idioma.",
   "antiabuse.wordsTitle": "Lista de palabras",

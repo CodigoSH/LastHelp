@@ -11,6 +11,7 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/notify"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
@@ -166,6 +167,21 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		created.AcceptsImages = false
+	}
+	// A board made while the server has a channel starts on it, so that the one the administrator set
+	// reaches the boards made after it without somebody having to choose it on each. Only a new one:
+	// a board that exists keeps what it has, and nothing already in use starts telling a team something
+	// it did not choose to hear. The board can still pick another channel, or none.
+	if s.serverChannel().Active() {
+		encoded, err := json.Marshal(notify.Config{Kind: notify.Server})
+		if err == nil {
+			err = s.orgs().SetNotifyConfig(created.ID, string(encoded))
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		created.NotifyConfig = string(encoded)
 	}
 	writeJSON(w, http.StatusCreated, describeRepository(created, s.mailConfigured()))
 }

@@ -505,7 +505,7 @@
   "overview.typeComment": "Comment",
   "overview.unanswered": "Unanswered",
   "panel.address": "Address",
-  "notifications.lead": "A channel every repository can choose in its own settings. One that does not choose it is not affected.",
+  "notifications.lead": "A channel every repository can choose in its own settings. A repository made after it is set starts on it; the ones that already exist are not affected.",
   "notifications.off": "No server channel",
   "antiabuse.lead": "Words that turn a report down before it reaches your queue. One list for the whole server, in any language.",
   "antiabuse.wordsTitle": "Word list",

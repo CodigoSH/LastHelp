@@ -507,7 +507,7 @@
   "overview.typeComment": "Yorum",
   "overview.unanswered": "Yanıtsız",
   "panel.address": "Adres",
-  "notifications.lead": "Her deponun kendi ayarlarında seçebileceği bir kanal. Seçmeyen depo etkilenmez.",
+  "notifications.lead": "Her deponun kendi ayarlarında seçebileceği bir kanal. Ayarlandıktan sonra oluşturulan depo onunla başlar; mevcut depolar etkilenmez.",
   "notifications.off": "Sunucu kanalı yok",
   "antiabuse.lead": "Bir bildirimi sıranıza ulaşmadan reddeden sözcükler. Tüm sunucu için tek liste, her dilde.",
   "antiabuse.wordsTitle": "Sözcük listesi",

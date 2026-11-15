@@ -46,6 +46,60 @@ func body(t *testing.T, resp *http.Response) string {
 	return string(raw)
 }
 
+// TestARepositoryMadeWhileTheServerHasAChannelStartsOnIt: the channel the administrator set reaches the boards
+// made after it, and nothing made before. A board that exists keeps what it has — an installation that
+// updates must not start telling a team something it never chose to hear — and one made while the server has
+// no channel has none either.
+func TestARepositoryMadeWhileTheServerHasAChannelStartsOnIt(t *testing.T) {
+	admin, _, _ := teamSetup(t)
+	channelOf := func(org, repo string) string {
+		t.Helper()
+		panel := body(t, admin.do(http.MethodGet, "/api/orgs/"+org+"/repos/"+repo+"/panel", nil))
+		switch {
+		case strings.Contains(panel, `"channel":"server"`):
+			return "server"
+		case strings.Contains(panel, `"channel":""`):
+			return ""
+		}
+		return "?" + panel
+	}
+	create := func(slug string) {
+		t.Helper()
+		if got := status(t, admin.do(http.MethodPost, "/api/orgs/acme/repositories", map[string]string{"slug": slug, "name": slug})); got != http.StatusCreated {
+			t.Fatalf("creating %s: %d", slug, got)
+		}
+	}
+
+	// No channel for the server: a new board has none.
+	create("before")
+	if got := channelOf("acme", "before"); got != "" {
+		t.Errorf("a board made with no server channel started on %q", got)
+	}
+
+	// The administrator sets one: the boards made from now on start on it, and the ones there are do not move.
+	if got := status(t, admin.do(http.MethodPut, "/api/notifications", map[string]string{"kind": "ntfy", "url": "https://ntfy.example/server"})); got != http.StatusOK {
+		t.Fatalf("setting the server's channel: %d", got)
+	}
+	create("after")
+	if got := channelOf("acme", "after"); got != "server" {
+		t.Errorf("a board made once the server has a channel started on %q, want the server's", got)
+	}
+	for _, old := range [][2]string{{"acme", "atlas"}, {"other", "elsewhere"}, {"acme", "before"}} {
+		if got := channelOf(old[0], old[1]); got != "" {
+			t.Errorf("%s/%s existed before the channel and now says %q: it must not move", old[0], old[1], got)
+		}
+	}
+
+	// The server's channel is taken away again: a board made then has none.
+	if got := status(t, admin.do(http.MethodPut, "/api/notifications", map[string]string{"kind": ""})); got != http.StatusOK {
+		t.Fatalf("clearing the server's channel: %d", got)
+	}
+	create("later")
+	if got := channelOf("acme", "later"); got != "" {
+		t.Errorf("a board made with the server's channel cleared started on %q", got)
+	}
+}
+
 // TestSavingAChannelWithoutATokenKeepsTheOneStored: the form shows the address
 // again and never the token, so saving it back has to leave the token alone.
 func TestSavingAChannelWithoutATokenKeepsTheOneStored(t *testing.T) {

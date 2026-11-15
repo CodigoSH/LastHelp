@@ -507,7 +507,7 @@
   "overview.typeComment": "Komentar",
   "overview.unanswered": "Belum dibalas",
   "panel.address": "Alamat",
-  "notifications.lead": "Saluran yang dapat dipilih setiap repositori di pengaturannya sendiri. Repositori yang tidak memilihnya tidak terpengaruh.",
+  "notifications.lead": "Saluran yang dapat dipilih setiap repositori di pengaturannya sendiri. Repositori yang dibuat setelah saluran ini ditetapkan dimulai dengannya; yang sudah ada tidak terpengaruh.",
   "notifications.off": "Tanpa saluran peladen",
   "antiabuse.lead": "Kata-kata yang menolak laporan sebelum sampai ke antrean Anda. Satu daftar untuk seluruh peladen, dalam bahasa apa pun.",
   "antiabuse.wordsTitle": "Daftar kata",

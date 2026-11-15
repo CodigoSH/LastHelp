@@ -507,7 +507,7 @@
   "overview.typeComment": "评论",
   "overview.unanswered": "未回复",
   "panel.address": "地址",
-  "notifications.lead": "每个仓库都可以在自己的设置中选择的通道。未选择的仓库不受影响。",
+  "notifications.lead": "每个仓库都可以在自己的设置中选择的通道。设置之后新建的仓库会以它开始；已有的仓库不受影响。",
   "notifications.off": "无服务器通道",
   "antiabuse.lead": "在报告进入你的队列之前就将其拒绝的词。整个服务器共用一份列表，不分语言。",
   "antiabuse.wordsTitle": "词语列表",
