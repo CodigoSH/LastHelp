@@ -77,7 +77,7 @@ let reviewCameFrom = "/panel";
  */
 let instanceName = "";
 /** Whether this load already put the browser back on the push list, if it had dropped off. */
-let pushResynced = false;
+let pushResynced: Promise<void> | null = null;
 
 /** The logo beside it, if the operator chose one. */
 let instanceLogo = "";
@@ -510,6 +510,7 @@ async function showInShell(content: string, path: string): Promise<void> {
         who: me?.username ?? "",
         role: views.accountRole(me, text),
         isAdmin: me?.admin === true,
+        onTeam: hasRole(),
         mayAddOrganization: me?.admin === true,
         avatar: me?.avatar,
         waiting: me?.pending,
@@ -806,28 +807,30 @@ async function requirePanel(): Promise<boolean> {
     go("/sign-in");
     return false;
   }
-  // Once per load, and not worth telling anybody if it fails: it runs again the next time the panel opens.
-  if (!pushResynced) {
-    pushResynced = true;
-    resyncPush().catch(() => undefined);
-  }
+  void resyncOnce();
   return true;
+}
+
+/**
+ * Once per load, and not worth telling anybody if it fails: it runs again the next time the panel opens.
+ * What asks for it gets the same answer back, so a screen that needs the list of devices to be right can wait.
+ */
+function resyncOnce(): Promise<void> {
+  pushResynced ??= resyncPush().catch(() => undefined);
+  return pushResynced;
+}
+
+/** Whether this account is on a team anywhere: the administrator, or somebody who was given a role. */
+function hasRole(): boolean {
+  return me?.admin === true || (me?.memberships ?? []).length > 0;
 }
 
 async function showProfile(): Promise<void> {
   if (!(await requirePanel())) return;
-  // What the account's devices are doing: left out of the page, not an error on
-  // it, when it cannot be read.
-  const push = await loadPush().catch(() => null);
   await showInShell(
-    views.profileScreen(
-      { username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) },
-      text,
-      push,
-    ),
+    views.profileScreen({ username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) }, text),
     "/panel/account",
   );
-  wirePush(push);
 
   // The picture, which is read in the browser and sent as a data URL. A file
   // upload would need a store, a route to serve it from and a second thing to
@@ -2312,11 +2315,11 @@ function wireCredentials(orgSlug: string): void {
 }
 
 /** Turning notifications on for this browser, trying one, and taking a device off the list. */
-function wirePush(view: PushView | null): void {
+function wirePush(view: PushView | null, again: () => Promise<void>): void {
   if (!view) return;
   const fail = async (err: unknown) => {
     // Drawn again first, so the switch shows what is true, and the reason after it.
-    await showProfile();
+    await again();
     const line = root?.querySelector<HTMLParagraphElement>("[data-push-error]");
     if (!line) return;
     const key =
@@ -2334,7 +2337,7 @@ function wirePush(view: PushView | null): void {
     try {
       if (on) await enablePush();
       else await disablePush(view.thisDevice);
-      await showProfile();
+      await again();
     } catch (err) {
       await fail(err);
     }
@@ -2345,7 +2348,7 @@ function wirePush(view: PushView | null): void {
       try {
         if (id === view.thisDevice) await disablePush(id);
         else await removePushDevice(id);
-        await showProfile();
+        await again();
       } catch (err) {
         await fail(err);
       }
@@ -2892,7 +2895,16 @@ async function showPanel(): Promise<void> {
     );
     return;
   }
-  await showInShell(views.overviewScreen(data, text), "/panel");
+  // A team told through Push hears nothing from a browser that is not on its list. Said only where it can be
+  // acted on: a browser that cannot take part, or has said no, has nothing to turn on from here. The list is
+  // read after the quiet re-adding of a browser that was forgotten, or it would be told off for nothing.
+  let pushOff = false;
+  if (data.push_boards > 0) {
+    await resyncOnce();
+    const push = await loadPush().catch(() => null);
+    pushOff = push !== null && push.support === "ready" && push.thisDevice === null;
+  }
+  await showInShell(views.overviewScreen(data, text, undefined, pushOff), "/panel");
   shownOverview = data;
   wireOverview();
 }
@@ -3738,19 +3750,32 @@ async function showAntiabuse(keep = false): Promise<void> {
 
 /** The channel every repository may choose, set once by whoever runs the server. */
 async function showNotifications(): Promise<void> {
-  if (!(await requireAdministrator())) return;
-  const channel = (await api
-    .get<{ kind: string; channel_url: string; channel_to: string; channel_has_token: boolean }>("/api/notifications")
-    .catch(() => null)) ?? { kind: "", channel_url: "", channel_to: "", channel_has_token: false };
+  if (!(await requirePanel())) return;
+  // Being told is for whoever is on a team: an account with no role has nothing that could reach it.
+  if (!hasRole()) {
+    go("/panel");
+    return;
+  }
+  // What this account's devices are doing: left out of the page, not an error on it, when it cannot be read.
+  const push = await loadPush().catch(() => null);
+  // The channel every repository can choose is the administrator's alone, and so is the card that sets it.
+  const channel = isAdministrator()
+    ? ((await api
+        .get<{ kind: string; channel_url: string; channel_to: string; channel_has_token: boolean }>("/api/notifications")
+        .catch(() => null)) ?? { kind: "", channel_url: "", channel_to: "", channel_has_token: false })
+    : null;
 
-  await showInShell(views.notificationsScreen(channel, text), "/panel/notifications");
-  wireChannel(
-    {
-      save: (data) => api.put("/api/notifications", data),
-      test: (data) => api.post("/api/notifications/test", data),
-    },
-    showNotifications,
-  );
+  await showInShell(views.notificationsScreen(channel, push, text), "/panel/notifications");
+  wirePush(push, showNotifications);
+  if (channel) {
+    wireChannel(
+      {
+        save: (data) => api.put("/api/notifications", data),
+        test: (data) => api.post("/api/notifications/test", data),
+      },
+      showNotifications,
+    );
+  }
 }
 
 /** The name, the logo and the accent of this installation. */

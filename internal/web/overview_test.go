@@ -81,6 +81,59 @@ func TestARepositoryCardCountsItsPublishedIdeasAndBugs(t *testing.T) {
 	}
 }
 
+// TestTheOverviewCountsTheBoardsThatTellTheirTeamByPush: the page uses it to tell somebody that their team
+// is told through Push and this browser is not on the list. It is counted over what each person may see —
+// the administrator all of it, an owner their organisation, a collaborator their repository — and a board
+// that takes the server's channel counts only while that channel is Push. A stranger, with no role, is
+// not shown the overview at all.
+func TestTheOverviewCountsTheBoardsThatTellTheirTeamByPush(t *testing.T) {
+	admin, owner, collaborator := teamSetup(t)
+	stranger := admin.anonymous()
+	resp := stranger.do(http.MethodPost, "/api/session", map[string]string{"username": "newcomer", "password": "a good long passphrase"})
+	_ = resp.Body.Close()
+
+	count := func(who *instance) float64 {
+		t.Helper()
+		got, _ := decode(t, who.do(http.MethodGet, "/api/overview", nil))["push_boards"].(float64)
+		return got
+	}
+	if got := count(admin); got != 0 {
+		t.Errorf("the administrator was told %v boards use Push when none does", got)
+	}
+
+	// One board of each organisation: atlas chose Push; elsewhere takes the server's channel, which is not set.
+	if got := status(t, admin.do(http.MethodPost, "/api/orgs/acme/repos/atlas/channel", map[string]string{"kind": "push"})); got != http.StatusOK {
+		t.Fatalf("choosing Push for atlas: %d", got)
+	}
+	if got := status(t, admin.do(http.MethodPost, "/api/orgs/other/repos/elsewhere/channel", map[string]string{"kind": "server"})); got != http.StatusOK {
+		t.Fatalf("choosing the server's channel: %d", got)
+	}
+	for who, got := range map[string]float64{"the administrator": count(admin), "an owner": count(owner), "a collaborator": count(collaborator)} {
+		if got != 1 {
+			t.Errorf("%s was told %v boards use Push, want 1", who, got)
+		}
+	}
+
+	// The server's channel becomes Push: the board that took it now counts, for the administrator, who sees
+	// it; not for the owner of the other organisation's neighbour, who never could.
+	if got := status(t, admin.do(http.MethodPut, "/api/notifications", map[string]string{"kind": "push"})); got != http.StatusOK {
+		t.Fatalf("setting the server's channel to Push: %d", got)
+	}
+	if got := count(admin); got != 2 {
+		t.Errorf("the administrator was told %v boards use Push once the server's channel is, want 2", got)
+	}
+	if got := count(owner); got != 1 {
+		t.Errorf("an owner of acme was told %v, want 1: the other organisation's board is not theirs", got)
+	}
+	if got := count(collaborator); got != 1 {
+		t.Errorf("a collaborator on atlas was told %v, want 1", got)
+	}
+
+	if got := status(t, stranger.do(http.MethodGet, "/api/overview", nil)); got != http.StatusForbidden {
+		t.Errorf("somebody with no role was given the overview: %d", got)
+	}
+}
+
 // TestAnEmptyOverviewStillSplitsByKind: nothing reported yet must not turn the
 // split into a null a browser then has to guess about.
 func TestAnEmptyOverviewStillSplitsByKind(t *testing.T) {

@@ -68,6 +68,10 @@ type overview struct {
 	// FailedJobs is what the server gave up on — a notification, an issue — and
 	// is for the administrator to look at, so only the administrator is told.
 	FailedJobs int `json:"failed_jobs"`
+	// PushBoards is how many of the boards this person may see tell their team through Push, whether by
+	// their own choice or by taking the server's. The page weighs it against this browser, which only the
+	// page can see: a team told that way hears nothing until each person turns it on where they are.
+	PushBoards int `json:"push_boards"`
 
 	// What the numbers above cannot say: whether it is getting busier, what
 	// people are actually asking for, and which board the work is in.
@@ -331,7 +335,51 @@ func (s *Server) supportFigures(out *overview, actor authz.Actor, repoIDs []int6
 		}
 		out.FailedJobs = len(failed)
 	}
-	return nil
+	out.PushBoards, err = s.pushBoards(repoIDs)
+	return err
+}
+
+// pushBoards counts, among these repositories, the ones whose channel — their own, or the server's when
+// they chose it — is Push.
+func (s *Server) pushBoards(repoIDs []int64) (int, error) {
+	if len(repoIDs) == 0 {
+		return 0, nil
+	}
+	in := strings.TrimSuffix(strings.Repeat("?,", len(repoIDs)), ",")
+	args := make([]any, 0, len(repoIDs))
+	for _, id := range repoIDs {
+		args = append(args, id)
+	}
+	rows, err := s.db.Query(`SELECT notify_config FROM repository WHERE id IN (`+in+`)`, args...)
+	if err != nil {
+		return 0, err
+	}
+	// Read all of them and let go of the connection before asking what the server's channel is: that is a
+	// second question to the same database, and with the first still open it waits for a connection the
+	// first is holding.
+	var stored []string
+	for rows.Next() {
+		var one string
+		if err := rows.Scan(&one); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		stored = append(stored, one)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0, err
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, one := range stored {
+		if s.channelFor(one).Kind == notify.Push {
+			n++
+		}
+	}
+	return n, nil
 }
 
 // overviewDays is how far back the chart goes. Three ranges and no others: the

@@ -52,10 +52,21 @@ curl -X POST "$BASE/api/orgs/acme/repos/atlas/channel" \
 
 The **Push** channel tells the team on their phones and desktops, with no page of
 LastHelp open. It needs nothing typed in: choose it on a repository (or as the
-server's channel) and then **each person turns it on for their own browser**, in
-their profile, under **Notifications on your devices**. Until somebody does,
-nobody is told anything. A person can turn on as many browsers as they like (up to
-20), see them listed, send themselves a test, and remove any of them.
+server's channel) and then **each person turns it on for their own browser**, under
+**Notifications** in their own menu, in the card **Notifications on your devices**. Until
+somebody does, nobody is told anything. A person can turn on as many browsers as they like
+(up to 20), see them listed, send themselves a test, and remove any of them.
+
+**Notifications** is in everybody's menu who is on a team somewhere — the administrator, the
+owners of an organisation and the collaborators on a repository — under **Your account**. It
+holds that card for all of them. Only the administrator sees a second card there, **The
+server's channel**, where the channel every repository can choose is set. An account that
+was given no role is not offered the page: nothing could reach it.
+
+So that nobody has to go looking for it, the overview says **Turn on notifications on this
+device** under *Needs you* to anybody whose team is told through Push, as long as this browser
+is not on their list and could be. A browser that cannot take part, or that blocked the site,
+is not told to turn anything on from there.
 
 It reaches the administrator, the owners of the repository's organisation and the
 collaborators on that repository, and nobody else. A disabled account is not
@@ -78,7 +89,7 @@ What the page needs:
 - On an **iPhone or iPad**, LastHelp has to be added to the Home Screen and opened
   from there; Safari in a tab cannot receive push.
 - Notifications **allowed** for the site in the browser. If they were blocked the
-  profile says so, and only the browser's own settings can undo that.
+  page says so, and only the browser's own settings can undo that.
 
 The signing key that identifies this installation to the push services is made the first time
 anybody asks and lives in the database, so a backup carries it and a restored

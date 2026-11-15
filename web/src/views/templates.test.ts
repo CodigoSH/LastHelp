@@ -374,6 +374,7 @@ function overview(over: Partial<OverviewData> = {}): OverviewData {
     answered: 36,
     first_reply: 21600,
     not_on_forge: 2,
+    push_boards: 0,
     failed_jobs: 3,
     series: [{ day: 1, reports: 3, bugs: 1, ideas: 2 }, { day: 2, reports: 0, bugs: 0, ideas: 0 }],
     top: [{ public_id: "a", title: "Dark mode", kind: "idea", status: "planned", votes: 31, created_at: 500 }],

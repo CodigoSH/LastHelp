@@ -1736,6 +1736,8 @@ export interface ShellSpec {
   /** What the account is, written under the name; empty says nothing. */
   role: string;
   isAdmin: boolean;
+  /** On a team somewhere, or the administrator: only they have anything that could notify them. */
+  onTeam: boolean;
   /** True for anybody who may create an organisation. */
   mayAddOrganization: boolean;
   avatar?: string;
@@ -1797,6 +1799,8 @@ export function adminShell(spec: ShellSpec, text: Text): string {
         ${group(
           text.t("shell.groupAccount"),
           item("/panel/account", text.t("shell.profile"), icons.person()) +
+            // Everybody on a team: the devices that get a notification are a thing each person turns on for themselves.
+            (spec.onTeam ? item("/panel/notifications", text.t("shell.notifications"), icons.bell()) : "") +
             item("/panel/appearance", text.t("shell.appearance"), icons.palette()),
         )}
         ${group(
@@ -1804,7 +1808,6 @@ export function adminShell(spec: ShellSpec, text: Text): string {
           spec.isAdmin
             ? item("/panel/people", text.t("shell.people"), icons.people()) +
                 item("/panel/personalization", text.t("shell.personalization"), icons.brush()) +
-                item("/panel/notifications", text.t("shell.notifications"), icons.bell()) +
                 item("/panel/antiabuse", text.t("shell.antiabuse"), icons.shield()) +
                 item("/panel/backups", text.t("shell.backups"), icons.backup()) +
                 // Updates live inside About: what is running
@@ -1944,6 +1947,8 @@ export interface OverviewData {
   first_reply: number;
   not_on_forge: number;
   failed_jobs: number;
+  /** How many of the boards this person sees tell their team through Push. */
+  push_boards: number;
   series: { day: number; reports: number; bugs: number; ideas: number }[];
   top: Brief[];
   recent: Brief[];
@@ -2089,7 +2094,7 @@ const LONG_SILENCE = 7 * 86400;
  * Nothing is drawn for a thing that is zero: a list of "0 of this, 0 of that"
  * is a list somebody has to read to learn that nothing is wrong.
  */
-export function overviewNeeds(data: OverviewData, text: Text, now: number): Need[] {
+export function overviewNeeds(data: OverviewData, text: Text, now: number, pushOff = false): Need[] {
   const out: Need[] = [];
   const age = (at: number) => text.age(Math.max(0, now - at));
   const wait = (n: number, key: string, oldest: number, href: string, icon: Need["icon"], action: string) => {
@@ -2143,6 +2148,17 @@ export function overviewNeeds(data: OverviewData, text: Text, now: number): Need
       href: "/panel/notifications",
     });
   }
+  // Their team is told through Push and this browser is not on the list: nobody is told until each person turns it on.
+  if (pushOff && data.push_boards > 0) {
+    out.push({
+      tone: "warn",
+      icon: "bell",
+      title: text.t("overview.needsPush"),
+      why: text.t("overview.needsPushWhy"),
+      action: text.t("overview.actTurnOn"),
+      href: "/panel/notifications",
+    });
+  }
   // The urgent ones first, and otherwise in the order above.
   return out.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "bad" ? -1 : 1));
 }
@@ -2168,6 +2184,7 @@ export function overviewScreen(
   data: OverviewData,
   text: Text,
   now: number = Math.floor(Date.now() / 1000),
+  pushOff = false,
 ): string {
   const number = (value: number) => escapeHTML(text.number(value));
   const label = (key: string, params?: Record<string, string | number>) => escapeHTML(text.t(key, params));
@@ -2270,7 +2287,7 @@ export function overviewScreen(
 
   const activity = overviewActivity(data, text);
 
-  const needs = overviewNeeds(data, text, now);
+  const needs = overviewNeeds(data, text, now, pushOff);
   const needsBox = box(
     "needs",
     text.t("overview.needsYou"),
@@ -2962,11 +2979,7 @@ export function accountRole(me: { admin?: boolean; memberships?: Array<{ role: s
   return (me.memberships ?? []).length > 0 ? text.t("comment.team") : "";
 }
 
-export function profileScreen(
-  me: { username: string; avatar?: string; role: string },
-  text: Text,
-  push: PushView | null = null,
-): string {
+export function profileScreen(me: { username: string; avatar?: string; role: string }, text: Text): string {
   // Profile and password, a card each: the picture, the name and the role; the username — the one name an account
   // has, to sign in with and to sign replies — with its save button on the same
   // line; and the password, closed by one button aligned with the fields
@@ -3010,7 +3023,6 @@ export function profileScreen(
         </form>`,
         { lead: text.t("profile.passwordHelp") },
       )}
-      ${push ? pushCard(push, text) : ""}
     </div>`;
 }
 
@@ -3356,22 +3368,35 @@ export function antiabuseScreen(data: AntiabuseData, text: Text): string {
     </div>`;
 }
 
-/** The channel every repository can choose, set once by whoever runs the server. */
+/**
+ * Everything about being told, in one place and for everybody on the team: the devices of this account
+ * that get a notification, and — for the administrator only, who is the one that runs the server — the
+ * channel every repository can choose. A person who is not the administrator has no channel to set, so
+ * the second card is not drawn for them rather than drawn empty.
+ */
 export function notificationsScreen(
-  channel: { kind: string; channel_url: string; channel_to: string; channel_has_token: boolean },
+  channel: { kind: string; channel_url: string; channel_to: string; channel_has_token: boolean } | null,
+  push: PushView | null,
   text: Text,
 ): string {
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.notifications"))}</h1>
-    <div class="settings">${settingsCard(
-      text.t("shell.notifications"),
-      channelForm(text, {
-        kind: channel.kind,
-        url: channel.channel_url,
-        to: channel.channel_to,
-        hasToken: channel.channel_has_token,
-      }),
-      { lead: text.t("notifications.lead") },
-    )}</div>`;
+    <div class="settings">
+      ${push ? pushCard(push, text) : ""}
+      ${
+        channel
+          ? settingsCard(
+              text.t("panel.channelServer"),
+              channelForm(text, {
+                kind: channel.kind,
+                url: channel.channel_url,
+                to: channel.channel_to,
+                hasToken: channel.channel_has_token,
+              }),
+              { lead: text.t("notifications.lead") },
+            )
+          : ""
+      }
+    </div>`;
 }
 
 /** Everything about this installation that an operator chose rather than typed. */

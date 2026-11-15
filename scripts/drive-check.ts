@@ -1209,6 +1209,33 @@ async function main() {
   //      with its address and without its token, and what it points at is
   //      what a repository's picker offers.
   await goTo("/panel/notifications", "form.channel");
+  // Being told is everybody's page: it sits under the account beside the profile (the same group label,
+  // whatever the language), once, and holds the devices as well as the channel for the administrator.
+  const notificaciones = await evaluate(`
+    const grupoDe = (href) => {
+      const link = document.querySelector('.side-item[href="' + href + '"]');
+      let grupo = "";
+      for (const l of document.querySelectorAll(".side nav .side-label"))
+        if (link && l.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING) grupo = l.textContent.trim();
+      return grupo;
+    };
+    return {
+      grupo: grupoDe("/panel/notifications"), cuenta: grupoDe("/panel/account"),
+      entradas: document.querySelectorAll('.side-item[href="/panel/notifications"]').length,
+      tarjetas: document.querySelectorAll(".settings .settings-card, .settings > section").length,
+      dispositivos: !!document.querySelector("[data-push-toggle], [data-push-state]"),
+      canal: !!document.querySelector("form.channel"),
+    };
+  `);
+  await goTo("/panel/account", ".profile-password");
+  const perfilSinPush = await evaluate(`return !document.querySelector("[data-push-toggle], [data-push-state], [data-push-test]");`);
+  check(
+    "Notifications is one entry under the account, beside the profile, with the devices and the server's channel; the profile holds no push",
+    notificaciones.grupo !== "" && notificaciones.grupo === notificaciones.cuenta && notificaciones.entradas === 1 &&
+      notificaciones.dispositivos && notificaciones.canal && perfilSinPush === true,
+    JSON.stringify({ ...notificaciones, perfilSinPush }),
+  );
+  await goTo("/panel/notifications", "form.channel");
   const servidor = await evaluate(`
     const f = document.querySelector("form.channel");
     const kind = f.querySelector("#chan-kind");
