@@ -5521,6 +5521,9 @@ form.merge { grid-template-columns: minmax(0, 1fr); }
 
 .ov-kpi-sub span { display: inline-flex; align-items: center; gap: 4px; }
 
+/* On a repository's card the two counts sit together at the end of the line, not one at each edge. */
+.ov-unit .ov-kpi-sub { justify-content: flex-end; column-gap: 14px; }
+
 /* "See more" sits at the foot of its tile, at the end, beside the chevron it points with. */
 .ov-more {
   display: inline-flex;
