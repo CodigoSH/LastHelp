@@ -2318,7 +2318,7 @@ export function overviewScreen(
                   b.pending > 0 ? `${label("panel.queue")}: ${number(b.pending)}` : label("overview.nothingPending")
                 }</span></span>
               <span class="ov-unit-org">${escapeHTML(b.organization)}</span>
-              <span class="ov-kpi-sub"><span>${icons.check(12)} ${number(b.published)}</span><span>${icons.idea(12)} ${number(b.votes)}</span></span>
+              <span class="ov-kpi-sub"><span data-ov-published>${icons.check(12)} ${number(b.published)} ${label("overview.published")}</span><span data-ov-votes>${number(b.votes)} ${label("item.votesLabel")}</span></span>
             </button>`,
           )
           .join("")}</div>`,

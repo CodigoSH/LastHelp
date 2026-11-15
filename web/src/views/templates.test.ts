@@ -532,6 +532,18 @@ describe("the overview", () => {
     );
     expect(html).toContain("[overview.nothingPending]");
   });
+
+  test("a repository card names what each of its two numbers counts, and the votes do not wear the idea's bulb", () => {
+    const html = overviewScreen(
+      overview({ boards: [{ org: "a", repo: "b", name: "B", organization: "A", published: 11, pending: 0, votes: 22 }] }),
+      text,
+      4600,
+    );
+    expect(html).toMatch(/data-ov-published>[^]*?11 \[overview\.published\]/);
+    expect(html).toMatch(/data-ov-votes>22 \[item\.votesLabel\]/);
+    const card = html.slice(html.indexOf("data-ov-votes"), html.indexOf("</button>", html.indexOf("data-ov-votes")));
+    expect(card).not.toContain("<svg"); // the number of votes has no icon: the bulb is an idea everywhere else
+  });
 });
 
 describe("what needs the person looking", () => {
