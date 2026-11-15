@@ -543,7 +543,10 @@ describe("the overview", () => {
     expect(html).toMatch(/data-ov-bugs title="\[overview\.bugs\]" aria-label="\[overview\.bugs\]: 4"><svg[^]*?<\/svg> 4</);
     const card = html.slice(html.indexOf("ov-kpi-sub"), html.indexOf("</button>", html.indexOf("ov-kpi-sub")));
     expect(html.indexOf("data-ov-bugs")).toBeLessThan(html.indexOf("data-ov-ideas")); // bugs first, then ideas
-    expect(html).toMatch(/data-ov="reports"[^]*?\[overview\.bugs\]: \d+<\/span><span>\[overview\.ideas\]: \d+/); // and the same on the reports tile
+    // and the same on the reports tile: bugs, then ideas, each an icon and its number, the name only for the pointer and a screen reader
+    const tile = html.slice(html.indexOf('data-ov="reports"'));
+    expect(tile).toMatch(/title="\[overview\.bugs\]" aria-label="\[overview\.bugs\]: \d+"><svg[^]*?<\/svg> \d+<\/span><span title="\[overview\.ideas\]" aria-label="\[overview\.ideas\]: \d+"><svg/);
+    expect(tile.slice(0, tile.indexOf("</div>", tile.indexOf("ov-kpi-sub")))).not.toMatch(/>\[overview\.(bugs|ideas)\]: /);
     expect(card).not.toContain("item.votesLabel");
     expect(card).not.toContain("overview.published");
   });

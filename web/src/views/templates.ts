@@ -2176,6 +2176,9 @@ export function overviewScreen(
 
   /** What the number counts, read from the same place the listing reads it. */
   const count = (name: string, n: number) => `<span>${label(name)}: ${number(n)}</span>`;
+  /** A number with the icon of what it counts; the name is for the pointer and for a screen reader. */
+  const iconCount = (mark: string, name: string, n: number) =>
+    `<span title="${label(name)}" aria-label="${label(name)}: ${number(n)}">${mark} ${number(n)}</span>`;
 
   /** "See more" that opens the detail in a dialog, at the foot of what it is about. */
   const seeMore = (detail: string, key: string) =>
@@ -2260,7 +2263,7 @@ export function overviewScreen(
       "overview.reports",
       icons.repository(),
       number(total),
-      [count("overview.bugs", data.kinds.bug ?? 0), count("overview.ideas", data.kinds.idea ?? 0)],
+      [iconCount(icons.bug(12), "overview.bugs", data.kinds.bug ?? 0), iconCount(icons.idea(12), "overview.ideas", data.kinds.idea ?? 0)],
       "arrived",
     )}
   </div>`;
