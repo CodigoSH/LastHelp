@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -109,6 +110,9 @@ type pushPayload struct {
 	Title string `json:"title"`
 	Body  string `json:"body"`
 	URL   string `json:"url,omitempty"`
+	// Tag is what a notification replaces: the ones about one board stack as one, the latest on
+	// top, and a person who is away for a day finds one entry per board, not one per report.
+	Tag string `json:"tag,omitempty"`
 }
 
 type pushSub struct {
@@ -200,17 +204,35 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 	// Each person is told in their own language: the browsers are grouped by the
 	// language of the account they belong to, and each group gets one message.
 	payloads := map[string][]byte{}
-	sent, gone := 0, 0
-	for _, sub := range subs {
+	langs := make([]string, len(subs))
+	for i, sub := range subs {
 		lang := s.languageOf(sub.UserID)
-		payload, ok := payloads[lang]
-		if !ok {
-			if payload, err = json.Marshal(s.pushPayloadIn(lang, msg)); err != nil {
-				return err
-			}
-			payloads[lang] = payload
+		langs[i] = lang
+		if _, ok := payloads[lang]; ok {
+			continue
 		}
-		switch s.sendPushOne(ctx, sub, payload, priv) {
+		payload, err := json.Marshal(s.pushPayloadIn(lang, msg))
+		if err != nil {
+			return err
+		}
+		payloads[lang] = payload
+	}
+	// All the browsers at once: they are different push services and each answer can take the full
+	// timeout, so one slow device must not hold back the others. The languages are settled above, so
+	// what runs together only reads.
+	outcomes := make([]pushOutcome, len(subs))
+	var wg sync.WaitGroup
+	for i, sub := range subs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			outcomes[i] = s.sendPushOne(ctx, sub, payloads[langs[i]], priv)
+		}()
+	}
+	wg.Wait()
+	sent, gone := 0, 0
+	for _, o := range outcomes {
+		switch o {
 		case pushSent:
 			sent++
 		case pushGone:
@@ -231,7 +253,11 @@ func (s *Server) pushPayloadIn(lang string, msg notify.Message) pushPayload {
 	if word := s.kindWord(lang, msg.Kind); word != "" {
 		title = isolate(lang, msg.Title) + ": " + word
 	}
-	return pushPayload{Title: clip(title, 120), Body: clip(msg.Body, 300), URL: "/review"}
+	tag := ""
+	if msg.Repo != 0 {
+		tag = fmt.Sprintf("board:%d", msg.Repo)
+	}
+	return pushPayload{Title: clip(title, 120), Body: clip(msg.Body, 300), URL: "/review", Tag: tag}
 }
 
 func scanPushSubs(rows *sql.Rows) ([]pushSub, error) {

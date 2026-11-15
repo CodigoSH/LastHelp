@@ -84,6 +84,11 @@ The signing key that identifies this installation to the push services is made t
 anybody asks and lives in the database, so a backup carries it and a restored
 server keeps every device working. A device whose app was uninstalled is
 forgotten the first time the push service says it is gone.
+A browser that was forgotten while it still holds its subscription and its permission is
+listed again the next time the panel opens on it. The same applies to a device removed from
+another one's list: to switch it off for good, turn push off on that device itself.
+Notifications about one board share a tag, so they stack as one entry per board, the
+latest on top, and each new one still alerts.
 
 Over the API, for the signed-in account's own devices: `GET /api/push/key`,
 `GET` and `POST /api/push/subscriptions`, `DELETE /api/push/subscriptions/{id}`

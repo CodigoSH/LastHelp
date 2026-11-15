@@ -26,7 +26,7 @@ import { dialogParams, laneCap, lanePlan, laneStatuses, tileNumbers, type Counts
 import { historyRows, rankedRows, titleHas, type RoadmapFilter } from "./services/roadmapState";
 import { installFilterMenus, syncFilterBar, type FilterApply, type FilterPick } from "./services/filterMenus";
 import { filterMenu } from "./views/filterBar";
-import { disablePush, enablePush, loadPush, removePushDevice, testPush, type PushView } from "./services/pushClient";
+import { disablePush, enablePush, loadPush, removePushDevice, resyncPush, testPush, type PushView } from "./services/pushClient";
 import { type Fit, ICON, shrink, TooLarge } from "./services/image";
 import { PICTURES_ON_A_MESSAGE, PICTURES_ON_A_REPORT, removePicture, sendPictures, wireTray } from "./services/reportPictures";
 import { attachPictureViewer } from "./services/pictureViewer";
@@ -76,6 +76,8 @@ let reviewCameFrom = "/panel";
  * that changes about once in the life of an install.
  */
 let instanceName = "";
+/** Whether this load already put the browser back on the push list, if it had dropped off. */
+let pushResynced = false;
 
 /** The logo beside it, if the operator chose one. */
 let instanceLogo = "";
@@ -803,6 +805,11 @@ async function requirePanel(): Promise<boolean> {
   if (!me) {
     go("/sign-in");
     return false;
+  }
+  // Once per load, and not worth telling anybody if it fails: it runs again the next time the panel opens.
+  if (!pushResynced) {
+    pushResynced = true;
+    resyncPush().catch(() => undefined);
   }
   return true;
 }

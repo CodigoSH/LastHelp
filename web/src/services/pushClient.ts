@@ -98,6 +98,35 @@ export async function enablePush(): Promise<void> {
   });
 }
 
+/**
+ * Puts this browser back on the server's list when it has dropped off it, and does nothing otherwise.
+ *
+ * A subscription can be lost on the server's side (the push service answered 410 once and the row was
+ * forgotten) while the browser still holds it and the permission is still given. Nothing would tell the
+ * person: notifications would simply stop arriving here. Called once when the panel opens, only for a
+ * browser that already took part: no worker is registered and no permission is asked for. The normal
+ * case is one request, the list.
+ */
+export async function resyncPush(): Promise<void> {
+  if (pushSupport(currentEnv()) !== "ready" || Notification.permission !== "granted") return;
+  const own = await ownSubscription();
+  if (!own) return;
+  const { devices } = await api.get<{ devices: PushDevice[] }>("/api/push/subscriptions");
+  const ref = await deviceRef(own.endpoint);
+  if (devices.some((d) => d.ref === ref)) return;
+
+  // A subscription made for another key cannot be used; turning it on again replaces it.
+  const { public_key } = await api.get<{ public_key: string }>("/api/push/key");
+  if (!sameKey(own.options.applicationServerKey, decodeKey(public_key))) return;
+
+  const json = own.toJSON();
+  await api.post("/api/push/subscriptions", {
+    endpoint: json.endpoint,
+    keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
+    label: deviceLabel(),
+  });
+}
+
 /** Turns notifications off for this browser: the server forgets it and the browser lets go of the subscription. */
 export async function disablePush(deviceId: number | null): Promise<void> {
   if (deviceId !== null) await api.del(`/api/push/subscriptions/${deviceId}`);

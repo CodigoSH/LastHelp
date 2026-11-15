@@ -7,6 +7,7 @@ interface Payload {
   title?: string;
   body?: string;
   url?: string;
+  tag?: string;
 }
 
 /** Where a tap goes. Only a path inside this instance; anything else is the home page. */
@@ -26,11 +27,17 @@ export function describe(raw: string | null): { title: string; options: Record<s
       data = { body: raw };
     }
   }
+  const tag = typeof data.tag === "string" && data.tag ? data.tag : undefined;
   return {
     title: typeof data.title === "string" && data.title ? data.title : "LastHelp",
     options: {
       body: typeof data.body === "string" ? data.body : "",
       icon: "/icon-192.png",
+      // The small mark in the status bar: the icon's own outline, which is mostly transparent.
+      badge: "/icon-192.png",
+      tag,
+      // A newer one replaces the older of its tag, and should still be noticed doing so.
+      renotify: !!tag,
       data: { url: target(data.url) },
     },
   };

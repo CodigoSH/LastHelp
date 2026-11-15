@@ -37,4 +37,22 @@ suite("describe", () => {
     expect(options.body).toBe("");
     expect((options.data as { url: string }).url).toBe("/");
   });
+
+  it("stacks the messages that share a tag, and still notices each one", () => {
+    const { options } = describe(JSON.stringify({ title: "a", tag: "board:3" }));
+    expect(options.tag).toBe("board:3");
+    expect(options.renotify).toBe(true);
+  });
+
+  it("stands alone without a tag, and a tag of the wrong type is none", () => {
+    for (const raw of [JSON.stringify({ title: "a" }), JSON.stringify({ title: "a", tag: 5 }), JSON.stringify({ title: "a", tag: "" })]) {
+      const { options } = describe(raw);
+      expect(options.tag).toBeUndefined();
+      expect(options.renotify).toBe(false);
+    }
+  });
+
+  it("carries the badge for the status bar", () => {
+    expect(describe(JSON.stringify({ title: "a" })).options.badge).toBe("/icon-192.png");
+  });
 });

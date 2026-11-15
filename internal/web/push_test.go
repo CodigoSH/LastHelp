@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdh"
 	"crypto/rand"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -72,6 +73,8 @@ type pushService struct {
 	paths    []string
 	reply    int
 	lastAuth string
+	// delay is how long the service takes to answer.
+	delay time.Duration
 }
 
 func newPushService(t *testing.T) *pushService {
@@ -81,8 +84,9 @@ func newPushService(t *testing.T) *pushService {
 		p.mu.Lock()
 		p.paths = append(p.paths, r.URL.Path)
 		p.lastAuth = r.Header.Get("Authorization")
-		code := p.reply
+		code, delay := p.reply, p.delay
 		p.mu.Unlock()
+		time.Sleep(delay)
 		w.WriteHeader(code)
 	}))
 	t.Cleanup(p.Close)
@@ -455,5 +459,54 @@ func TestTheLanguageOfAnAccountFallsBackToEnglish(t *testing.T) {
 	// A sentence a language lacks is English, and one English lacks is its key.
 	if got := srv.say("en", "no.such.key", nil); got != "no.such.key" {
 		t.Errorf("a missing key reads %q", got)
+	}
+}
+
+// A slow push service must not hold back the others: the browsers are sent to together, so the time is
+// that of the slowest and not the sum. Five that each take 300 ms would be 1.5 s one after another.
+func TestTheBrowsersOfATeamAreSentToTogether(t *testing.T) {
+	team, srv := newPushInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepo("codigosh", "lastboard")
+	service := newPushService(t)
+	service.mu.Lock()
+	service.delay = 300 * time.Millisecond
+	service.mu.Unlock()
+	for i := 0; i < 5; i++ {
+		resp := team.do(http.MethodPost, "/api/push/subscriptions", subscription(t, fmt.Sprintf("%s/device-%d", service.URL, i)))
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("could not subscribe: %d", resp.StatusCode)
+		}
+	}
+	var board int64
+	if err := team.db().QueryRow(`SELECT id FROM repository WHERE slug = 'lastboard'`).Scan(&board); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now()
+	if err := srv.pushTo(context.Background(), notify.Message{Title: "a", Body: "b", Repo: board}); err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("five browsers at 300 ms took %v: they were sent to one after another", took)
+	}
+	if n := len(service.reached()); n != 5 {
+		t.Errorf("%d of 5 browsers were reached", n)
+	}
+}
+
+// The notifications about one board share a tag, so they stack as one; a message that is not about a
+// board (a test) has none and stands alone.
+func TestANotificationAboutABoardCarriesTheBoardAsItsTag(t *testing.T) {
+	_, srv := newPushInstance(t)
+	if got := srv.pushPayloadIn("en", notify.Message{Title: "a", Repo: 7}).Tag; got != "board:7" {
+		t.Errorf("tag for board 7 = %q", got)
+	}
+	if got := srv.pushPayloadIn("en", notify.Message{Title: "a", Repo: 8}).Tag; got != "board:8" {
+		t.Errorf("tag for board 8 = %q", got)
+	}
+	if got := srv.pushPayloadIn("en", notify.Message{Title: "a", User: 1}).Tag; got != "" {
+		t.Errorf("a test carries the tag %q", got)
 	}
 }
