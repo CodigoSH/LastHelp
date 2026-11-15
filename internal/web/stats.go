@@ -114,7 +114,10 @@ type boardCount struct {
 	Organization string `json:"organization"`
 	Published    int    `json:"published"`
 	Pending      int    `json:"pending"`
-	Votes        int    `json:"votes"`
+	// What is published, by kind: the two numbers its card shows. Votes are
+	// not here, because they are a sign of interest and not a size of work.
+	Ideas int `json:"ideas"`
+	Bugs  int `json:"bugs"`
 }
 
 // handleOverview counts what this installation holds.
@@ -430,7 +433,8 @@ func (s *Server) boardCounts(limit int, scope string) ([]boardCount, error) {
 		`SELECT o.slug, r.slug, r.name, o.name,
 		        COALESCE(SUM(i.moderation_state = 'published'), 0),
 		        COALESCE(SUM(i.moderation_state = 'pending'), 0),
-		        COALESCE(SUM(i.vote_count), 0)
+		        COALESCE(SUM(i.moderation_state = 'published' AND i.kind = 'idea'), 0),
+		        COALESCE(SUM(i.moderation_state = 'published' AND i.kind = 'bug'), 0)
 		   FROM repository r
 		   JOIN organization o ON o.id = r.org_id
 		   LEFT JOIN item i ON i.repo_id = r.id AND i.merged_into IS NULL
@@ -447,7 +451,7 @@ func (s *Server) boardCounts(limit int, scope string) ([]boardCount, error) {
 	for rows.Next() {
 		var b boardCount
 		if err := rows.Scan(&b.Org, &b.Repo, &b.Name, &b.Organization,
-			&b.Published, &b.Pending, &b.Votes); err != nil {
+			&b.Published, &b.Pending, &b.Ideas, &b.Bugs); err != nil {
 			return nil, err
 		}
 		out = append(out, b)

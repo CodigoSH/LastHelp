@@ -1954,7 +1954,9 @@ export interface OverviewData {
     organization: string;
     published: number;
     pending: number;
-    votes: number;
+    /** What is published, by kind. */
+    ideas: number;
+    bugs: number;
   }[];
 }
 
@@ -2318,7 +2320,7 @@ export function overviewScreen(
                   b.pending > 0 ? `${label("panel.queue")}: ${number(b.pending)}` : label("overview.nothingPending")
                 }</span></span>
               <span class="ov-unit-org">${escapeHTML(b.organization)}</span>
-              <span class="ov-kpi-sub"><span data-ov-published>${icons.check(12)} ${number(b.published)} ${label("overview.published")}</span><span data-ov-votes>${number(b.votes)} ${label("item.votesLabel")}</span></span>
+              <span class="ov-kpi-sub"><span data-ov-ideas title="${label("overview.ideas")}" aria-label="${label("overview.ideas")}: ${number(b.ideas)}">${icons.idea(12)} ${number(b.ideas)}</span><span data-ov-bugs title="${label("overview.bugs")}" aria-label="${label("overview.bugs")}: ${number(b.bugs)}">${icons.bug(12)} ${number(b.bugs)}</span></span>
             </button>`,
           )
           .join("")}</div>`,

@@ -378,7 +378,7 @@ function overview(over: Partial<OverviewData> = {}): OverviewData {
     series: [{ day: 1, reports: 3, bugs: 1, ideas: 2 }, { day: 2, reports: 0, bugs: 0, ideas: 0 }],
     top: [{ public_id: "a", title: "Dark mode", kind: "idea", status: "planned", votes: 31, created_at: 500 }],
     recent: [{ public_id: "b", title: "Crash <b>", kind: "bug", status: "new", moderation: "pending", votes: 0, created_at: 900 }],
-    boards: [{ org: "acme", repo: "atlas", name: "Atlas", organization: "Acme", published: 71, pending: 5, votes: 412 }],
+    boards: [{ org: "acme", repo: "atlas", name: "Atlas", organization: "Acme", published: 71, pending: 5, ideas: 40, bugs: 31 }],
     ...over,
   };
 }
@@ -526,23 +526,24 @@ describe("the overview", () => {
 
   test("a repository with nothing waiting says so rather than showing a zero", () => {
     const html = overviewScreen(
-      overview({ boards: [{ org: "a", repo: "b", name: "B", organization: "A", published: 1, pending: 0, votes: 0 }] }),
+      overview({ boards: [{ org: "a", repo: "b", name: "B", organization: "A", published: 1, pending: 0, ideas: 1, bugs: 0 }] }),
       text,
       4600,
     );
     expect(html).toContain("[overview.nothingPending]");
   });
 
-  test("a repository card names what each of its two numbers counts, and the votes do not wear the idea's bulb", () => {
+  test("a repository card shows its ideas and its bugs, each with its icon and its name, and nothing about votes", () => {
     const html = overviewScreen(
-      overview({ boards: [{ org: "a", repo: "b", name: "B", organization: "A", published: 11, pending: 0, votes: 22 }] }),
+      overview({ boards: [{ org: "a", repo: "b", name: "B", organization: "A", published: 11, pending: 0, ideas: 7, bugs: 4 }] }),
       text,
       4600,
     );
-    expect(html).toMatch(/data-ov-published>[^]*?11 \[overview\.published\]/);
-    expect(html).toMatch(/data-ov-votes>22 \[item\.votesLabel\]/);
-    const card = html.slice(html.indexOf("data-ov-votes"), html.indexOf("</button>", html.indexOf("data-ov-votes")));
-    expect(card).not.toContain("<svg"); // the number of votes has no icon: the bulb is an idea everywhere else
+    expect(html).toMatch(/data-ov-ideas title="\[overview\.ideas\]" aria-label="\[overview\.ideas\]: 7"><svg[^]*?<\/svg> 7</);
+    expect(html).toMatch(/data-ov-bugs title="\[overview\.bugs\]" aria-label="\[overview\.bugs\]: 4"><svg[^]*?<\/svg> 4</);
+    const card = html.slice(html.indexOf("ov-kpi-sub"), html.indexOf("</button>", html.indexOf("ov-kpi-sub")));
+    expect(card).not.toContain("item.votesLabel");
+    expect(card).not.toContain("overview.published");
   });
 });
 

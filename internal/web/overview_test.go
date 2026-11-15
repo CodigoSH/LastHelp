@@ -49,6 +49,38 @@ func TestTheOverviewSplitsStatusesByKind(t *testing.T) {
 	}
 }
 
+// TestARepositoryCardCountsItsPublishedIdeasAndBugs: the two numbers on a
+// repository's card are what is published, by kind. A report still waiting is
+// not an idea of the repository yet, and a vote is not a report at all.
+func TestARepositoryCardCountsItsPublishedIdeasAndBugs(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("acme")
+	team.createRepo("acme", "atlas")
+
+	publish := func(kind, title string) {
+		id, _ := team.anonymous().submit("acme", "atlas", kind, title)
+		_ = status(t, team.do(http.MethodPost, "/api/items/"+id+"/moderation", map[string]string{"state": "published"}))
+	}
+	publish("idea", "dark mode")
+	publish("idea", "csv export")
+	publish("bug", "it crashes")
+	team.anonymous().submit("acme", "atlas", "bug", "still waiting")
+	team.anonymous().submit("acme", "atlas", "idea", "also waiting")
+
+	boards, _ := decode(t, team.do(http.MethodGet, "/api/overview", nil))["boards"].([]any)
+	if len(boards) != 1 {
+		t.Fatalf("the overview listed %d repositories, want 1", len(boards))
+	}
+	card := boards[0].(map[string]any)
+	if card["ideas"] != float64(2) || card["bugs"] != float64(1) {
+		t.Errorf("the card counted %v ideas and %v bugs, want 2 and 1 (what waits is not counted)", card["ideas"], card["bugs"])
+	}
+	if _, has := card["votes"]; has {
+		t.Errorf("the card still carries votes: %v", card)
+	}
+}
+
 // TestAnEmptyOverviewStillSplitsByKind: nothing reported yet must not turn the
 // split into a null a browser then has to guess about.
 func TestAnEmptyOverviewStillSplitsByKind(t *testing.T) {
