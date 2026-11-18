@@ -24,6 +24,8 @@
 /** The alignments, which are the four a paragraph can take. */
 const ALIGNMENTS = ["align-start", "align-center", "align-end", "align-justify"] as const;
 
+import { isEnter } from "./imeKeys";
+
 /**
  * The palette, and it is a palette rather than a colour wheel on purpose: every
  * one of these is a token the theme already defines, so the words stay legible
@@ -277,7 +279,7 @@ export function wireWords(options: {
     // Enter inside a block of prose should start a paragraph, not a div, which
     // is what a browser does left alone.
     block.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" && !event.shiftKey) {
+      if (isEnter(event) && !event.shiftKey) {
         event.preventDefault();
         document.execCommand("insertParagraph");
       }

@@ -18,6 +18,7 @@ import type {
   Submitted,
 } from "./api";
 import { i18n } from "./services/i18n";
+import { isEnter } from "./services/imeKeys";
 import { availableLocales } from "./locales/metadata";
 import { applyTheme, currentTheme, restoreTheme, type Theme } from "./services/theme";
 import { escapeAttr, escapeHTML } from "./escape";
@@ -2834,7 +2835,7 @@ function wireOverview(): void {
   // A tile that is a button for the eye is one for the keyboard too: Enter and
   // Space press it, as they press the real thing.
   body?.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
+    if (!isEnter(event) && event.key !== " ") return;
     const tile = (event.target as Element).closest<HTMLElement>('[role="button"][data-ov-open]');
     if (!tile) return;
     event.preventDefault();

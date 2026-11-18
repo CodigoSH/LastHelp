@@ -12,6 +12,7 @@
 import { api, ApiError } from "./api";
 import { askConfirm } from "./confirm";
 import { escapeHTML } from "./escape";
+import { isEnter } from "./services/imeKeys";
 import { putImage, TooLarge } from "./services/landingImage";
 import { wireWords } from "./services/words";
 import * as landingViews from "./views/landing";
@@ -503,7 +504,7 @@ export class LandingEditor {
     // is exactly what can be seen.
     canvas.querySelectorAll<HTMLElement>("[data-field][data-for]").forEach((field) => {
       field.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
+        if (isEnter(e)) {
           e.preventDefault();
           field.blur();
         }
@@ -533,7 +534,7 @@ export class LandingEditor {
     // The footer's line, typed in place like a heading. Plain text.
     canvas.querySelectorAll<HTMLElement>("[data-footer-text]").forEach((field) => {
       field.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
+        if (isEnter(e)) {
           e.preventDefault();
           field.blur();
         }

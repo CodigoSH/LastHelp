@@ -26,6 +26,7 @@
  */
 
 import { setRule } from "./dynamicStyles";
+import { isEnter } from "./imeKeys";
 
 /** Mirrors `.sel-list.open { max-block-size }` in theme.css. */
 const LIST_MAX_HEIGHT = 300;
@@ -202,6 +203,12 @@ function enhance(select: HTMLSelectElement): void {
   // single letters and arrows, and a list is where those mean something else.
   const keys = (event: KeyboardEvent) => {
     const count = options().length;
+    if (isEnter(event)) {
+      choose(active);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     switch (event.key) {
       case "ArrowDown":
         active = Math.min(count - 1, active + 1);
@@ -219,7 +226,6 @@ function enhance(select: HTMLSelectElement): void {
         active = count - 1;
         mark();
         break;
-      case "Enter":
       case " ":
         choose(active);
         break;
