@@ -38,6 +38,11 @@ func (s *Server) updater() updater.Updater {
 		SchemaVersion: func() (int, error) {
 			return database.SchemaVersion(s.db)
 		},
+		// The copy taken before anything is replaced is a snapshot through the
+		// connection, as the downloadable backup is, and not the file.
+		Snapshot: func(target string) error {
+			return database.Snapshot(s.db, target)
+		},
 		Now: s.now,
 	}
 }

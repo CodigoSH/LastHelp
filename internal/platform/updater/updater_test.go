@@ -100,7 +100,9 @@ func updaterFor(t *testing.T, f *forge, keys []string, schema int) (Updater, str
 		Keys:          keys,
 		Current:       "v1.0.0",
 		SchemaVersion: func() (int, error) { return schema, nil },
-		Now:           time.Now,
+		// The real one is database.Snapshot, tested where the database is.
+		Snapshot: func(target string) error { return os.WriteFile(target, []byte("a copy"), 0o600) },
+		Now:      time.Now,
 	}, running
 }
 
@@ -272,7 +274,10 @@ func TestABinaryOlderThanTheDatabaseIsRefused(t *testing.T) {
 
 // TestTheDatabaseIsBackedUpBeforeAnythingIsReplaced.
 //
-// The moment somebody wants a backup is after it is too late to take one.
+// The moment somebody wants a backup is after it is too late to take one. The
+// copy is taken by whoever owns the connection (it is not a copy of the file:
+// see backup), written under another name, and only named like a backup once it
+// is whole.
 func TestTheDatabaseIsBackedUpBeforeAnythingIsReplaced(t *testing.T) {
 	private, public := keyPair(t)
 	f := newForge(t, private, "v1.1.0", candidateBinary(5))
@@ -281,6 +286,11 @@ func TestTheDatabaseIsBackedUpBeforeAnythingIsReplaced(t *testing.T) {
 	db := filepath.Join(filepath.Dir(running), "lasthelp.db")
 	if err := os.WriteFile(db, []byte("the database as it was"), 0o600); err != nil {
 		t.Fatal(err)
+	}
+	var asked string
+	u.Snapshot = func(target string) error {
+		asked = target
+		return os.WriteFile(target, []byte("a consistent copy"), 0o644)
 	}
 
 	if err := applyIn(t, u, running, Release{Tag: "v1.1.0"}, db); err != nil {
@@ -291,8 +301,152 @@ func TestTheDatabaseIsBackedUpBeforeAnythingIsReplaced(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no backup was taken: %v", err)
 	}
-	if string(saved) != "the database as it was" {
+	if string(saved) != "a consistent copy" {
 		t.Errorf("the backup holds %q", saved)
+	}
+	if asked != db+".before-v1.1.0.partial" {
+		t.Errorf("the copy was taken to %q, not under a name that is not a backup's yet", asked)
+	}
+	if _, err := os.Stat(asked); !os.IsNotExist(err) {
+		t.Error("the unfinished name was left behind")
+	}
+	info, err := os.Stat(db + ".before-v1.1.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Errorf("the copy is %v: a copy of the whole database is for whoever runs the server only", info.Mode().Perm())
+	}
+}
+
+// A copy that could not be taken stops the update before anything is replaced:
+// an update nobody can undo is not worth it.
+func TestACopyThatFailsStopsTheUpdate(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	u, running := updaterFor(t, f, []string{public}, 2)
+	db := filepath.Join(filepath.Dir(running), "lasthelp.db")
+	u.Snapshot = func(target string) error {
+		_ = os.WriteFile(target, []byte("half of it"), 0o600)
+		return errors.New("the disk is full")
+	}
+
+	err := applyIn(t, u, running, Release{Tag: "v1.1.0"}, db)
+	if err == nil || !strings.Contains(err.Error(), "the disk is full") {
+		t.Fatalf("got %v, want the copy's failure", err)
+	}
+	assertNotReplaced(t, running)
+	for _, left := range []string{db + ".before-v1.1.0", db + ".before-v1.1.0.partial"} {
+		if _, err := os.Stat(left); !os.IsNotExist(err) {
+			t.Errorf("%s was left behind", filepath.Base(left))
+		}
+	}
+}
+
+// No way to take a copy is not "no copy needed". The file of a running database
+// is not a copy, so the updater does not fall back to it.
+func TestWithoutAWayToCopyTheDatabaseNothingIsReplaced(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	u, running := updaterFor(t, f, []string{public}, 2)
+	u.Snapshot = nil
+	db := filepath.Join(filepath.Dir(running), "lasthelp.db")
+
+	err := applyIn(t, u, running, Release{Tag: "v1.1.0"}, db)
+	if !errors.Is(err, ErrNoBackup) {
+		t.Fatalf("got %v, want ErrNoBackup", err)
+	}
+	assertNotReplaced(t, running)
+}
+
+// An update with no database to protect asks for no copy.
+func TestAnUpdateWithNoDatabaseTakesNoCopy(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	u, running := updaterFor(t, f, []string{public}, 2)
+	u.Snapshot = func(string) error { t.Error("a copy was asked for with no database"); return nil }
+
+	if err := applyIn(t, u, running, Release{Tag: "v1.1.0"}, ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// An upgrade every few weeks would leave a whole copy of the database for ever.
+// The three newest stay; only files named like ours are ever looked at.
+func TestOnlyTheThreeNewestCopiesAreKept(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	u, running := updaterFor(t, f, []string{public}, 2)
+	dir := filepath.Dir(running)
+	db := filepath.Join(dir, "lasthelp.db")
+
+	now := time.Now()
+	old := map[string]time.Duration{
+		"lasthelp.db.before-v0.9.0": -50 * 24 * time.Hour,
+		"lasthelp.db.before-v1.0.0": -40 * 24 * time.Hour,
+		"lasthelp.db.before-v1.0.1": -30 * 24 * time.Hour,
+		"lasthelp.db.before-v1.0.2": -20 * 24 * time.Hour,
+	}
+	for name, age := range old {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, now.Add(age), now.Add(age)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// What is not a copy of ours is never touched, however it is named.
+	for _, name := range []string{"lasthelp.db", "lasthelp.db-wal", "lasthelp.db.notes", "other.db.before-v1.0.0"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := applyIn(t, u, running, Release{Tag: "v1.1.0"}, db); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, gone := range []string{"lasthelp.db.before-v0.9.0", "lasthelp.db.before-v1.0.0"} {
+		if _, err := os.Stat(filepath.Join(dir, gone)); !os.IsNotExist(err) {
+			t.Errorf("%s was kept", gone)
+		}
+	}
+	for _, kept := range []string{"lasthelp.db.before-v1.0.1", "lasthelp.db.before-v1.0.2", "lasthelp.db.before-v1.1.0",
+		"lasthelp.db", "lasthelp.db-wal", "lasthelp.db.notes", "other.db.before-v1.0.0"} {
+		if _, err := os.Stat(filepath.Join(dir, kept)); err != nil {
+			t.Errorf("%s was removed: %v", kept, err)
+		}
+	}
+}
+
+// A copy of the same release from an attempt that failed afterwards, and the
+// unfinished name an attempt that crashed left, do not get in the way of the next.
+func TestAnEarlierAttemptsLeftoversDoNotGetInTheWay(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	u, running := updaterFor(t, f, []string{public}, 2)
+	db := filepath.Join(filepath.Dir(running), "lasthelp.db")
+
+	if err := os.WriteFile(db+".before-v1.1.0", []byte("from the attempt before"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(db+".before-v1.1.0.partial", []byte("a crash left this"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	u.Snapshot = func(target string) error {
+		if _, err := os.Stat(target); err == nil {
+			return errors.New("the name for the copy was not free")
+		}
+		return os.WriteFile(target, []byte("this attempt's copy"), 0o600)
+	}
+
+	if err := applyIn(t, u, running, Release{Tag: "v1.1.0"}, db); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := os.ReadFile(db + ".before-v1.1.0")
+	if err != nil || string(saved) != "this attempt's copy" {
+		t.Errorf("the copy holds %q (%v)", saved, err)
 	}
 }
 

@@ -35,12 +35,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -70,6 +72,10 @@ var (
 
 	// ErrNoRelease means there is nothing to install.
 	ErrNoRelease = errors.New("no release found")
+
+	// ErrNoBackup means there is no way to take a copy of the database, so
+	// nothing is replaced: an update nobody can undo is not worth the risk.
+	ErrNoBackup = errors.New("there is no way to take a copy of the database, so it will not update")
 )
 
 // MaxBinaryBytes bounds the download. A release binary is tens of megabytes,
@@ -123,6 +129,11 @@ type Updater struct {
 
 	// SchemaVersion is what the database is at right now.
 	SchemaVersion func() (int, error)
+
+	// Snapshot writes a consistent, verified copy of the database to the path it
+	// is given, which does not exist yet. Without it nothing is replaced: a
+	// copy of the file of a running database is not a backup (see backup).
+	Snapshot func(target string) error
 
 	// Now, so a test does not have to wait.
 	Now func() time.Time
@@ -281,7 +292,7 @@ func (u Updater) Apply(ctx context.Context, release Release, dbPath string, prog
 
 	if dbPath != "" {
 		report(StepBackup, filepath.Base(dbPath))
-		if err := backup(dbPath, release.Tag); err != nil {
+		if err := backup(dbPath, release.Tag, u.Snapshot); err != nil {
 			return fmt.Errorf("backing up the database: %w", err)
 		}
 	}
@@ -365,29 +376,100 @@ func prove(ctx context.Context, path string) (Candidate, error) {
 	return candidate, nil
 }
 
+// keptBackups is how many copies of the database the updater leaves beside it.
+// An upgrade every few weeks would otherwise leave a whole copy for ever, and the
+// old ones are the least useful.
+const keptBackups = 3
+
+// backupInfix names a copy: lasthelp.db.before-<tag>. install.sh writes the same
+// name, so the two share the three that are kept.
+const backupInfix = ".before-"
+
 // backup copies the database beside itself, named after the release going in.
 //
 // Before anything is replaced. An update that goes wrong with no backup is an
 // update nobody can undo, and the moment somebody wants one is after it is too
 // late to take.
-func backup(dbPath, tag string) error {
-	source, err := os.Open(dbPath)
+//
+// The copy is not made here. Reading the file of a database that is running in
+// WAL gives a file that opens and passes every check and is missing what was
+// written since the last checkpoint — zero of two hundred reports, measured — so
+// whoever owns the connection takes the snapshot, and this only decides what is
+// done with it: written under another name, flushed, and renamed into place only
+// once it is whole, so a copy that is named like a backup is one.
+func backup(dbPath, tag string, snapshot func(target string) error) error {
+	if snapshot == nil {
+		return ErrNoBackup
+	}
+	final := dbPath + backupInfix + strings.NewReplacer("/", "-", " ", "-").Replace(tag)
+	partial := final + ".partial"
+
+	// What an attempt that did not finish left: the snapshot needs a name that is free.
+	_ = os.Remove(partial)
+	if err := snapshot(partial); err != nil {
+		_ = os.Remove(partial)
+		return err
+	}
+	if err := flush(partial); err != nil {
+		_ = os.Remove(partial)
+		return err
+	}
+	// Replaces the copy of the same release from an earlier attempt.
+	if err := os.Rename(partial, final); err != nil {
+		_ = os.Remove(partial)
+		return err
+	}
+	pruneBackups(dbPath)
+	return nil
+}
+
+// flush makes the copy reach the disk and be private to whoever runs the server.
+func flush(path string) error {
+	if err := os.Chmod(path, 0o600); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = source.Close() }()
+	defer func() { _ = file.Close() }()
+	return file.Sync()
+}
 
-	target := dbPath + ".before-" + strings.NewReplacer("/", "-", " ", "-").Replace(tag)
-	destination, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+// pruneBackups keeps the newest keptBackups copies named like ours and removes
+// the rest. Only files that are exactly <database>.before-<something> are looked
+// at, and the unfinished ones (.partial) are not copies.
+func pruneBackups(dbPath string) {
+	found, err := filepath.Glob(dbPath + backupInfix + "*")
 	if err != nil {
-		return err
+		return
 	}
-	defer func() { _ = destination.Close() }()
-
-	if _, err := io.Copy(destination, source); err != nil {
-		return err
+	type copyFile struct {
+		path string
+		mod  time.Time
 	}
-	return destination.Sync()
+	copies := make([]copyFile, 0, len(found))
+	for _, path := range found {
+		if strings.HasSuffix(path, ".partial") {
+			continue
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		copies = append(copies, copyFile{path, info.ModTime()})
+	}
+	sort.Slice(copies, func(i, j int) bool {
+		if !copies[i].mod.Equal(copies[j].mod) {
+			return copies[i].mod.After(copies[j].mod)
+		}
+		return copies[i].path > copies[j].path
+	})
+	for i := keptBackups; i < len(copies); i++ {
+		if err := os.Remove(copies[i].path); err != nil {
+			slog.Warn("could not remove an old copy of the database", "file", copies[i].path, "error", err)
+		}
+	}
 }
 
 // fetch downloads one file of a release, up to limit bytes.
