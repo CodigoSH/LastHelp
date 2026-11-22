@@ -8016,6 +8016,16 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
 .rev-sides .tab.on .icon { opacity: 1; }
 .rev-sides .tab.on .count-chip { background: transparent; border: 0; color: inherit; }
 
+/* Three equal segments in a phone's width leave a word like "Geschlossen" a few
+   pixels short, and an ellipsis on the shortest of three words reads as broken.
+   Tighter inside each segment, and the label gets the room. */
+@media (max-width: 480px) {
+  .rev-sides .tab { padding-inline: 3px; gap: 4px; }
+}
+@media (max-width: 340px) {
+  .rev-sides .tab .icon { display: none; }
+}
+
 /* A repository's heading in the archive is the control that folds its reports
    away: the same heading, as a button, with a mark that turns down when open. */
 button.rev-group {
