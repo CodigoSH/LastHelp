@@ -59,6 +59,13 @@ type Config struct {
 	// operator can verify rather than take on trust: turn this on, and if
 	// anything still reaches the network, the document is wrong.
 	Offline bool
+
+	// ListenFD is the number of the listening socket the process this one replaced
+	// handed over, or empty. It is set by the updater when it replaces the binary,
+	// so that the port never closes, and by nobody else: Load clears the variable,
+	// so it never reaches a process started later, where the number would mean
+	// something else.
+	ListenFD string
 }
 
 // Load reads the environment. It never fails: every value has a working
@@ -73,6 +80,7 @@ func Load() Config {
 		TrustProxy:     boolean("LASTHELP_TRUST_PROXY", false),
 		TrustProxyHops: hops(),
 		Offline:        boolean("LASTHELP_OFFLINE", false),
+		ListenFD:       takeListenFD(),
 		PublicURL:      str("LASTHELP_PUBLIC_URL", ""),
 		Mail: mail.Config{
 			Host:     str("LASTHELP_SMTP_HOST", ""),
@@ -83,6 +91,15 @@ func Load() Config {
 			StartTLS: boolean("LASTHELP_SMTP_STARTTLS", true),
 		},
 	}
+}
+
+// takeListenFD reads the socket a replaced process handed over and clears the
+// variable, so that a process this one starts later does not inherit a number
+// that names something else by then.
+func takeListenFD() string {
+	value := str("LASTHELP_LISTEN_FD", "")
+	_ = os.Unsetenv("LASTHELP_LISTEN_FD")
+	return value
 }
 
 // addr accepts either a bare port or a full address, because both are what

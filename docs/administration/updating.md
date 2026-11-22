@@ -46,7 +46,10 @@ What it does, in this order, and each step either proves something or stops:
    and still look like a database — and it is opened and checked before it
    counts. The three newest copies are kept. If the copy cannot be taken, nothing
    is replaced.
-9. Only now replaces the binary and restarts.
+9. Only now replaces the binary, keeping the one it replaces beside it as
+   `lasthelp.old`, and restarts. The restart hands the listening port to the new
+   process, so the port is never closed while it starts: a proxy in front sees
+   requests answered, not refused.
 
 Anything that fails leaves the running binary untouched and says which step it
 was.
@@ -83,8 +86,8 @@ The backup is beside the database, named `lasthelp.db.before-<tag>`, and the
 three newest are kept. To go back: stop the service, put the copy in place of
 `lasthelp.db`, delete `lasthelp.db-wal` and `lasthelp.db-shm` if they are there
 — they belong to the database you are replacing, and a database opened with
-another one's journal is a damaged one — install the previous release, and
-start again.
+another one's journal is a damaged one — put `lasthelp.old` back as the binary
+(or install the previous release), and start again.
 
 The binary refuses to run against a database newer than it understands, so
 downgrading without restoring the backup stops at startup with a message rather

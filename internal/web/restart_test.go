@@ -2,9 +2,13 @@ package web
 
 import (
 	"errors"
+	"net"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
+
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/handoff"
 )
 
 // TestAFailedRestartExitsNonZero.
@@ -58,6 +62,48 @@ func TestAFailedRestartExitsNonZero(t *testing.T) {
 					got, tc.wantExit, got)
 			}
 		})
+	}
+}
+
+// A restart hands the listening socket to the new process: the server is readied
+// to be replaced, and the number of the socket goes to the new process in its
+// environment. Without it the port closes while the new process starts, and a
+// proxy in front reads a healthy server as one that failed.
+func TestARestartHandsTheSocketToTheNewProcess(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = ln.Close() }()
+
+	readied := false
+	handoff.Register(func() (*os.File, error) {
+		readied = true
+		return ln.(*net.TCPListener).File()
+	})
+	t.Cleanup(func() { handoff.Register(nil) })
+
+	oldPath, oldExec, oldExit := executablePath, execSelf, exitProcess
+	defer func() { executablePath, execSelf, exitProcess = oldPath, oldExec, oldExit }()
+	var env []string
+	executablePath = func() (string, error) { return "/opt/lasthelp/bin/lasthelp", nil }
+	execSelf = func(_ string, _ []string, e []string) error { env = e; return nil }
+	exitProcess = func(int) { t.Error("it exited") }
+
+	restart()
+
+	if !readied {
+		t.Error("the server was not readied to be replaced")
+	}
+	handed := false
+	for _, kv := range env {
+		if strings.HasPrefix(kv, handoff.Env+"=") {
+			handed = true
+		}
+	}
+	if !handed {
+		// Only the count: the environment of the process is nobody's to print in a failure.
+		t.Errorf("the new process was not told which socket to take (%d variables passed on)", len(env))
 	}
 }
 

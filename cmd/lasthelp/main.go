@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +16,7 @@ import (
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/handoff"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web"
 )
@@ -61,32 +63,68 @@ func main() {
 	defer stopWork()
 	go server.Work(workCtx)
 
-	if err := serve(web.HTTPServer(cfg, server)); err != nil {
+	// A process that replaced another one is handed its listening socket, so the
+	// port never closed while it started; otherwise it listens as it always did.
+	ln := handoff.Inherit(cfg.ListenFD, cfg.Addr)
+	if ln == nil {
+		if ln, err = net.Listen("tcp", cfg.Addr); err != nil {
+			slog.Error("could not listen", "addr", cfg.Addr, "error", err)
+			os.Exit(1)
+		}
+	} else {
+		slog.Info("took over the listening socket of the process this one replaced", "addr", ln.Addr().String())
+	}
+
+	if err := serve(web.HTTPServer(cfg, server), ln); err != nil {
 		slog.Error("the server stopped", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("stopped cleanly")
 }
 
+// errHandedOver says the server stopped accepting because its listening socket
+// was given to the process that is about to replace this one.
+var errHandedOver = errors.New("the listening socket was handed to the next process")
+
 // serve runs until a signal arrives, then gives in-flight requests time to
 // finish. A container stop that severs a request half way through writing is
 // how a database ends up with an item nobody can find and a reporter with a
 // follow link that leads nowhere.
-func serve(srv *http.Server) error {
+//
+// When an update replaces the binary, the server is readied to be replaced
+// instead: it stops accepting, answers what is in flight and gives its socket to
+// the new process (see handoff). Serving then ends, and the process has to stay
+// until the exec that follows replaces it. Returning here would end it first, and
+// the port with it.
+func serve(srv *http.Server, ln net.Listener) error {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
+	serveOn, ready := handoff.Wrap(srv, ln)
+	handoff.Register(ready)
+
 	errs := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		err := srv.Serve(serveOn)
+		switch {
+		case err == nil, errors.Is(err, http.ErrServerClosed):
+			errs <- nil
+		case errors.Is(err, net.ErrClosed):
+			errs <- errHandedOver
+		default:
 			errs <- err
-			return
 		}
-		errs <- nil
 	}()
 
 	select {
 	case err := <-errs:
+		if errors.Is(err, errHandedOver) {
+			// If the exec fails, whoever asked for it exits with an error. Until
+			// then only a signal ends this process.
+			sig := <-stop
+			slog.Info("stopping while being replaced", "signal", sig.String())
+			return nil
+		}
 		return err
 	case sig := <-stop:
 		slog.Info("shutting down", "signal", sig.String())

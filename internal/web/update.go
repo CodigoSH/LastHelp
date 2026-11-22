@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/handoff"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/updater"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
 )
@@ -307,7 +309,15 @@ func restart() {
 		exitProcess(1)
 		return
 	}
-	if err := execSelf(path, os.Args, os.Environ()); err != nil {
+	// The server stops accepting, answers what is in flight and hands its
+	// listening socket to the new process, so the port never closes and a proxy
+	// in front never sees a server that failed. The socket stays open until the
+	// exec has happened: closing it earlier would close the port the new process
+	// is about to take.
+	env, socket := handoff.Begin(os.Environ())
+	err = execSelf(path, os.Args, env)
+	runtime.KeepAlive(socket)
+	if err != nil {
 		slog.Error("could not restart; exiting for the supervisor", "error", err)
 		exitProcess(1)
 		return
