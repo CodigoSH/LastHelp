@@ -357,6 +357,9 @@ func (s *Server) routes() {
 
 	// Public, and only these: the health check and the static frontend.
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
+	// What a search engine reads: where the public pages are, and where it may go.
+	s.mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
+	s.mux.HandleFunc("GET /robots.txt", s.handleRobots)
 	s.mux.Handle("GET /", s.static())
 }
 
@@ -376,7 +379,8 @@ func (s *Server) static() http.Handler {
 		}
 
 		// A path with no extension is a client-side route, not a file. It gets
-		// the shell, stamped with a language, rather than a 404.
+		// the shell, stamped with a language, with the status of what the
+		// frontend will draw there (see shellStatus).
 		clean := path.Clean(r.URL.Path)
 		if clean == "/" || path.Ext(clean) == "" {
 			s.serveShell(w, r)
@@ -413,6 +417,9 @@ func (s *Server) serveShell(w http.ResponseWriter, r *http.Request) {
 	// not hand an Arabic document to the next person.
 	w.Header().Set("Vary", "Accept-Language")
 	w.Header().Set("Cache-Control", "no-cache")
+	// The page is the same for every address the frontend routes, and the frontend draws "not
+	// found" itself, so a page that does not exist is still this page, with the status that says so.
+	w.WriteHeader(s.shellStatus(r))
 	_, _ = io.WriteString(w, shell)
 }
 

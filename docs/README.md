@@ -20,6 +20,7 @@ One binary, one SQLite file, no external services.
 - [Private organizations and boards](administration/private-boards.md)
 - [Updating](administration/updating.md)
 - [Keeping the queue readable](administration/anti-abuse.md)
+- [Search engines](administration/search-engines.md)
 - [What a visitor leaves behind](administration/privacy.md)
 
 ## What it does not do
