@@ -545,6 +545,10 @@ if [ "$UPGRADE" = yes ] && [ -f "$DATA/$NAME.db" ]; then
     step "Backing up the database to $(basename "$BACKUP")..."
     cp "$DATA/$NAME.db" "$BACKUP"
     chown "$USER_NAME:$USER_NAME" "$BACKUP"
+    # Keep the three newest copies and drop the rest: an upgrade every few weeks
+    # would otherwise leave a whole copy of the database for ever. The unfinished
+    # ones the panel's updater may leave (.partial) are not copies.
+    ls -1t "$DATA/$NAME.db.before-"* 2>/dev/null | grep -v '[.]partial' | tail -n +4 | while read -r OLD; do rm -f "$OLD"; done
 fi
 
 step "Installing the binary..."

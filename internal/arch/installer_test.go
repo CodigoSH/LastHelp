@@ -2,10 +2,12 @@ package arch
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestTheInstallerIsPOSIXShellAndNotBash.
@@ -89,6 +91,73 @@ func TestTheInstallerIsPOSIXShellAndNotBash(t *testing.T) {
 // one of its own, so the unit has to be in the release. Nothing else notices if
 // it is not: the build succeeds, the release publishes, and the failure lands on
 // whoever runs the install command.
+// TestTheInstallerKeepsTheThreeNewestCopiesOfTheDatabase.
+//
+// Every upgrade leaves a whole copy of the database beside it, so without a limit
+// they pile up for ever. The line that prunes them is run for real, against files
+// of different ages — under whatever `sh` this machine has, which is bash here, so
+// it proves what the line does and not that it is free of bashisms (the grep above
+// is for that).
+//
+// The unfinished copy the panel's updater may leave is the newest of all, on
+// purpose: counted as a copy it would push a real one out.
+func TestTheInstallerKeepsTheThreeNewestCopiesOfTheDatabase(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(repoRoot(t), "install.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prune := ""
+	for _, line := range strings.Split(string(raw), "\n") {
+		if trimmed := strings.TrimSpace(line); !strings.HasPrefix(trimmed, "#") && strings.Contains(trimmed, "tail -n +4") {
+			prune = trimmed
+		}
+	}
+	if prune == "" {
+		t.Fatal("the installer does not prune the copies of the database any more")
+	}
+
+	dir := t.TempDir()
+	now := time.Now()
+	age := map[string]time.Duration{
+		// The order of the names is not the order of the dates, or sorting by name would pass.
+		"lasthelp.db.before-v1.0.0":         -10 * 24 * time.Hour,
+		"lasthelp.db.before-v1.0.1":         -50 * 24 * time.Hour,
+		"lasthelp.db.before-v1.0.2":         -20 * 24 * time.Hour,
+		"lasthelp.db.before-v1.0.3":         -40 * 24 * time.Hour,
+		"lasthelp.db.before-v1.0.4":         -30 * 24 * time.Hour,
+		"lasthelp.db.before-v1.1.0.partial": 0,
+		"lasthelp.db":                       -60 * 24 * time.Hour,
+		"lasthelp.db.notes":                 -60 * 24 * time.Hour,
+		"other.db.before-v1.0.0":            -60 * 24 * time.Hour,
+	}
+	for name, d := range age {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, now.Add(d), now.Add(d)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	out, err := exec.Command("sh", "-c", "set -eu; DATA="+dir+"; NAME=lasthelp; "+prune).CombinedOutput()
+	if err != nil {
+		t.Fatalf("the line failed: %v\n%s", err, out)
+	}
+
+	for _, gone := range []string{"lasthelp.db.before-v1.0.1", "lasthelp.db.before-v1.0.3"} {
+		if _, err := os.Stat(filepath.Join(dir, gone)); !os.IsNotExist(err) {
+			t.Errorf("%s was kept", gone)
+		}
+	}
+	for _, kept := range []string{"lasthelp.db.before-v1.0.0", "lasthelp.db.before-v1.0.2", "lasthelp.db.before-v1.0.4",
+		"lasthelp.db.before-v1.1.0.partial", "lasthelp.db", "lasthelp.db.notes", "other.db.before-v1.0.0"} {
+		if _, err := os.Stat(filepath.Join(dir, kept)); err != nil {
+			t.Errorf("%s was removed: %v", kept, err)
+		}
+	}
+}
+
 func TestTheInstallerAndTheReleaseAgreeOnWhatIsPublished(t *testing.T) {
 	root := repoRoot(t)
 

@@ -40,7 +40,12 @@ What it does, in this order, and each step either proves something or stops:
    beta channel somebody eventually tries to install an older binary over a
    newer database, and the failure without this guard is not a crash — it is an
    old binary writing rows that ignore columns it does not know about.
-8. **Backs up the database**, next to it, named after the release going in.
+8. **Backs up the database**, next to it, named after the release going in. The
+   copy is a snapshot taken through the running database, not a copy of its
+   file — which would be missing whatever was written since the last checkpoint
+   and still look like a database — and it is opened and checked before it
+   counts. The three newest copies are kept. If the copy cannot be taken, nothing
+   is replaced.
 9. Only now replaces the binary and restarts.
 
 Anything that fails leaves the running binary untouched and says which step it
@@ -53,8 +58,9 @@ curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh
 ```
 
 Run it again and it updates: it tells you which version you have, keeps the
-port and settings it finds, backs up the database, and does the same
-verification the panel does — with `openssl` instead of Go.
+port and settings it finds, backs up the database (stopping the service first,
+and keeping the three newest copies), and does the same verification the panel
+does — with `openssl` instead of Go.
 
 When you already have the latest version it says so and stops, changing
 nothing. Add `--reinstall` (`… | sudo sh -s -- --reinstall`) to install it
@@ -73,8 +79,12 @@ docker compose pull && docker compose up -d
 
 ## If an update goes wrong
 
-The backup is beside the database, named `lasthelp.db.before-<tag>`. Stop the
-service, put it back, install the previous release, start again.
+The backup is beside the database, named `lasthelp.db.before-<tag>`, and the
+three newest are kept. To go back: stop the service, put the copy in place of
+`lasthelp.db`, delete `lasthelp.db-wal` and `lasthelp.db-shm` if they are there
+— they belong to the database you are replacing, and a database opened with
+another one's journal is a damaged one — install the previous release, and
+start again.
 
 The binary refuses to run against a database newer than it understands, so
 downgrading without restoring the backup stops at startup with a message rather
