@@ -73,6 +73,8 @@ type pushService struct {
 	paths    []string
 	reply    int
 	lastAuth string
+	// urgencies is the Urgency header of each message that reached it.
+	urgencies []string
 	// delay is how long the service takes to answer.
 	delay time.Duration
 }
@@ -84,6 +86,7 @@ func newPushService(t *testing.T) *pushService {
 		p.mu.Lock()
 		p.paths = append(p.paths, r.URL.Path)
 		p.lastAuth = r.Header.Get("Authorization")
+		p.urgencies = append(p.urgencies, r.Header.Get("Urgency"))
 		code, delay := p.reply, p.delay
 		p.mu.Unlock()
 		time.Sleep(delay)
@@ -509,4 +512,36 @@ func TestANotificationAboutABoardCarriesTheBoardAsItsTag(t *testing.T) {
 	if got := srv.pushPayloadIn("en", notify.Message{Title: "a", User: 1}).Tag; got != "" {
 		t.Errorf("a test carries the tag %q", got)
 	}
+}
+
+// A phone in doze holds back a push that is not urgent for minutes, or until it is picked
+// up: a report is something somebody has to look at, so it asks to be delivered at once. A
+// message that is not that, a notice of a new version, may ask for less.
+func TestAPushAsksToBeDeliveredAtOnceUnlessTheMessageSaysOtherwise(t *testing.T) {
+	team, srv := newPushInstance(t)
+	team.claim()
+	service := newPushService(t)
+	resp := team.do(http.MethodPost, "/api/push/subscriptions", subscription(t, service.URL+"/admin"))
+	_ = resp.Body.Close()
+
+	for _, tc := range []struct{ asked, want string }{
+		{"", "high"},
+		{"low", "low"},
+		{"urgent", "high"}, // not one the protocol has: the default, not whatever was typed
+	} {
+		before := len(service.urgenciesSeen())
+		if err := srv.pushTo(context.Background(), notify.Message{Title: "x", Body: "y", User: 1, Urgency: tc.asked}); err != nil {
+			t.Fatal(err)
+		}
+		got := service.urgenciesSeen()[before:]
+		if len(got) != 1 || got[0] != tc.want {
+			t.Errorf("asked %q: the push service saw %v, want %q", tc.asked, got, tc.want)
+		}
+	}
+}
+
+func (p *pushService) urgenciesSeen() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]string(nil), p.urgencies...)
 }

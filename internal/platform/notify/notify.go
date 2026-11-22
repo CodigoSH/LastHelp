@@ -124,6 +124,11 @@ type Message struct {
 	// them: Push, which sends to the team of Repo, or to User alone.
 	Repo int64
 	User int64
+
+	// Urgency is how hard a push service should try to deliver it at once. Empty
+	// is "high", which is what a report is: somebody has to look. A phone in doze
+	// holds back anything less for minutes, or until it is picked up.
+	Urgency string
 }
 
 // Glyph is the mark of a kind, and Tag the name ntfy gives the same mark. Both

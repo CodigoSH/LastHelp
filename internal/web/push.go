@@ -217,6 +217,11 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 		}
 		payloads[lang] = payload
 	}
+	urgency := "high"
+	switch msg.Urgency {
+	case "very-low", "low", "normal":
+		urgency = msg.Urgency
+	}
 	// All the browsers at once: they are different push services and each answer can take the full
 	// timeout, so one slow device must not hold back the others. The languages are settled above, so
 	// what runs together only reads.
@@ -226,7 +231,7 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			outcomes[i] = s.sendPushOne(ctx, sub, payloads[langs[i]], priv)
+			outcomes[i] = s.sendPushOne(ctx, sub, payloads[langs[i]], priv, urgency)
 		}()
 	}
 	wg.Wait()
@@ -318,7 +323,7 @@ func (s *Server) pushSubject() string {
 	return defaultPushSubject
 }
 
-func (s *Server) sendPushOne(ctx context.Context, sub pushSub, payload []byte, private string) pushOutcome {
+func (s *Server) sendPushOne(ctx context.Context, sub pushSub, payload []byte, private, urgency string) pushOutcome {
 	if !pushEndpointOK(sub.Endpoint) {
 		// Stored before this check existed, or written by hand: never sent to.
 		slog.Warn("push: a subscription is not on a push service's domain; skipped", "subscription", sub.ID)
@@ -344,7 +349,9 @@ func (s *Server) sendPushOne(ctx context.Context, sub pushSub, payload []byte, p
 	// Twelve hours: a report that arrived while a phone was switched off is still
 	// news when it is switched on, and a day-old one is not.
 	req.Header.Set("TTL", "43200")
-	req.Header.Set("Urgency", "normal")
+	// High unless the message says otherwise: a push service holds back anything less
+	// for a phone in doze, which on Android is minutes, or until it is picked up.
+	req.Header.Set("Urgency", urgency)
 
 	resp, err := s.out.Do(req)
 	if err != nil {
