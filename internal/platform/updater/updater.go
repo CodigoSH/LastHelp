@@ -267,7 +267,8 @@ func (u Updater) Apply(ctx context.Context, release Release, dbPath string, prog
 	}
 
 	candidatePath := running + ".candidate"
-	if err := os.WriteFile(candidatePath, binary, 0o755); err != nil {
+	if err := writeDurably(candidatePath, binary); err != nil {
+		_ = os.Remove(candidatePath)
 		return fmt.Errorf("writing the candidate: %w", err)
 	}
 	defer func() { _ = os.Remove(candidatePath) }()
@@ -298,6 +299,7 @@ func (u Updater) Apply(ctx context.Context, release Release, dbPath string, prog
 	}
 
 	report(StepInstall, candidate.Version)
+	keepPrevious(running)
 	// Rename, not copy: it is atomic within a filesystem, so there is no moment
 	// where the file on disk is half a binary. Replacing a running executable
 	// this way is fine on Linux — the running process keeps its own inode.
@@ -421,6 +423,39 @@ func backup(dbPath, tag string, snapshot func(target string) error) error {
 	}
 	pruneBackups(dbPath)
 	return nil
+}
+
+// previousSuffix names the binary an update replaced, left beside the new one so
+// going back is a rename and not a download from a forge that may be the thing
+// that is down.
+const previousSuffix = ".old"
+
+// keepPrevious links the running binary as <binary>.old before it is replaced.
+// A hard link costs no disk (the rename that follows only unlinks the name) and
+// is best effort: an update is not refused for want of a rollback.
+func keepPrevious(running string) {
+	old := running + previousSuffix
+	_ = os.Remove(old)
+	_ = os.Link(running, old)
+}
+
+// writeDurably writes the file and forces it to the disk. A power cut between
+// the rename that follows and the disk catching up would otherwise leave the
+// name pointing at a binary with no content, and nothing to start.
+func writeDurably(path string, content []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(content); err != nil {
+		_ = file.Close()
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 // flush makes the copy reach the disk and be private to whoever runs the server.

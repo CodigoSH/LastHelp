@@ -154,6 +154,59 @@ func TestAGoodUpdateIsInstalled(t *testing.T) {
 	}
 }
 
+// The binary an update replaces is kept beside the new one, so going back is a
+// rename; and a refused update leaves the one from the update before it alone.
+func TestTheReplacedBinaryIsKeptAsOld(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(5))
+	u, running := updaterFor(t, f, []string{public}, 2)
+	before, err := os.ReadFile(running)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	release, err := u.Latest(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyIn(t, u, running, release, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	kept, err := os.ReadFile(running + ".old")
+	if err != nil {
+		t.Fatalf("the replaced binary was not kept: %v", err)
+	}
+	if string(kept) != string(before) {
+		t.Error(".old is not the binary that was replaced")
+	}
+	now, _ := os.ReadFile(running)
+	if string(now) == string(before) {
+		t.Error("the binary was not replaced")
+	}
+}
+
+func TestARefusedUpdateLeavesThePreviousBinaryAlone(t *testing.T) {
+	private, public := keyPair(t)
+	f := newForge(t, private, "v1.1.0", candidateBinary(1))
+	u, running := updaterFor(t, f, []string{public}, 9) // older than the database
+	old := running + ".old"
+	if err := os.WriteFile(old, []byte("earlier"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	release, err := u.Latest(context.Background(), false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyIn(t, u, running, release, ""); err == nil {
+		t.Fatal("it was not refused")
+	}
+	if got, _ := os.ReadFile(old); string(got) != "earlier" {
+		t.Errorf(".old was touched by an update that never replaced anything: %q", got)
+	}
+}
+
 // TestABinaryLargerThanAForgeReplyIsInstalled.
 //
 // Real release binaries are 13 MB, and the gate bounds forge replies at 8 MiB:
