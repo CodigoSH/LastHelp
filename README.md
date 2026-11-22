@@ -55,7 +55,7 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 | **Setup** | A browser wizard. Zero configuration files |
 | **Forges** | GitHub, GitLab, Gitea and Forgejo, including your own network |
 | **Languages** | 20, hand-translated, with full RTL support |
-| **Licence** | Apache-2.0 |
+| **License** | Apache-2.0 |
 | **Telemetry** | None. Ever |
 
 ---
@@ -76,7 +76,7 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 - **One screen for everything that arrives** — **Reports**, in the top bar: every repository you work on in one list, the report beside it, and publish, reject and spam with a key each. It opens on what is waiting, and is also the archive of every report ever sent, with its filters in the address so a narrowed view can be sent to somebody else.
 - **The whole report where you decide** — edit its words, change its status, reply, edit or delete any comment, fold a duplicate into the original, open or link a forge issue.
 - **An overview that says what to do next** — what is waiting and for how long, which published reports nobody on the team has answered, how fast the team replies, and the work per repository, with ideas and bugs counted apart. Every figure opens the lines it counts, and the chart goes back a week, a month or three months.
-- **Two levels of trust** — a **lead** runs an organisation, its forge token and its repositories; a **collaborator** triages the repositories they are given and never sees the token.
+- **Two levels of trust** — a **lead** runs an organization, its forge token and its repositories; a **collaborator** triages the repositories they are given and never sees the token.
 - **A front page you compose** — bands of modules for the repositories, the most voted ideas, what was resolved, statistics, links and your own words and images, arranged on a grid in the page itself.
 - **Notifications for the team** through ntfy, Gotify, a webhook or mail, configured per repository.
 

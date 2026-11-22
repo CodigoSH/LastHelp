@@ -24,8 +24,8 @@ that channel, and its page shows it chosen, so the repository can keep it, pick 
 or pick none. If the server has no channel when a repository is made, the repository has none.
 Repositories that existed before are not moved.
 
-Choose it in the panel, on the repository's page (**Organisations**, the
-organisation, then the repository): pick a channel, and it asks only for what
+Choose it in the panel, on the repository's page (**Organizations**, the
+organization, then the repository): pick a channel, and it asks only for what
 that channel needs. The address and the recipient are shown again once saved,
 so you can check them. A saved token is shown as dots: it is there, and which one
 it is cannot be seen. Type a new token over the dots to replace it, or empty the
@@ -65,7 +65,7 @@ somebody does, nobody is told anything. A person can turn on as many browsers as
 (up to 20), see them listed, send themselves a test, and remove any of them.
 
 **Notifications** is in everybody's menu who is on a team somewhere — the administrator, the
-owners of an organisation and the collaborators on a repository — under **Your account**. It
+owners of an organization and the collaborators on a repository — under **Your account**. It
 holds that card for all of them. Only the administrator sees a second card there, **The
 server's channel**, where the channel every repository can choose is set. An account that
 was given no role is not offered the page: nothing could reach it.
@@ -75,7 +75,7 @@ device** under *Needs you* to anybody whose team is told through Push, as long a
 is not on their list and could be. A browser that cannot take part, or that blocked the site,
 is not told to turn anything on from there.
 
-It reaches the administrator, the owners of the repository's organisation and the
+It reaches the administrator, the owners of the repository's organization and the
 collaborators on that repository, and nobody else. A disabled account is not
 told. Tapping the notification opens the reports.
 
@@ -141,7 +141,7 @@ switch on without reading a language, and absent for a test.
 
 **Push is the exception, because it goes to one person.** Each account is told in
 its own language: the same report reads *Atlas: Idea* to one account and
-*Atlas: Idee* to another, from the catalogues the page uses.
+*Atlas: Idee* to another, from the catalogs the page uses.
 
 A notification carries a nudge, not the report. One containing the whole
 submission would deliver spam straight to wherever your team reads things, which

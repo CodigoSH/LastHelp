@@ -10,7 +10,7 @@ addresses stay blocked regardless, and a redirect to a different host is refused
 
 ## 1. A token
 
-The token goes on the organisation, because that is as far as a forge will let
+The token goes on the organization, because that is as far as a forge will let
 one reach:
 
 | Forge | What to create | Scope |
@@ -23,13 +23,13 @@ On Gitea and Forgejo a write scope also grants the matching read routes, so
 `write:issue` alone covers both creating an issue and reading one back — and a
 scope is required even for a public repository.
 
-A GitHub fine-grained token cannot span two organisations. That is why an
-organisation here is one connection: two of them are two connections whether or
+A GitHub fine-grained token cannot span two organizations. That is why an
+organization here is one connection: two of them are two connections whether or
 not anybody wanted a second level.
 
 ## 2. Store it
 
-In the panel, open **Organisations** and then the organisation. If it has a
+In the panel, open **Organizations** and then the organization. If it has a
 forge, its **Forge connection** section says whether it is connected, asks for
 the token and a webhook secret, and gives the address to configure:
 
@@ -50,7 +50,7 @@ A saved token and a saved secret show as dots, so you can see that they are
 there and not which they are. Type over the dots to replace one, or empty the
 field to remove it; leave the dots and it is kept. Each is changed on its own:
 replacing the token does not touch the secret. Removing the token disconnects the
-organisation from its forge.
+organization from its forge.
 
 Over the API, which is what the panel calls (an empty field keeps what is
 stored; `clear_token` and `clear_webhook_secret` remove it):
@@ -65,7 +65,7 @@ curl -X POST "$BASE/api/orgs/acme/credentials" \
 
 ## 3. Point the forge at it
 
-Add a webhook on the repository (or the organisation) with:
+Add a webhook on the repository (or the organization) with:
 
 - **URL**: `https://help.example.com/hooks/xO3f…`
 - **Content type**: JSON

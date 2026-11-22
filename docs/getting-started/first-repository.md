@@ -2,9 +2,9 @@
 
 The structure is two levels, and they are the ones your forge already has:
 
-- An **organisation** is a connection to a forge: its address, the account
+- An **organization** is a connection to a forge: its address, the account
   that owns the repositories there, and the credentials. It is not an org chart — a token cannot span two
-  organisations on any forge, so the boundary is imposed rather than invented.
+  organizations on any forge, so the boundary is imposed rather than invented.
 - A **repository** is one place people report about. You register only the
   ones you want feedback for.
 
@@ -15,19 +15,19 @@ in, and should not have to.
 
 ## Creating them
 
-From the panel: **Organisations** in the sidebar, then **Add an organisation** —
+From the panel: **Organizations** in the sidebar, then **Add an organization** —
 a name, an address, and which forge it connects to, or none. Open it and add a
 repository the same way.
 
 Both can carry an **icon**, chosen in their settings: a repository's is shown on
-the front page and on its organisation's page, and an organisation's beside its
+the front page and on its organization's page, and an organization's beside its
 name on its own page. Without one, a repository shows its initials.
 
-![The organisations screen](../images/organizations.png)
+![The organizations screen](../images/organizations.png)
 
 The first run does not ask for either of them. It configures the installation —
 language, the administrator account, and what this installation calls itself —
-and stops there. Organisations and repositories are the work, made and unmade
+and stops there. Organizations and repositories are the work, made and unmade
 for years after that screen is gone.
 
 Or over the API, which is what the panel calls:
@@ -86,24 +86,24 @@ down are both *declined*.
 
 | Level | Role | Can |
 |---|---|---|
-| Server | **Administrator** | Everything, and the only one who crosses organisations |
-| Organisation | **Lead** | Its connection and **its token**, its repositories — including deleting them —, who works in it, and deleting reports. Ending the organisation itself is the administrator's |
+| Server | **Administrator** | Everything, and the only one who crosses organizations |
+| Organization | **Lead** | Its connection and **its token**, its repositories — including deleting them —, who works in it, and deleting reports. Ending the organization itself is the administrator's |
 | Repository | **Collaborator** | Triage that repository: moderate, edit, change status, reply, edit and delete comments and replies, create and link issues. **Never sees the token** |
 
 Accounts are created by the administrator, under **Users**. Who works where is
-given where the work is: leads on the organisation's page, collaborators on
+given where the work is: leads on the organization's page, collaborators on
 each repository's page — by the administrator or by any lead of that
-organisation.
+organization.
 
 That last line of the table is the reason the two levels exist. Somebody trusted to triage
 one repository is not automatically somebody trusted with a credential that can
-write to every repository the organisation owns.
+write to every repository the organization owns.
 
 ## Votes are a signal, not a ballot
 
 A voter is a random identity in a signed cookie, never an address — behind a
 household router or a mobile carrier the address is shared, so keying votes on
-it would let one neighbour spend everybody else's vote and make a whole office
+it would let one neighbor spend everybody else's vote and make a whole office
 count as one person.
 
 The honest consequence: clearing the cookie allows a second vote. That is a

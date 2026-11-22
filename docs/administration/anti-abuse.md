@@ -127,7 +127,7 @@ choice is kept in your browser. The queue tab has none of these: whatever waits 
 shown, closed or not. Whatever you choose opens
 beside the list as the whole report — edit its words, change its status, open
 or link an issue, reply, edit or delete any comment on it, and, for the
-organisation's leads and the administrator, delete the report itself. Each repository's page in the
+organization's leads and the administrator, delete the report itself. Each repository's page in the
 panel opens the same screen filtered to that repository.
 
 To decide many at once, press **Select** above the list: the reports that are waiting get a box, a row is ticked

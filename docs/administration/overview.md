@@ -37,7 +37,7 @@ One list, most urgent first, and nothing in it that is zero:
 
 - comments and reports waiting for review — late after two days;
 - published reports with no team reply — late after seven days;
-- confirmed bugs with no issue, on a repository whose organisation has a
+- confirmed bugs with no issue, on a repository whose organization has a
   forge: work the team agreed was real that nobody has been given;
 - deliveries the server gave up on after trying again — a notification or an
   issue that did not go out. Only the administrator is told, and it leads to
@@ -56,7 +56,7 @@ Greenwich counts towards the next day.
 ## Repositories and the rest
 
 - **Repositories** — a tile for each, with what waits in it. Press it for its
-  figures, the forge of its organisation and how many reports are linked to an
+  figures, the forge of its organization and how many reports are linked to an
   issue, what its team is told through (the kind of channel, never its address
   or its token), and how far its ideas and its bugs have got.
 - **Recent reports** and **Most voted** — the newest six, and the five most
@@ -64,7 +64,7 @@ Greenwich counts towards the next day.
 - **Ideas by status** and **Bugs by status** — kept apart, because they do not
   share a vocabulary: *fixed* is not what an idea becomes and *planned* is not
   what a bug does. Each reads in the order the work moves.
-- **By moderation** and **This server** — the latter, organisations and users,
+- **By moderation** and **This server** — the latter, organizations and users,
   only for the administrator.
 
 ## Reports nobody answered
