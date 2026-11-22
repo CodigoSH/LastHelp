@@ -50,23 +50,33 @@ type Secure func(*http.Request) bool
 
 // hidden is what a crawler must not put in an index.
 //
-// Everything under the panel, the two screens that lead into it, and — the one
-// that matters most here — any address carrying a follow token, which is the
-// key to somebody's own report. A published board and a published report are
-// public on purpose and stay indexable: being findable is what the product is
-// for.
+// Everything under the panel and the team's own archive, the two screens that
+// lead into them, and — the one that matters most here — any address carrying a
+// follow token, which is the key to somebody's own report. A published board and
+// a published report are public on purpose and stay indexable: being findable is
+// what the product is for.
+//
+// A prefix is a whole path segment: an organization called "reviewers" is not
+// the archive, and keeps its place in a search.
 func hidden(r *http.Request) bool {
 	if r.URL.Query().Has("k") {
 		return true
 	}
 	path := r.URL.Path
-	for _, prefix := range []string{"/panel", "/setup", "/sign-in", "/api/"} {
-		if path == prefix || strings.HasPrefix(path, prefix) {
+	if strings.HasPrefix(path, "/api/") {
+		return true
+	}
+	for _, prefix := range []string{"/panel", "/review", "/setup", "/sign-in"} {
+		if path == prefix || strings.HasPrefix(path, prefix+"/") {
 			return true
 		}
 	}
 	return false
 }
+
+// Hidden says whether a crawler must not index this address: the header says so,
+// and the page says so too, for the proxy that drops a header.
+func Hidden(r *http.Request) bool { return hidden(r) }
 
 func SecurityHeaders(secure Secure) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

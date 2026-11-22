@@ -69,10 +69,12 @@ assumptions apply, and keeping them apart is most of the design:
   else is `'self'` or `'none'`, and the whole product has no third party to make
   an exception for.
 
-- **What is private is not indexable.** Everything under the panel, the screens
-  that lead into it, and — the one that matters — any address carrying a follow
-  token answer with `X-Robots-Tag: noindex, nofollow`, and `robots.txt` says the
-  same for a crawler that reads it first. A follow link is the key to somebody's
+- **What is private is not indexable.** Everything under the panel and the team's
+  archive, the screens that lead into them, and — the one that matters — any
+  address carrying a follow token answer with `X-Robots-Tag: noindex, nofollow`,
+  and their page says the same in a robots meta tag for the proxy that drops a
+  header. `robots.txt` does not forbid them: a crawler that is not allowed to fetch an address
+  never reads the noindex on it. A follow link is the key to somebody's
   own report, and an indexed key is a published one. A published board and a
   published report stay indexable on purpose: being findable is what a feedback
   portal is for. That is `TestPrivatePagesStayOutOfSearchAndPublicOnesDoNot`,

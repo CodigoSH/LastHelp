@@ -33,7 +33,7 @@ func TestPrivatePagesStayOutOfSearchAndPublicOnesDoNot(t *testing.T) {
 
 	// The one that matters: a follow link is the key to somebody's own report,
 	// and an indexed key is a published key.
-	for _, path := range []string{"/panel", "/panel/people", "/sign-in", "/i/anything?k=secret"} {
+	for _, path := range []string{"/panel", "/panel/people", "/review", "/review/anything", "/setup", "/sign-in", "/i/anything?k=secret"} {
 		resp := team.do(http.MethodGet, path, nil)
 		robots := resp.Header.Get("X-Robots-Tag")
 		_ = resp.Body.Close()
@@ -43,7 +43,7 @@ func TestPrivatePagesStayOutOfSearchAndPublicOnesDoNot(t *testing.T) {
 	}
 
 	// And the public side is meant to be found: that is what the product is for.
-	for _, path := range []string{"/", "/codigosh/lastboard"} {
+	for _, path := range []string{"/", "/codigosh/lastboard", "/reviewers", "/panelists/board"} {
 		resp := team.do(http.MethodGet, path, nil)
 		robots := resp.Header.Get("X-Robots-Tag")
 		_ = resp.Body.Close()
@@ -161,5 +161,41 @@ func repoRootFromHere(t *testing.T) string {
 			t.Fatal("no go.mod above the working directory")
 		}
 		dir = parent
+	}
+}
+
+// The header is not the only place a crawler is told: the page says it too, for the proxy that
+// drops a header, and the public pages say nothing.
+func TestPrivatePagesSayNoindexInThePageToo(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+
+	meta := `<meta name="robots" content="noindex, nofollow"`
+	for path, want := range map[string]bool{
+		"/panel": true, "/review": true, "/setup": true, "/sign-in": true, "/i/x?k=secret": true,
+		"/": false, "/codigosh/lastboard": false, "/reviewers": false,
+	} {
+		resp := team.do(http.MethodGet, path, nil)
+		page := body(t, resp)
+		if got := strings.Contains(page, meta); got != want {
+			t.Errorf("%s carries the robots meta: %v, want %v", path, got, want)
+		}
+	}
+}
+
+// A crawler that is not allowed to fetch an address never reads the noindex on it, and an address
+// that is linked from elsewhere can then be listed without its page. So robots.txt forbids none
+// of what is kept out of an index.
+func TestRobotsTxtDoesNotForbidWhatIsKeptOutOfSearch(t *testing.T) {
+	team := newInstance(t)
+	resp := team.do(http.MethodGet, "/robots.txt", nil)
+	txt := body(t, resp)
+	if !strings.Contains(txt, "User-agent: *") {
+		t.Fatalf("robots.txt was not served: %q", txt)
+	}
+	for _, line := range strings.Split(txt, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(strings.ToLower(line)), "disallow:") && strings.TrimSpace(line[len("disallow:"):]) != "" {
+			t.Errorf("robots.txt forbids %q: the noindex on it would never be read", line)
+		}
 	}
 }

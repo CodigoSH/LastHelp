@@ -396,10 +396,16 @@ func (s *Server) static() http.Handler {
 func (s *Server) serveShell(w http.ResponseWriter, r *http.Request) {
 	lang := negotiateLanguage(r.Header.Get("Accept-Language"))
 
+	head := s.head()
+	if middleware.Hidden(r) {
+		// The header says it too; this is for the proxy that drops a header, and for a crawler
+		// that is shown the page by something other than this server.
+		head += "\n    <meta name=\"robots\" content=\"noindex, nofollow\" />"
+	}
 	shell := strings.NewReplacer(
 		`lang="en"`, `lang="`+lang+`"`,
 		`dir="ltr"`, `dir="`+direction(lang)+`"`,
-		shellTitle, s.head(),
+		shellTitle, head,
 	).Replace(s.shell)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
