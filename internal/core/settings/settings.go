@@ -66,6 +66,15 @@ const LandingLayout = "landing_layout"
 
 const UpdateChannel = "update_channel"
 
+// UpdateNotice is "on" when the administrators are to be told, through the
+// server's channel, that a newer version is out. Off unless somebody turned it
+// on: a channel that was set up for reports does not start saying other things.
+const UpdateNotice = "update_notice"
+
+// UpdateNotified is the last version the administrators were told about, so
+// that each version is announced once and not every time it is looked for.
+const UpdateNotified = "update_notified"
+
 type Store struct {
 	DB database.Execer
 }

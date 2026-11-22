@@ -129,6 +129,14 @@ type Message struct {
 	// is "high", which is what a report is: somebody has to look. A phone in doze
 	// holds back anything less for minutes, or until it is picked up.
 	Urgency string
+
+	// Admins says the message is for the administrators, and Version and Current
+	// are what it is about when that is a new version: the one that is out and the
+	// one that is running. A channel that goes to people writes it in each one's
+	// language from these; one that goes to an address gets Title and Body.
+	Admins  bool
+	Version string
+	Current string
 }
 
 // Glyph is the mark of a kind, and Tag the name ntfy gives the same mark. Both
@@ -141,6 +149,8 @@ func (m Message) Glyph() string {
 		return "🐞"
 	case "comment":
 		return "💬"
+	case "update":
+		return "📦"
 	}
 	return ""
 }
@@ -153,6 +163,8 @@ func (m Message) Tag() string {
 		return "beetle"
 	case "comment":
 		return "speech_balloon"
+	case "update":
+		return "package"
 	}
 	return ""
 }
@@ -265,6 +277,10 @@ func (n Notifier) sendWebhook(ctx context.Context, cfg Config, msg Message) erro
 	// What arrived, as a code a script can switch on without reading a language.
 	if msg.Kind != "" {
 		fields["kind"] = msg.Kind
+	}
+	if msg.Kind == "update" {
+		fields["version"] = msg.Version
+		fields["current_version"] = msg.Current
 	}
 	payload, err := json.Marshal(fields)
 	if err != nil {

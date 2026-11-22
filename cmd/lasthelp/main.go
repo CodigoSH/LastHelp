@@ -68,6 +68,9 @@ func main() {
 	workCtx, stopWork := context.WithCancel(context.Background())
 	defer stopWork()
 	go server.Work(workCtx)
+	// Looks for a newer version now and then, and says so through the server's channel
+	// if an administrator asked to be told. Does nothing otherwise.
+	go server.WatchUpdates(workCtx)
 
 	// A process that replaced another one is handed its listening socket, so the
 	// port never closed while it started; otherwise it listens as it always did.

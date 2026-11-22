@@ -182,6 +182,8 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 	switch {
 	case msg.User != 0:
 		subs, err = s.pushSubsOfUser(ctx, msg.User)
+	case msg.Admins:
+		subs, err = s.pushSubsOfAdministrators(ctx)
 	case msg.Repo != 0:
 		subs, err = s.pushSubsOfTeam(ctx, msg.Repo)
 	default:
@@ -191,7 +193,9 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 		return err
 	}
 	if len(subs) == 0 {
-		if msg.User != 0 {
+		if msg.User != 0 || msg.Admins {
+			// A test exists to say so. A notice of a new version is not marked as told while
+			// nobody was, so that it still goes out to whoever turns notifications on next.
 			return errNoPushDevices
 		}
 		return nil
@@ -254,6 +258,16 @@ func (s *Server) pushTo(ctx context.Context, msg notify.Message) error {
 // named in that language ("Atlas: Idea"); a message that is not about a report,
 // a test, carries the title its writer already wrote.
 func (s *Server) pushPayloadIn(lang string, msg notify.Message) pushPayload {
+	if msg.Kind == "update" {
+		// Not about a report: a version, said in the language of whoever reads it. One tag, so a
+		// newer version replaces the notice of the one before.
+		return pushPayload{
+			Title: clip(s.say(lang, "notify.updateTitle", map[string]string{"version": msg.Version}), 120),
+			Body:  clip(s.say(lang, "notify.updateBody", map[string]string{"current": msg.Current}), 300),
+			URL:   "/panel/about",
+			Tag:   "update",
+		}
+	}
 	title := msg.Title
 	if word := s.kindWord(lang, msg.Kind); word != "" {
 		title = isolate(lang, msg.Title) + ": " + word
@@ -289,6 +303,20 @@ func (s *Server) pushSubsOfUser(ctx context.Context, userID int64) ([]pushSub, e
 // pushSubsOfTeam is the browsers of the accounts that work on a board: the
 // administrator, the owners of its organisation and the collaborators on it. An
 // account that was disabled is not told anything.
+// pushSubsOfAdministrators is the browsers of the accounts that can update the
+// server, and nobody else's. One that was disabled is not told.
+func (s *Server) pushSubsOfAdministrators(ctx context.Context) ([]pushSub, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT p.id, p.user_id, p.endpoint, p.p256dh, p.auth
+		FROM push_subscription p
+		JOIN app_user u ON u.id = p.user_id AND u.disabled = 0 AND u.is_administrator = 1
+		ORDER BY p.id`)
+	if err != nil {
+		return nil, err
+	}
+	return scanPushSubs(rows)
+}
+
 func (s *Server) pushSubsOfTeam(ctx context.Context, repoID int64) ([]pushSub, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT p.id, p.user_id, p.endpoint, p.p256dh, p.auth

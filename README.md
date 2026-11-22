@@ -78,7 +78,7 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 - **An overview that says what to do next** — what is waiting and for how long, which published reports nobody on the team has answered, how fast the team replies, and the work per repository, with ideas and bugs counted apart. Every figure opens the lines it counts, and the chart goes back a week, a month or three months.
 - **Two levels of trust** — a **lead** runs an organization, its forge token and its repositories; a **collaborator** triages the repositories they are given and never sees the token.
 - **A front page you compose** — bands of modules for the repositories, the most voted ideas, what was resolved, statistics, links and your own words and images, arranged on a grid in the page itself.
-- **Notifications for the team** through ntfy, Gotify, a webhook or mail, configured per repository.
+- **Notifications for the team** through push to their own browsers, ntfy, Gotify, a webhook or mail, configured per repository, plus a channel for the whole server that can also tell the administrators when a new version is out.
 
 ### The forge bridge
 

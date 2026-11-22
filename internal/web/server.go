@@ -13,6 +13,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
@@ -78,6 +79,14 @@ type Server struct {
 	// wordsMu makes changing the operator's word list one step: it is read,
 	// changed and written back, and two changes at once lose one of them.
 	wordsMu sync.Mutex
+
+	// releaseAPI is where newer versions are looked for. A field so a test can
+	// point it at a forge of its own; in a real server it is ReleaseAPI.
+	releaseAPI string
+	// noticeMu lets one telling of the administrators about a version run at a time,
+	// and watching says the loop that looks for one is running.
+	noticeMu sync.Mutex
+	watching atomic.Bool
 
 	// box seals the forge credentials. Its key lives in a file beside the
 	// database rather than in it, so a leaked backup is not write access to
@@ -158,6 +167,7 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	s.perAddress = middleware.NewLimiter(240, time.Minute, 20_000, s.now)
 	s.perBlock = middleware.NewLimiter(600, time.Minute, 20_000, s.now)
 	s.signIn = middleware.NewLockout(5, time.Minute, 5*time.Minute, 10_000, s.now)
+	s.releaseAPI = ReleaseAPI
 
 	s.routes()
 	// The webhook endpoint is not on the application's mux at all.

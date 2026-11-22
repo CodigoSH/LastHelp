@@ -2378,6 +2378,7 @@ function wireChannel(
   const mail = form.querySelector<HTMLDivElement>(".channel-mail");
   const serverNote = form.querySelector<HTMLParagraphElement>("[data-channel-server]");
   const pushNote = form.querySelector<HTMLParagraphElement>("[data-channel-push]");
+  const updatesRow = form.querySelector<HTMLElement>("[data-channel-updates]");
   const errorLine = form.querySelector<HTMLParagraphElement>(".form-error");
   const result = form.querySelector<HTMLParagraphElement>(".channel-result");
   const testButton = form.querySelector<HTMLButtonElement>("[data-channel-test]");
@@ -2391,6 +2392,8 @@ function wireChannel(
     if (mail) mail.hidden = value !== "smtp";
     if (serverNote) serverNote.hidden = value !== "server";
     if (pushNote) pushNote.hidden = value !== "push";
+    // A notice about a new version needs a channel to go through.
+    if (updatesRow) updatesRow.hidden = value === "";
     if (testButton) testButton.hidden = value === "";
   };
   kind?.addEventListener("change", sync);
@@ -2411,7 +2414,7 @@ function wireChannel(
 
   const read = (): Record<string, unknown> => {
     const data = new FormData(form);
-    return channelPayload(
+    const payload: Record<string, unknown> = channelPayload(
       {
         kind: String(data.get("kind") ?? ""),
         url: String(data.get("url") ?? ""),
@@ -2420,6 +2423,9 @@ function wireChannel(
       },
       hadToken(),
     );
+    // Only the server's own form has the switch; a repository's sends nothing about it.
+    if (updatesRow) payload.updates = form.querySelector<HTMLInputElement>('input[name="updates"]')?.checked === true;
+    return payload;
   };
   // The failure stays beside the form as well as toasting: it is about what was
   // typed, and the fix is in the fields somebody is looking at.
@@ -3762,8 +3768,8 @@ async function showNotifications(): Promise<void> {
   // The channel every repository can choose is the administrator's alone, and so is the card that sets it.
   const channel = isAdministrator()
     ? ((await api
-        .get<{ kind: string; channel_url: string; channel_to: string; channel_has_token: boolean }>("/api/notifications")
-        .catch(() => null)) ?? { kind: "", channel_url: "", channel_to: "", channel_has_token: false })
+        .get<{ kind: string; channel_url: string; channel_to: string; channel_has_token: boolean; updates: boolean }>("/api/notifications")
+        .catch(() => null)) ?? { kind: "", channel_url: "", channel_to: "", channel_has_token: false, updates: false })
     : null;
 
   await showInShell(views.notificationsScreen(channel, push, text), "/panel/notifications");

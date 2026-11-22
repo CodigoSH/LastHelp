@@ -810,5 +810,9 @@
   "words.redo": "Rétablir",
   "words.strike": "Barré",
   "words.underline": "Souligné",
-  "words.undo": "Annuler"
+  "words.undo": "Annuler",
+  "notify.updateTitle": "LastHelp {version} est disponible",
+  "notify.updateBody": "Ce serveur utilise la version {current}. Ouvrez « Info » pour voir les nouveautés et mettre à jour.",
+  "notifications.updates": "Nouvelles versions",
+  "notifications.updatesHelp": "Prévenir les administrateurs par ce canal quand une version plus récente de LastHelp sort, une fois par version."
 }

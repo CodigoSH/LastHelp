@@ -8,6 +8,10 @@ Sign in as the administrator. When something newer is released, the panel
 icon in the top bar carries a red dot and **About** in the sidebar says **New
 update!**.
 
+Rather than wait for the red dot, the server can tell you: turn on **New versions** under
+**Notifications** (see [Notifications](notifications.md#telling-the-administrators-about-a-new-version))
+and a push, a message or a mail arrives when something is out.
+
 Open **About**. Under the version it says whether there is something newer — or
 why it could not check — and when there is, **Update** opens a dialog with the
 two versions, a link to what is new, and every step listed. Confirm it there and

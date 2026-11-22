@@ -33,7 +33,7 @@ const (
 func (s *Server) updater() updater.Updater {
 	return updater.Updater{
 		Out:          s.out,
-		APIBase:      ReleaseAPI,
+		APIBase:      s.releaseAPI,
 		DownloadBase: ReleaseDownloads,
 		Keys:         version.ReleaseKeys,
 		Current:      version.Current,
@@ -365,11 +365,7 @@ func (s *Server) wantsBeta(r *http.Request) bool {
 	if value := r.URL.Query().Get("beta"); value != "" {
 		return value == "true"
 	}
-	channel, err := s.settings().Get(settings.UpdateChannel)
-	if err != nil {
-		return false
-	}
-	return followsBeta(channel, version.Current)
+	return s.betaChannel()
 }
 
 // followsBeta is the channel an installation follows: the one chosen, or with

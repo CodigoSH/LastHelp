@@ -3153,6 +3153,8 @@ function channelForm(
     /** Set for a repository's form; the server's own has none. */
     repo?: string;
     server?: { configured: boolean; kind: string };
+    /** The server's own form only: whether the administrators are told about a newer version through it. */
+    updates?: boolean;
   },
 ): string {
   const kinds: [string, string][] = [
@@ -3199,6 +3201,16 @@ function channelForm(
     </div>
     ${serverNote}
     ${pushNote}
+    ${
+      spec.repo === undefined
+        ? `<div class="toggle-rows" data-channel-updates${spec.kind === "" ? " hidden" : ""}>${toggleRow(
+            "updates",
+            text.t("notifications.updates"),
+            text.t("notifications.updatesHelp"),
+            spec.updates === true,
+          )}</div>`
+        : ""
+    }
     <p class="form-error" role="alert" hidden></p>
     <p class="hint channel-result" role="status" hidden></p>
     <div class="settings-actions">
@@ -3375,7 +3387,7 @@ export function antiabuseScreen(data: AntiabuseData, text: Text): string {
  * the second card is not drawn for them rather than drawn empty.
  */
 export function notificationsScreen(
-  channel: { kind: string; channel_url: string; channel_to: string; channel_has_token: boolean } | null,
+  channel: { kind: string; channel_url: string; channel_to: string; channel_has_token: boolean; updates?: boolean } | null,
   push: PushView | null,
   text: Text,
 ): string {
@@ -3391,6 +3403,7 @@ export function notificationsScreen(
                 url: channel.channel_url,
                 to: channel.channel_to,
                 hasToken: channel.channel_has_token,
+                updates: channel.updates === true,
               }),
               { lead: text.t("notifications.lead") },
             )

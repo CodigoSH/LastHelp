@@ -810,5 +810,9 @@
   "words.redo": "ازنو",
   "words.strike": "خط‌خورده",
   "words.underline": "زیرخط",
-  "words.undo": "واگرد"
+  "words.undo": "واگرد",
+  "notify.updateTitle": "LastHelp {version} در دسترس است",
+  "notify.updateBody": "این سرور نسخه {current} را اجرا می‌کند. «اطلاعات» را باز کنید تا تازه‌ها را ببینید و به‌روزرسانی کنید.",
+  "notifications.updates": "نسخه‌های تازه",
+  "notifications.updatesHelp": "وقتی نسخه‌ای تازه‌تر از LastHelp منتشر شد، از این کانال به مدیران خبر دهید؛ برای هر نسخه یک بار."
 }

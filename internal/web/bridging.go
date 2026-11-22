@@ -371,6 +371,9 @@ type notifyChannel struct {
 	Token      string `json:"token"`
 	To         string `json:"to"`
 	ClearToken bool   `json:"clear_token"`
+	// Updates is only the server's: whether the administrators are told about a newer
+	// version. A pointer, so that a page which does not send it leaves it as it is.
+	Updates *bool `json:"updates"`
 }
 
 // build turns what the form sent into the channel to store, given what is stored.

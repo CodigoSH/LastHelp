@@ -810,5 +810,9 @@
   "words.redo": "다시 실행",
   "words.strike": "취소선",
   "words.underline": "밑줄",
-  "words.undo": "실행 취소"
+  "words.undo": "실행 취소",
+  "notify.updateTitle": "LastHelp {version}을(를) 사용할 수 있습니다",
+  "notify.updateBody": "이 서버는 {current}을(를) 실행 중입니다. 「정보」를 열어 새 내용을 확인하고 업데이트하세요.",
+  "notifications.updates": "새 버전",
+  "notifications.updatesHelp": "LastHelp의 새 버전이 나오면 이 채널로 관리자에게 알립니다. 버전마다 한 번입니다."
 }

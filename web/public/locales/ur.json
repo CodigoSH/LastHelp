@@ -810,5 +810,9 @@
   "words.redo": "دوبارہ",
   "words.strike": "کٹا ہوا",
   "words.underline": "خط کشیدہ",
-  "words.undo": "واپس"
+  "words.undo": "واپس",
+  "notify.updateTitle": "LastHelp {version} دستیاب ہے",
+  "notify.updateBody": "یہ سرور {current} چلا رہا ہے۔ نیا کیا ہے یہ دیکھنے اور اپ ڈیٹ کرنے کے لیے «معلومات» کھولیں۔",
+  "notifications.updates": "نئے ورژن",
+  "notifications.updatesHelp": "LastHelp کا نیا ورژن آنے پر اس چینل سے منتظمین کو بتائیں، ہر ورژن کے لیے ایک بار۔"
 }

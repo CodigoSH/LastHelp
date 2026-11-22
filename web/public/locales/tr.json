@@ -810,5 +810,9 @@
   "words.redo": "Yinele",
   "words.strike": "Üstü çizili",
   "words.underline": "Altı çizili",
-  "words.undo": "Geri al"
+  "words.undo": "Geri al",
+  "notify.updateTitle": "LastHelp {version} yayımlandı",
+  "notify.updateBody": "Bu sunucu {current} sürümünü çalıştırıyor. Yenilikleri görmek ve güncellemek için «Bilgi»yi açın.",
+  "notifications.updates": "Yeni sürümler",
+  "notifications.updatesHelp": "LastHelp'in daha yeni bir sürümü çıktığında yöneticilere bu kanaldan haber verin, her sürüm için bir kez."
 }

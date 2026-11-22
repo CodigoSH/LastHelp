@@ -129,6 +129,33 @@ A repository's test is `POST /api/orgs/{org}/repos/{repo}/channel/test`.
 The webhook shape is three fields and is meant to stay that way: it is somebody's
 script.
 
+### Telling the administrators about a new version
+
+Off until somebody turns it on. In the card **The server's channel**, once a channel is chosen,
+the switch **New versions** tells the administrators through that channel when a newer version of
+LastHelp is out: once for each version, whoever's browser or room it reaches.
+
+- **Who is told.** Through push, the administrators' own devices and nobody else's: a
+  collaborator on a board is told about reports and not about this. Through ntfy, Gotify,
+  mail or a webhook, whatever the channel reaches.
+- **When.** The server asks for the newest release every hour while the switch is on, and as
+  soon as it is turned on, so a version that is already out does not wait. With the switch off
+  it asks nothing: the only time it reaches for a new version is when somebody opens **About**.
+- **Once, and not lost.** A version counts as told only when the channel took it. A channel
+  that was down, or a push with nobody subscribed yet, is tried again with the next check.
+- **Which channel of releases.** The one this installation follows, the same one **About**
+  uses: a beta installation is told about betas, a stable one is not.
+- **What it says.** Push, in each account's language: *LastHelp v1.4.0 is available*, with the
+  version running, opening **About**. It goes with a low urgency, so it does not wake a phone
+  the way a report does, and a newer notice replaces the one before it. The other channels get
+  the same words in English, ntfy with its package mark, and the webhook adds
+  `"kind": "update"`, `"version"` and `"current_version"`.
+- **In a container** it tells you the same, and the answer is to pull the new image.
+- **Offline.** With `LASTHELP_OFFLINE=true` it asks nothing and tells nothing.
+
+Over the API, `GET` and `PUT /api/notifications` carry it as `"updates": true | false`; a save
+that leaves the field out leaves the switch as it was.
+
 ### What a notification says, and in which language
 
 A channel the whole team reads has no one language, so what arrived is not said

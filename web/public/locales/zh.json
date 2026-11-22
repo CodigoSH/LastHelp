@@ -810,5 +810,9 @@
   "words.redo": "重做",
   "words.strike": "删除线",
   "words.underline": "下划线",
-  "words.undo": "撤销"
+  "words.undo": "撤销",
+  "notify.updateTitle": "LastHelp {version} 已发布",
+  "notify.updateBody": "此服务器运行的是 {current}。打开「信息」查看更新内容并升级。",
+  "notifications.updates": "新版本",
+  "notifications.updatesHelp": "当 LastHelp 发布更新的版本时，通过此通道通知管理员，每个版本通知一次。"
 }

@@ -810,5 +810,9 @@
   "words.redo": "Refazer",
   "words.strike": "Rasurado",
   "words.underline": "Sublinhado",
-  "words.undo": "Anular"
+  "words.undo": "Anular",
+  "notify.updateTitle": "O LastHelp {version} está disponível",
+  "notify.updateBody": "Este servidor corre a {current}. Abra «Info» para ver as novidades e atualizar.",
+  "notifications.updates": "Versões novas",
+  "notifications.updatesHelp": "Avise os administradores por este canal quando sair uma versão mais recente do LastHelp, uma vez por versão."
 }

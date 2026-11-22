@@ -810,5 +810,9 @@
   "words.redo": "Rehacer",
   "words.strike": "Tachado",
   "words.underline": "Subrayado",
-  "words.undo": "Deshacer"
+  "words.undo": "Deshacer",
+  "notify.updateTitle": "LastHelp {version} está disponible",
+  "notify.updateBody": "Este servidor usa {current}. Abre «Info» para ver las novedades y actualizar.",
+  "notifications.updates": "Versiones nuevas",
+  "notifications.updatesHelp": "Avisa a los administradores por este canal cuando salga una versión más reciente de LastHelp, una vez por versión."
 }

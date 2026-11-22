@@ -24,6 +24,8 @@ func (s *Server) handleGetServerChannel(w http.ResponseWriter, r *http.Request) 
 	cfg := s.serverChannel()
 	body := channelDetails(string(mustJSON(cfg)))
 	body["kind"] = string(cfg.Kind)
+	// Whether the administrators are told through it about a newer version.
+	body["updates"] = s.updateNoticeOn()
 	writeJSON(w, http.StatusOK, body)
 }
 
@@ -48,7 +50,27 @@ func (s *Server) handleSetServerChannel(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"kind": in.Kind, "active": cfg.Active()})
+	// Absent leaves it as it is, so a page that does not know the field cannot turn it off.
+	if in.Updates != nil {
+		was := s.updateNoticeOn()
+		value := ""
+		if *in.Updates {
+			value = "on"
+		}
+		if err := s.settings().Set(settings.UpdateNotice, value); err != nil {
+			slog.Error("storing whether to tell the administrators about new versions", "error", err)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		if *in.Updates && !was {
+			s.notifyUpdateSoon()
+		}
+	}
+	// A channel that was just chosen may be the first one that can take a notice already waiting.
+	if s.updateNoticeOn() && cfg.Active() {
+		s.notifyUpdateSoon()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"kind": in.Kind, "active": cfg.Active(), "updates": s.updateNoticeOn()})
 }
 
 func (s *Server) handleTestServerChannel(w http.ResponseWriter, r *http.Request) {

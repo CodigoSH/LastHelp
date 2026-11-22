@@ -810,5 +810,9 @@
   "words.redo": "Ulangi",
   "words.strike": "Coret",
   "words.underline": "Garis bawah",
-  "words.undo": "Urungkan"
+  "words.undo": "Urungkan",
+  "notify.updateTitle": "LastHelp {version} tersedia",
+  "notify.updateBody": "Peladen ini menjalankan {current}. Buka «Info» untuk melihat yang baru dan memperbarui.",
+  "notifications.updates": "Versi baru",
+  "notifications.updatesHelp": "Beri tahu para administrator lewat saluran ini saat versi LastHelp yang lebih baru terbit, sekali untuk setiap versi."
 }

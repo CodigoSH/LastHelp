@@ -810,5 +810,9 @@
   "words.redo": "পুনরায়",
   "words.strike": "কাটা দাগ",
   "words.underline": "নিম্নরেখ",
-  "words.undo": "পূর্বাবস্থা"
+  "words.undo": "পূর্বাবস্থা",
+  "notify.updateTitle": "LastHelp {version} পাওয়া যাচ্ছে",
+  "notify.updateBody": "এই সার্ভার {current} চালাচ্ছে। কী নতুন তা দেখতে ও হালনাগাদ করতে «তথ্য» খুলুন।",
+  "notifications.updates": "নতুন সংস্করণ",
+  "notifications.updatesHelp": "LastHelp-এর নতুন সংস্করণ বেরোলে এই চ্যানেলের মাধ্যমে প্রশাসকদের জানান, প্রতিটি সংস্করণের জন্য একবার।"
 }

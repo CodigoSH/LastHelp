@@ -810,5 +810,9 @@
   "words.redo": "Redo",
   "words.strike": "Strikethrough",
   "words.underline": "Underline",
-  "words.undo": "Undo"
+  "words.undo": "Undo",
+  "notify.updateTitle": "LastHelp {version} is available",
+  "notify.updateBody": "This server runs {current}. Open About to see what is new and to update.",
+  "notifications.updates": "New versions",
+  "notifications.updatesHelp": "Tell the administrators through this channel when a newer version of LastHelp is out, once for each version."
 }

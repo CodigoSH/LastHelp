@@ -810,5 +810,9 @@
   "words.redo": "फिर से करें",
   "words.strike": "काटकर लिखा",
   "words.underline": "रेखांकित",
-  "words.undo": "पूर्ववत"
+  "words.undo": "पूर्ववत",
+  "notify.updateTitle": "LastHelp {version} उपलब्ध है",
+  "notify.updateBody": "यह सर्वर {current} चला रहा है। नया क्या है यह देखने और अपडेट करने के लिए «जानकारी» खोलें।",
+  "notifications.updates": "नए संस्करण",
+  "notifications.updatesHelp": "LastHelp का नया संस्करण आने पर इस चैनल से प्रशासकों को बताएँ, हर संस्करण के लिए एक बार।"
 }

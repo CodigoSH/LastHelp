@@ -810,5 +810,9 @@
   "words.redo": "Opnieuw",
   "words.strike": "Doorgehaald",
   "words.underline": "Onderstreept",
-  "words.undo": "Ongedaan maken"
+  "words.undo": "Ongedaan maken",
+  "notify.updateTitle": "LastHelp {version} is beschikbaar",
+  "notify.updateBody": "Deze server draait {current}. Open ‘Info’ om te zien wat er nieuw is en om bij te werken.",
+  "notifications.updates": "Nieuwe versies",
+  "notifications.updatesHelp": "Laat de beheerders via dit kanaal weten wanneer er een nieuwere versie van LastHelp is, één keer per versie."
 }
