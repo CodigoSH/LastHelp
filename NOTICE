@@ -56,6 +56,11 @@ THIRD-PARTY COMPONENTS
 
      golang.org/x/image                  BSD 3-Clause
 
+   Reading a password from the terminal without showing it, for the command
+   that sets one when it is forgotten:
+
+     golang.org/x/term                   BSD 3-Clause
+
    Everything else this binary does uses the Go standard library.
 
    Required by go.mod and NOT in what we publish. The SQLite driver lists them

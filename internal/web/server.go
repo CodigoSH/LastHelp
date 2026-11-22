@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
@@ -73,6 +74,10 @@ type Server struct {
 	// they came from: the limiters above count requests, and a patient guesser
 	// spreads theirs.
 	signIn *middleware.Lockout
+
+	// wordsMu makes changing the operator's word list one step: it is read,
+	// changed and written back, and two changes at once lose one of them.
+	wordsMu sync.Mutex
 
 	// box seals the forge credentials. Its key lives in a file beside the
 	// database rather than in it, so a leaked backup is not write access to

@@ -123,6 +123,20 @@ func (s Store) Authenticate(username, plainPassword string) (User, error) {
 	return u, nil
 }
 
+// ByUsername finds an account by the name it signs in with, written the way a
+// person types it: case and surrounding spaces do not matter.
+func (s Store) ByUsername(username string) (User, error) {
+	var id int64
+	err := s.DB.QueryRow(`SELECT id FROM app_user WHERE username = ?`, normaliseUsername(username)).Scan(&id)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return User{}, ErrNotFound
+	case err != nil:
+		return User{}, fmt.Errorf("looking up the account: %w", err)
+	}
+	return s.ByID(id)
+}
+
 // ByID reads an account, for a screen that has to say which one is acting.
 //
 // It carries no password material and asks for nothing beyond the identity: a
