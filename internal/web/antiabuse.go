@@ -96,7 +96,14 @@ func (s *Server) storeWords(words []string) error {
 }
 
 // addWord puts one word on the list if it is not there already.
+//
+// Reading the list, adding to it and writing it back is one step: two
+// moderators acting in the same moment would otherwise each write the list
+// without the other's word.
 func (s *Server) addWord(word string) string {
+	s.wordsMu.Lock()
+	defer s.wordsMu.Unlock()
+
 	words := append(s.currentWords(), word)
 	cleaned, failure := cleanWords(words)
 	if failure != "" {
@@ -216,7 +223,10 @@ func (s *Server) handleSetWords(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, failure)
 		return
 	}
-	if err := s.storeWords(words); err != nil {
+	s.wordsMu.Lock()
+	err := s.storeWords(words)
+	s.wordsMu.Unlock()
+	if err != nil {
 		slog.Error("storing the word list", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")
 		return
