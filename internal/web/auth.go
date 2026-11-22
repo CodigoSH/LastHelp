@@ -101,9 +101,21 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Checked before the password is, and refusing the right one too: a lock that
+	// opens for the correct guess only tells the guesser when to stop.
+	name := strings.ToLower(strings.TrimSpace(in.Username))
+	if left, locked := s.signIn.Locked(name); locked {
+		w.Header().Set("Retry-After", strconv.Itoa(int(left.Seconds())+1))
+		writeError(w, http.StatusTooManyRequests, "error.too_many")
+		return
+	}
+
 	user, err := s.accounts().Authenticate(in.Username, in.Password)
 	if err != nil {
 		if errors.Is(err, account.ErrNotFound) {
+			// Counted for a name with no account as for one with, so the lock does
+			// not say which names exist.
+			s.signIn.Fail(name)
 			// One answer for a wrong password and an address with no account.
 			writeError(w, http.StatusUnauthorized, "error.bad_credentials")
 			return
@@ -113,6 +125,7 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.signIn.Succeed(name)
 	s.startSession(w, r, user.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"id": user.ID, "username": user.Username})
 }

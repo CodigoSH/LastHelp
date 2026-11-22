@@ -40,6 +40,23 @@ const (
 	keyLength   = 32
 )
 
+// maxConcurrent is how many hashes may be computed at once. Each takes 64 MiB,
+// and a sign-in form anybody can post to turns a burst of requests into a burst
+// of 64 MiB allocations: thirty of them at once is two gigabytes on a machine
+// that runs the whole product in a few tens. The rest wait their turn, which
+// costs a caller a few milliseconds and the process nothing.
+const maxConcurrent = 2
+
+// slots is the queue for the cost above.
+var slots = make(chan struct{}, maxConcurrent)
+
+// derive is argon2id behind the queue.
+func derive(plain, salt []byte, time, memory uint32, threads uint8, length uint32) []byte {
+	slots <- struct{}{}
+	defer func() { <-slots }()
+	return argon2.IDKey(plain, salt, time, memory, threads, length)
+}
+
 // Hash returns a PHC-format string: the algorithm, its parameters, the salt and
 // the digest, all in one column. Storing the parameters alongside is what makes
 // them changeable.
@@ -49,7 +66,7 @@ func Hash(plain string) (string, error) {
 		return "", fmt.Errorf("generating a salt: %w", err)
 	}
 
-	key := argon2.IDKey([]byte(plain), salt, timeCost, memoryCost, parallelism, keyLength)
+	key := derive([]byte(plain), salt, timeCost, memoryCost, parallelism, keyLength)
 
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
 		argon2.Version, memoryCost, timeCost, parallelism,
@@ -90,7 +107,7 @@ func Verify(plain, encoded string) error {
 		return ErrMismatch
 	}
 
-	got := argon2.IDKey([]byte(plain), salt, time, memory, threads, uint32(len(want)))
+	got := derive([]byte(plain), salt, time, memory, threads, uint32(len(want)))
 	if subtle.ConstantTimeCompare(got, want) != 1 {
 		return ErrMismatch
 	}

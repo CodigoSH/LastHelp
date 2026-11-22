@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 )
@@ -99,4 +100,42 @@ func TestParametersComeFromTheStoredHash(t *testing.T) {
 func hashWith(plain string, salt []byte, time, memory uint32, threads uint8) (string, error) {
 	key := argon2.IDKey([]byte(plain), salt, time, memory, threads, keyLength)
 	return base64.RawStdEncoding.EncodeToString(key), nil
+}
+
+// Only two hashes are computed at once: each holds 64 MiB, and a form anybody can
+// post to must not turn a burst of requests into a burst of allocations.
+func TestOnlyTwoHashesAreComputedAtOnce(t *testing.T) {
+	for i := 0; i < maxConcurrent; i++ {
+		slots <- struct{}{}
+	}
+	released := false
+	defer func() {
+		if !released {
+			for i := 0; i < maxConcurrent; i++ {
+				<-slots
+			}
+		}
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		_, _ = Hash("waits for its turn")
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("a third hash ran while two were already being computed")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	released = true
+	for i := 0; i < maxConcurrent; i++ {
+		<-slots
+	}
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the waiting hash never ran once the slots were free")
+	}
 }

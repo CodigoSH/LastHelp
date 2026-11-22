@@ -69,6 +69,11 @@ type Server struct {
 	perAddress *middleware.Limiter
 	perBlock   *middleware.Limiter
 
+	// signIn locks one account name after repeated failures, whichever addresses
+	// they came from: the limiters above count requests, and a patient guesser
+	// spreads theirs.
+	signIn *middleware.Lockout
+
 	// box seals the forge credentials. Its key lives in a file beside the
 	// database rather than in it, so a leaked backup is not write access to
 	// somebody's forge.
@@ -147,6 +152,7 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 
 	s.perAddress = middleware.NewLimiter(240, time.Minute, 20_000, s.now)
 	s.perBlock = middleware.NewLimiter(600, time.Minute, 20_000, s.now)
+	s.signIn = middleware.NewLockout(5, time.Minute, 5*time.Minute, 10_000, s.now)
 
 	s.routes()
 	// The webhook endpoint is not on the application's mux at all.
