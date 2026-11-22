@@ -146,8 +146,8 @@ LastHelp is out: once for each version, whoever's browser or room it reaches.
 - **Which channel of releases.** The one this installation follows, the same one **About**
   uses: a beta installation is told about betas, a stable one is not.
 - **What it says.** Push, in each account's language: *LastHelp v1.4.0 is available*, with the
-  version running, opening **About**. It goes with a low urgency, so it does not wake a phone
-  the way a report does, and a newer notice replaces the one before it. The other channels get
+  version running, opening **About**. It asks the push service for a low urgency, where a report asks
+  for a high one, and a newer notice carries the same tag as the one before it, so it replaces it. The other channels get
   the same words in English, ntfy with its package mark, and the webhook adds
   `"kind": "update"`, `"version"` and `"current_version"`.
 - **In a container** it tells you the same, and the answer is to pull the new image.
