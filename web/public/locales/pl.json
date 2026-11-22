@@ -631,7 +631,7 @@
   "profile.password": "Hasło",
   "profile.passwordHelp": "Zmiana wylogowuje wszystkie inne sesje tego konta.",
   "profile.picture": "Wybierz obraz",
-  "profile.usernameHelp": "Służy do logowania i jest widoczna przy twoich odpowiedziach.",
+  "profile.usernameHelp": "Służy do logowania i jest widoczna przy Twoich odpowiedziach.",
   "push.title": "Powiadomienia na Twoich urządzeniach",
   "push.lead": "Dostawaj powiadomienie, gdy zgłoszenie trafi na tablicę używającą Push, nawet przy zamkniętym LastHelp. Wiadomość przechodzi przez usługę push Twojej przeglądarki (Google, Apple, Mozilla lub Microsoft), która może wiedzieć, że urządzenie dostało powiadomienie i kiedy, ale nie co w nim było.",
   "push.thisDevice": "To urządzenie",

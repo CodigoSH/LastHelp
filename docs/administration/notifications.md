@@ -140,7 +140,7 @@ LastHelp is out: once for each version, whoever's browser or room it reaches.
   mail or a webhook, whatever the channel reaches.
 - **When.** The server asks for the newest release every hour while the switch is on, and as
   soon as it is turned on, so a version that is already out does not wait. With the switch off
-  it asks nothing: the only time it reaches for a new version is when somebody opens **About**.
+  it asks nothing on its own: it still asks, as before, when an administrator opens the panel (once, a moment after arriving) and when one opens **About**.
 - **Once, and not lost.** A version counts as told only when the channel took it. A channel
   that was down, or a push with nobody subscribed yet, is tried again with the next check.
 - **Which channel of releases.** The one this installation follows, the same one **About**

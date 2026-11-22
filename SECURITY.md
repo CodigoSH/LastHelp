@@ -133,11 +133,12 @@ have let it happen again.
 
 Releases are published directly by us, with no intermediary.
 
-- The server asks our forge whether a newer release exists when an administrator opens
-  **About**, and, only if an administrator turned on **New versions** under Notifications, once
-  an hour. The request carries no version, identifier or detail of the installation (our forge sees an address, as with any request), and with
+- The server asks our forge whether a newer release exists when an administrator opens the
+  panel (once, a moment after arriving) or **About**, and, only if an administrator turned on
+  **New versions** under Notifications, once an hour. The request carries `Accept`,
+  `Accept-Encoding` and the default `User-Agent` of Go's HTTP client, and no version or
+  identifier of the installation (our forge sees an address, as with any request). With
   `LASTHELP_OFFLINE=true` it does not ask at all.
-
 - Every release ships a `SHA256SUMS` file in the format `sha256sum` already
   writes, so you can check it with the tools on your own machine, and a
   `SHA256SUMS.sig` signed with an ed25519 key.

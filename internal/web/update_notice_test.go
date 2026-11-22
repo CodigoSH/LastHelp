@@ -279,3 +279,35 @@ func TestTurningTheNoticeOnTellsAtOnceWhenTheWatcherIsRunning(t *testing.T) {
 		t.Fatalf("turning it on told %d times, want 1", len(hook.got()))
 	}
 }
+
+// With the server set to work offline nothing is asked and nothing is told.
+func TestAnOfflineServerAsksAndTellsNothingAboutVersions(t *testing.T) {
+	_, srv, forge, hook := noticeSetup(t, true)
+	srv.cfg.Offline = true
+
+	srv.notifyUpdate(context.Background())
+	if forge.asked() != 0 || len(hook.got()) != 0 {
+		t.Errorf("offline, the forge was asked %d times and the channel told %d", forge.asked(), len(hook.got()))
+	}
+}
+
+// A build with no release keys cannot install an update, so there is nothing to tell about —
+// except in a container, where the answer to a new version is to pull an image.
+func TestABuildThatCannotVerifyIsOnlyToldInAContainer(t *testing.T) {
+	_, srv, forge, hook := noticeSetup(t, true)
+	keys, container := version.ReleaseKeys, inContainer
+	version.ReleaseKeys = nil
+	t.Cleanup(func() { version.ReleaseKeys, inContainer = keys, container })
+
+	inContainer = func() bool { return false }
+	srv.notifyUpdate(context.Background())
+	if forge.asked() != 0 || len(hook.got()) != 0 {
+		t.Fatalf("a build that cannot verify, outside a container, asked %d times and told %d", forge.asked(), len(hook.got()))
+	}
+
+	inContainer = func() bool { return true }
+	srv.notifyUpdate(context.Background())
+	if len(hook.got()) != 1 {
+		t.Errorf("in a container it told %d times, want 1", len(hook.got()))
+	}
+}
