@@ -67,11 +67,15 @@ jobs:
         with:
           bun-version: "1.4.4"
 
-      # The suite before anything is published. A tag can be deleted; a release
-      # people have already downloaded cannot. The race detector is not run here:
-      # it made the tests three or four times slower on this runner, and
-      # scripts/release.sh runs it before the tag exists, which is when it has to
-      # hold.
+      # The checks that fail in seconds, before anything is published. A tag can be
+      # deleted; a release people have already downloaded cannot.
+      #
+      # The whole Go suite is not run again here. It takes a minute and a half of this
+      # runner's single slot, and it has already run on this very commit twice: in
+      # scripts/release.sh, with the race detector, before the tag existed, which is when
+      # it has to hold, and in ci.yml, which the push of the same commit starts. What
+      # stays is what is quick and what only this file could get wrong: the order of the
+      # build, the architecture rules, the types and the catalogs.
       #
       # `bun run build` comes before anything that compiles Go, and the order is
       # load-bearing. The binary embeds internal/web/dist, which is build output
@@ -91,7 +95,6 @@ jobs:
           bun run build
           go vet ./...
           go test -count=1 ./internal/arch/
-          go test -count=1 ./...
           bun run typecheck
           bun test
           bun run i18n:sync

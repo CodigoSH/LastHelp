@@ -104,6 +104,14 @@ jobs:
       - name: Frontend tests
         run: bun test --randomize
 
+      # The catalogs: a key one language lacks, or one the code asks for that does not
+      # exist. They took seconds in the release workflow and ran nowhere on a push, so a
+      # missing key was found on the day of a release.
+      - name: Catalogs
+        run: |
+          bun run i18n:sync
+          bun run i18n:scan
+
       - name: go vet
         run: go vet ./...
 

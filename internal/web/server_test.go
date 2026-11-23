@@ -7,13 +7,16 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/session"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/password"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
@@ -171,14 +174,71 @@ func (i *instance) csrf() string {
 	return ""
 }
 
+// ownerPassword is the passphrase of the administrator every test makes.
+const ownerPassword = "a good long passphrase"
+
+// ownerHash is that passphrase hashed, once for the whole run. Hashing is Argon2id, which is most
+// of what these tests cost — 84 % of their CPU, measured — and a hundred of them need an
+// administrator to exist and be signed in, not the route that makes one.
+var ownerHash = sync.OnceValues(func() (string, error) { return password.Hash(ownerPassword) })
+
+// claim makes the first administrator, "owner", and signs this client in as them: the account and
+// the session /api/setup makes, written straight into the database with a hash made once.
+//
+// The route has tests of its own (claimThroughTheRoute, and the ones about its refusals), and the
+// hash is the one a real sign-in checks, so every test that signs in afterwards still proves it.
 func (i *instance) claim() {
 	i.t.Helper()
+	hash, err := ownerHash()
+	if err != nil {
+		i.t.Fatal(err)
+	}
+	res, err := i.db().Exec(`INSERT INTO app_user (username, password_hash, is_administrator, created_at)
+		VALUES (?, ?, 1, ?)`, "owner", hash, i.now().Unix())
+	if err != nil {
+		i.t.Fatal(err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		i.t.Fatal(err)
+	}
+	token, err := session.Store{DB: i.db()}.Create(id, i.now(), session.DefaultTTL)
+	if err != nil {
+		i.t.Fatal(err)
+	}
+	u, err := url.Parse(i.server.URL)
+	if err != nil {
+		i.t.Fatal(err)
+	}
+	i.client.Jar.SetCookies(u, []*http.Cookie{{Name: middleware.SessionCookie, Value: token, Path: "/"}})
+}
+
+// claimThroughTheRoute is claim as a visitor does it: the setup route, with its hashing.
+func (i *instance) claimThroughTheRoute() {
+	i.t.Helper()
 	resp := i.do(http.MethodPost, "/api/setup", map[string]string{
-		"username": "owner", "password": "a good long passphrase",
+		"username": "owner", "password": ownerPassword,
 	})
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusCreated {
 		i.t.Fatalf("setup returned %d", resp.StatusCode)
+	}
+}
+
+// What the setup route makes is an administrator who is signed in, and the account's password is the
+// one they typed.
+func TestSetupMakesTheAdministratorAndSignsThemIn(t *testing.T) {
+	i := newInstance(t)
+	i.claimThroughTheRoute()
+
+	me := decode(t, i.do(http.MethodGet, "/api/me", nil))
+	if me["username"] != "owner" {
+		t.Errorf("after setup the account is %v, want owner", me["username"])
+	}
+	if got := status(t, i.anonymous().do(http.MethodPost, "/api/session", map[string]string{
+		"username": "owner", "password": ownerPassword,
+	})); got != http.StatusOK {
+		t.Errorf("the password typed at setup does not sign in: %d", got)
 	}
 }
 
