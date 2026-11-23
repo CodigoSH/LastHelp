@@ -15,6 +15,13 @@ on:
   # happens minutes before that release exists — so it would advertise the
   # previous version until some unrelated push rebuilt it.
   workflow_dispatch:
+    inputs:
+      requested_at:
+        description: >-
+          When the change to show was published, in seconds since 1970. The web
+          host skips the build if one already started after it. Empty always builds.
+        required: false
+        type: string
 
 jobs:
   rebuild:
@@ -33,6 +40,7 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_SSH_TARGET: ${{ secrets.DEPLOY_SSH_TARGET }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          REQUESTED_AT: ${{ github.event.inputs.requested_at }}
         run: |
           # An unconfigured key is a skip on a push — somebody's fork must not
           # get a red build over a secret they were never given — and a failure
@@ -49,6 +57,11 @@ jobs:
             exit 0
           fi
 
+          # Only digits go to the host; anything else asks for a plain rebuild.
+          case "$REQUESTED_AT" in
+            "" | *[!0-9]*) REQUESTED_AT= ;;
+          esac
+
           umask 077
           mkdir -p "$HOME/.ssh"
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
@@ -63,5 +76,5 @@ jobs:
             -o IdentitiesOnly=yes -o BatchMode=yes \
             -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             -o ConnectTimeout=15 \
-            "$DEPLOY_SSH_TARGET" rebuild
+            "$DEPLOY_SSH_TARGET" "rebuild${REQUESTED_AT:+ $REQUESTED_AT}"
           echo "Website rebuild finished."
