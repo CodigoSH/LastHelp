@@ -7574,6 +7574,9 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
   .settings-row:has(> .toggle) { grid-template-columns: minmax(0, 1fr) auto; }
   .profile-head { flex-direction: column; align-items: flex-start; }
   .si-tags { display: none; }
+  /* Except where the tag is the point of the row: which session is this browser. That row has no
+     button, so the tag takes the place the button would. */
+  .sessions .si-tags { display: flex; white-space: nowrap; }
 }
 
 /* The logo is a square tile with a border beside the name, not a round

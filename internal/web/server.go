@@ -303,6 +303,9 @@ func (s *Server) routes() {
 	private("POST /api/push/test", s.handlePushTest)
 
 	private("POST /api/me/password", s.handleChangePassword)
+	private("GET /api/sessions", s.handleListSessions)
+	private("DELETE /api/sessions/{id}", s.handleCloseSession)
+	private("POST /api/sessions/close-others", s.handleCloseOtherSessions)
 	private("POST /api/me/profile", s.handleChangeProfile)
 	private("POST /api/me/language", s.handleChangeLanguage)
 	private("POST /api/me/avatar", s.handleChangeAvatar)
@@ -436,6 +439,7 @@ func (s *Server) wrap() http.Handler {
 		Sessions: s.sessions(),
 		Accounts: s.accounts(),
 		Now:      s.now,
+		Device:   s.deviceOf,
 	}
 
 	var h http.Handler = s.mux

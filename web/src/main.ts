@@ -829,10 +829,16 @@ function hasRole(): boolean {
 
 async function showProfile(): Promise<void> {
   if (!(await requirePanel())) return;
+  // Where this account is signed in: left out of the page, not an error on it, when it cannot be read.
+  const sessions = await api
+    .get<{ sessions: views.SessionRow[] }>("/api/sessions")
+    .then((r) => r.sessions)
+    .catch(() => null);
   await showInShell(
-    views.profileScreen({ username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) }, text),
+    views.profileScreen({ username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) }, text, sessions),
     "/panel/account",
   );
+  wireSessions();
 
   // The picture, which is read in the browser and sent as a data URL. A file
   // upload would need a store, a route to serve it from and a second thing to
@@ -880,6 +886,39 @@ async function showProfile(): Promise<void> {
       await render();
     } catch (err) {
       showFormError(err);
+    }
+  });
+}
+
+/** Signing out one of this account's other browsers, or all of them. */
+function wireSessions(): void {
+  const fail = (err: unknown) => {
+    const line = root?.querySelector<HTMLParagraphElement>("[data-sessions-error]");
+    if (!line) return;
+    line.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+    line.hidden = false;
+  };
+  root?.querySelectorAll<HTMLButtonElement>("[data-session-close]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const device = button.dataset.device ?? "";
+      if (!(await askConfirm(i18n.t("sessions.close"), i18n.t("sessions.closeOneConfirm", { device })))) return;
+      try {
+        await api.del(`/api/sessions/${encodeURIComponent(button.dataset.sessionClose ?? "")}`);
+        await showProfile();
+        toast(i18n.t("sessions.closed"));
+      } catch (err) {
+        fail(err);
+      }
+    }),
+  );
+  root?.querySelector<HTMLButtonElement>("[data-sessions-close-others]")?.addEventListener("click", async () => {
+    if (!(await askConfirm(i18n.t("sessions.closeOthers"), i18n.t("sessions.closeOthersConfirm")))) return;
+    try {
+      await api.post("/api/sessions/close-others", {});
+      await showProfile();
+      toast(i18n.t("sessions.closedOthers"));
+    } catch (err) {
+      fail(err);
     }
   });
 }

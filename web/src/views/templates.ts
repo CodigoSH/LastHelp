@@ -24,6 +24,7 @@ import { icons } from "./icons";
 import { choiceMenu, chosenValues, filterChips, filterChipsHost, filterMenu, segmented, sortMenu, type FilterGroup, type FilterOption } from "./filterBar";
 import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
+import { userAgentLabel, type BrowserId, type OsId } from "../services/userAgentLabel";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
 import { actionButton, iconButton, modal } from "./modal";
@@ -3046,7 +3047,11 @@ export function accountRole(me: { admin?: boolean; memberships?: Array<{ role: s
   return (me.memberships ?? []).length > 0 ? text.t("comment.team") : "";
 }
 
-export function profileScreen(me: { username: string; avatar?: string; role: string }, text: Text): string {
+export function profileScreen(
+  me: { username: string; avatar?: string; role: string },
+  text: Text,
+  sessions: SessionRow[] | null = null,
+): string {
   // Profile and password, a card each: the picture, the name and the role; the username — the one name an account
   // has, to sign in with and to sign replies — with its save button on the same
   // line; and the password, closed by one button aligned with the fields
@@ -3090,7 +3095,85 @@ export function profileScreen(me: { username: string; avatar?: string; role: str
         </form>`,
         { lead: text.t("profile.passwordHelp") },
       )}
+      ${sessions ? sessionsCard(sessions, text) : ""}
     </div>`;
+}
+
+/** One sign-in of this account, as the server lists it. */
+export interface SessionRow {
+  id: string;
+  current: boolean;
+  last_seen: number;
+  user_agent: string;
+  ip: string;
+}
+
+const BROWSER_NAMES: Record<Exclude<BrowserId, "unknown">, string> = {
+  firefox: "Firefox",
+  chrome: "Chrome",
+  edge: "Edge",
+  safari: "Safari",
+  opera: "Opera",
+};
+const OS_NAMES: Record<Exclude<OsId, "unknown">, string> = {
+  windows: "Windows",
+  macos: "macOS",
+  linux: "Linux",
+  android: "Android",
+  ios: "iOS",
+  chromeos: "ChromeOS",
+};
+
+/**
+ * "Firefox · Linux". The names are products and stay as they are in every language, and a dot joins
+ * them rather than a word, which would put a name first in a sentence in some languages and last in
+ * others for nothing it adds.
+ */
+export function deviceName(userAgent: string, text: Text): string {
+  const { browser, os } = userAgentLabel(userAgent);
+  if (browser === "unknown" && os === "unknown") return text.t("sessions.unknownDevice");
+  const b = browser === "unknown" ? text.t("sessions.unknownBrowser") : BROWSER_NAMES[browser];
+  return os === "unknown" ? b : `${b} · ${OS_NAMES[os]}`;
+}
+
+/**
+ * Where this account is signed in: this browser first, then the rest by when they were last seen, each
+ * of the others with a way to sign it out, and one to sign them all out at once.
+ */
+export function sessionsCard(sessions: SessionRow[], text: Text): string {
+  const ordered = [...sessions].sort((a, b) => Number(b.current) - Number(a.current) || b.last_seen - a.last_seen);
+  const rows = ordered
+    .map((s) => {
+      const name = deviceName(s.user_agent, text);
+      const address = s.ip || "—";
+      // What the confirmation calls it: the name, and the address when there is one to tell two apart.
+      const called = s.ip ? `${name} (${s.ip})` : name;
+      return settingsItem({
+        attrs: `data-session="${escapeAttr(s.id)}"`,
+        lead: `<span class="si-mark">${icons.monitor(16)}</span>`,
+        name,
+        sub: text.t("sessions.seen", { address, date: text.dateTime(s.last_seen) }),
+        tags: s.current ? `<span class="mono-tag accent">${escapeHTML(text.t("sessions.thisDevice"))}</span>` : "",
+        actions: s.current
+          ? ""
+          : iconButton(
+              "signOut",
+              text.t("sessions.close"),
+              `class="icon-button danger" data-session-close="${escapeAttr(s.id)}" data-device="${escapeAttr(called)}"`,
+            ),
+      });
+    })
+    .join("");
+  const others = ordered.some((s) => !s.current)
+    ? `<div class="settings-actions"><button class="button danger" type="button" data-sessions-close-others>${escapeHTML(
+        text.t("sessions.closeOthers"),
+      )}</button></div>`
+    : "";
+  return settingsCard(
+    text.t("sessions.title"),
+    `<ul class="settings-list sessions">${rows}</ul>${others}<p class="form-error" data-sessions-error role="alert" hidden></p>`,
+    { lead: text.t("sessions.lead") },
+  );
 }
 
 /**

@@ -558,6 +558,19 @@ var migrations = []migration{
 			return addColumn(tx, "field_def", "applies_to", "TEXT NOT NULL DEFAULT 'both'")
 		},
 	},
+	{
+		version: 19,
+		name:    "a session remembers the browser and the address it was last used from",
+		// So the account can see where it is signed in and close what it does not
+		// recognise. A session open before this has neither until its next use in
+		// a new hour fills them in; until then the list calls it an unknown device.
+		fn: func(tx *sql.Tx) error {
+			if err := addColumn(tx, "session", "user_agent", "TEXT NOT NULL DEFAULT ''"); err != nil {
+				return err
+			}
+			return addColumn(tx, "session", "ip", "TEXT NOT NULL DEFAULT ''")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

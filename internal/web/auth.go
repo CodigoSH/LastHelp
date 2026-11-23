@@ -242,7 +242,7 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) startSession(w http.ResponseWriter, r *http.Request, userID int64) {
-	token, err := s.sessions().Create(userID, s.now(), session.DefaultTTL)
+	token, err := s.sessions().Create(userID, s.now(), session.DefaultTTL, s.deviceOf(r))
 	if err != nil {
 		slog.Error("creating the session", "error", err)
 		writeError(w, http.StatusInternalServerError, "error.internal")

@@ -18,12 +18,17 @@ const SessionCookie = "lasthelp_session"
 
 type actorCtxKey struct{}
 
+type sessionCtxKey struct{}
+
 // Authenticator resolves the cookie on a request into the actor authz answers
 // questions about.
 type Authenticator struct {
 	Sessions session.Store
 	Accounts account.Store
 	Now      func() time.Time
+	// Device says which browser and address a request came from, for the
+	// account's list of sessions.
+	Device func(*http.Request) session.Device
 }
 
 // Attach reads the session if there is one and puts the actor on the context.
@@ -37,7 +42,7 @@ func (a Authenticator) Attach(next http.Handler) http.Handler {
 			return
 		}
 
-		userID, err := a.Sessions.Resolve(cookie.Value, a.Now(), session.DefaultTTL)
+		found, err := a.Sessions.Resolve(cookie.Value, a.Now(), session.DefaultTTL, a.Device(r))
 		if err != nil {
 			// An invalid session is not an error to shout about — expiry is
 			// normal — but a broken query is, and Resolve keeps them apart.
@@ -49,13 +54,15 @@ func (a Authenticator) Attach(next http.Handler) http.Handler {
 			return
 		}
 
-		actor, err := a.Accounts.Actor(userID)
+		actor, err := a.Accounts.Actor(found.UserID)
 		if err != nil {
 			// The account went away or was disabled while the session lived.
 			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), actorCtxKey{}, actor)))
+		ctx := context.WithValue(r.Context(), actorCtxKey{}, actor)
+		ctx = context.WithValue(ctx, sessionCtxKey{}, found.ID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -80,4 +87,11 @@ func RequireActor(next http.Handler) http.Handler {
 func ActorFrom(r *http.Request) (authz.Actor, bool) {
 	actor, ok := r.Context().Value(actorCtxKey{}).(authz.Actor)
 	return actor, ok
+}
+
+// SessionFrom returns which of the account's sessions a request came in on,
+// as the list of sessions names it, or "" when it came in on none.
+func SessionFrom(r *http.Request) string {
+	id, _ := r.Context().Value(sessionCtxKey{}).(string)
+	return id
 }

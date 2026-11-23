@@ -86,7 +86,7 @@ export function actionButton(
 
 /** The same, reduced to the icon, for a row where the label is the row itself. */
 export function iconButton(
-  action: "edit" | "remove" | "open" | "person",
+  action: "edit" | "remove" | "open" | "person" | "signOut",
   label: string,
   attrs = "",
 ): string {

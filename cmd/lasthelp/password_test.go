@@ -62,7 +62,7 @@ func newFixture(t *testing.T) (*fixture, database.Execer) {
 
 func (f *fixture) signedIn(user account.User) string {
 	f.t.Helper()
-	token, err := f.sessions.Create(user.ID, time.Unix(1_700_000_000, 0), time.Hour)
+	token, err := f.sessions.Create(user.ID, time.Unix(1_700_000_000, 0), time.Hour, session.Device{})
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func (f *fixture) signedIn(user account.User) string {
 }
 
 func (f *fixture) resolves(token string) bool {
-	_, err := f.sessions.Resolve(token, time.Unix(1_700_000_100, 0), time.Hour)
+	_, err := f.sessions.Resolve(token, time.Unix(1_700_000_100, 0), time.Hour, session.Device{})
 	return err == nil
 }
 

@@ -535,3 +535,31 @@ func TestAQuestionFromBeforeIsAskedOfEveryReport(t *testing.T) {
 		t.Errorf("a question from before the column is asked of %q, want both", applies)
 	}
 }
+
+// A session open before the list of sessions existed keeps working, and has no
+// browser or address until it is next used.
+func TestASessionFromBeforeKeepsWorking(t *testing.T) {
+	db := open(t)
+	for _, stmt := range []string{
+		`INSERT INTO app_user (id, username, password_hash, created_at) VALUES (1, 'ana', 'x', 0)`,
+		`ALTER TABLE session DROP COLUMN user_agent`,
+		`ALTER TABLE session DROP COLUMN ip`,
+		`INSERT INTO session (token_hash, user_id, created_at, expires_at, last_seen) VALUES ('ab', 1, 0, 99, 0)`,
+		`PRAGMA user_version = 18`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	var agent, ip string
+	var user int64
+	if err := db.QueryRow(`SELECT user_id, user_agent, ip FROM session WHERE token_hash = 'ab'`).Scan(&user, &agent, &ip); err != nil {
+		t.Fatal(err)
+	}
+	if user != 1 || agent != "" || ip != "" {
+		t.Errorf("the session from before is (%d, %q, %q), want (1, \"\", \"\")", user, agent, ip)
+	}
+}

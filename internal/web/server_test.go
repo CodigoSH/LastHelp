@@ -202,7 +202,7 @@ func (i *instance) claim() {
 	if err != nil {
 		i.t.Fatal(err)
 	}
-	token, err := session.Store{DB: i.db()}.Create(id, i.now(), session.DefaultTTL)
+	token, err := session.Store{DB: i.db()}.Create(id, i.now(), session.DefaultTTL, session.Device{})
 	if err != nil {
 		i.t.Fatal(err)
 	}
