@@ -118,6 +118,9 @@ GOVULNCHECK_VERSION="v1.9.0"
 PREFLIGHT=(
     "gofmt|test -z \"\$(gofmt -l ./cmd ./internal)\""
     "go vet|go vet ./..."
+    # The CI fails a go.mod that is not tidy, and it would fail on the tagged
+    # commit, after the release is out. -diff writes nothing.
+    "go mod tidy|go mod tidy -diff"
     # go vet does not see dead code: a function that lost its last caller
     # compiles, passes vet and passes every test. Two of them had been sitting
     # here — a predicate about which forges share an adapter, and the accessor
