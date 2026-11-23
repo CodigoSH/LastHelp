@@ -13,6 +13,7 @@ import type {
   ItemSummary,
   Me,
   OrganizationSummary,
+  Question,
   RepositorySummary,
   Status,
   Submitted,
@@ -1615,6 +1616,18 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
       root?.querySelectorAll<HTMLElement>(".kind-fields").forEach((block) => {
         block.hidden = block.dataset.for !== kind;
       });
+      // The project's own questions: shown and enabled for the kinds they are
+      // put to, hidden and disabled otherwise, so the browser neither checks
+      // nor sends one the chosen kind is not asked.
+      let anyAsked = false;
+      root?.querySelectorAll<HTMLFieldSetElement>(".own-question").forEach((set) => {
+        const on = views.questionAsks({ for: (set.dataset.for ?? "both") as "bug" | "idea" | "both" }, kind);
+        set.hidden = !on;
+        set.disabled = !on;
+        anyAsked ||= on;
+      });
+      const own = root?.querySelector<HTMLElement>(".own-questions");
+      if (own) own.hidden = !anyAsked;
     }),
   );
 
@@ -1656,6 +1669,10 @@ async function showReportForm(orgSlug: string, repoSlug: string): Promise<void> 
         fields: {
           version: String(data.get("version") ?? ""),
           steps: String(data.get("steps") ?? ""),
+          // The project's own questions, by key. One the chosen kind is not
+          // asked sits in a disabled fieldset, is absent from the form data and
+          // goes as empty.
+          ...Object.fromEntries((repo.fields ?? []).map((q) => [q.key, String(data.get(q.key) ?? "")])),
         },
         token: ticket.token,
       });
@@ -4014,6 +4031,98 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   });
 }
 
+/**
+ * A project's own questions, on its settings page: one dialog that adds a
+ * question or edits one, and the buttons on each row to move and remove it.
+ * Every change redraws the page from what the server now says.
+ */
+function wireQuestions(base: string, fields: Question[]): void {
+  const dialog = root?.querySelector<HTMLDialogElement>("#question-modal");
+  const form = dialog?.querySelector<HTMLFormElement>("form.question-form");
+  if (!dialog || !form) return;
+  const input = <T extends Element>(name: string) => form.elements.namedItem(name) as T | null;
+  const typeSelect = input<HTMLSelectElement>("type");
+  const options = form.querySelector<HTMLElement>("[data-options]");
+  const fixed = form.querySelector<HTMLElement>("[data-type-fixed]");
+  const title = dialog.querySelector("h2");
+  // The choices are asked for only when the answer is a choice.
+  const showOptions = () => {
+    if (options && typeSelect) options.hidden = typeSelect.value !== "choice";
+  };
+  typeSelect?.addEventListener("change", showOptions);
+
+  const open = (q?: Question) => {
+    form.reset();
+    const key = input<HTMLInputElement>("key");
+    const label = input<HTMLInputElement>("label");
+    const asked = input<HTMLSelectElement>("for");
+    const choices = input<HTMLTextAreaElement>("options");
+    const required = input<HTMLInputElement>("required");
+    if (key) key.value = q?.key ?? "";
+    if (label) label.value = q?.label ?? "";
+    if (asked) asked.value = q?.for ?? "both";
+    if (choices) choices.value = (q?.options ?? []).join("\n");
+    if (required) required.checked = q?.required ?? false;
+    // The kind of answer is chosen once: answers already given were given to it.
+    if (typeSelect) {
+      typeSelect.value = q?.type ?? "short";
+      typeSelect.disabled = !!q;
+    }
+    if (fixed) fixed.hidden = !q;
+    if (title) title.textContent = i18n.t(q ? "repo.editQuestion" : "repo.addQuestion");
+    showOptions();
+    dialog.showModal();
+  };
+
+  root?.querySelector("[data-add-question]")?.addEventListener("click", () => open());
+  root?.querySelectorAll<HTMLButtonElement>("[data-edit-question]").forEach((button) =>
+    button.addEventListener("click", () => open(fields.find((q) => q.key === button.dataset.editQuestion))),
+  );
+
+  onSubmit("form.question-form", async (data) => {
+    const key = String(data.get("key") ?? "");
+    const body = {
+      label: String(data.get("label") ?? ""),
+      // Read from the control, not the form data: on an edit it is disabled,
+      // and the server keeps the question's kind whatever is sent.
+      type: typeSelect?.value ?? "short",
+      required: data.get("required") !== null,
+      for: String(data.get("for") ?? "both"),
+      options: String(data.get("options") ?? "").split("\n"),
+    };
+    if (key) await api.patch(`${base}/fields/${encodeURIComponent(key)}`, body);
+    else await api.post(`${base}/fields`, body);
+    toast(i18n.t("panel.saved"));
+    await render();
+  });
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-remove-question]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      const label = button.dataset.label ?? "";
+      if (!(await askConfirm(i18n.t("action.remove"), i18n.t("question.confirmRemove", { label })))) return;
+      try {
+        await api.del(`${base}/fields/${encodeURIComponent(button.dataset.removeQuestion ?? "")}`);
+        await render();
+      } catch (err) {
+        report(err);
+      }
+    }),
+  );
+
+  root?.querySelectorAll<HTMLButtonElement>("[data-move-question]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      try {
+        await api.post(`${base}/fields/${encodeURIComponent(button.dataset.moveQuestion ?? "")}/move`, {
+          direction: button.dataset.direction,
+        });
+        await render();
+      } catch (err) {
+        report(err);
+      }
+    }),
+  );
+}
+
 async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<void> {
   me = await api.get<Me>("/api/me").catch(() => null);
   if (!me) return go("/sign-in");
@@ -4049,6 +4158,7 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
     await render();
   });
   wireIconPicker();
+  if (repo.can_manage) wireQuestions(base, repo.fields ?? []);
 
   const channelURL = `${base}/channel`;
   wireChannel(

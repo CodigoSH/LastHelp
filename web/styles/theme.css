@@ -2626,6 +2626,9 @@ body > main:has(> .lpe) {
    are the same in every reading direction. */
 .lpe-tool[data-turn="up"] .icon { transform: rotate(-90deg); }
 .lpe-tool[data-turn="down"] .icon { transform: rotate(90deg); }
+/* The same turn for a row's own buttons, as in a project's list of questions. */
+.icon-button[data-turn="up"] .icon { transform: rotate(-90deg); }
+.icon-button[data-turn="down"] .icon { transform: rotate(90deg); }
 .lpe-grip { cursor: grab; }
 .lpe-grip:active { cursor: grabbing; }
 
@@ -4540,6 +4543,24 @@ body > nav .brand {
   gap: 0.75rem;
   padding-block-start: 0.75rem;
   border-block-start: 1px dashed var(--border);
+}
+
+/* A project's own questions, under the same rule. Each sits in a fieldset that
+   is disabled while its kind is not the one chosen, so the browser neither
+   checks it nor sends it: a required question for ideas does not stop a
+   problem. The fieldset draws nothing of its own. */
+.own-questions {
+  display: grid;
+  gap: 0.75rem;
+  padding-block-start: 0.75rem;
+  border-block-start: 1px dashed var(--border);
+}
+
+.own-question {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
 }
 
 /* The answers, on the report and in the queue. A definition list, because that

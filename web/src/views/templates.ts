@@ -11,6 +11,7 @@ import type {
   ReportPicture,
   ItemSummary,
   OrganizationSummary,
+  Question,
   ReportField,
   RepositorySummary,
 } from "../api";
@@ -25,7 +26,7 @@ import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
-import { actionButton, iconButton } from "./modal";
+import { actionButton, iconButton, modal } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
 export { field, choiceField, areaField } from "./wizard";
@@ -657,6 +658,26 @@ export function roadmap(
   </div>`;
 }
 
+/** Whether a project's own question is put to a report of this kind. */
+export const questionAsks = (q: Pick<Question, "for">, kind: string): boolean => q.for === "both" || q.for === kind;
+
+/** The control for one of a project's own questions. The label is the team's
+ *  own words, shown as they wrote them; the field's name is the question's key,
+ *  which is what the server reads the answer under. */
+function ownQuestionControl(q: Question, id: string, text: Text): string {
+  const base = { id, name: q.key, label: q.label, required: q.required };
+  switch (q.type) {
+    case "long":
+      return areaField({ ...base, rows: 4 });
+    case "choice":
+      return choiceField({ ...base, blank: text.t("question.choose"), options: q.options.map((o) => [o, o]) });
+    case "date":
+      return field({ ...base, type: "date" }, undefined);
+    default:
+      return field(base, undefined);
+  }
+}
+
 /**
  * The form somebody reports through.
  *
@@ -728,6 +749,24 @@ export function reportForm(
       </div>`
     : "";
 
+  // The project's own questions, each in a fieldset of its own that is shown
+  // and enabled only for the kinds it is put to (see questionAsks). A disabled
+  // fieldset is neither checked nor sent by the browser, so a required question
+  // for ideas never stands in the way of a problem.
+  const ownList = repo.fields ?? [];
+  const ownQuestions = ownList.length
+    ? `<div class="own-questions"${ownList.some((q) => questionAsks(q, kind)) ? "" : " hidden"}>
+        ${ownList
+          .map((q, i) => {
+            const on = questionAsks(q, kind);
+            return `<fieldset class="own-question" data-for="${escapeAttr(q.for)}"${on ? "" : " hidden disabled"}>
+              ${ownQuestionControl(q, `report-q${i}`, text)}
+            </fieldset>`;
+          })
+          .join("")}
+      </div>`
+    : "";
+
   return `<div class="page narrow">
     <header class="page-head">
       <div class="head-text">
@@ -775,6 +814,8 @@ export function reportForm(
         })}
 
         ${bugFields}
+
+        ${ownQuestions}
 
         ${pictures > 0 ? pictureTray("report-pictures", pictures, text) : ""}
 
@@ -3886,6 +3927,8 @@ export interface RepositoryPanel {
   /** Which of the problem form's two questions this project asks. */
   asks_version?: boolean;
   asks_steps?: boolean;
+  /** The project's own questions, in the order they are asked. */
+  fields?: Question[];
   /** Hidden from everybody who is not on the team. */
   private?: boolean;
   /** A data URL, or absent for the initials of the name. */
@@ -4024,10 +4067,84 @@ export function repositoryScreen(
     <div class="settings">
       ${summary}
       ${settings}
+      ${questionsCard(repo.fields ?? [], text)}
       ${team ? repositoryTeam(repo, team, text) : ""}
       ${channel}
       ${danger}
     </div>`;
+}
+
+/** How many questions of its own a project may ask; the server holds the same. */
+export const MAX_QUESTIONS = 10;
+
+/**
+ * A project's own questions on its report form: one row each, in the order the
+ * form asks them, with what kind of answer it takes, which reports it is put to
+ * and whether it must be answered, and the buttons to move, edit and remove it.
+ * The dialog that adds and edits one is drawn once beside it.
+ */
+export function questionsCard(fields: Question[], text: Text): string {
+  const tag = (words: string) => `<span class="mono-tag">${escapeHTML(words)}</span>`;
+  const turn = (q: Question, direction: "up" | "down", disabled: boolean) => {
+    const label = text.t(direction === "up" ? "landing.moveUp" : "landing.moveDown");
+    return `<button type="button" class="icon-button" data-turn="${direction}" data-move-question="${escapeAttr(q.key)}"
+      data-direction="${direction}" title="${escapeAttr(label)}" aria-label="${escapeAttr(label)}"${disabled ? " disabled" : ""}>${icons.chevron()}</button>`;
+  };
+  const rows = fields.length
+    ? `<ul class="settings-list questions">${fields
+        .map((q, i) =>
+          settingsItem({
+            lead: "",
+            name: q.label,
+            tags:
+              tag(text.t(`question.type.${q.type}`)) +
+              tag(text.t(`question.for.${q.for}`)) +
+              (q.required ? tag(text.t("question.required")) : ""),
+            attrs: `data-question="${escapeAttr(q.key)}"`,
+            actions:
+              turn(q, "up", i === 0) +
+              turn(q, "down", i === fields.length - 1) +
+              iconButton("edit", text.t("action.edit"), `data-edit-question="${escapeAttr(q.key)}"`) +
+              iconButton("remove", text.t("action.remove"), `class="icon-button danger" data-remove-question="${escapeAttr(q.key)}" data-label="${escapeAttr(q.label)}"`),
+          }),
+        )
+        .join("")}</ul>`
+    : `<p class="card-sub">${escapeHTML(text.t("repo.noQuestions"))}</p>`;
+  const full = fields.length >= MAX_QUESTIONS;
+  return (
+    settingsCard(
+      text.t("repo.questions"),
+      rows + (full ? `<p class="card-sub">${escapeHTML(text.t("error.question_limit"))}</p>` : ""),
+      {
+        lead: text.t("repo.questionsLead"),
+        action: full ? undefined : actionButton("add", text.t("repo.addQuestion"), "data-add-question", "primary"),
+      },
+    ) + questionModal(text)
+  );
+}
+
+/** The dialog that adds a question and edits one; main.ts fills it in for an edit. */
+function questionModal(text: Text): string {
+  const types: [string, string][] = (["short", "long", "choice", "date"] as const).map((t) => [t, text.t(`question.type.${t}`)]);
+  const fors: [string, string][] = (["both", "bug", "idea"] as const).map((f) => [f, text.t(`question.for.${f}`)]);
+  return modal(
+    {
+      id: "question-modal",
+      title: text.t("repo.addQuestion"),
+      formClass: "question-form",
+      submit: text.t("action.save"),
+      body: `<input type="hidden" name="key" value="" />
+        ${field({ id: "q-label", name: "label", label: text.t("question.label"), hint: text.t("question.labelHelp"), required: true }, undefined)}
+        ${choiceField({ id: "q-type", name: "type", label: text.t("question.type"), options: types, selected: "short" })}
+        <p class="hint" data-type-fixed hidden>${escapeHTML(text.t("question.typeFixed"))}</p>
+        <div data-options hidden>
+          ${areaField({ id: "q-options", name: "options", label: text.t("question.options"), hint: text.t("question.optionsHelp"), rows: 4 })}
+        </div>
+        ${choiceField({ id: "q-for", name: "for", label: text.t("question.for"), options: fors, selected: "both" })}
+        <div class="toggle-rows">${toggleRow("required", text.t("question.required"), text.t("question.requiredHelp"), false)}</div>`,
+    },
+    text,
+  );
 }
 
 function repositoryCrumb(org: { slug: string; name: string }, text: Text): string {

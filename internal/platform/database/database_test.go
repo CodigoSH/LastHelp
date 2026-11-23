@@ -508,3 +508,30 @@ func TestEveryExistingProjectKeepsAskingForTheVersionAndTheSteps(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// field_def had no column saying which reports a question is put to. A row from
+// before it — none is known to exist, the table had no writer — is asked of both.
+func TestAQuestionFromBeforeIsAskedOfEveryReport(t *testing.T) {
+	db := open(t)
+	for _, stmt := range []string{
+		`INSERT INTO organization (id, slug, name, forge_kind, base_url, forge_owner, created_at) VALUES (1, 'acme', 'Acme', 'none', '', '', 0)`,
+		`INSERT INTO repository (id, org_id, slug, name, forge_repo, created_at) VALUES (1, 1, 'atlas', 'Atlas', '', 0)`,
+		`ALTER TABLE field_def DROP COLUMN applies_to`,
+		`INSERT INTO field_def (repo_id, key, label, type) VALUES (1, 'f00000001', 'Room', 'short')`,
+		`PRAGMA user_version = 17`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	var applies string
+	if err := db.QueryRow(`SELECT applies_to FROM field_def WHERE key = 'f00000001'`).Scan(&applies); err != nil {
+		t.Fatal(err)
+	}
+	if applies != "both" {
+		t.Errorf("a question from before the column is asked of %q, want both", applies)
+	}
+}

@@ -66,6 +66,14 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		// A repository is deleted by whoever runs its organisation.
 		"can_delete": canManage,
 	}
+	// The project's own questions, which its settings page lists and edits.
+	own, err := s.forms().List(repo.ID)
+	if err != nil {
+		slog.Error("reading a project's questions", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	body["fields"] = describeQuestions(own)
 	if canManage {
 		for key, value := range channelDetails(repo.NotifyConfig) {
 			body[key] = value

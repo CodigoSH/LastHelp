@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/form"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/guard"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
@@ -22,9 +23,11 @@ import (
 //
 // It is in bytes, because it bounds what is read off the wire, and the limits
 // on the words are in characters: a report at every one of them in a language
-// that takes four bytes a letter is (200 + 20,000 + two answers of 4,000) times
-// four, about 113 KB. 64 KiB refused that as a malformed request.
-const reportBodyLimit = 128 << 10
+// that takes four bytes a letter is (200 + 20,000 + twelve answers of 4,000 —
+// the version, the steps and a project's ten own questions) times four, about
+// 273 KB. 64 KiB once refused the two-answer version of that as a malformed
+// request, and 128 KiB would have refused this one.
+const reportBodyLimit = 320 << 10
 
 // handleOrganizations lists what this instance serves. Public: it is the front
 // page of the portal.
@@ -94,6 +97,13 @@ func (s *Server) handleRepository(w http.ResponseWriter, r *http.Request) {
 	// separately is a second request every page has to remember to make.
 	body := describeRepository(repo, s.mailConfigured())
 	body["organization"] = map[string]any{"slug": organisation.Slug, "name": organisation.Name}
+	// The project's own questions, for the form. Not reading them is not a
+	// reason to refuse the page: it is drawn with the questions every project has.
+	own, err := s.forms().List(repo.ID)
+	if err != nil {
+		slog.Error("reading a project's questions", "error", err)
+	}
+	body["fields"] = describeQuestions(own)
 	writeJSON(w, http.StatusOK, body)
 }
 
@@ -452,6 +462,36 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 		spec.Value = value
 		fields = append(fields, spec)
+		answers = append(answers, value)
+	}
+
+	// Then the project's own questions, the ones put to this kind. Each answer has
+	// to be the kind its question takes: a required one answered, a choice from
+	// the list, a date that is a date. The label stored is the one the question
+	// has now, so rewording it later does not rewrite this report.
+	own, err := s.forms().List(repo.ID)
+	if err != nil {
+		slog.Error("reading a project's questions", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	}
+	for _, q := range own {
+		if !q.Asks(string(kind)) {
+			continue
+		}
+		value := strings.TrimSpace(in.Fields[q.Key])
+		if err := q.Check(value); err != nil {
+			key := "error.field_invalid"
+			if errors.Is(err, form.ErrRequired) {
+				key = "error.field_required"
+			}
+			writeError(w, http.StatusBadRequest, key)
+			return
+		}
+		if value == "" {
+			continue
+		}
+		fields = append(fields, item.Field{Key: q.Key, Label: q.Label, Value: value})
 		answers = append(answers, value)
 	}
 

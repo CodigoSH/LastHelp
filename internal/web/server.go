@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/form"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/outbox"
@@ -313,6 +314,11 @@ func (s *Server) routes() {
 	private("PATCH /api/orgs/{org}", s.handleRenameOrganization)
 	private("DELETE /api/orgs/{org}", s.handleDeleteOrganization)
 	private("PATCH /api/orgs/{org}/repos/{repo}", s.handleUpdateRepository)
+	// A project's own questions on its report form.
+	private("POST /api/orgs/{org}/repos/{repo}/fields", s.handleCreateQuestion)
+	private("PATCH /api/orgs/{org}/repos/{repo}/fields/{key}", s.handleUpdateQuestion)
+	private("DELETE /api/orgs/{org}/repos/{repo}/fields/{key}", s.handleDeleteQuestion)
+	private("POST /api/orgs/{org}/repos/{repo}/fields/{key}/move", s.handleMoveQuestion)
 	// A repository's page in the panel, and the team of an organisation: who
 	// works where, changed by whoever runs it.
 	private("GET /api/orgs/{org}/repos/{repo}/panel", s.handleRepositoryPanel)
@@ -463,6 +469,7 @@ func (s *Server) accounts() account.Store  { return account.Store{DB: s.db} }
 func (s *Server) sessions() session.Store  { return session.Store{DB: s.db} }
 func (s *Server) orgs() org.Store          { return org.Store{DB: s.db} }
 func (s *Server) items() item.Store        { return item.Store{DB: s.db} }
+func (s *Server) forms() form.Store        { return form.Store{DB: s.db} }
 func (s *Server) settings() settings.Store { return settings.Store{DB: s.db} }
 func (s *Server) outbox() outbox.Store     { return outbox.Store{DB: s.db} }
 

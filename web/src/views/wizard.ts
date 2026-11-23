@@ -150,11 +150,18 @@ export function areaField(
 
 /** A labelled <select>, with the same shape as a field so a form reads evenly. */
 export function choiceField(
-  spec: Omit<FieldSpec, "example"> & { options: [string, string][]; selected?: string },
+  spec: Omit<FieldSpec, "example"> & {
+    options: [string, string][];
+    selected?: string;
+    /** A first, empty choice with these words, for a question with no answer
+     *  given yet: without it the first real choice looks already chosen. */
+    blank?: string;
+  },
 ): string {
   return `<div class="field">
     <label for="${escapeAttr(spec.id)}">${escapeHTML(spec.label)}</label>
-    <select id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}">
+    <select id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}"${spec.required ? " required" : ""}>
+      ${spec.blank !== undefined ? `<option value="">${escapeHTML(spec.blank)}</option>` : ""}
       ${spec.options
         .map(
           ([value, label]) =>

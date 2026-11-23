@@ -547,6 +547,17 @@ var migrations = []migration{
 			return addColumn(tx, "repository", "asks_steps", "INTEGER NOT NULL DEFAULT 1")
 		},
 	},
+	{
+		version: 18,
+		name:    "a project's own question says which kind of report it is asked of",
+		// field_def has been in the schema since the first version, with no code
+		// writing to it, so no row exists anywhere for this default to change; it
+		// is "both" so that one written before the column, were there any, would
+		// keep being asked of everything.
+		fn: func(tx *sql.Tx) error {
+			return addColumn(tx, "field_def", "applies_to", "TEXT NOT NULL DEFAULT 'both'")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

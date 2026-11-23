@@ -149,11 +149,25 @@ export interface OrganizationSummary {
   webhook_path?: string;
 }
 
+/** One of a project's own questions on its report form. */
+export interface Question {
+  key: string;
+  /** The team's words, shown as they wrote them. */
+  label: string;
+  type: "short" | "long" | "choice" | "date";
+  required: boolean;
+  options: string[];
+  /** Which reports it is asked of: "bug", "idea" or "both". */
+  for: "bug" | "idea" | "both";
+}
+
 export interface RepositorySummary {
   slug: string;
   name: string;
   accepts_bugs: boolean;
   accepts_ideas: boolean;
+  /** The project's own questions, in the order they are asked. */
+  fields?: Question[];
   /** Whether reporters and the team may attach pictures. */
   accepts_images?: boolean;
   /** Which of the problem form's two questions this project asks. */

@@ -253,6 +253,32 @@ describe("pictures", () => {
     expect(both).toContain('name="steps"');
   });
 
+  test("a project's own questions are drawn for their kind, and disabled for the other", () => {
+    const org = { slug: "acme", name: "Acme" };
+    const repo = {
+      slug: "atlas",
+      name: "Atlas",
+      accepts_bugs: true,
+      accepts_ideas: true,
+      can_notify: false,
+      fields: [
+        { key: "f00000001", label: "Room", type: "choice" as const, required: true, options: ["Kitchen", "Hall"], for: "bug" as const },
+        { key: "f00000002", label: "Budget", type: "short" as const, required: false, options: [], for: "idea" as const },
+      ],
+    };
+    const html = reportForm(org, repo, "bug", text, 0);
+    const set = (key: string) => html.slice(html.lastIndexOf("<fieldset", html.indexOf(`name="${key}"`)), html.indexOf(`name="${key}"`));
+    // The problem's question: shown, enabled, required, with an empty first choice.
+    expect(set("f00000001")).not.toContain("disabled");
+    expect(html).toMatch(/name="f00000001" required/);
+    expect(html).toContain('<option value="">[question.choose]</option>');
+    expect(html).toContain('<option value="Hall">Hall</option>');
+    // The idea's: there, but hidden and disabled, so it is neither checked nor sent.
+    expect(set("f00000002")).toContain("hidden disabled");
+    // No questions, no block.
+    expect(reportForm(org, { ...repo, fields: [] }, "bug", text, 0)).not.toContain("own-questions");
+  });
+
   test("the report shows its own pictures and each message its own", () => {
     const html = itemView(
       report({
