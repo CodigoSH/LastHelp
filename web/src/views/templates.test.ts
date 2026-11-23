@@ -238,6 +238,21 @@ describe("pictures", () => {
     expect(reportForm(org, repo, "bug", text, 0)).not.toContain("data-tray");
   });
 
+  test("the problem form asks only the questions the project turned on", () => {
+    const org = { slug: "acme", name: "Acme" };
+    const base = { slug: "atlas", name: "Atlas", accepts_bugs: true, accepts_ideas: true, can_notify: false };
+    const none = reportForm(org, base, "bug", text, 0);
+    expect(none).not.toContain('name="version"');
+    expect(none).not.toContain('name="steps"');
+    expect(none).not.toContain("kind-fields");
+    const versionOnly = reportForm(org, { ...base, asks_version: true }, "bug", text, 0);
+    expect(versionOnly).toContain('name="version"');
+    expect(versionOnly).not.toContain('name="steps"');
+    const both = reportForm(org, { ...base, asks_version: true, asks_steps: true }, "bug", text, 0);
+    expect(both).toContain('name="version"');
+    expect(both).toContain('name="steps"');
+  });
+
   test("the report shows its own pictures and each message its own", () => {
     const html = itemView(
       report({

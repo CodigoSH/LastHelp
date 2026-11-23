@@ -52,6 +52,8 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		"accepts_bugs":   repo.AcceptsBugs,
 		"accepts_ideas":  repo.AcceptsIdeas,
 		"accepts_images": repo.AcceptsImages,
+		"asks_version":   repo.AsksVersion,
+		"asks_steps":     repo.AsksSteps,
 		"private":        repo.Private,
 		"icon":           repo.Icon,
 		// Which channel. The address and the recipient go only to whoever may

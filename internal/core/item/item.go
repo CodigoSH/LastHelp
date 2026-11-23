@@ -231,8 +231,16 @@ type Field struct {
 	Position int
 }
 
+// Asks is which of the problem form's two questions a project has turned on.
+// The project decides it (org.Repository.AsksVersion, AsksSteps); it is a type
+// of its own here so that this package does not reach into that one.
+type Asks struct {
+	Version bool
+	Steps   bool
+}
+
 // FieldsFor is the whole set of questions a kind may be asked, in the order
-// they are asked in.
+// they are asked in, given which of them the project asks.
 //
 // Fixed here rather than taken from whatever the browser sends. The submission
 // endpoint used to build a field out of every key in the request and use the
@@ -244,18 +252,24 @@ type Field struct {
 // Only a bug has any. An idea is the sentence somebody wrote; asking it which
 // version it happened in is a box that means nothing, and every box on a public
 // form is somebody deciding not to bother.
-func FieldsFor(k Kind) []Field {
+func FieldsFor(k Kind, asks Asks) []Field {
 	if k != Bug {
 		return nil
 	}
 	// The labels are English and stay English: they are stored with the answer
 	// and printed into the forge issue, which the team reads — not necessarily
 	// in the language the reporter's browser happened to be in. The page
-	// translates them for the person filling them in.
-	return []Field{
-		{Key: "version", Label: "Version", Position: 0},
-		{Key: "steps", Label: "Steps to reproduce", Position: 1},
+	// translates them for the person filling them in. A question the project
+	// does not ask is not here, so an answer to it that arrives anyway is
+	// dropped like any other key nobody asked for.
+	var out []Field
+	if asks.Version {
+		out = append(out, Field{Key: "version", Label: "Version", Position: 0})
 	}
+	if asks.Steps {
+		out = append(out, Field{Key: "steps", Label: "Steps to reproduce", Position: 1})
+	}
+	return out
 }
 
 // Item is a report or an idea.

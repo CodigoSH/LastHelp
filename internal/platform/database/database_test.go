@@ -470,3 +470,41 @@ func TestEveryExistingOrganizationAndBoardStaysPublic(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// A project from before the version and steps became switches asked both of
+// every problem. After the update it still does: what its reporters see does not
+// change because the installation was updated.
+func TestEveryExistingProjectKeepsAskingForTheVersionAndTheSteps(t *testing.T) {
+	db := open(t)
+	if _, err := db.Exec(`INSERT INTO organization (id, slug, name, forge_kind, base_url, forge_owner, created_at)
+		VALUES (1, 'acme', 'Acme', 'none', '', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO repository (id, org_id, slug, name, forge_repo, created_at)
+		VALUES (1, 1, 'atlas', 'Atlas', '', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	// An installation from before the switches, whose table lacks the columns.
+	for _, stmt := range []string{
+		`ALTER TABLE repository DROP COLUMN asks_version`,
+		`ALTER TABLE repository DROP COLUMN asks_steps`,
+		`PRAGMA user_version = 16`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	var version, steps int
+	if err := db.QueryRow(`SELECT asks_version, asks_steps FROM repository WHERE id = 1`).Scan(&version, &steps); err != nil {
+		t.Fatal(err)
+	}
+	if version != 1 || steps != 1 {
+		t.Errorf("after the update the project asks version=%d steps=%d, want both as before", version, steps)
+	}
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -910,6 +910,8 @@ func TestABugIsAskedWhatMakesItUsable(t *testing.T) {
 	team.claim()
 	team.createOrg("codigosh")
 	team.createRepo("codigosh", "lastboard")
+	// Software, so its team turns both questions on; a new project has neither.
+	team.asks("codigosh", "lastboard", true, true)
 
 	public := team.anonymous()
 	id, _ := public.submitWith("codigosh", "lastboard", "bug", "crash on import", map[string]string{
@@ -977,6 +979,7 @@ func TestTheAnswersReachTheForge(t *testing.T) {
 	team.claim()
 	team.createOrg("codigosh")
 	team.createRepo("codigosh", "lastboard")
+	team.asks("codigosh", "lastboard", true, true)
 
 	public := team.anonymous()
 	id, _ := public.submitWith("codigosh", "lastboard", "bug", "crash on import", map[string]string{

@@ -4040,6 +4040,8 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
       accepts_bugs: data.get("accepts_bugs") !== null,
       accepts_ideas: data.get("accepts_ideas") !== null,
       accepts_images: data.get("accepts_images") !== null,
+      asks_version: data.get("asks_version") !== null,
+      asks_steps: data.get("asks_steps") !== null,
       private: data.get("private") !== null,
       icon: String(data.get("icon") ?? ""),
     });

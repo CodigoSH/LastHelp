@@ -100,6 +100,10 @@ type repositoryChange struct {
 	Icon *string `json:"icon"`
 	// AcceptsImages likewise: absent leaves it as it was.
 	AcceptsImages *bool `json:"accepts_images"`
+	// AsksVersion and AsksSteps likewise, each on its own: one that is not sent
+	// keeps what the project had.
+	AsksVersion *bool `json:"asks_version"`
+	AsksSteps   *bool `json:"asks_steps"`
 	// Private likewise.
 	Private *bool `json:"private"`
 }
@@ -148,6 +152,19 @@ func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) 
 	}
 	if in.AcceptsImages != nil {
 		if err := s.orgs().SetAcceptsImages(repo.ID, *in.AcceptsImages); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+	}
+	if in.AsksVersion != nil || in.AsksSteps != nil {
+		version, steps := repo.AsksVersion, repo.AsksSteps
+		if in.AsksVersion != nil {
+			version = *in.AsksVersion
+		}
+		if in.AsksSteps != nil {
+			steps = *in.AsksSteps
+		}
+		if err := s.orgs().SetFormFields(repo.ID, version, steps); err != nil {
 			writeError(w, http.StatusInternalServerError, "error.internal")
 			return
 		}

@@ -110,6 +110,13 @@ type Repository struct {
 	// On unless the team turned it off.
 	AcceptsImages bool
 
+	// AsksVersion and AsksSteps are whether the problem form asks which version
+	// was in use and what steps lead to the problem: questions for software, so a
+	// new project starts without them and a team that makes software turns them
+	// on. Projects from before the switches keep asking, as they always did.
+	AsksVersion bool
+	AsksSteps   bool
+
 	// NotifyConfig is the channel this board's team reads, stored as JSON. It
 	// is opaque here on purpose: the domain has no business knowing what a
 	// Gotify token is.
@@ -245,10 +252,13 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 	// Pictures are on for a new board: the column's default, said here too so
 	// what is returned matches what was stored.
 	r.AcceptsImages = true
+	// The version and steps questions are written as given, never left to the
+	// column's default: that default is 1, for the projects that existed before
+	// the switches, and a new project starts with whatever the caller chose.
 	res, err := s.DB.Exec(`INSERT INTO repository
-		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, icon, is_private, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas, r.Icon, r.Private, now.Unix())
+		(org_id, slug, name, forge_repo, accepts_bugs, accepts_ideas, asks_version, asks_steps, icon, is_private, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.OrgID, r.Slug, r.Name, r.ForgeRepo, r.AcceptsBugs, r.AcceptsIdeas, r.AsksVersion, r.AsksSteps, r.Icon, r.Private, now.Unix())
 	if err != nil {
 		if isUnique(err) {
 			return Repository{}, ErrSlugTaken
@@ -270,7 +280,8 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.is_private, r.created_at
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.asks_version, r.asks_steps,
+		       r.notify_config, r.icon, r.is_private, r.created_at
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
 		WHERE o.slug = ? AND r.slug = ?`, NormaliseSlug(orgSlug), NormaliseSlug(repoSlug)))
@@ -279,14 +290,16 @@ func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 func (s Store) RepositoryByID(id int64) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, is_private, created_at
+		       accepts_bugs, accepts_ideas, accepts_images, asks_version, asks_steps,
+		       notify_config, icon, is_private, created_at
 		FROM repository WHERE id = ?`, id))
 }
 
 func (s Store) ListRepositories(orgID int64) ([]Repository, error) {
 	rows, err := s.DB.Query(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, accepts_images, notify_config, icon, is_private, created_at
+		       accepts_bugs, accepts_ideas, accepts_images, asks_version, asks_steps,
+		       notify_config, icon, is_private, created_at
 		FROM repository WHERE org_id = ? ORDER BY name COLLATE NOCASE, id`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("listing repositories: %w", err)
@@ -337,7 +350,8 @@ func scanRepositoryRow(row scanner) (Repository, error) {
 	var r Repository
 	var created int64
 	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.ForgeRepo,
-		&r.AcceptsBugs, &r.AcceptsIdeas, &r.AcceptsImages, &r.NotifyConfig, &r.Icon, &r.Private, &created)
+		&r.AcceptsBugs, &r.AcceptsIdeas, &r.AcceptsImages, &r.AsksVersion, &r.AsksSteps,
+		&r.NotifyConfig, &r.Icon, &r.Private, &created)
 	if err != nil {
 		return Repository{}, err
 	}
@@ -420,6 +434,21 @@ func (s Store) SetAcceptsImages(id int64, on bool) error {
 	return nil
 }
 
+// SetFormFields turns the problem form's version and steps questions on or
+// off for one project. Apart from UpdateRepository, like the pictures, so that
+// an edit which does not mention them — a page from before they existed —
+// leaves them as they were.
+func (s Store) SetFormFields(id int64, version, steps bool) error {
+	res, err := s.DB.Exec(`UPDATE repository SET asks_version = ?, asks_steps = ? WHERE id = ?`, version, steps, id)
+	if err != nil {
+		return fmt.Errorf("setting the form of the repository: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // SetOrganizationIcon replaces an organisation's icon; empty goes back to the
 // initials. Apart from the rename, so that one that does not mention the icon
 // leaves it alone.
@@ -483,7 +512,8 @@ func (b Board) Hidden() bool { return b.Private || b.OrgPrivate }
 func (s Store) ListBoards() ([]Board, error) {
 	rows, err := s.DB.Query(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.notify_config, r.icon, r.is_private, r.created_at,
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.asks_version, r.asks_steps,
+		       r.notify_config, r.icon, r.is_private, r.created_at,
 		       o.slug, o.name, o.is_private
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
@@ -498,7 +528,8 @@ func (s Store) ListBoards() ([]Board, error) {
 		var b Board
 		var created int64
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Slug, &b.Name, &b.ForgeRepo,
-			&b.AcceptsBugs, &b.AcceptsIdeas, &b.AcceptsImages, &b.NotifyConfig, &b.Icon, &b.Private, &created,
+			&b.AcceptsBugs, &b.AcceptsIdeas, &b.AcceptsImages, &b.AsksVersion, &b.AsksSteps,
+			&b.NotifyConfig, &b.Icon, &b.Private, &created,
 			&b.OrgSlug, &b.OrgName, &b.OrgPrivate)
 		if err != nil {
 			return nil, fmt.Errorf("listing boards: %w", err)

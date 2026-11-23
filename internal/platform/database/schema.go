@@ -533,6 +533,20 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 17,
+		name:    "a project chooses whether its problem form asks for a version and for steps",
+		// Both questions were asked of every problem, which suits software and
+		// nothing else. Each becomes a switch. 1 is what every existing row already
+		// did, so a project that exists keeps asking them; a new one is created with
+		// both off, by the code that creates it, not by this default.
+		fn: func(tx *sql.Tx) error {
+			if err := addColumn(tx, "repository", "asks_version", "INTEGER NOT NULL DEFAULT 1"); err != nil {
+				return err
+			}
+			return addColumn(tx, "repository", "asks_steps", "INTEGER NOT NULL DEFAULT 1")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

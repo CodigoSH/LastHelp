@@ -694,12 +694,13 @@ export function reportForm(
     repo.accepts_ideas ? choice("idea", text.t("form.kindIdea"), text.t("form.kindIdeaHelp"), icons.idea(20)) : "",
   ].join("");
 
-  // Only a bug is asked these, and the block is drawn once and hidden rather
-  // than rebuilt on every choice: rebuilding it would throw away whatever had
-  // already been typed in it.
-  const bugFields = repo.accepts_bugs
-    ? `<div class="kind-fields" data-for="bug"${kind === "bug" ? "" : " hidden"}>
-        ${field(
+  // Only a problem is asked these, and only the ones the project turned on: a
+  // version and steps are questions for software. The block is drawn once and
+  // hidden rather than rebuilt on every choice: rebuilding it would throw away
+  // whatever had already been typed in it.
+  const asked = [
+    repo.asks_version
+      ? field(
           {
             id: "report-version",
             name: "version",
@@ -708,15 +709,22 @@ export function reportForm(
             example: "1.4.2",
           },
           text,
-        )}
-        ${areaField({
+        )
+      : "",
+    repo.asks_steps
+      ? areaField({
           id: "report-steps",
           name: "steps",
           label: text.t("form.steps"),
           hint: text.t("form.stepsHelp"),
           example: text.t("form.stepsPlaceholder"),
           rows: 4,
-        })}
+        })
+      : "",
+  ].join("");
+  const bugFields = repo.accepts_bugs && asked
+    ? `<div class="kind-fields" data-for="bug"${kind === "bug" ? "" : " hidden"}>
+        ${asked}
       </div>`
     : "";
 
@@ -1469,13 +1477,31 @@ export function repositoryFields(text: Text, forge: string, hasForge: boolean): 
  *  refused by the server, and defaulting to off makes that the common mistake.
  *  Pictures are a field of their own: they are not a kind of report, and the
  *  "at least one" under the kinds is not about them. */
-export function acceptsFields(text: Text, current?: { bugs: boolean; ideas: boolean; images?: boolean; private?: boolean }): string {
+export function acceptsFields(
+  text: Text,
+  current?: {
+    bugs: boolean;
+    ideas: boolean;
+    images?: boolean;
+    private?: boolean;
+    /** The problem form's two questions. Absent draws neither: a project is
+     *  created without them and they are turned on from its settings. */
+    version?: boolean;
+    steps?: boolean;
+  },
+): string {
   // What a board takes and who may see it are switches, on rows of their own:
   // the control the panel uses for a thing that is on or off, with what it
   // means beside it. Boxed checkboxes read as a form to fill in, and these are
   // not answers but settings.
+  const asks =
+    current?.version === undefined
+      ? ""
+      : `${toggleRow("asks_version", text.t("repo.askVersion"), text.t("repo.askVersionHelp"), current.version)}
+    ${toggleRow("asks_steps", text.t("repo.askSteps"), text.t("repo.askStepsHelp"), current.steps ?? false)}`;
   return `<div class="toggle-rows">
     ${toggleRow("accepts_bugs", text.t("repo.acceptsBugs"), "", current?.bugs ?? true)}
+    ${asks}
     ${toggleRow("accepts_ideas", text.t("repo.acceptsIdeas"), text.t("repo.acceptsHelp"), current?.ideas ?? true)}
     ${toggleRow("accepts_images", text.t("repo.acceptsImages"), text.t("repo.imagesHelp"), current?.images ?? true)}
     ${toggleRow("private", text.t("visibility.private"), text.t("visibility.help"), current?.private ?? false)}
@@ -3857,6 +3883,9 @@ export interface RepositoryPanel {
   accepts_ideas: boolean;
   /** Whether reporters and the team may attach pictures. */
   accepts_images?: boolean;
+  /** Which of the problem form's two questions this project asks. */
+  asks_version?: boolean;
+  asks_steps?: boolean;
   /** Hidden from everybody who is not on the team. */
   private?: boolean;
   /** A data URL, or absent for the initials of the name. */
@@ -3950,7 +3979,14 @@ export function repositoryScreen(
       ${iconField(text, repo.name, repo.icon ?? "")}
       ${field({ id: "rs-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: repo.name }, text)}
       ${hasForge ? field({ id: "rs-forge", name: "forge_repo", label: text.t("panel.forgeRepo"), hint: text.t("panel.forgeRepoHelp"), value: repo.forge_repo }, text) : ""}
-      ${acceptsFields(text, { bugs: repo.accepts_bugs, ideas: repo.accepts_ideas, images: repo.accepts_images ?? true, private: repo.private ?? false })}
+      ${acceptsFields(text, {
+        bugs: repo.accepts_bugs,
+        ideas: repo.accepts_ideas,
+        images: repo.accepts_images ?? true,
+        private: repo.private ?? false,
+        version: repo.asks_version ?? false,
+        steps: repo.asks_steps ?? false,
+      })}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">
         <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button></div>

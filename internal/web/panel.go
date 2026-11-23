@@ -100,6 +100,11 @@ type newRepository struct {
 	AcceptsIdeas *bool  `json:"accepts_ideas"`
 	// AcceptsImages is on unless it is sent off.
 	AcceptsImages *bool `json:"accepts_images"`
+	// AsksVersion and AsksSteps are off unless they are sent on: the problem
+	// form of a new project asks only what a problem of any kind has, and a team
+	// that makes software turns these on.
+	AsksVersion bool `json:"asks_version"`
+	AsksSteps   bool `json:"asks_steps"`
 	// Icon is a data URL, or empty for the initials of the name.
 	Icon string `json:"icon"`
 	// Private keeps the board from the public; public unless chosen.
@@ -155,6 +160,7 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 	created, err := s.orgs().CreateRepository(org.Repository{
 		OrgID: o.ID, Slug: in.Slug, Name: in.Name, ForgeRepo: in.ForgeRepo,
 		AcceptsBugs: accepts(in.AcceptsBugs), AcceptsIdeas: accepts(in.AcceptsIdeas),
+		AsksVersion: in.AsksVersion, AsksSteps: in.AsksSteps,
 		Icon: icon, Private: in.Private,
 	}, s.now())
 	if err != nil {

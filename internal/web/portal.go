@@ -445,7 +445,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	// label the sender chose is a sentence they got the team to print.
 	fields := make([]item.Field, 0, len(in.Fields))
 	answers := make([]string, 0, len(in.Fields))
-	for _, spec := range item.FieldsFor(kind) {
+	for _, spec := range item.FieldsFor(kind, item.Asks{Version: repo.AsksVersion, Steps: repo.AsksSteps}) {
 		value := strings.TrimSpace(in.Fields[spec.Key])
 		if value == "" {
 			continue
@@ -802,7 +802,12 @@ func describeRepository(r org.Repository, mailConfigured bool) map[string]any {
 		"accepts_ideas": r.AcceptsIdeas,
 		// Whether the form offers pictures: the board's switch.
 		"accepts_images": r.AcceptsImages,
-		"icon":           r.Icon,
+		// Which of the problem form's two questions this project asks. The
+		// server drops an answer to one it does not ask, so these only spare
+		// somebody typing into a box that goes nowhere.
+		"asks_version": r.AsksVersion,
+		"asks_steps":   r.AsksSteps,
+		"icon":         r.Icon,
 		// With no relay there is nothing to notify anybody with, so the form
 		// does not ask for an address rather than collecting one it cannot use.
 		"can_notify": mailConfigured,

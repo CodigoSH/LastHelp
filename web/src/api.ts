@@ -156,6 +156,9 @@ export interface RepositorySummary {
   accepts_ideas: boolean;
   /** Whether reporters and the team may attach pictures. */
   accepts_images?: boolean;
+  /** Which of the problem form's two questions this project asks. */
+  asks_version?: boolean;
+  asks_steps?: boolean;
   /** A data URL, or absent for the initials of the name. */
   icon?: string;
   /** Whether a mail relay exists. Without one the form does not ask for an

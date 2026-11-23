@@ -202,8 +202,10 @@ func seed(path string, now time.Time) error {
 	}
 	repos := map[string]org.Repository{}
 	for _, r := range []org.Repository{
-		{OrgID: acme.ID, Slug: "atlas", Name: "Atlas", AcceptsBugs: true, AcceptsIdeas: true},
-		{OrgID: acme.ID, Slug: "orbit", Name: "Orbit", AcceptsBugs: true, AcceptsIdeas: true},
+		// Two pieces of software, so their problem forms ask for the version and
+		// the steps, which a new project does not until somebody turns them on.
+		{OrgID: acme.ID, Slug: "atlas", Name: "Atlas", AcceptsBugs: true, AcceptsIdeas: true, AsksVersion: true, AsksSteps: true},
+		{OrgID: acme.ID, Slug: "orbit", Name: "Orbit", AcceptsBugs: true, AcceptsIdeas: true, AsksVersion: true, AsksSteps: true},
 	} {
 		made, err := orgs.CreateRepository(r, start)
 		if err != nil {
@@ -237,7 +239,8 @@ func seed(path string, now time.Time) error {
 	for _, r := range all {
 		when := now.AddDate(0, 0, -r.daysAgo)
 		fields := []item.Field{}
-		for _, spec := range item.FieldsFor(r.kind) {
+		project := repos[r.repo]
+		for _, spec := range item.FieldsFor(r.kind, item.Asks{Version: project.AsksVersion, Steps: project.AsksSteps}) {
 			spec.Value = map[string]string{"version": "1.4.2", "steps": "1. Open the page\n2. Do what the title says"}[spec.Key]
 			if spec.Value != "" {
 				fields = append(fields, spec)
