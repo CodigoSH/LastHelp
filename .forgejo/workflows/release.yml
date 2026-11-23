@@ -291,19 +291,19 @@ jobs:
           fi
           echo "the stable channel sees: ${latest:-no stable release yet}"
 
-  # Retention runs from here, not from the tag push. The prune asks the API
-  # which releases exist, and on a tag push it asked before this one had been
-  # published — so it decided from a list that was one version out of date.
-  # With `needs:`, it runs only when the release above actually shipped, which
-  # also means a failed release never costs the previous beta.
-  #
-  # Not `on: workflow_run`, whose support here is incomplete.
-  prune:
-    name: Prune old releases
-    needs: release
-    runs-on: ubuntu-latest
-    container: node:24-trixie
-    steps:
+      # Retention and the website are asked for from here, as the last steps of the release
+      # and not as jobs of their own. Each is four seconds of curl, and a job of its own is
+      # a slot of the runner, which has one: it went to the back of a queue of everybody
+      # else's runs and the release read as running for as long as that took, twenty-five
+      # minutes on a day with four releases. A step runs only if every step before it
+      # passed, which is all the `needs:` they replace was for.
+      #
+      # Retention runs from here, not from the tag push. The prune asks the API which
+      # releases exist, and on a tag push it asked before this one had been published — so
+      # it decided from a list that was one version out of date. It also means a failed
+      # release never costs the previous beta.
+      #
+      # Not `on: workflow_run`, whose support here is incomplete.
       - name: Dispatch the prune, live
         env:
           CI_TOKEN: ${{ secrets.CI_TOKEN }}
@@ -321,16 +321,10 @@ jobs:
           [ "$code" = "204" ] || { echo "the prune dispatch answered HTTP $code" >&2; exit 1; }
           echo "prune dispatched"
 
-  # The website reads the latest release from this repository's API when it is
-  # built, and a build set off by the tag push happens minutes before the
-  # release above exists — so it would go on advertising the previous version
-  # until something else rebuilt it. Dispatched only once the release shipped.
-  site-rebuild:
-    name: Rebuild the website
-    needs: release
-    runs-on: ubuntu-latest
-    container: node:24-trixie
-    steps:
+      # The website reads the latest release from this repository's API when it is built,
+      # and a build set off by the tag push happens minutes before the release above exists
+      # — so it would go on advertising the previous version until something else rebuilt
+      # it. Dispatched only once the release shipped.
       - name: Dispatch the website rebuild
         env:
           CI_TOKEN: ${{ secrets.CI_TOKEN }}
