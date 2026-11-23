@@ -51,8 +51,8 @@ jobs:
 
           BASE = os.environ["GITHUB_API_URL"]
           REPO = os.environ["GITHUB_REPOSITORY"]
-          # The container image this repository publishes, named as docker-release.yml
-          # names it: the repository, lowercased, under its owner.
+          # The container image this repository publishes, named as release.yml names
+          # it: the repository, lowercased, under its owner.
           PKG_OWNER, PKG_NAME = REPO.split("/")[0], REPO.split("/")[1].lower()
           TOKEN = os.environ["CI_TOKEN"]
           KEEP_STABLE = int(os.environ.get("KEEP_STABLE", "2"))

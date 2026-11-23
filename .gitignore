@@ -98,3 +98,6 @@ AUDIT.md
 audit.md
 PLAN_*.md
 ROADMAP_*.md
+
+# The binaries the release copies into the container image. Built output.
+/image-bin/

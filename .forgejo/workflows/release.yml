@@ -130,6 +130,106 @@ jobs:
           go run ./cmd/sign sign dist/SHA256SUMS
           test -s dist/SHA256SUMS.sig
 
+      # ---- the container image, from the binaries above -------------------
+      #
+      # The image used to be a workflow of its own that compiled the same commit
+      # again inside the Dockerfile, for each architecture: two more builds per
+      # release, a second slot of the runner, and an image whose binary was not
+      # the one signed here (it carried another commit string). Now it is these
+      # binaries, copied: what is pulled is what is on the release page, and its
+      # hash is in SHA256SUMS.
+      #
+      # Before `publish`, so that an image that cannot be built stops the release
+      # instead of leaving a release page with no image beside it.
+      #
+      # No signing key reaches the image, and none is needed: the binary inside a
+      # container refuses to update itself, because updating a container is
+      # pulling a new image. The panel says so instead of offering the button.
+      - name: binaries for the image
+        run: |
+          mkdir -p image-bin
+          for arch in amd64 arm64; do
+            cp "dist/lasthelp-linux-${arch}" image-bin/
+            GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false -ldflags "-s -w" \
+              -o "image-bin/healthcheck-linux-${arch}" ./cmd/healthcheck
+          done
+          # The same files as the release, and not only the same names.
+          for arch in amd64 arm64; do
+            cmp "dist/lasthelp-linux-${arch}" "image-bin/lasthelp-linux-${arch}"
+          done
+          ls -la image-bin
+
+      # The Docker socket is mounted into the job container whatever image it
+      # runs on (act/runner/run_context.go, forgejo-runner v13.2.0).
+      - name: Install Docker CLI and Buildx
+        run: |
+          # Retry transient gateway errors (e.g. 504) on external downloads.
+          CURL="curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 30"
+
+          # Docker CLI static binary (pinned, no apt/systemd deps)
+          $CURL "https://download.docker.com/linux/static/stable/x86_64/docker-29.9.2.tgz" \
+            | tar xz --strip-components=1 -C /usr/local/bin docker/docker
+
+          # Buildx plugin (pinned)
+          mkdir -p /usr/lib/docker/cli-plugins
+          $CURL "https://github.com/docker/buildx/releases/download/v0.38.1/buildx-v0.38.1.linux-amd64" \
+            -o /usr/lib/docker/cli-plugins/docker-buildx
+          chmod +x /usr/lib/docker/cli-plugins/docker-buildx
+
+      - name: Set lowercase image name
+        id: vars
+        run: echo "image=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: git.codigosh.com/${{ steps.vars.outputs.image }}
+          # `latest` is decided here and nowhere else. The action's default
+          # flavour is `latest=auto`, which adds the tag to whatever it judges to
+          # be the newest release — and it judges by parsing the version. A tag
+          # like v1.7.0-Beta.09 is not valid semver (a numeric prerelease
+          # identifier may not carry a leading zero), so the parse failed, the
+          # action stopped seeing a prerelease, and it moved `latest` onto that
+          # beta. Betas here are padded to two digits, so the same would happen.
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+            type=raw,value=beta,enable=${{ contains(github.ref, 'Beta') }}
+            type=raw,value=rc,enable=${{ contains(github.ref, 'RC') }}
+            type=ref,event=tag
+
+      - name: Login to registry
+        env:
+          CI_TOKEN: ${{ secrets.CI_TOKEN }}
+        run: echo "${CI_TOKEN}" | docker login git.codigosh.com -u ${{ github.actor }} --password-stdin
+
+      - name: Set up Docker Buildx
+        run: |
+          docker buildx create --name multiarch --driver docker-container --use
+          docker buildx inspect --bootstrap
+
+      - name: Build and push multi-arch image
+        run: |
+          TAGS=""
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
+            TAGS="$TAGS --tag $tag"
+          done <<< "${{ steps.meta.outputs.tags }}"
+
+          # BINARIES=prebuilt: the image takes image-bin/ instead of compiling.
+          # Nothing runs on the target platform, so neither architecture is
+          # emulated. See the Dockerfile.
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --build-arg BINARIES=prebuilt \
+            $TAGS \
+            --push \
+            .
+
       - name: publish
         env:
           CI_TOKEN: ${{ secrets.CI_TOKEN }}
