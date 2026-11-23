@@ -7896,10 +7896,23 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
 .tl-note { font-size: 11px; color: var(--text-dim); opacity: 0.75; }
 .tl-note:empty { display: none; }
 
+/* Running: a dim ring with an arc turning on it, and a soft pulse around it.
+   The turning arc is what says "working": the pulse alone reads as a frozen
+   screen during a step that takes a while, such as copying a large database. */
 .tl-step.is-running .tl-dot {
-  border-color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.28);
   box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.15);
   animation: tl-pulse 1.4s ease-in-out infinite;
+}
+
+.tl-step.is-running .tl-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-block-start-color: var(--accent);
+  animation: tl-spin 0.9s linear infinite;
 }
 
 .tl-step.is-running .tl-label { color: var(--text-main); font-weight: 600; }
@@ -7932,6 +7945,10 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
   50% { box-shadow: 0 0 0 7px rgba(var(--accent-rgb), 0.05); }
 }
 
+@keyframes tl-spin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes tl-pop {
   from { transform: scale(0.4); }
   60% { transform: scale(1.15); }
@@ -7958,6 +7975,11 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
   .tl-step.is-error .tl-dot,
   .notification-dot,
   .side-update { animation: none; }
+
+  /* Without motion the arc would be a still, odd-looking piece of ring: the
+     step is marked by a full accent ring instead. */
+  .tl-step.is-running .tl-dot { border-color: var(--accent); }
+  .tl-step.is-running .tl-dot::after { display: none; }
 }
 
 /* Open and closed on the archive. A row of equal segments the width of the search
