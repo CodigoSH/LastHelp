@@ -7256,11 +7256,18 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
 
 .card-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-block-end: 4px;
 }
+
+/* When the title and its action do not fit side by side — a phone, a long word
+   in German — the action drops to a line of its own instead of squeezing the
+   title onto three lines or running past the card's edge. */
+.card-top > h3 { flex: 1 1 12rem; }
+.card-top > .button { flex: 0 0 auto; }
 
 .admin-main .bento-card .card-sub {
   display: block;
