@@ -159,12 +159,12 @@ that leaves the field out leaves the switch as it was.
 ### What a notification says, and in which language
 
 A channel the whole team reads has no one language, so what arrived is not said
-as a word. The **title is the repository's name**, the **body is the report's
+as a word. The **title is the project's name**, the **body is the report's
 title** (in whatever language its author wrote it), and the **kind** is a mark:
-💡 an idea, 🐞 a bug, 💬 a comment waiting for review. ntfy gets it as its own
+💡 an idea, ⚠️ a problem, 💬 a comment waiting for review. ntfy gets it as its own
 emoji tag, beside the title; Gotify and mail put the mark before the title; the
-webhook carries it as `"kind": "idea" | "bug" | "comment"`, a code a script can
-switch on without reading a language, and absent for a test.
+webhook carries it as `"kind": "idea" | "bug" | "comment"` (a problem is `"bug"`),
+a code a script can switch on without reading a language, and absent for a test.
 
 **Push is the exception, because it goes to one person.** Each account is told in
 its own language: the same report reads *Atlas: Idea* to one account and

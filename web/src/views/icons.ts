@@ -223,12 +223,10 @@ export const icons = {
        <path d="M12 9v4M12 17h.01"/>`,
       s,
     ),
-  bug: (s?: number) =>
-    stroke(
-      `<rect x="8" y="6" width="8" height="14" rx="4"/><path d="M19 7l-3 2M5 7l3 2"/>
-       <path d="M19 13h3M2 13h3M19 19l-3-2M5 19l3-2"/><path d="M9 6V4a3 3 0 0 1 6 0v2"/>`,
-      s,
-    ),
+  // A problem, whatever it is about: a circle with an exclamation mark. The kind
+  // is still called "bug" underneath, but an insect said software to somebody
+  // reporting a broken streetlight.
+  bug: (s?: number) => stroke(`<circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 17h.01"/>`, s),
   idea: (s?: number) =>
     stroke(
       `<path d="M9 18h6M10 22h4"/>

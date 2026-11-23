@@ -231,7 +231,7 @@ func TestTheOfflineSwitchStopsNotificationsToo(t *testing.T) {
 func TestWhatArrivedIsAMarkAndACodeNotAWord(t *testing.T) {
 	for kind, want := range map[string]struct{ tag, glyph string }{
 		"idea":    {"bulb", "💡"},
-		"bug":     {"beetle", "🐞"},
+		"bug":     {"warning", "⚠️"},
 		"comment": {"speech_balloon", "💬"},
 	} {
 		server, seen := recorder(t)

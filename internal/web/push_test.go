@@ -413,8 +413,11 @@ func TestAPushIsWrittenInTheLanguageOfWhoReadsIt(t *testing.T) {
 	}{
 		{"en", "idea", "Atlas: Idea"},
 		{"es", "idea", "Atlas: Idea"},
-		{"es", "bug", "Atlas: Fallo"},
-		{"de", "bug", "Atlas: Fehler"},
+		{"es", "bug", "Atlas: Problema"},
+		// Not German: there "Problem" is spelled as in English, and a case that
+		// reads the same in both cannot tell a fall back to English from the right
+		// language.
+		{"fr", "bug", "Atlas: Problème"},
 		{"es", "comment", "Atlas: Comentario pendiente de revisión"},
 	}
 	for _, c := range cases {

@@ -114,8 +114,9 @@ type Message struct {
 
 	// Kind is what arrived, as a code and not as a word: "idea", "bug" or
 	// "comment". A channel shared by a whole team has no one language to say it
-	// in, so it says it with a mark every language reads — a bulb, a beetle, a
-	// speech balloon — and a script reads the code itself. A channel that goes to
+	// in, so it says it with a mark every language reads — a bulb, a warning
+	// sign, a speech balloon — and a script reads the code itself. The code stays
+	// "bug" for a problem: it is what a webhook receiver already matches on. A channel that goes to
 	// one person writes the word in that person's language instead.
 	Kind string
 
@@ -146,7 +147,7 @@ func (m Message) Glyph() string {
 	case "idea":
 		return "💡"
 	case "bug":
-		return "🐞"
+		return "⚠️"
 	case "comment":
 		return "💬"
 	case "update":
@@ -160,7 +161,7 @@ func (m Message) Tag() string {
 	case "idea":
 		return "bulb"
 	case "bug":
-		return "beetle"
+		return "warning"
 	case "comment":
 		return "speech_balloon"
 	case "update":
