@@ -20,6 +20,21 @@ jobs:
   ci:
     name: Check, test and build
     runs-on: ubuntu-latest
+    # A push made of nothing but the commits scripts/release.sh writes is not
+    # checked again: the release preflight ran these checks on that very tree,
+    # and release.yml waits behind this run for the runner's only slot. Any
+    # other push runs, code pushed together with a release included: a third
+    # commit, or one that is not a release commit, and this is true. Forgejo's
+    # push event has no total_commits, hence "there is no commits[2]"; a list
+    # that is missing, empty or cut short also runs.
+    if: >-
+      !(github.event_name == 'push'
+      && github.event.commits[2] == null
+      && (startsWith(github.event.commits[0].message, 'release: ')
+      || startsWith(github.event.commits[0].message, 'chore(release): bump to '))
+      && (github.event.commits[1] == null
+      || startsWith(github.event.commits[1].message, 'release: ')
+      || startsWith(github.event.commits[1].message, 'chore(release): bump to ')))
     # `ubuntu-latest` is a label the runner translates, and by default it lands
     # on a Node image built on Debian bullseye — from 2021, carrying OpenSSL
     # 1.1.1. That is not a detail: verifying an ed25519 signature needs
