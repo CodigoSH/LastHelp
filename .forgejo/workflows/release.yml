@@ -180,12 +180,33 @@ jobs:
         id: vars
         run: echo "image=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
+      - name: Decide which moving tags this version may take
+        id: moving
+        run: |
+          # A moving tag goes only to the newest version of its kind. A tag pushed
+          # again for an old release (a history rewrite does that) must not take
+          # `latest` back to it: on 24-oct-2026 a re-pushed v1.0.6 did, and
+          # `:latest` served a June image for days.
+          this="${GITHUB_REF_NAME#v}"
+          names=$(git ls-remote --tags --refs origin 'v*' | sed 's#.*refs/tags/v##')
+          # No match is an answer (a repository with no beta yet), not an error: the
+          # runner's shell stops on a failed command inside a pipeline.
+          [ -n "$names" ] || { echo "no version tags found on the remote: refusing to guess"; exit 1; }
+          newest() { { printf '%s\n' "$names" | grep -E "$1" || true; } | sort -V | tail -n 1; }
+          stable=$(newest '^[0-9]+\.[0-9]+\.[0-9]+$')
+          beta=$(newest '^[0-9]+\.[0-9]+\.[0-9]+-[Bb]eta')
+          rc=$(newest '^[0-9]+\.[0-9]+\.[0-9]+-(RC|rc)')
+          [ "$this" = "$stable" ] && echo "latest=true" >> "$GITHUB_OUTPUT" || echo "latest=false" >> "$GITHUB_OUTPUT"
+          [ "$this" = "$beta" ] && echo "beta=true" >> "$GITHUB_OUTPUT" || echo "beta=false" >> "$GITHUB_OUTPUT"
+          [ "$this" = "$rc" ] && echo "rc=true" >> "$GITHUB_OUTPUT" || echo "rc=false" >> "$GITHUB_OUTPUT"
+          echo "v$this — newest stable v$stable, beta v$beta, rc v$rc"
+
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: git.codigosh.com/${{ steps.vars.outputs.image }}
-          # `latest` is decided here and nowhere else. The action's default
+          # `latest` is decided by the step above and nowhere else. The action's default
           # flavour is `latest=auto`, which adds the tag to whatever it judges to
           # be the newest release — and it judges by parsing the version. A tag
           # like v1.7.0-Beta.09 is not valid semver (a numeric prerelease
@@ -197,9 +218,9 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
-            type=raw,value=beta,enable=${{ contains(github.ref, 'Beta') }}
-            type=raw,value=rc,enable=${{ contains(github.ref, 'RC') }}
+            type=raw,value=latest,enable=${{ steps.moving.outputs.latest == 'true' }}
+            type=raw,value=beta,enable=${{ steps.moving.outputs.beta == 'true' }}
+            type=raw,value=rc,enable=${{ steps.moving.outputs.rc == 'true' }}
             type=ref,event=tag
 
       - name: Login to registry
