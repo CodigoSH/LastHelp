@@ -229,7 +229,8 @@ export const icons = {
   // A problem, whatever it is about: a circle with an exclamation mark. The kind
   // is still called "bug" underneath, but an insect said software to somebody
   // reporting a broken streetlight.
-  bug: (s?: number) => stroke(`<circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 17h.01"/>`, s),
+  /** A problem: a square with a warning in it, so it never reads as the round clock of what waits. */
+  bug: (s?: number) => stroke(`<rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><path d="M12 8v5M12 16.5h.01"/>`, s),
   idea: (s?: number) =>
     stroke(
       `<path d="M9 18h6M10 22h4"/>

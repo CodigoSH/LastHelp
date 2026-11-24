@@ -2119,11 +2119,11 @@ function privateMark(text: Text): string {
   return `<span class="mono-tag" data-private="true">${escapeHTML(text.t("visibility.tag"))}</span>`;
 }
 
-function acceptsMarks(repo: { accepts_bugs: boolean; accepts_ideas: boolean }, text: Text): string {
+function acceptsMarks(repo: { accepts_bugs: boolean; accepts_ideas: boolean }, text: Text, size = 15): string {
   const mark = (kind: string) =>
     `<span class="kind kind-${kind}" role="img" title="${escapeAttr(text.t(`kind.${kind}`))}"
        aria-label="${escapeAttr(text.t(`kind.${kind}`))}" data-accepts="${kind}">${
-      kind === "bug" ? icons.bug(15) : icons.idea(15)
+      kind === "bug" ? icons.bug(size) : icons.idea(size)
     }</span>`;
   return (repo.accepts_bugs ? mark("bug") : "") + (repo.accepts_ideas ? mark("idea") : "");
 }
@@ -3067,13 +3067,15 @@ function settingsItem(spec: {
   lead: string;
   name: string;
   sub?: string;
+  /** Marks drawn by these templates after the sub line: what the thing is, beside its address. */
+  subMarks?: string;
   tags?: string;
   href?: string;
   actions?: string;
   attrs?: string;
 }): string {
   const main = `${spec.lead}<span class="si-text"><span class="si-name">${escapeHTML(spec.name)}</span>${
-    spec.sub ? `<span class="si-sub">${escapeHTML(spec.sub)}</span>` : ""
+    spec.sub ? `<span class="si-sub">${escapeHTML(spec.sub)}${spec.subMarks ? `<span class="si-sub-marks">${spec.subMarks}</span>` : ""}</span>` : ""
   }</span>${spec.tags ? `<span class="si-tags">${spec.tags}</span>` : ""}`;
   return `<li class="settings-item" ${spec.attrs ?? ""}>
     ${spec.href ? `<a class="si-main" href="${escapeAttr(spec.href)}">${main}</a>` : `<div class="si-main">${main}</div>`}
@@ -3983,10 +3985,10 @@ export function organizationScreen(
         lead: r.icon ? markOf(r.name, r.icon, "si-mark repo-si-mark") : `<span class="si-mark">${icons.repository(16)}</span>`,
         name: r.name,
         sub: `/${org.slug}/${r.slug}`,
-        tags:
-          (r.pending > 0
-            ? waitingMark(r.pending, text)
-            : "") + (r.private ? privateMark(text) : "") + acceptsMarks(r, text),
+        // What the project is — the kinds it takes — beside its address; on the right only what
+        // happens in it, so the kinds never read as two more counts.
+        subMarks: acceptsMarks(r, text, 13),
+        tags: (r.pending > 0 ? waitingMark(r.pending, text) : "") + (r.private ? privateMark(text) : ""),
         href: `/panel/${org.slug}/repos/${r.slug}`,
         actions: `${iconButton("open", text.t("shell.publicBoard"), `data-open="/${escapeAttr(org.slug)}/${escapeAttr(r.slug)}"`)}
           ${data.can_delete_repos ? iconButton("remove", text.t("action.delete"), `class="icon-button danger" data-delete-repo="${escapeAttr(r.slug)}" data-name="${escapeAttr(r.name)}"`) : ""}`,

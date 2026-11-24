@@ -7719,6 +7719,16 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
 .si-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
 .si-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-inline-start: auto; }
 .si-actions { display: flex; gap: 4px; flex: none; }
+/* The kinds a project takes, beside its address: part of what it is, not a count. */
+.si-sub-marks { display: inline-flex; align-items: center; gap: 8px; margin-inline-start: 10px; vertical-align: -2px; }
+/* A project's row: what waits as a small amber pill, and a hairline before the buttons, so the
+   state and the actions read as two groups. */
+.settings-list.repositories .state-mark.hold {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hue-hold) 14%, transparent);
+}
+.settings-list.repositories .si-actions { padding-inline-start: 10px; margin-inline-start: 4px; border-inline-start: 1px solid var(--border); }
 
 /* A small monospaced tag: a role, a slug, a state. */
 .mono-tag {
