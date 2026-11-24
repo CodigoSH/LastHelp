@@ -4922,27 +4922,102 @@ body > nav .brand {
   border-block-start: 1px solid var(--border);
 }
 
-/* The server's facts: a card each, two to a row, one on a phone. */
-.about-stats {
+/* What needs the administrator: one card under the product. Amber when anything is wrong, blue when
+   all there is to say is information, green and quiet when there is nothing; the count in the tone,
+   the worst three by name beside it, and the way to all of them at the foot. */
+.about-attn { min-block-size: 0; }
+.about-attn .ov-kpi-main { gap: 18px; align-items: flex-start; }
+.about-attn.warn,
+.about-attn.info { cursor: pointer; transition: border-color 0.15s; }
+.about-attn.warn { border-color: rgba(var(--warning-rgb), 0.45); background: linear-gradient(rgba(var(--warning-rgb), 0.06), rgba(var(--warning-rgb), 0.06)), var(--sheet); }
+.about-attn.warn:hover { border-color: rgba(var(--warning-rgb), 0.8); }
+.about-attn.info:hover { border-color: rgba(var(--accent-rgb), 0.35); }
+.about-attn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.about-attn.warn .ov-kpi-top .icon,
+.about-attn.warn .ov-kpi-v { color: var(--warning-color); opacity: 1; }
+.about-attn.info .ov-kpi-top .icon,
+.about-attn.info .ov-kpi-v { color: var(--hue-open); opacity: 1; }
+.about-attn.ok .ov-kpi-top .icon { color: var(--success-color); opacity: 1; }
+.about-attn-ok { font-size: 18px; font-weight: 700; color: var(--success-color); }
+.about-attn-list { display: grid; min-inline-size: 0; gap: 2px; font-size: 13px; font-weight: 600; line-height: 1.6; }
+.about-attn-item { overflow-wrap: anywhere; }
+.about-attn-more { font-weight: 500; color: var(--text-dim); }
+
+/* A state as a dot: the tone of an item, or whether a setting is on. Off is grey, not red: off is a choice. */
+.about-dot { display: inline-block; inline-size: 7px; block-size: 7px; margin-inline-end: 8px; border-radius: 50%; vertical-align: 1px; background: var(--text-dim); opacity: 0.45; }
+.about-dot.bad { background: var(--danger-color); opacity: 1; }
+.about-dot.warn { background: var(--warning-color); opacity: 1; }
+.about-dot.info { background: var(--hue-open); opacity: 1; }
+.about-dot.ok { background: var(--success-color); opacity: 1; }
+
+/* The discreet way to the server's facts: a small pill in the product card's corner. */
+.about-hero { position: relative; }
+.about-hero-tools { position: absolute; inset-block-start: 14px; inset-inline-end: 14px; }
+.about-server-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: none;
+  color: var(--text-dim);
+  font: 500 11px/1.3 var(--font-mono);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.about-server-button:hover { color: var(--text-main); border-color: rgba(var(--accent-rgb), 0.35); }
+
+/* In the attention dialog: each line's mark in its tone, and the fix under the reason. */
+.about-modal .ov-need { align-items: flex-start; padding: 12px; }
+.about-modal .ov-need.bad .ov-need-mark { color: var(--danger-color); border-color: rgba(var(--danger-rgb), 0.4); background: rgba(var(--danger-rgb), 0.08); }
+.about-modal .ov-need.warn .ov-need-mark { color: var(--warning-color); border-color: rgba(var(--warning-rgb), 0.4); background: rgba(var(--warning-rgb), 0.08); }
+.about-modal .ov-need.info .ov-need-mark { color: var(--hue-open); }
+.about-modal .ov-need-text .about-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block-start: 6px; }
+.about-fix .ov-more { align-self: auto; margin: 0; }
+.about-fix code {
+  padding: 1px 6px;
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  background: var(--surface-dim);
+  color: var(--text-main);
+  font: 500 11px/1.5 var(--font-mono);
+}
+
+/* In the server dialog: a group's name over a card of label and value lines, a bar under a value that has one. */
+.about-modal .ov-sub { margin: 6px 0 -4px; }
+.about-kvs { border: 1px solid var(--card-border); border-radius: 8px; background: var(--sheet); }
+.about-kv {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  align-items: center;
+  column-gap: 16px;
+  padding: 10px 14px;
+  border-block-start: 1px solid var(--card-border);
+  font-size: 13px;
 }
-
-.about-stat-value {
-  display: block;
-  margin-block-start: 6px;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
+.about-kv:first-child { border-block-start: 0; }
+.about-k { color: var(--text-dim); }
+.about-v { min-inline-size: 0; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.about-v small { margin-inline-start: 6px; font-weight: 400; color: var(--text-dim); }
+.about-kv .about-meter { grid-column: 2; margin-block-start: 6px; }
+.about-support {
+  inline-size: 100%;
+  margin-block-start: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--surface-dim);
+  color: var(--text-main);
+  font: 500 12px/1.5 var(--font-mono);
+  resize: none;
 }
-
-.about-stat-sub { margin: 4px 0 0; font-size: 12px; color: var(--text-dim); }
-.about-stat .about-meter { margin-block-start: 10px; }
 
 @media (max-width: 40rem) {
-  .about-stats { grid-template-columns: minmax(0, 1fr); }
+  .about-hero-tools { position: static; margin-block-end: 8px; }
+  .about-kv { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
+  .about-kv .about-meter { grid-column: 1; }
 }
 
 .about-links a {

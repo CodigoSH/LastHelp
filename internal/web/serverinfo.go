@@ -3,8 +3,8 @@ package web
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
+	"time"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/database"
@@ -36,10 +36,6 @@ func (s *Server) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 	// Seconds rather than a formatted string: the page knows the reader's
 	// language and this does not.
 	out["uptime_seconds"] = int64(s.now().Sub(s.startedAt).Seconds())
-	// A proxy is in front that the configuration does not know about.
-	if s.forwardedUnread.Load() {
-		out["proxy_unread"] = true
-	}
 	out["started_at"] = s.startedAt.Unix()
 
 	// The database and everything SQLite keeps beside it. Reporting only the
@@ -61,11 +57,7 @@ func (s *Server) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 		out["schema"] = schema
 	}
 
-	dir := filepath.Dir(s.cfg.DBFile)
-	if dir == "" {
-		dir = "."
-	}
-	if free, total, ok := diskFree(dir); ok {
+	if free, total, ok := diskFree(s.dataDir()); ok {
 		out["disk_free_bytes"] = free
 		out["disk_total_bytes"] = total
 	}
@@ -78,6 +70,25 @@ func (s *Server) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 	runtime.ReadMemStats(&mem)
 	out["memory_bytes"] = mem.Sys - mem.HeapReleased
 	out["goroutines"] = runtime.NumGoroutine()
+
+	// The machine: processor and memory, where the system says. A short sample,
+	// because this is asked when somebody opens the dialog, not polled.
+	if host, ok := readHostStats(150 * time.Millisecond); ok {
+		out["host"] = host
+	}
+
+	// How this server is set up, as far as it changes what people get: the
+	// address it builds links with, whether it trusts a proxy, whether it can
+	// send mail or reach anything outside, and whether this request came over
+	// HTTPS. Whether mail is set up, never its password.
+	out["config"] = map[string]any{
+		"trust_proxy": s.cfg.TrustProxy,
+		"proxy_hops":  s.cfg.TrustProxyHops,
+		"public_url":  s.cfg.PublicURL,
+		"mail":        s.cfg.Mail.Host != "",
+		"offline":     s.cfg.Offline,
+		"https":       s.isSecure(r),
+	}
 
 	writeJSON(w, http.StatusOK, out)
 }

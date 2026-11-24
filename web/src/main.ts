@@ -1229,8 +1229,15 @@ async function showAbout(): Promise<void> {
   // Asked of the server rather than assembled from what the page happens to
   // know: uptime, disk and memory are facts about the machine, and the browser
   // has none of them.
-  const facts = await api.get<views.ServerFacts>("/api/server").catch(() => ({}) as views.ServerFacts);
-  await showInShell(views.aboutScreen(facts, text), "/panel/about");
+  const [facts, attention] = await Promise.all([
+    api.get<views.ServerFacts>("/api/server").catch(() => ({}) as views.ServerFacts),
+    api
+      .get<{ items: views.AttentionItem[] }>("/api/attention")
+      .then((r) => r.items ?? [])
+      .catch(() => [] as views.AttentionItem[]),
+  ]);
+  await showInShell(views.aboutScreen(facts, attention, text), "/panel/about");
+  wireAttention(attention, facts);
 
   const zone = root?.querySelector<HTMLElement>("[data-update-zone]");
   const check = root?.querySelector<HTMLButtonElement>("[data-check]");
@@ -1248,6 +1255,11 @@ async function showAbout(): Promise<void> {
     zone.innerHTML = views.updateZone(status, text);
     // The bar and the menu follow what was just found.
     if (status) noteUpdate(status);
+    // And a newer version is one more thing on the administrator's list.
+    showAttention([
+      ...attention,
+      ...(status?.available && status.latest ? [{ key: "update", tone: "info" as const, params: { version: status.latest } }] : []),
+    ]);
     if (beta && status) {
       beta.checked = status.beta === true;
       beta.disabled = false;
@@ -1284,6 +1296,51 @@ async function showAbout(): Promise<void> {
   });
 
   await ask();
+}
+
+/** Draws About's attention card and its dialog's list again, from this list. */
+function showAttention(items: views.AttentionItem[]): void {
+  const host = root?.querySelector<HTMLElement>("[data-attention-host]");
+  if (host) host.innerHTML = views.attentionCard(items, text);
+  const body = root?.querySelector<HTMLElement>("[data-attention-body]");
+  if (body) body.innerHTML = views.attentionList(items, text);
+  const count = root?.querySelector<HTMLElement>("[data-attention-count]");
+  if (count) count.textContent = text.number(items.length);
+}
+
+/**
+ * The attention card opens its dialog from the keyboard too (the click is the shared dialog opener's),
+ * the update item in it opens the update dialog, and the server dialog copies what support asks for.
+ */
+function wireAttention(_items: views.AttentionItem[], facts: views.ServerFacts): void {
+  root?.addEventListener("keydown", (event) => {
+    const card = (event.target as HTMLElement).closest<HTMLElement>("[data-attention][data-open-modal]");
+    if (!card || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    root?.querySelector<HTMLDialogElement>("#attention-modal")?.showModal();
+  });
+  root?.querySelector("#attention-modal")?.addEventListener("click", (event) => {
+    if (!(event.target as HTMLElement).closest("[data-attention-update]")) return;
+    event.preventDefault();
+    root?.querySelector<HTMLDialogElement>("#attention-modal")?.close();
+    if (updateFound) openUpdateDialog(updateFound);
+  });
+  root?.querySelector<HTMLButtonElement>("[data-copy-support]")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    try {
+      await navigator.clipboard.writeText(views.supportText(facts));
+      const label = button.querySelector("span");
+      if (label) label.textContent = i18n.t("action.copied");
+    } catch {
+      // No clipboard on a plain-HTTP address, which is how many servers at home are reached: the text
+      // is shown instead, selected, for the person to copy themselves.
+      const area = root?.querySelector<HTMLTextAreaElement>("[data-support-text]");
+      if (!area) return;
+      area.hidden = false;
+      area.focus();
+      area.select();
+    }
+  });
 }
 
 /** A page that could not be loaded. The screen has nothing else to show. */

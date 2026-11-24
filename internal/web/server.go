@@ -91,6 +91,9 @@ type Server struct {
 	// forwardedUnread says a proxy's headers have arrived while this server was
 	// told no proxy is in front, so About can say the setting is probably wrong.
 	forwardedUnread atomic.Bool
+	// insecureSeen says somebody reached this server over plain HTTP from
+	// another machine.
+	insecureSeen atomic.Bool
 
 	// box seals the forge credentials. Its key lives in a file beside the
 	// database rather than in it, so a leaked backup is not write access to
@@ -266,6 +269,7 @@ func (s *Server) routes() {
 	private("POST /api/orgs/{org}/repositories", s.handleCreateRepository)
 	private("GET /api/orgs/{org}/repos/{repo}/queue", s.handleQueue)
 	private("GET /api/server", s.handleServerInfo)
+	private("GET /api/attention", s.handleAttention)
 	private("GET /api/orgs/{org}/repos/{repo}/comments", s.handleCommentQueue)
 
 	// The same queue without having to name a board first. The per-board one
@@ -454,6 +458,7 @@ func (s *Server) wrap() http.Handler {
 	// the whole server on itself.
 	h = middleware.RateLimit(s.perAddress, s.perBlock, s.addressOf)(h)
 	h = s.noticeForwarded(h)                     // and is a proxy in front that nobody declared
+	h = s.noticeInsecure(h)                      // and did it come over plain HTTP
 	h = middleware.BodyLimit(GlobalBodyLimit)(h) // and is it a sane size
 	// Outside the rate limiter, so a refused request is answered with the same
 	// policy as a served one: a 429 that arrives without a CSP is a page the

@@ -4653,7 +4653,7 @@ export function backupScreen(text: Text): string {
     </div>`;
 }
 
-/** What is running, where it came from, and whether there is more of it. */
+/** What is running, where it came from, and the machine under it. */
 export interface ServerFacts {
   version?: string;
   go?: string;
@@ -4665,89 +4665,267 @@ export interface ServerFacts {
   disk_total_bytes?: number;
   memory_bytes?: number;
   schema?: number;
-  /** A reverse proxy or a tunnel is in front, and the configuration says there is none. */
-  proxy_unread?: boolean;
+  /** The machine, where the system says. */
+  host?: { cpu_percent: number; cores: number; mem_total_bytes: number; mem_used_bytes: number };
+  /** How the server is set up, as far as it changes what people get. */
+  config?: { trust_proxy: boolean; proxy_hops: number; public_url: string; mail: boolean; offline: boolean; https: boolean };
+}
+
+/** One thing the administrator should know and can fix, as the server lists it. */
+export interface AttentionItem {
+  key: string;
+  tone: "bad" | "warn" | "info";
+  params?: Record<string, string | number>;
+}
+
+const TONE_ORDER = { bad: 0, warn: 1, info: 2 } as const;
+
+/** Worst first; the order the server gave within one tone. */
+export function attentionInOrder(items: AttentionItem[]): AttentionItem[] {
+  return items
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => TONE_ORDER[a.item.tone] - TONE_ORDER[b.item.tone] || a.i - b.i)
+    .map((x) => x.item);
+}
+
+interface AttentionWords {
+  icon: string;
+  title: string;
+  why?: string;
+  code?: string;
+  act?: string;
+  link?: { label: string; attrs: string };
+}
+
+/** What each kind of item says, in the reader's language: what is wrong, why it matters, the one thing to do. */
+function attentionWords(item: AttentionItem, text: Text): AttentionWords | null {
+  const p = item.params ?? {};
+  switch (item.key) {
+    case "disk":
+      return {
+        icon: icons.disk(14),
+        title: text.t("attention.disk"),
+        why: text.t("attention.diskWhy", { free: text.bytes(Number(p.free_bytes)), total: text.bytes(Number(p.total_bytes)) }),
+        act: text.t("attention.diskAct"),
+      };
+    case "jobs":
+      return {
+        icon: icons.bell(14),
+        title: text.t("overview.needsFailed", { count: text.number(Number(p.count)) }),
+        why: p.last_error ? text.t("attention.jobsWhy", { error: String(p.last_error) }) : text.t("overview.needsFailedWhy"),
+        link: { label: text.t("overview.actCheck"), attrs: 'href="/panel/notifications"' },
+      };
+    case "proxy":
+      return {
+        icon: icons.warning(14),
+        title: text.t("attention.proxy"),
+        why: text.t("attention.proxyWhy"),
+        code: "LASTHELP_TRUST_PROXY=true",
+        act: text.t("attention.restartAct"),
+      };
+    case "public_url":
+      return {
+        icon: icons.link(14),
+        title: text.t("attention.publicUrl"),
+        why: text.t("attention.publicUrlWhy"),
+        code: "LASTHELP_PUBLIC_URL=https://…",
+        act: text.t("attention.restartAct"),
+      };
+    case "https":
+      return { icon: icons.shield(14), title: text.t("attention.https"), why: text.t("attention.httpsWhy"), act: text.t("attention.httpsAct") };
+    case "update":
+      return {
+        icon: icons.update(14),
+        title: text.t("attention.update", { version: String(p.version ?? "") }),
+        link: { label: text.t("attention.updateAct"), attrs: 'href="#" data-attention-update' },
+      };
+    default:
+      // A kind this page does not know yet: left out rather than shown as a key.
+      return null;
+  }
 }
 
 /**
- * About, for the person who has to keep this running: what it is, whether
- * there is something newer, and whether the machine under it is healthy.
- *
- * Updates used to be a page of their own beside this one, with the version on
- * both. They are the same question — "what am I running, and is it the one I
- * should be" — so they are one screen: the product and its
- * version at the top with the update underneath, the release channel as a
- * setting on a row of its own, the server's health below, and the links out
- * at the foot.
- *
- * The update zone is drawn by `updateZone` and filled after the page: asking
- * the release server can take seconds, and the rest of this screen is known at
- * once.
+ * The card on About that holds whatever needs the administrator: how many, the worst three by name, and
+ * the way to all of them. With nothing to say it says so, in green, and is not a button.
  */
-export function aboutScreen(facts: ServerFacts, text: Text): string {
-  // A fact about the machine, as a card of the panel's recipe: its name as the
-  // card's quiet title, the number under it at the size of a number.
-  const row = (label: string, value: string, sub = "", extra = "") =>
-    `<section class="bento-card about-stat">
-      <div class="card-top"><h3>${escapeHTML(label)}</h3></div>
-      <strong class="about-stat-value">${escapeHTML(value)}</strong>
-      ${extra}
-      ${sub ? `<p class="about-stat-sub">${escapeHTML(sub)}</p>` : ""}
-    </section>`;
+export function attentionCard(items: AttentionItem[], text: Text): string {
+  const known = attentionInOrder(items).filter((i) => attentionWords(i, text) !== null);
+  if (known.length === 0) {
+    return `<div class="ov-kpi about-attn ok" data-attention>
+      <div class="ov-kpi-top"><span class="ov-lbl">${escapeHTML(text.t("overview.needsYou"))}</span>${icons.circleCheck()}</div>
+      <div class="ov-kpi-main"><span class="about-attn-ok">${escapeHTML(text.t("attention.allGood"))}</span></div>
+      <div class="ov-kpi-sub"><span>${escapeHTML(text.t("overview.nothingNeedsYou"))}</span></div>
+    </div>`;
+  }
+  const shown = known.slice(0, 3);
+  const tone = known[0]?.tone === "info" ? "info" : "warn";
+  return `<div class="ov-kpi about-attn ${tone}" data-attention data-open-modal="attention-modal" role="button" tabindex="0" aria-haspopup="dialog">
+      <div class="ov-kpi-top"><span class="ov-lbl">${escapeHTML(text.t("overview.needsYou"))}</span>${tone === "info" ? icons.info() : icons.warning()}</div>
+      <div class="ov-kpi-main"><span class="ov-kpi-v">${escapeHTML(text.number(known.length))}</span>
+        <span class="about-attn-list">${shown
+          .map((i) => `<span class="about-attn-item"><span class="about-dot ${i.tone}" aria-hidden="true"></span>${escapeHTML(attentionWords(i, text)!.title)}</span>`)
+          .join("")}${
+          known.length > shown.length
+            ? `<span class="about-attn-more">${escapeHTML(text.t("attention.more", { count: text.number(known.length - shown.length) }))}</span>`
+            : ""
+        }</span></div>
+      <div class="ov-kpi-sub"><span></span><span class="ov-more">${escapeHTML(text.t("attention.seeAll"))}${icons.chevron(12)}</span></div>
+    </div>`;
+}
 
-  const stats: string[] = [];
+/** Every item, worst first, each with what is wrong, why it matters and the one thing to do. */
+export function attentionList(items: AttentionItem[], text: Text): string {
+  return `<div class="ov-needs">${attentionInOrder(items)
+    .map((item) => {
+      const w = attentionWords(item, text);
+      if (!w) return "";
+      const fix = `${w.code ? `<code>${escapeHTML(w.code)}</code>` : ""}${w.act ? `<span>${escapeHTML(w.act)}</span>` : ""}${
+        w.link ? `<a class="ov-more" ${w.link.attrs}>${escapeHTML(w.link.label)}${icons.chevron(12)}</a>` : ""
+      }`;
+      return `<div class="ov-need ${item.tone}" data-attention-item="${escapeAttr(item.key)}">
+        <span class="ov-need-mark">${w.icon}</span>
+        <span class="ov-need-text"><b>${escapeHTML(w.title)}</b>${w.why ? `<span>${escapeHTML(w.why)}</span>` : ""}${
+          fix ? `<span class="about-fix">${fix}</span>` : ""
+        }</span>
+      </div>`;
+    })
+    .join("")}</div>`;
+}
+
+/** What "Copy for support" puts on the clipboard: the facts a bug report needs, in one language for anyone. */
+export function supportText(facts: ServerFacts): string {
+  return [
+    `LastHelp ${facts.version ?? "?"}`,
+    `${facts.os ?? "?"} · ${facts.go ?? "?"}`,
+    `schema ${facts.schema ?? "?"}`,
+    facts.config ? `proxy ${facts.config.trust_proxy ? `on (${facts.config.proxy_hops})` : "off"} · https ${facts.config.https ? "yes" : "no"}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/** The dialog behind About's discreet button: the machine, the installation and how it is set up. */
+export function serverDialog(facts: ServerFacts, text: Text): string {
+  const row = (label: string, value: string, extra = "") =>
+    `<div class="about-kv"><span class="about-k">${escapeHTML(label)}</span><span class="about-v">${value}</span>${extra}</div>`;
+  const meter = (used: number, total: number, label: string) =>
+    total > 0
+      ? `<meter class="about-meter" min="0" max="${String(Math.round(total))}" value="${String(Math.round(used))}"
+          low="${String(Math.round(total * 0.75))}" high="${String(Math.round(total * 0.9))}" optimum="0" aria-label="${escapeAttr(label)}"></meter>`
+      : "";
+  const state = (on: boolean, words: string) => `<span class="about-dot ${on ? "ok" : "off"}" aria-hidden="true"></span>${escapeHTML(words)}`;
+
+  const machine: string[] = [];
+  if (facts.host) {
+    const h = facts.host;
+    machine.push(
+      row(
+        text.t("about.cpu"),
+        `${escapeHTML(text.number(Math.round(h.cpu_percent)))} % · ${escapeHTML(text.t("about.cores", { count: text.number(h.cores) }))}`,
+        meter(h.cpu_percent, 100, text.t("about.cpu")),
+      ),
+      row(
+        text.t("about.hostMemory"),
+        escapeHTML(text.t("about.usedOf", { used: text.bytes(h.mem_used_bytes), total: text.bytes(h.mem_total_bytes) })),
+        meter(h.mem_used_bytes, h.mem_total_bytes, text.t("about.hostMemory")),
+      ),
+    );
+  }
+  if (facts.disk_free_bytes !== undefined && facts.disk_total_bytes !== undefined) {
+    machine.push(
+      row(
+        text.t("about.diskLabel"),
+        escapeHTML(text.t("about.freeOf", { free: text.bytes(facts.disk_free_bytes), total: text.bytes(facts.disk_total_bytes) })),
+        meter(facts.disk_total_bytes - facts.disk_free_bytes, facts.disk_total_bytes, text.t("about.diskLabel")),
+      ),
+    );
+  }
   if (facts.uptime_seconds !== undefined) {
-    stats.push(
+    machine.push(
       row(
         text.t("about.uptime"),
-        text.since(facts.uptime_seconds),
-        facts.started_at !== undefined ? text.t("about.since", { date: text.date(facts.started_at) }) : "",
+        `${escapeHTML(text.since(facts.uptime_seconds))}${
+          facts.started_at !== undefined ? ` <small>${escapeHTML(text.t("about.since", { date: text.date(facts.started_at) }))}</small>` : ""
+        }`,
       ),
     );
-  }
-  if (facts.database_bytes !== undefined) {
-    stats.push(
-      // The size and nothing else: the schema number beside it answered a
-      // question for whoever develops this, not for whoever runs it.
-      row(text.t("about.database"), text.bytes(facts.database_bytes)),
-    );
-  }
-  if (facts.disk_free_bytes !== undefined) {
-    const total = facts.disk_total_bytes;
-    // How full, as a bar under the row's words: a <meter>, so its length is an
-    // attribute this page's policy allows. Amber past 75%, red past 90%.
-    const meter =
-      total !== undefined && total > 0
-        ? // Machine numbers, never through the locale formatter: a decimal
-          // comma in an attribute is a number the browser cannot read.
-          `<meter class="about-meter" min="0" max="${String(Math.round(total))}"
-             value="${String(Math.round(total - facts.disk_free_bytes))}"
-             low="${String(Math.round(total * 0.75))}" high="${String(Math.round(total * 0.9))}" optimum="0"
-             aria-label="${escapeAttr(text.t("about.disk"))}"></meter>`
-        : "";
-    stats.push(
-      row(
-        text.t("about.disk"),
-        text.bytes(facts.disk_free_bytes),
-        total !== undefined ? text.t("about.diskOf", { total: text.bytes(total) }) : "",
-        meter,
-      ),
-    );
-  }
-  if (facts.memory_bytes !== undefined) {
-    stats.push(row(text.t("about.memory"), text.bytes(facts.memory_bytes)));
   }
 
+  const install = [
+    row(text.t("field.version"), escapeHTML(facts.version || "—")),
+    facts.database_bytes !== undefined
+      ? row(
+          text.t("about.database"),
+          `${escapeHTML(text.bytes(facts.database_bytes))}${facts.schema !== undefined ? ` <small>${escapeHTML(text.t("about.schemaValue", { schema: text.number(facts.schema) }))}</small>` : ""}`,
+        )
+      : "",
+    facts.memory_bytes !== undefined ? row(text.t("about.appMemory"), escapeHTML(text.bytes(facts.memory_bytes))) : "",
+    row(text.t("about.platform"), escapeHTML([facts.os, facts.go].filter(Boolean).join(" · ") || "—")),
+  ];
+
+  const c = facts.config;
+  const config = c
+    ? [
+        row(text.t("about.proxyRow"), state(c.trust_proxy, c.trust_proxy ? text.t("about.proxyYes", { hops: text.number(c.proxy_hops) }) : text.t("about.no"))),
+        row(text.t("about.publicUrl"), c.public_url ? `${state(true, "")}<span dir="ltr">${escapeHTML(c.public_url)}</span>` : state(false, text.t("about.notSet"))),
+        row(text.t("about.mail"), state(c.mail, text.t(c.mail ? "about.set" : "about.notSet"))),
+        row(text.t("about.outbound"), state(!c.offline, text.t(c.offline ? "about.off" : "about.on"))),
+        row(text.t("about.https"), state(c.https, text.t(c.https ? "about.yes" : "about.no"))),
+      ]
+    : [];
+
+  const group = (title: string, rows: string[]) =>
+    rows.filter(Boolean).length === 0 ? "" : `<p class="ov-sub">${escapeHTML(title)}</p><div class="about-kvs">${rows.join("")}</div>`;
+
+  return `<dialog class="modal ov-modal about-modal" id="server-modal" aria-labelledby="server-modal-title">
+    <header class="ov-modal-head">
+      <h2 id="server-modal-title">${escapeHTML(text.t("about.serverData"))}</h2>
+      <button type="button" class="icon-button" data-close aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+    </header>
+    <div class="ov-modal-body">
+      ${group(text.t("about.machine"), machine)}
+      ${group(text.t("about.install"), install)}
+      ${group(text.t("about.config"), config)}
+      <textarea class="about-support" data-support-text readonly hidden rows="4" aria-label="${escapeAttr(text.t("about.copySupport"))}">${escapeHTML(
+        supportText(facts),
+      )}</textarea>
+      <div class="ov-modal-foot"><button type="button" class="button ghost with-icon" data-copy-support>${icons.copy(15)}<span>${escapeHTML(
+        text.t("about.copySupport"),
+      )}</span></button></div>
+    </div>
+  </dialog>`;
+}
+
+/** The dialog with every item that needs the administrator. */
+export function attentionDialog(items: AttentionItem[], text: Text): string {
+  return `<dialog class="modal ov-modal about-modal" id="attention-modal" aria-labelledby="attention-modal-title">
+    <header class="ov-modal-head">
+      <h2 id="attention-modal-title">${escapeHTML(text.t("overview.needsYou"))}</h2>
+      <span class="ov-chip" data-attention-count>${escapeHTML(text.number(items.length))}</span>
+      <button type="button" class="icon-button" data-close aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+    </header>
+    <div class="ov-modal-body" data-attention-body>${attentionList(items, text)}</div>
+  </dialog>`;
+}
+
+/**
+ * About, for the person who keeps this running, kept quiet: the product with its version and its
+ * update, what needs them, and the beta switch. The facts about the machine are one discreet button
+ * away, in a dialog, rather than a wall of numbers on the page.
+ */
+export function aboutScreen(facts: ServerFacts, attention: AttentionItem[], text: Text): string {
   const link = (href: string, icon: string, label: string) =>
     `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${icon}<span>${escapeHTML(label)}</span></a>`;
 
-  // The product as a statement in a card of its own — mark, name, version,
-  // and the update under it; the beta switch on a row in a card of its own;
-  // and the links out at the foot, over a rule. The server's health is one
-  // more card of the same recipe with a row per fact.
   return `<h1 class="visually-hidden">${escapeHTML(text.t("shell.about"))}</h1>
     <div class="settings about">
       <section class="bento-card about-hero">
+        <div class="about-hero-tools">
+          <button type="button" class="about-server-button" data-open-modal="server-modal">${icons.chip(13)}<span>${escapeHTML(
+            text.t("about.serverData"),
+          )}</span></button>
+        </div>
         <img class="about-logo" src="/logo.svg" alt="" width="72" height="72" />
         <h2 class="about-name">${escapeHTML(text.t("app.name"))}</h2>
         <p class="about-version">${escapeHTML(facts.version || "—")}</p>
@@ -4756,14 +4934,7 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
           ${icons.update(15)}<span>${escapeHTML(text.t("update.check"))}</span></button>
       </section>
 
-      ${
-        // Said here, where the person who can change the setting looks, and only once the server has seen
-        // a proxy's headers arrive: every visitor otherwise has that proxy's address, in the sessions and
-        // in the sign-in limits, and nothing else on any screen would say so.
-        facts.proxy_unread
-          ? `<p class="notice">${icons.warning()}<span>${escapeHTML(text.t("about.proxyUnread", { setting: "LASTHELP_TRUST_PROXY" }))}</span></p>`
-          : ""
-      }
+      <div data-attention-host>${attentionCard(attention, text)}</div>
 
       <section class="bento-card">
         <div class="settings-row">
@@ -4779,14 +4950,14 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
         </div>
       </section>
 
-      ${stats.length === 0 ? "" : `<div class="about-stats">${stats.join("")}</div>`}
-
       <nav class="about-links" aria-label="${escapeAttr(text.t("shell.about"))}">
         ${link("https://git.codigosh.com/CodigoSH/LastHelp", icons.code(15), text.t("about.sourceCode"))}
         ${link("https://support.codigosh.com/codigosh/lasthelp", icons.comment(15), text.t("about.support"))}
         ${link("https://opencollective.com/codigosh", icons.heart(15), text.t("about.donate"))}
       </nav>
-    </div>`;
+    </div>
+    ${attentionDialog(attention, text)}
+    ${serverDialog(facts, text)}`;
 }
 
 /** What /api/update says. */

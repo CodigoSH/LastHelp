@@ -54,13 +54,13 @@ func TestNoNoticeWithoutGrounds(t *testing.T) {
 	}
 }
 
-// What was noticed reaches the administrator on About, and not before.
+// What was noticed reaches the administrator, and not before.
 func TestAboutSaysAProxyIsUndeclared(t *testing.T) {
 	i := newInstance(t)
 	i.claim()
 
-	if _, said := decode(t, i.do(http.MethodGet, "/api/server", nil))["proxy_unread"]; said {
-		t.Fatal("About says a proxy is undeclared before any proxy header arrived")
+	if i.attentionHas("proxy") {
+		t.Fatal("told of a proxy before any proxy header arrived")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, i.server.URL+"/api/status", nil)
@@ -74,7 +74,7 @@ func TestAboutSaysAProxyIsUndeclared(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 
-	if got := decode(t, i.do(http.MethodGet, "/api/server", nil))["proxy_unread"]; got != true {
-		t.Errorf("after a proxy header from this machine, About says proxy_unread=%v, want true", got)
+	if !i.attentionHas("proxy") {
+		t.Error("after a proxy header from this machine, the administrator is not told")
 	}
 }
