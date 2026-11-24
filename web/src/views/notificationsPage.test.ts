@@ -31,6 +31,17 @@ describe("the menu", () => {
     expect(groupOf(shell({ isAdmin: true }), "/panel/antiabuse")).toBe("[shell.groupSystem]");
   });
 
+  test("inside an organization or one of its projects, Organizations is the current place, and only it", () => {
+    const orgs = [{ slug: "acme", name: "Acme" }] as ShellSpec["organizations"];
+    for (const path of ["/panel/acme", "/panel/acme/repos/atlas"]) {
+      const html = shell({ path, organizations: orgs, isAdmin: true });
+      expect(html).toContain('href="/panel/organizations" aria-current="page"');
+      expect(html.match(/aria-current="page"/g)?.length).toBe(1);
+    }
+    // A page of the panel is not mistaken for an organization.
+    expect(shell({ path: "/panel/about", organizations: orgs, isAdmin: true })).not.toContain('href="/panel/organizations" aria-current');
+  });
+
   test("an account with no role is not offered it: nothing could reach them", () => {
     expect(shell({ onTeam: false })).not.toContain('href="/panel/notifications"');
   });

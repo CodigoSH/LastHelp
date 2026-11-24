@@ -1838,7 +1838,11 @@ export function adminShell(spec: ShellSpec, text: Text): string {
       : "";
 
   const item = (href: string, label: string, icon: string, extra = "", count = 0, after = ""): string => {
-    const current = spec.path === href || (href !== "/panel" && spec.path.startsWith(href + "/"));
+    // An organization and its projects live at /panel/<org>, not under /panel/organizations, and are
+    // still that place: without this the band marked nothing while one was open.
+    const insideOrganization =
+      href === "/panel/organizations" && spec.organizations.some((o) => spec.path === `/panel/${o.slug}` || spec.path.startsWith(`/panel/${o.slug}/`));
+    const current = spec.path === href || (href !== "/panel" && spec.path.startsWith(href + "/")) || insideOrganization;
     return `<a class="side-item ${extra}" href="${escapeAttr(href)}"${current ? ' aria-current="page"' : ""}>${icon}<span>${escapeHTML(label)}</span>${badge(count)}${after}</a>`;
   };
 
