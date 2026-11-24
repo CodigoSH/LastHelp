@@ -20,6 +20,14 @@ docker exec -it lasthelp lasthelp password reset ana
 
 This is the way back for the administrator too: nobody else can reset that account.
 
+The second step of signing in is cleared the same way, for an account whose phone and recovery codes are both gone:
+
+```sh
+lasthelp 2fa reset ana
+```
+
+It signs in with the password alone until two-step sign-in is turned on again. For anybody else the administrator can do it from **Users** — see [Signing in](signing-in.md#two-step-sign-in).
+
 ## Seeing where you are signed in
 
 **Profile**, under **Your account**, says how many browsers the account is signed in on, and **View sessions** opens them in a window: one line for each, with the browser and the system (*Firefox · Linux*), the address it was last used from and when. A green dot marks one used in the last five minutes; yours is marked **This device**.

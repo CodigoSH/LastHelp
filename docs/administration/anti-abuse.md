@@ -23,9 +23,9 @@ model — what people write in your portal reaches your database and nowhere els
    addresses, so limiting per exact address is limiting per attempt.
 5. **Content heuristics**: the same text again (a flood is one paragraph over
    and over), too many links, and a word list you control — a word that means
-   nothing on your repository is somebody else's daily traffic. It is edited on
+   nothing on your project is somebody else's daily traffic. It is edited on
    the **Anti-abuse** screen (see below).
-6. **A circuit breaker.** Past sixty submissions in an hour a repository stops taking
+6. **A circuit breaker.** Past sixty submissions in an hour a project stops taking
    them for a while. Refusing for an hour beats handing you a queue you will not
    open.
 7. **The moderation queue**, which catches what the rest did not.
@@ -44,7 +44,7 @@ installation, which refuses new pictures with a message once it is full. Every
 picture is drawn again from its pixels before it is kept, so a file that only
 looks like a picture is refused, and one whose header asks for more pixels than
 the server opens is refused before it is read. Nothing is shown before your team
-has seen it, and each repository can turn pictures off.
+has seen it, and each project can turn pictures off.
 
 ## Everything waits for a person
 
@@ -56,7 +56,7 @@ project actually gets, reviewing everything costs minutes a week.
 
 ## Knowing whether any of it works
 
-Every refusal is counted by layer and by repository. Look at those numbers
+Every refusal is counted by layer and by project. Look at those numbers
 occasionally:
 
 - A layer that never refuses anything is a layer to delete.
@@ -64,8 +64,8 @@ occasionally:
   wrong — and those people do not complain, they leave.
 
 The **Anti-abuse** screen, under **This server** and for administrators, shows
-them: a row per repository and check, with how many submissions each turned away.
-The checks are the hidden field, the form token, the pause a repository takes
+them: a row per project and check, with how many submissions each turned away.
+The checks are the hidden field, the form token, the pause a project takes
 after too many submissions in an hour, the same text again, too many links, and
 the word list.
 
@@ -108,36 +108,36 @@ Anyone claiming a spam filter stops a determined human is selling something.
 ![The moderation queue](../images/queue.png)
 
 Everything waiting is decided in **Reports**, the icon in the top bar: every
-repository you work on in one list, the report beside it, and three buttons —
+project you work on in one list, the report beside it, and three buttons —
 publish, reject, and spam. The arrow keys move down the list. It opens on what
 is waiting when something is, and on **History**, every report, otherwise.
 
 The **History** tab is the archive: every report ever sent, found by its words or
 narrowed in four ways that sit together above the list: **No team reply**, a button that is always in sight; the
 **Filters** menu, where you tick as many moderation states and statuses as you want, choose a type, a date
-(the last day, week or month, or older than a month) and, under Closed, a result, and press **Apply** to apply them together; the **Repository** button, to choose one
-repository among many, or all, and search for it by name; and an order button (newest, oldest first, or most voted).
+(the last day, week or month, or older than a month) and, under Closed, a result, and press **Apply** to apply them together; the **Project** button, to choose one
+project among many, or all, and search for it by name; and an order button (newest, oldest first, or most voted).
 What is chosen shows under them as chips, each of which comes off by itself, and a line says how many reports
 the list holds. On a phone the menus open as a sheet from the bottom. **All / Open / Closed**
-splits the published reports the way the public board does, each with how many
+splits the published reports the way the public page does, each with how many
 it would show; under **Closed**, the menu adds **Completed** and **Declined**, which tell a delivery from a
-report the team turned down. In the archive the list is grouped by repository,
-and a repository's heading folds its reports away and opens them again; the
+report the team turned down. In the archive the list is grouped by project,
+and a project's heading folds its reports away and opens them again; the
 choice is kept in your browser. The queue tab has none of these: whatever waits is
 shown, closed or not. Whatever you choose opens
 beside the list as the whole report — edit its words, change its status, open
 or link an issue, reply, edit or delete any comment on it, and, for the
-organization's leads and the administrator, delete the report itself. Each repository's page in the
-panel opens the same screen filtered to that repository.
+organization's leads and the administrator, delete the report itself. Each project's page in the
+panel opens the same screen filtered to that project.
 
 To decide many at once, press **Select** above the list: the reports that are waiting get a box, a row is ticked
 instead of opened, and a bar at the foot of the list says how many are chosen and offers **Publish**, **Reject** and **Spam**
 for all of them (**Select all** ticks every one in view). Rejecting and marking as spam ask once more before they act.
-Only what is waiting can be ticked; a board you do not work on is skipped, and the notice says how many were
-applied and how many skipped. Together with the filters it is the way through a long queue: filter to a repository or to what
+Only what is waiting can be ticked; a project you do not work on is skipped, and the notice says how many were
+applied and how many skipped. Together with the filters it is the way through a long queue: filter to a project or to what
 is older than a month, tick the lot, and decide it.
 
-With four repositories you will see between zero and five things a week, which
+With four projects you will see between zero and five things a week, which
 is why there are no bulk actions: anything that assumes scale on this side is
 weight you carry for a situation you do not have.
 

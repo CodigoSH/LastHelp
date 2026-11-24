@@ -2,21 +2,23 @@
 
 A self-hosted feedback portal that speaks to your forge.
 
-Anyone reports a bug or suggests an idea **without an account**. Ideas gather
+Anyone reports a problem or suggests an idea **without an account**. Ideas gather
 votes. You triage what arrives and turn what deserves it into a real issue on
 GitHub, GitLab, Gitea or Forgejo — including one on your own network. When that
-issue closes, the item follows, which is what makes the roadmap something nobody
+issue closes, the report follows, which is what makes the roadmap something nobody
 has to maintain.
 
 One binary, one SQLite file, no external services.
 
-![The public page of a repository](images/board.png)
+![The public page of a project](images/board.png)
 
 - [Install](getting-started/install.md)
-- [Your first repository](getting-started/first-repository.md)
+- [Your first project](getting-started/first-repository.md)
 - [Connecting a forge](forges/connecting.md)
 - [The overview](administration/overview.md)
 - [Notifications](administration/notifications.md)
+- [Signing in: two-step, passkeys and a proxy](administration/signing-in.md)
+- [Passwords and locked accounts](administration/passwords.md)
 - [Private organizations and boards](administration/private-boards.md)
 - [Updating](administration/updating.md)
 - [Keeping the queue readable](administration/anti-abuse.md)

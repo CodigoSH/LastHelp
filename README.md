@@ -38,7 +38,7 @@
 
 ---
 
-📖 **[Read the Official Documentation](https://codigosh.com/docs/lasthelp/)** for detailed guides on installation, your first repository, connecting a forge, notifications and keeping the queue readable.
+📖 **[Read the Official Documentation](https://codigosh.com/docs/lasthelp/)** for detailed guides on installation, your first project, connecting a forge, notifications, signing in and keeping the queue readable.
 
 ---
 
@@ -64,21 +64,23 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 
 ### For the people reporting
 
-- **Reporting without an account** — a bug or an idea, in one form, from anybody. What they get back is a secret link: the only way to their own report, and the reason no sign-up is needed at all.
-- **Bugs and ideas are two journeys** — a bug is asked which version and how to see it happen, and is not voted; an idea is one sentence, and gathers votes.
+- **Reporting without an account** — a problem or an idea, in one form, from anybody. What they get back is a secret link: the only way to their own report, and the reason no sign-up is needed at all.
+- **Problems and ideas are two journeys** — a problem can be asked which version and how to see it happen, and is not voted; an idea is one sentence, and gathers votes.
+- **The questions each project needs** — up to ten of its own on the report form (a line, a paragraph, a choice or a date), asked of problems, ideas or both, and carried to the public page, the export and the forge issue.
 - **Screenshots with the report** — the person reporting attaches up to five pictures and the team replies with its own. Nothing is shown before the team has looked, the location and camera data in a photo are removed, and the pictures are erased thirty days after the report closes.
 - **Similar reports while typing**, so the tenth person with the same crash adds a vote or a comment instead of a duplicate.
-- **A roadmap nobody maintains** — three columns built from the state of each report, so it cannot be out of date.
-- **Following without an address** — an Atom feed per repository that needs no account and stores nothing about whoever reads it, or an optional email when a mail relay is set up.
+- **A roadmap nobody maintains** — built from the state of each report, so it cannot be out of date, and kept to the team when a project prefers.
+- **Following without an address** — an Atom feed per project that needs no account and stores nothing about whoever reads it, or an optional email when a mail relay is set up.
 
 ### For the team
 
-- **One screen for everything that arrives** — **Reports**, in the top bar: every repository you work on in one list, the report beside it, and publish, reject and spam with a key each. It opens on what is waiting, and is also the archive of every report ever sent, with its filters in the address so a narrowed view can be sent to somebody else.
+- **One screen for everything that arrives** — **Reports**, in the top bar: every project you work on in one list, the report beside it, and publish, reject and spam with a key each. It opens on what is waiting, and is also the archive of every report ever sent, with its filters in the address so a narrowed view can be sent to somebody else.
 - **The whole report where you decide** — edit its words, change its status, reply, edit or delete any comment, fold a duplicate into the original, open or link a forge issue.
-- **An overview that says what to do next** — what is waiting and for how long, which published reports nobody on the team has answered, how fast the team replies, and the work per repository, with ideas and bugs counted apart. Every figure opens the lines it counts, and the chart goes back a week, a month or three months.
-- **Two levels of trust** — a **lead** runs an organization, its forge token and its repositories; a **collaborator** triages the repositories they are given and never sees the token.
-- **A front page you compose** — bands of modules for the repositories, the most voted ideas, what was resolved, statistics, links and your own words and images, arranged on a grid in the page itself.
-- **Notifications for the team** through push to their own browsers, ntfy, Gotify, a webhook or mail, configured per repository, plus a channel for the whole server that can also tell the administrators when a new version is out.
+- **An overview that says what to do next** — what is waiting and for how long, which published reports nobody on the team has answered, how fast the team replies, and the work per project, with ideas and problems counted apart. Every figure opens the lines it counts, and the chart goes back a week, a month or three months.
+- **A project made the way it will stay** — one dialog with everything its settings have: a use to start from (software, community, ideas only or custom), what it receives, whether ideas are voted, whether its roadmap is public, who can see it and whether the team is told.
+- **Two levels of trust** — a **lead** runs an organization, its forge token and its projects; a **collaborator** triages the projects they are given and never sees the token.
+- **A front page you compose** — bands of modules for the projects, the most voted ideas, what was resolved, statistics, links and your own words and images, arranged on a grid in the page itself.
+- **Notifications for the team** through push to their own browsers, ntfy, Gotify, a webhook or mail, configured per project, plus a channel for the whole server that can also tell the administrators when a new version is out.
 
 ### The forge bridge
 
@@ -90,7 +92,14 @@ It is **one static Go binary** and **one SQLite file**. No database server, no r
 ### Keeping the queue readable
 
 - **Nothing is published without a person.**
-- **Anti-abuse without a third party** — a signed single-use form token, a timing window, a honeypot, rate limits keyed on the address a caller cannot choose, duplicate and link heuristics, an operator word list, and a breaker that closes a repository for a while rather than hand somebody a queue they will not open. Every refusal is counted by layer, because a filter nobody can measure is a filter quietly turning away people who never complain.
+- **Anti-abuse without a third party** — a signed single-use form token, a timing window, a honeypot, rate limits keyed on the address a caller cannot choose, duplicate and link heuristics, an operator word list, and a breaker that closes a project for a while rather than hand somebody a queue they will not open. Every refusal is counted by layer, because a filter nobody can measure is a filter quietly turning away people who never complain.
+
+### Signing in
+
+- **Two-step sign-in** with any authenticator app, and ten single-use recovery codes.
+- **Passkeys** — a fingerprint, a face or the screen lock instead of the password.
+- **Signing in through a proxy** that already signs people in — Authelia, Authentik, oauth2-proxy — for accounts that exist, believed only from the proxy's own addresses.
+- **Active sessions** — every browser the account is signed in on, with the way to close any of them.
 
 ### Operations
 
@@ -116,7 +125,7 @@ Not there yet, and said here rather than discovered:
 
 ### Security
 
-Passwords are hashed with Argon2id, at most two at a time so a burst of sign-in attempts cannot become a burst of memory, and five wrong guesses at one name inside a minute lock that name for five minutes — from whichever addresses they come, and for the right password too. A forgotten password is set again with `lasthelp password reset <username>` on the machine the server runs on. Sessions are opaque tokens in an `HttpOnly`, `SameSite=Lax` cookie, marked `Secure` over HTTPS, and CSRF is a double-submit token checked alongside `Sec-Fetch-Site` — a header the browser writes from the real origins and a page cannot forge. Every response carries a Content-Security-Policy with `script-src 'self'`, so an injected script does not run, and `Referrer-Policy: no-referrer`, because the address of a report carries the token that opens it. Rate limits are keyed on the address our own proxy added rather than the first one the caller sent, because a proxy appends to `X-Forwarded-For` and reading the left-hand entry lets anybody choose their own identity. A stored forge token is never shown again and no endpoint returns one, request bodies are bounded per handler, and every release is signed.
+Passwords are hashed with Argon2id, at most two at a time so a burst of sign-in attempts cannot become a burst of memory, and five wrong guesses at one name inside a minute lock that name for five minutes — from whichever addresses they come, and for the right password too. A forgotten password is set again with `lasthelp password reset <username>` on the machine the server runs on. Each account can add two-step sign-in with an authenticator app, with single-use recovery codes, or passkeys, which only work on the address they were made for and over HTTPS; a lost second step is cleared by the administrator, or for the administrator with `lasthelp 2fa reset <username>`. Sessions are opaque tokens in an `HttpOnly`, `SameSite=Lax` cookie, marked `Secure` over HTTPS, and CSRF is a double-submit token checked alongside `Sec-Fetch-Site` — a header the browser writes from the real origins and a page cannot forge. Every response carries a Content-Security-Policy with `script-src 'self'`, so an injected script does not run, and `Referrer-Policy: no-referrer`, because the address of a report carries the token that opens it. Rate limits are keyed on the address our own proxy added rather than the first one the caller sent, because a proxy appends to `X-Forwarded-For` and reading the left-hand entry lets anybody choose their own identity. A stored forge token is never shown again and no endpoint returns one, request bodies are bounded per handler, and every release is signed.
 
 For a detailed breakdown, including what the threat model does **not** cover, see the [Security Policy](SECURITY.md).
 
@@ -197,7 +206,7 @@ It verifies the signature over the checksums before anything reaches the disk, i
 
 Updates are delivered directly from our own Forgejo instance — no proxy, no intermediary and no telemetry.
 
-The updater checks the signature over the checksum list before it downloads anything, then the binary's own checksum, then makes the candidate prove it runs and report its schema, then refuses any binary older than the database, takes a backup, and only then replaces anything. None of those has a switch. In a container it says to pull an image instead of offering a button that would silently revert.
+The updater checks the signature over the checksum list before it downloads anything, then the binary's own checksum, then makes the candidate prove it runs and report its schema, then refuses any binary older than the database, takes a backup, and only then replaces anything. None of those has a switch. An installation that cannot replace its own program — one made from a container image, wherever it runs — is told to update the image instead of being offered a button that would fail or silently revert.
 
 For detailed instructions see the [Updating guide](https://codigosh.com/docs/lasthelp/administration/updating/), or the [Security Policy](SECURITY.md) for how the signing works.
 

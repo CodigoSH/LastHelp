@@ -80,14 +80,15 @@ Add a webhook on the repository (or the organization) with:
 
 ## What happens then
 
-- A triaged item becomes an issue, or is attached to one that already exists by
+- A triaged report becomes an issue, or is attached to one that already exists by
   pasting its number or URL. A project with four thousand open issues wants the
   second far more often than the first.
-- What the reporter wrote reaches the issue **as text**. Forges read an issue as Markdown,
+- What the reporter wrote reaches the issue **as text**, with the answers to the
+  project's questions — the version, the steps and its own — under the description. Forges read an issue as Markdown,
   where `@name` notifies somebody, `![](url)` loads a picture from a host the writer
   chose and a line starting with `/` can be a command, so those are escaped on the way
   out; code in backticks is left exactly as it was written.
-- When that issue is **closed** or **reopened**, the item follows: a bug becomes
+- When that issue is **closed** or **reopened**, the report follows: a problem becomes
   *completed* or *fix in progress*, an idea becomes *completed* or *in progress*.
 - The roadmap follows from that, which is why nobody has to maintain it.
 
@@ -115,7 +116,7 @@ would accept what it could not check.
 Forgejo, Gitea and GitLab are walked end to end against a real instance in a
 container, by `make live-forge`: LastHelp creates the issue, the forge signs a
 webhook with its own code, our receiver verifies it, and closing the issue there
-closes the item here.
+closes the report here.
 
 It asks the forge which version it is and prints it, and pulls **the current
 stable** rather than a tag somebody pinned once — a check against a version
@@ -147,5 +148,5 @@ way and agree.
 ## Running without a forge
 
 Set `forge` to `none`, or simply do not add credentials. Everything except
-turning an item into an issue works, and the screens say there is no forge
+turning a report into an issue works, and the screens say there is no forge
 rather than offering buttons that fail.

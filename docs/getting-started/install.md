@@ -154,8 +154,8 @@ make build   # frontend and binaries into bin/
 
 ## Where the data lives
 
-One file. `lasthelp.db` holds everything: repositories, reports, votes,
-accounts, and the forge token this server uses to open issues.
+One file. `lasthelp.db` holds everything: organizations and projects, reports,
+votes, accounts, and the forge token this server uses to open issues.
 
 **That file is the thing to protect.** Passwords are hashed and cannot be read
 back, but the forge token and the webhook secret are in there as they were
@@ -185,6 +185,7 @@ invents one the binary does not read. The ones worth knowing about:
 | `LASTHELP_TRUST_PROXY` | `false` | Turn on **only** when a reverse proxy or a tunnel really is in front |
 | `LASTHELP_TRUST_PROXY_HOPS` | `1` | How many of them a request passes through |
 | `LASTHELP_OFFLINE` | `false` | Stops every outbound connection |
+| `LASTHELP_AUTH_PROXY_HEADER`, `LASTHELP_AUTH_PROXY_TRUSTED`, `LASTHELP_AUTH_PROXY_LOGOUT_URL` | empty | Signing in through a proxy that already signs people in — see [Signing in](../administration/signing-in.md#signing-in-through-a-proxy) |
 
 ### About `LASTHELP_TRUST_PROXY`
 

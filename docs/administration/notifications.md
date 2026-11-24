@@ -13,19 +13,19 @@ The channel hears about two things: a **new report**, and a **comment waiting fo
 review** (a visitor's, or the reporter's own follow-up), so nothing sits in the queue
 unseen. A team reply does not notify the team: it was written by the team.
 
-Configured **per repository**, so one repository can go to one room and another somewhere
-else. Nothing applies to a repository that already exists by itself: a channel everybody is
+Configured **per project**, so one project can go to one room and another somewhere
+else. Nothing applies to a project that already exists by itself: a channel everybody is
 signed up to without choosing it is a channel everybody eventually silences, and an
 installation that updates does not start telling a team something it never chose to hear.
 
-The one exception is a repository made **after** the administrator has set a channel for the
+The one exception is a project made **after** the administrator has set a channel for the
 server (under **Notifications**, **The server's channel**): it is created already using
-that channel, and its page shows it chosen, so the repository can keep it, pick another
-or pick none. If the server has no channel when a repository is made, the repository has none.
-Repositories that existed before are not moved.
+that channel, and its page shows it chosen, so the project can keep it, pick another
+or pick none. If the server has no channel when a project is made, the project has none.
+Projects that existed before are not moved.
 
-Choose it in the panel, on the repository's page (**Organizations**, the
-organization, then the repository): pick a channel, and it asks only for what
+Choose it in the panel, on the project's page (**Organizations**, the
+organization, then the project): pick a channel, and it asks only for what
 that channel needs. The address and the recipient are shown again once saved,
 so you can check them. A saved token is shown as dots: it is there, and which one
 it is cannot be seen. Type a new token over the dots to replace it, or empty the
@@ -52,22 +52,22 @@ curl -X POST "$BASE/api/orgs/acme/repos/atlas/channel" \
 | `webhook` | `url`, optional `token` | Posts `{"title","body","url","kind"}` — point it at Matrix, a bridge, a script |
 | `smtp` | `to` | Uses the relay configured on the server |
 | `push` | — | The browsers of the team: see [Push notifications](#push-notifications) |
-| `server` | — | A repository only: use the channel the administrator set for the server |
+| `server` | — | A project only: use the channel the administrator set for the server |
 | *(empty)* | — | No notifications |
 
 ### Push notifications
 
 The **Push** channel tells the team on their phones and desktops, with no page of
-LastHelp open. It needs nothing typed in: choose it on a repository (or as the
+LastHelp open. It needs nothing typed in: choose it on a project (or as the
 server's channel) and then **each person turns it on for their own browser**, under
 **Notifications** in their own menu, in the card **Notifications on your devices**. Until
 somebody does, nobody is told anything. A person can turn on as many browsers as they like
 (up to 20), see them listed, send themselves a test, and remove any of them.
 
 **Notifications** is in everybody's menu who is on a team somewhere — the administrator, the
-owners of an organization and the collaborators on a repository — under **Your account**. It
+owners of an organization and the collaborators on a project — under **Your account**. It
 holds that card for all of them. Only the administrator sees a second card there, **The
-server's channel**, where the channel every repository can choose is set. An account that
+server's channel**, where the channel every project can choose is set. An account that
 was given no role is not offered the page: nothing could reach it.
 
 So that nobody has to go looking for it, the overview says **Turn on notifications on this
@@ -75,8 +75,8 @@ device** under *Needs you* to anybody whose team is told through Push, as long a
 is not on their list and could be. A browser that cannot take part, or that blocked the site,
 is not told to turn anything on from there.
 
-It reaches the administrator, the owners of the repository's organization and the
-collaborators on that repository, and nobody else. A disabled account is not
+It reaches the administrator, the owners of the project's organization and the
+collaborators on that project, and nobody else. A disabled account is not
 told. Tapping the notification opens the reports.
 
 **It goes through a third party, and that is the one thing about it you should
@@ -85,7 +85,7 @@ service — Google's for Chrome and Android, Apple's for Safari and iPhones,
 Mozilla's for Firefox, Microsoft's for Edge — and messages go there. They are
 encrypted for that one browser, so the service carries them without reading
 them, but it learns that a device was notified, and when. That is why it is off
-until a repository chooses it and a person turns it on. LastHelp only ever sends
+until a project chooses it and a person turns it on. LastHelp only ever sends
 to an https address on one of those services' own domains, and
 `LASTHELP_OFFLINE` stops it.
 
@@ -105,7 +105,7 @@ forgotten the first time the push service says it is gone.
 A browser that was forgotten while it still holds its subscription and its permission is
 listed again the next time the panel opens on it. The same applies to a device removed from
 another one's list: to switch it off for good, turn push off on that device itself.
-Notifications about one board share a tag, so they stack as one entry per board, the
+Notifications about one project share a tag, so they stack as one entry per project, the
 latest on top, and each new one still alerts.
 
 Over the API, for the signed-in account's own devices: `GET /api/push/key`,
@@ -115,12 +115,12 @@ and `POST /api/push/test`.
 ### One channel for the whole server
 
 An administrator can set a channel once, under **Notifications** in the **Your account**
-group of the menu, in the card **The server's channel**, and repositories that want it pick
-**The server's channel** in their own list. For a repository that already exists it is still
+group of the menu, in the card **The server's channel**, and projects that want it pick
+**The server's channel** in their own list. For a project that already exists it is still
 opt-in: one that does not choose it is not touched, and one that does is told where its
-messages go. A repository made after the channel was set starts on it, as described above.
-Change the server's channel and every repository that chose it follows; remove it and they
-send nothing until it is set again. A repository's own channel is never replaced by it.
+messages go. A project made after the channel was set starts on it, as described above.
+Change the server's channel and every project that chose it follows; remove it and they
+send nothing until it is set again. A project's own channel is never replaced by it.
 
 Over the API, administrators only: `GET` and `PUT /api/notifications` (same
 fields as above, and no `server` kind), and `POST /api/notifications/test`.
@@ -136,7 +136,7 @@ the switch **New versions** tells the administrators through that channel when a
 LastHelp is out: once for each version, whoever's browser or room it reaches.
 
 - **Who is told.** Through push, the administrators' own devices and nobody else's: a
-  collaborator on a board is told about reports and not about this. Through ntfy, Gotify,
+  collaborator on a project is told about reports and not about this. Through ntfy, Gotify,
   mail or a webhook, whatever the channel reaches.
 - **When.** The server asks for the newest release every hour while the switch is on, and as
   soon as it is turned on, so a version that is already out does not wait. With the switch off
@@ -183,7 +183,7 @@ account, and stores nothing about whoever subscribes:
 https://help.example.com/feed/acme/atlas/atom.xml
 ```
 
-It carries published items only, through the same listing the public page uses,
+It carries published reports only, through the same listing the public page uses,
 so it cannot show something the page would not.
 
 **Email** if you configure a relay. Then, and only then, the report form offers
@@ -191,7 +191,7 @@ an optional address field — with no relay it is not shown at all, because
 collecting an address nothing can use is collecting personal data for nothing.
 
 That address is never returned by any endpoint — not to the team, not through
-the API — and is **deleted when the item closes**. It was collected for one
+the API — and is **deleted when the report closes**. It was collected for one
 purpose and that purpose is over. It is stored as it was given, so it is in the
 database file: whoever can read that file can read it.
 

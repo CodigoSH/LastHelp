@@ -20,7 +20,7 @@ advice.
 Without a mail relay (`LASTHELP_SMTP_HOST`) the "tell me when this changes"
 option is not even offered, so **no email address is stored at all**.
 
-Following a board with Atom stores nothing about the reader.
+Following a project with Atom stores nothing about the reader.
 
 ## What is *not* stored
 
