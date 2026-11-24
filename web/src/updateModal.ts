@@ -24,6 +24,8 @@ export interface UpdateInfo {
   latest?: string;
   available?: boolean;
   container?: boolean;
+  /** False when the binary cannot be replaced from here: the dialog then says to update the image. */
+  replaceable?: boolean;
 }
 
 /** The steps the server reports, in the order they run. Mirrors UpdateSteps in update.go. */
@@ -54,7 +56,7 @@ const busy = () => phase === "running" || phase === "restarting";
 export function openUpdateDialog(found: UpdateInfo): void {
   if (busy()) return;
   info = found;
-  phase = found.available || found.container ? "available" : "idle";
+  phase = found.available || found.container || found.replaceable === false ? "available" : "idle";
   steps = freshSteps();
   errorKey = "";
   ensureDialog();
@@ -119,7 +121,7 @@ function renderBody(): void {
     phase,
     currentVersion: info?.current ?? "",
     latestVersion: info?.latest ?? "",
-    isDocker: info?.container === true,
+    isDocker: info?.container === true || info?.replaceable === false,
     steps: buildSteps(),
     errorText: errorKey ? i18n.t(errorKey) : "",
     changelogUrl: CHANGELOG_URL,
@@ -134,8 +136,8 @@ function renderBody(): void {
       restarting: i18n.t("update.restarting"),
       done: i18n.t("update.done", { version: info?.latest ?? "" }),
       retry: i18n.t("update.retry"),
-      dockerTitle: i18n.t("update.dockerMode"),
-      dockerBody: i18n.t("update.dockerDesc"),
+      dockerTitle: i18n.t(info?.container === true ? "update.dockerMode" : "update.imageMode"),
+      dockerBody: i18n.t(info?.container === true ? "update.dockerDesc" : "update.imageDesc"),
     },
   });
   renderedPhase = phase;

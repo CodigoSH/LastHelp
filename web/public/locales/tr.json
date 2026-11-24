@@ -988,5 +988,8 @@
   "project.summaryPrivate": "Yalnızca ekip görebilir.",
   "project.summaryChannel": "Ekip sunucunun kanalıyla bilgilendirilir.",
   "project.summaryNoChannel": "Bir kanal seçilene kadar ekip bildirim almaz.",
-  "error.votes_off": "Bu proje oy kabul etmiyor."
+  "error.votes_off": "Bu proje oy kabul etmiyor.",
+  "update.imageMode": "İmajla güncelleme",
+  "update.imageDesc": "Bu kurulum kendi programını değiştiremez. Bir kapsayıcı imajından (OCI) kurduysanız imajı güncelleyin.",
+  "error.update_not_replaceable": "Yeni bir sürüm var, ancak bu kurulum kendi programını değiştiremez. Bir kapsayıcı imajından (OCI) kurduysanız imajı güncelleyin."
 }

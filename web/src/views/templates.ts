@@ -4578,8 +4578,8 @@ function panelCrumb(steps: [href: string, label: string][], here: string): strin
  * The card's rows, when it has any, follow under it.
  */
 function pageHead(spec: { name: string; icon?: string; tags: string; action: string; rows?: string }): string {
-  return `<section class="bento-card settings-card page-head-card">
-    <div class="page-head">
+  return `<section class="bento-card settings-card panel-head-card">
+    <div class="panel-head">
       ${markOf(spec.name, spec.icon, "card-mark ph-mark")}
       <div class="ph-text">
         <h1 class="ph-name">${escapeHTML(spec.name)}</h1>
@@ -5292,6 +5292,9 @@ export interface UpdateStatus {
   available?: boolean;
   /** Running in a container: updated by pulling an image, never from here. */
   container?: boolean;
+  /** False when this process cannot replace its own binary — an installation
+   *  made from a container image, wherever it runs: updated from outside too. */
+  replaceable?: boolean;
   reason?: string;
   beta?: boolean;
 }
@@ -5312,14 +5315,16 @@ export function updateZone(status: UpdateStatus | "checking" | null, text: Text)
   if (status === null) {
     return `<p class="about-state warn" role="status">${icons.warning(16)}<span>${escapeHTML(text.t("error.update_unreachable"))}</span></p>`;
   }
-  if (status.container) {
-    // The Docker notice: what manages this installation, and whether
-    // there is a newer image to pull.
+  if (status.container || status.replaceable === false) {
+    // The notice of an installation updated from outside: what manages it, and
+    // whether there is a newer image. A container we recognise says Docker; one
+    // we only know cannot replace its own binary says what to do in general.
+    const known = status.container === true;
     return `<div class="about-docker" role="status">
       ${icons.info(20)}
       <div>
-        <h4>${escapeHTML(text.t("update.dockerMode"))}</h4>
-        <p>${escapeHTML(text.t("update.dockerDesc"))}<br>${
+        <h4>${escapeHTML(text.t(known ? "update.dockerMode" : "update.imageMode"))}</h4>
+        <p>${escapeHTML(text.t(known ? "update.dockerDesc" : "update.imageDesc"))}<br>${
           status.available
             ? `<strong>${escapeHTML(text.t("update.newVersion"))} (${escapeHTML(status.latest ?? "")})</strong>`
             : escapeHTML(text.t("update.upToDateDocker"))

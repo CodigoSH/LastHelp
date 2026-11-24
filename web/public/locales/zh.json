@@ -988,5 +988,8 @@
   "project.summaryPrivate": "只有团队能查看。",
   "project.summaryChannel": "团队通过服务器的通道接收通知。",
   "project.summaryNoChannel": "选择通道之前，团队不会收到通知。",
-  "error.votes_off": "此项目不接受投票。"
+  "error.votes_off": "此项目不接受投票。",
+  "update.imageMode": "通过镜像更新",
+  "update.imageDesc": "此安装无法替换自身的程序。如果你是从容器镜像（OCI）安装的，请更新镜像。",
+  "error.update_not_replaceable": "有新版本，但此安装无法替换自身的程序。如果你是从容器镜像（OCI）安装的，请更新镜像。"
 }

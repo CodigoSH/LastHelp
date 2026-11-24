@@ -988,5 +988,8 @@
   "project.summaryPrivate": "Alleen het team kan het zien.",
   "project.summaryChannel": "Het team krijgt berichten via het kanaal van de server.",
   "project.summaryNoChannel": "Het team krijgt geen berichten tot er een kanaal is gekozen.",
-  "error.votes_off": "Dit project neemt geen stemmen aan."
+  "error.votes_off": "Dit project neemt geen stemmen aan.",
+  "update.imageMode": "Bijwerken via de image",
+  "update.imageDesc": "Deze installatie kan haar eigen programma niet vervangen. Als je haar vanuit een containerimage (OCI) hebt geïnstalleerd, werk dan de image bij.",
+  "error.update_not_replaceable": "Er is een nieuwe versie, maar deze installatie kan haar eigen programma niet vervangen. Als je haar vanuit een containerimage (OCI) hebt geïnstalleerd, werk dan de image bij."
 }

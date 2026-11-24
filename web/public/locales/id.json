@@ -988,5 +988,8 @@
   "project.summaryPrivate": "Hanya tim yang dapat melihatnya.",
   "project.summaryChannel": "Tim diberi tahu melalui saluran peladen.",
   "project.summaryNoChannel": "Tim tidak menerima pemberitahuan sampai saluran dipilih.",
-  "error.votes_off": "Proyek ini tidak menerima suara."
+  "error.votes_off": "Proyek ini tidak menerima suara.",
+  "update.imageMode": "Diperbarui lewat image",
+  "update.imageDesc": "Instalasi ini tidak dapat mengganti programnya sendiri. Jika Anda memasangnya dari image kontainer (OCI), perbarui image-nya.",
+  "error.update_not_replaceable": "Ada versi baru, tetapi instalasi ini tidak dapat mengganti programnya sendiri. Jika Anda memasangnya dari image kontainer (OCI), perbarui image-nya."
 }

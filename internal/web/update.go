@@ -83,6 +83,40 @@ func inContainerUnder(root string) bool {
 	return false
 }
 
+// replaceable says whether this process can put a new binary where its own
+// is: whether it may write in that directory, asked by writing there.
+//
+// An installation made from a container image cannot — the image's binary
+// belongs to root and the process runs as somebody else — wherever the image
+// runs: Docker, Podman, an OCI image in Proxmox or anything else. Asking the
+// directory rather than guessing the runtime is what covers all of them,
+// including the ones nobody has named yet, and it is what the update itself
+// would find out halfway through. The installer gives the binary to the user
+// the service runs as, so an installation made with it always can.
+//
+// A variable so a test can say which it is.
+var replaceable = func() bool {
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	if real, err := filepath.EvalSymlinks(exe); err == nil {
+		exe = real
+	}
+	return writableDir(filepath.Dir(exe))
+}
+
+// writableDir says whether a file can be made, and removed, in dir.
+func writableDir(dir string) bool {
+	f, err := os.CreateTemp(dir, ".lasthelp-update-check-")
+	if err != nil {
+		return false
+	}
+	name := f.Name()
+	_ = f.Close()
+	return os.Remove(name) == nil
+}
+
 // handleUpdateStatus says what is running and what could be.
 func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	if !s.may(w, r, authz.ManageServer, authz.Scope{}) {
@@ -90,11 +124,15 @@ func (s *Server) handleUpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	body := map[string]any{
-		"current":    version.Current,
-		"commit":     version.Commit,
-		"container":  inContainer(),
-		"can_verify": len(version.ReleaseKeys) > 0,
-		"offline":    s.cfg.Offline,
+		"current":   version.Current,
+		"commit":    version.Commit,
+		"container": inContainer(),
+		// False when the binary cannot be replaced from here: the panel then
+		// says there is a newer version and that the image is what to update,
+		// rather than offering a button that fails halfway.
+		"replaceable": inContainer() || replaceable(),
+		"can_verify":  len(version.ReleaseKeys) > 0,
+		"offline":     s.cfg.Offline,
 	}
 
 	// Which channel this installation follows, so the panel can show it rather
@@ -144,6 +182,10 @@ func (s *Server) handleUpdatePerform(w http.ResponseWriter, r *http.Request) {
 	}
 	if inContainer() {
 		writeError(w, http.StatusBadRequest, "error.update_container")
+		return
+	}
+	if !replaceable() {
+		writeError(w, http.StatusBadRequest, "error.update_not_replaceable")
 		return
 	}
 

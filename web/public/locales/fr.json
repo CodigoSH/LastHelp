@@ -988,5 +988,8 @@
   "project.summaryPrivate": "Seule l'équipe peut le voir.",
   "project.summaryChannel": "L'équipe est notifiée par le canal du serveur.",
   "project.summaryNoChannel": "L'équipe ne reçoit aucune notification tant qu'aucun canal n'est choisi.",
-  "error.votes_off": "Ce projet n'accepte pas de votes."
+  "error.votes_off": "Ce projet n'accepte pas de votes.",
+  "update.imageMode": "Mise à jour par l'image",
+  "update.imageDesc": "Cette installation ne peut pas remplacer son propre programme. Si vous l'avez installée depuis une image de conteneur (OCI), mettez à jour l'image.",
+  "error.update_not_replaceable": "Une nouvelle version est disponible, mais cette installation ne peut pas remplacer son propre programme. Si vous l'avez installée depuis une image de conteneur (OCI), mettez à jour l'image."
 }

@@ -177,6 +177,7 @@ function noteUpdate(status: views.UpdateStatus): void {
     latest: status.latest,
     available: status.available === true,
     container: status.container === true,
+    replaceable: status.replaceable !== false,
   };
   renderNav();
   const info = root?.querySelector<HTMLAnchorElement>('.side-item[href="/panel/about"]');

@@ -988,5 +988,8 @@
   "project.summaryPrivate": "팀만 볼 수 있습니다.",
   "project.summaryChannel": "팀은 서버 채널로 알림을 받습니다.",
   "project.summaryNoChannel": "채널을 고르기 전까지 팀은 알림을 받지 않습니다.",
-  "error.votes_off": "이 프로젝트는 투표를 받지 않습니다."
+  "error.votes_off": "이 프로젝트는 투표를 받지 않습니다.",
+  "update.imageMode": "이미지로 업데이트",
+  "update.imageDesc": "이 설치는 자체 프로그램을 교체할 수 없습니다. 컨테이너 이미지(OCI)로 설치했다면 이미지를 업데이트하세요.",
+  "error.update_not_replaceable": "새 버전이 있지만 이 설치는 자체 프로그램을 교체할 수 없습니다. 컨테이너 이미지(OCI)로 설치했다면 이미지를 업데이트하세요."
 }

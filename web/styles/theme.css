@@ -8910,8 +8910,8 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 
 /* The page's head: its icon, its name as the title, what it is beside its address, the way to its
    public page. Rows that belong to it (a project's reports and export) follow under a rule. */
-.page-head { display: flex; align-items: center; gap: 14px; }
-.page-head .ph-mark { inline-size: 48px; block-size: 48px; border-radius: 12px; font-size: 1.05rem; flex: none; }
+.panel-head { display: flex; align-items: center; gap: 14px; }
+.panel-head .ph-mark { inline-size: 48px; block-size: 48px; border-radius: 12px; font-size: 1.05rem; flex: none; }
 .ph-text { flex: 1; min-inline-size: 0; }
 .ph-name {
   margin: 0;
@@ -8923,10 +8923,10 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
   white-space: nowrap;
 }
 .ph-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0 0; }
-.page-head > .button { flex: none; }
-.page-head-card .page-head + .settings-row { margin-block-start: 14px; border-block-start: 1px solid var(--border); }
+.panel-head > .button { flex: none; }
+.panel-head-card .panel-head + .settings-row { margin-block-start: 14px; border-block-start: 1px solid var(--border); }
 
 @media (max-width: 640px) {
-  .page-head { flex-wrap: wrap; }
-  .page-head > .button { inline-size: 100%; }
+  .panel-head { flex-wrap: wrap; }
+  .panel-head > .button { inline-size: 100%; }
 }

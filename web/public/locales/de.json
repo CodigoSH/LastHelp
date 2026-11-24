@@ -988,5 +988,8 @@
   "project.summaryPrivate": "Nur das Team kann es sehen.",
   "project.summaryChannel": "Das Team wird über den Kanal des Servers benachrichtigt.",
   "project.summaryNoChannel": "Das Team erhält keine Benachrichtigungen, bis ein Kanal gewählt ist.",
-  "error.votes_off": "Dieses Projekt nimmt keine Stimmen an."
+  "error.votes_off": "Dieses Projekt nimmt keine Stimmen an.",
+  "update.imageMode": "Aktualisierung über das Image",
+  "update.imageDesc": "Diese Installation kann ihr eigenes Programm nicht ersetzen. Wenn Sie sie aus einem Container-Image (OCI) installiert haben, aktualisieren Sie das Image.",
+  "error.update_not_replaceable": "Eine neue Version ist verfügbar, aber diese Installation kann ihr eigenes Programm nicht ersetzen. Wenn Sie sie aus einem Container-Image (OCI) installiert haben, aktualisieren Sie das Image."
 }

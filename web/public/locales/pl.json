@@ -988,5 +988,8 @@
   "project.summaryPrivate": "Tylko zespół może go zobaczyć.",
   "project.summaryChannel": "Zespół dostaje powiadomienia kanałem serwera.",
   "project.summaryNoChannel": "Zespół nie dostaje powiadomień, dopóki nie zostanie wybrany kanał.",
-  "error.votes_off": "Ten projekt nie przyjmuje głosów."
+  "error.votes_off": "Ten projekt nie przyjmuje głosów.",
+  "update.imageMode": "Aktualizacja przez obraz",
+  "update.imageDesc": "Ta instalacja nie może zastąpić własnego programu. Jeśli zainstalowano ją z obrazu kontenera (OCI), zaktualizuj obraz.",
+  "error.update_not_replaceable": "Jest nowa wersja, ale ta instalacja nie może zastąpić własnego programu. Jeśli zainstalowano ją z obrazu kontenera (OCI), zaktualizuj obraz."
 }

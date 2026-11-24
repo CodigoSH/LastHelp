@@ -102,16 +102,34 @@ When you already have the latest version it says so and stops, changing
 nothing. Add `--reinstall` (`… | sudo sh -s -- --reinstall`) to install it
 again anyway, to repair a damaged binary.
 
-## In a container
+## From a container image (OCI)
 
-Pull a new image. About says so, and whether a newer one exists, rather than
-offering a button:
-replacing the binary inside a container works until the next restart and then
-silently reverts, which is worse than not offering it.
+Update the image. About says whether a newer one exists rather than offering a
+button: replacing the binary inside a container lasts until the container is
+recreated from its image and then silently reverts, which is worse than not
+offering it. The same goes for any installation that cannot replace its own
+program — LastHelp checks whether it may write where its binary is, so it does
+not need to know what runs it.
+
+With Docker Compose:
 
 ```sh
 docker compose pull && docker compose up -d
 ```
+
+With Podman, pull the image and recreate the container the same way you
+created it.
+
+On Proxmox VE, an OCI image runs as an LXC container. Proxmox has no step that
+swaps the image of an existing container, so it is recreated from the new
+image; the database survives only if `/data` is on its own mount point, which
+is what the image declares. Tools that manage OCI applications on Proxmox, such
+as ProxMenux, do this for you: they rebuild the container from the new image
+and keep its data.
+
+A binary copied into a directory its service cannot write to is in the same
+position: download the new release from the releases page, or install with the
+installer above, which gives the binary to the user the service runs as.
 
 ## If an update goes wrong
 

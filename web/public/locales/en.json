@@ -988,5 +988,8 @@
   "project.summaryPrivate": "Only the team can see it.",
   "project.summaryChannel": "The team is told through the server's channel.",
   "project.summaryNoChannel": "The team gets no notices until a channel is chosen.",
-  "error.votes_off": "This project does not take votes."
+  "error.votes_off": "This project does not take votes.",
+  "update.imageMode": "Updated from the image",
+  "update.imageDesc": "This installation cannot replace its own program. If you installed it from a container image (OCI), update the image.",
+  "error.update_not_replaceable": "A new version is available, but this installation cannot replace its own program. If you installed it from a container image (OCI), update the image."
 }

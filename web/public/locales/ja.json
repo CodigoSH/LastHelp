@@ -988,5 +988,8 @@
   "project.summaryPrivate": "チームだけが閲覧できます。",
   "project.summaryChannel": "チームにはサーバーのチャネルで通知されます。",
   "project.summaryNoChannel": "チャネルを選ぶまでチームに通知は届きません。",
-  "error.votes_off": "このプロジェクトは投票を受け付けていません。"
+  "error.votes_off": "このプロジェクトは投票を受け付けていません。",
+  "update.imageMode": "イメージで更新",
+  "update.imageDesc": "このインストールは自身のプログラムを置き換えられません。コンテナイメージ（OCI）からインストールした場合は、イメージを更新してください。",
+  "error.update_not_replaceable": "新しいバージョンがありますが、このインストールは自身のプログラムを置き換えられません。コンテナイメージ（OCI）からインストールした場合は、イメージを更新してください。"
 }
