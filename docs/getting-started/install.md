@@ -143,6 +143,18 @@ It asks for a **username**, not an email address. Nothing is ever sent to it,
 and the second password box is the one thing standing between a typo and an
 installation nobody can sign into — there is no reset here.
 
+## On Proxmox VE (OCI image)
+
+Proxmox VE 9.1 and later can run the same image as an LXC container, with no
+Docker inside: pull `git.codigosh.com/codigosh/lasthelp:latest` as an OCI
+template and create the container from it, or let a tool that manages OCI
+applications on Proxmox, such as ProxMenux, do both. Put `/data`, where the
+database lives, on a mount point of its own: an update recreates the container
+from the new image, and only what is on a mount point carries over. LastHelp
+cannot replace its own program in such a container, so **About** says when there
+is a newer version instead of offering a button — see
+[Updating](../administration/updating.md#from-a-container-image-oci).
+
 ## From source
 
 Requires Go and [bun](https://bun.sh).
