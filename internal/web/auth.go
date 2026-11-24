@@ -126,6 +126,25 @@ func (s *Server) handleSignIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.signIn.Succeed(name)
+
+	// An account with a second step gets a challenge and no session: the
+	// password alone buys a few minutes and a few tries at a code.
+	switch on, err := s.twoStep().Enabled(user.ID); {
+	case err != nil:
+		slog.Error("reading the second step", "error", err)
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return
+	case on:
+		challenge, err := s.twoStep().NewChallenge(user.ID, s.now())
+		if err != nil {
+			slog.Error("starting the second step", "error", err)
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"two_step": true, "challenge": challenge})
+		return
+	}
+
 	s.startSession(w, r, user.ID)
 	writeJSON(w, http.StatusOK, map[string]any{"id": user.ID, "username": user.Username})
 }

@@ -23,6 +23,7 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/outbox"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/session"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/twostep"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/outbound"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/version"
@@ -76,6 +77,10 @@ type Server struct {
 	// they came from: the limiters above count requests, and a patient guesser
 	// spreads theirs.
 	signIn *middleware.Lockout
+	// secondStep locks an account's codes after repeated wrong ones, across
+	// every sign-in it starts: a challenge counts its own five, and a guesser
+	// with the password would otherwise just ask for another.
+	secondStep *middleware.Lockout
 
 	// wordsMu makes changing the operator's word list one step: it is read,
 	// changed and written back, and two changes at once lose one of them.
@@ -174,6 +179,7 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	s.perAddress = middleware.NewLimiter(240, time.Minute, 20_000, s.now)
 	s.perBlock = middleware.NewLimiter(600, time.Minute, 20_000, s.now)
 	s.signIn = middleware.NewLockout(5, time.Minute, 5*time.Minute, 10_000, s.now)
+	s.secondStep = middleware.NewLockout(5, time.Minute, 5*time.Minute, 10_000, s.now)
 	s.releaseAPI = ReleaseAPI
 
 	s.routes()
@@ -218,6 +224,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/instance", s.handleGetInstance)
 	s.mux.HandleFunc("POST /api/setup", s.handleSetup)
 	s.mux.HandleFunc("POST /api/session", s.handleSignIn)
+	// The code after the password: public for the same reason, since there is
+	// no session until it is right.
+	s.mux.HandleFunc("POST /api/session/second-step", s.handleSecondStep)
 
 	s.mux.HandleFunc("GET /api/orgs", s.handleOrganizations)
 
@@ -313,6 +322,11 @@ func (s *Server) routes() {
 	private("GET /api/sessions", s.handleListSessions)
 	private("DELETE /api/sessions/{id}", s.handleCloseSession)
 	private("POST /api/sessions/close-others", s.handleCloseOtherSessions)
+	private("GET /api/me/two-step", s.handleTwoStepStatus)
+	private("POST /api/me/two-step/setup", s.handleTwoStepSetup)
+	private("POST /api/me/two-step/enable", s.handleTwoStepEnable)
+	private("POST /api/me/two-step/disable", s.handleTwoStepDisable)
+	private("POST /api/me/two-step/recovery-codes", s.handleTwoStepRecoveryCodes)
 	private("POST /api/me/profile", s.handleChangeProfile)
 	private("POST /api/me/language", s.handleChangeLanguage)
 	private("POST /api/me/avatar", s.handleChangeAvatar)
@@ -340,6 +354,7 @@ func (s *Server) routes() {
 
 	private("PATCH /api/people/{id}", s.handleUpdatePerson)
 	private("DELETE /api/people/{id}", s.handleDeletePerson)
+	private("DELETE /api/people/{id}/two-step", s.handleRemovePersonTwoStep)
 
 	private("POST /api/restore", s.handleRestore)
 
@@ -480,6 +495,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accounts() account.Store  { return account.Store{DB: s.db} }
 func (s *Server) sessions() session.Store  { return session.Store{DB: s.db} }
+func (s *Server) twoStep() twostep.Store   { return twostep.Store{DB: s.db} }
 func (s *Server) orgs() org.Store          { return org.Store{DB: s.db} }
 func (s *Server) items() item.Store        { return item.Store{DB: s.db} }
 func (s *Server) forms() form.Store        { return form.Store{DB: s.db} }

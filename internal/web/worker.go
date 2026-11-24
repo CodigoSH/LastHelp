@@ -54,6 +54,9 @@ func (s *Server) Work(ctx context.Context) {
 		if err := s.sessions().Purge(now); err != nil {
 			slog.Error("sweeping sessions", "error", err)
 		}
+		if err := s.twoStep().PurgeChallenges(now); err != nil {
+			slog.Error("sweeping sign-ins waiting for a code", "error", err)
+		}
 		if err := s.bridge().PurgeDeliveries(now, 30*24*time.Hour); err != nil {
 			slog.Error("sweeping deliveries", "error", err)
 		}

@@ -40,6 +40,11 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "password" {
 		os.Exit(runPassword(os.Args[2:], console{fd: int(os.Stdin.Fd())}, os.Stdout, os.Stderr))
 	}
+	// `lasthelp 2fa reset <username>` takes the second step of signing in off an
+	// account whose phone and recovery codes are both lost.
+	if len(os.Args) > 1 && os.Args[1] == "2fa" {
+		os.Exit(runTwoStep(os.Args[2:], os.Stdout, os.Stderr))
+	}
 
 	cfg := config.Load()
 	setupLogger(cfg)

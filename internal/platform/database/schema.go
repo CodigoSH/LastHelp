@@ -571,6 +571,47 @@ var migrations = []migration{
 			return addColumn(tx, "session", "ip", "TEXT NOT NULL DEFAULT ''")
 		},
 	},
+	{
+		version: 20,
+		name:    "an account can ask for a code from an authenticator app after its password",
+		// two_step is an account's authenticator secret, kept as it was given like
+		// every other secret here: a key beside the database would protect nothing.
+		// enabled is 0 while it is still being scanned; last_step is the period of
+		// the last code accepted, so no code is accepted twice. recovery_code keeps
+		// only the hash of each code and when it was spent. sign_in_challenge is a
+		// sign-in that has passed the password and waits for the code: the hash of
+		// what the browser holds, whose it is, until when, and how many wrong codes
+		// it has had. Nobody has a second step until they turn it on.
+		fn: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`CREATE TABLE IF NOT EXISTS two_step (
+					user_id    INTEGER PRIMARY KEY REFERENCES app_user(id) ON DELETE CASCADE,
+					secret     TEXT    NOT NULL,
+					enabled    INTEGER NOT NULL DEFAULT 0,
+					last_step  INTEGER NOT NULL DEFAULT 0,
+					created_at INTEGER NOT NULL
+				)`,
+				`CREATE TABLE IF NOT EXISTS recovery_code (
+					id        INTEGER PRIMARY KEY,
+					user_id   INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+					code_hash TEXT    NOT NULL,
+					used_at   INTEGER
+				)`,
+				`CREATE INDEX IF NOT EXISTS recovery_code_by_user ON recovery_code (user_id)`,
+				`CREATE TABLE IF NOT EXISTS sign_in_challenge (
+					token_hash TEXT    PRIMARY KEY,
+					user_id    INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+					expires_at INTEGER NOT NULL,
+					attempts   INTEGER NOT NULL DEFAULT 0
+				)`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

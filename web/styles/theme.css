@@ -6012,6 +6012,39 @@ a.ov-row:hover { background: var(--surface-dim); }
 .sessions-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .sessions-summary p { margin: 0; color: var(--text-dim); }
 .sessions-summary .button { flex: none; }
+
+/* The second step's card is drawn again in place, step by step; the box that holds it has none of its
+   own, so the card sits in the settings grid like the others. */
+.two-step-host { display: contents; }
+/* White behind the QR in both themes: a code on a dark ground is one some cameras will not read. */
+.two-step-qr { inline-size: fit-content; margin-block: 16px; padding: 8px; border-radius: 12px; background: #fff; line-height: 0; }
+.two-step-secret {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+#two-step-code, #auth-code { font-family: var(--font-mono); letter-spacing: 0.12em; }
+.two-step-codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 16px;
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-main);
+}
+.two-step-low { color: var(--warning-color); }
 .sessions-modal .ov-modal-body { gap: 0; }
 /* One grid for the head and every line, each line a subgrid of it, so a column is as wide as its widest
    cell from the head to the last line and the heads stand over what they name. */

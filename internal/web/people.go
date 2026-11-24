@@ -229,6 +229,13 @@ func (s *Server) handleListPeople(w http.ResponseWriter, r *http.Request) {
 			}
 			grants = append(grants, grant)
 		}
+		// Whether the account signs in with a code too, so the administrator can
+		// see it, and take it off for somebody who lost the phone and the codes.
+		twoStep, err := s.twoStep().Enabled(u.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
 		out = append(out, map[string]any{
 			"id":       u.ID,
 			"username": u.Username,
@@ -236,6 +243,7 @@ func (s *Server) handleListPeople(w http.ResponseWriter, r *http.Request) {
 			"disabled": u.Disabled,
 			"avatar":   u.Avatar,
 			"grants":   grants,
+			"two_step": twoStep,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"people": out})

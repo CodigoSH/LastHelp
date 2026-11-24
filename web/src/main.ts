@@ -45,6 +45,8 @@ import { icons } from "./views/icons";
 import { installSearchShortcut } from "./services/searchShortcut";
 import { SECRET_MASK, secretChange } from "./services/secretField";
 import { channelPayload, credentialsPayload } from "./services/secretPayload";
+import { looksLikeAppCode, normalizeCode, recoveryCodesText } from "./services/twoStep";
+import { qrMatrix, qrSvg } from "./services/qrCode";
 
 const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
@@ -885,11 +887,17 @@ async function showProfile(): Promise<void> {
     .get<{ sessions: views.SessionRow[] }>("/api/sessions")
     .then((r) => r.sessions)
     .catch(() => null);
+  // The second step, left out the same way when it cannot be read.
+  const twoStep = await api
+    .get<{ enabled: boolean; recovery_left: number }>("/api/me/two-step")
+    .then((r): views.TwoStepView => ({ ...views.twoStepIdle, enabled: !!r.enabled, recoveryLeft: r.recovery_left || 0 }))
+    .catch(() => null);
   await showInShell(
-    views.profileScreen({ username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) }, text, sessions),
+    views.profileScreen({ username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) }, text, sessions, twoStep),
     "/panel/account",
   );
   wireSessions();
+  if (twoStep) wireTwoStep(twoStep);
 
   // The picture, which is read in the browser and sent as a data URL. A file
   // upload would need a store, a route to serve it from and a second thing to
@@ -938,6 +946,154 @@ async function showProfile(): Promise<void> {
     } catch (err) {
       showFormError(err);
     }
+  });
+}
+
+/**
+ * The second step's card: turning it on (QR, key, the code that confirms it), the recovery codes shown
+ * once, new ones and turning it off with the password. The card is drawn again in place for each step;
+ * a failure says why on the card or in the password dialog and leaves the step where it was.
+ */
+function wireTwoStep(initial: views.TwoStepView): void {
+  const host = root?.querySelector<HTMLElement>("[data-two-step-host]");
+  const dialog = root?.querySelector<HTMLDialogElement>("#two-step-password");
+  const passwordForm = dialog?.querySelector<HTMLFormElement>("form.two-step-password");
+  if (!host || !dialog || !passwordForm) return;
+  let view = initial;
+  let pending: "off" | "new-codes" = "off";
+
+  const draw = () => {
+    host.innerHTML = views.twoStepCard(view, text);
+  };
+  const fail = (err: unknown) => {
+    const line = host.querySelector<HTMLParagraphElement>(".form-error");
+    const message = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+    if (line) {
+      line.textContent = message;
+      line.hidden = false;
+    } else toastError(message);
+  };
+  // No clipboard on a plain-HTTP address: what was to be copied is selected instead, for the person to copy.
+  const copy = async (value: string, shown: Element | null) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast(i18n.t("twoStep.copied"));
+    } catch {
+      if (!shown) return;
+      const range = document.createRange();
+      range.selectNodeContents(shown);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+  };
+  const askPassword = (what: "off" | "new-codes") => {
+    pending = what;
+    const words = what === "off"
+      ? { title: "twoStep.turnOff", lead: "twoStep.turnOffMessage" }
+      : { title: "twoStep.newCodes", lead: "twoStep.newCodesMessage" };
+    const set = (selector: string, key: string) => {
+      const el = dialog.querySelector<HTMLElement>(selector);
+      if (el) el.textContent = i18n.t(key);
+    };
+    set(".modal-head h2", words.title);
+    set(".lead", words.lead);
+    set("button[type=submit]", words.title);
+    dialog.querySelector<HTMLButtonElement>("button[type=submit]")?.classList.toggle("danger", what === "off");
+    dialog.querySelector<HTMLButtonElement>("button[type=submit]")?.classList.toggle("primary", what !== "off");
+    passwordForm.reset();
+    const line = passwordForm.querySelector<HTMLParagraphElement>(".form-error");
+    if (line) line.hidden = true;
+    dialog.showModal();
+    passwordForm.querySelector<HTMLInputElement>("#two-step-current")?.focus();
+  };
+
+  passwordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const current = String(new FormData(passwordForm).get("current") ?? "");
+    try {
+      if (pending === "off") {
+        await api.post("/api/me/two-step/disable", { current });
+        view = { ...views.twoStepIdle };
+        toast(i18n.t("twoStep.turnedOff"));
+      } else {
+        const r = await api.post<{ recovery_codes: string[] }>("/api/me/two-step/recovery-codes", { current });
+        view = { ...view, recoveryLeft: r.recovery_codes.length, step: "codes", codes: r.recovery_codes };
+      }
+      dialog.close();
+      draw();
+    } catch (err) {
+      const line = passwordForm.querySelector<HTMLParagraphElement>(".form-error");
+      if (line) {
+        line.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
+        line.hidden = false;
+      }
+    }
+  });
+
+  host.addEventListener("click", async (event) => {
+    const action = (event.target as HTMLElement).closest<HTMLElement>("[data-two-step]")?.dataset.twoStep;
+    switch (action) {
+      case "start":
+        try {
+          const r = await api.post<{ secret: string; uri: string }>("/api/me/two-step/setup", {});
+          view = { ...view, step: "setup", secret: r.secret, qr: qrSvg(qrMatrix(r.uri), { size: 200 }) };
+          draw();
+          host.querySelector<HTMLInputElement>("#two-step-code")?.focus();
+        } catch (err) {
+          fail(err);
+        }
+        break;
+      case "copy-key":
+        await copy(view.secret, host.querySelector(".two-step-secret"));
+        break;
+      case "confirm": {
+        const input = host.querySelector<HTMLInputElement>("#two-step-code");
+        const code = normalizeCode(input?.value ?? "");
+        if (!code) return input?.focus();
+        try {
+          const r = await api.post<{ recovery_codes: string[] }>("/api/me/two-step/enable", { code });
+          view = { enabled: true, recoveryLeft: r.recovery_codes.length, step: "codes", codes: r.recovery_codes, secret: "", qr: "" };
+          draw();
+        } catch (err) {
+          fail(err);
+          input?.focus();
+        }
+        break;
+      }
+      case "cancel":
+        view = { ...view, step: "state", secret: "", qr: "" };
+        draw();
+        break;
+      case "copy-codes":
+        await copy(recoveryCodesText(view.codes), host.querySelector(".two-step-codes"));
+        break;
+      case "download-codes": {
+        const url = URL.createObjectURL(new Blob([recoveryCodesText(view.codes)], { type: "text/plain" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "lasthelp-recovery-codes.txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        break;
+      }
+      case "done":
+        view = { ...view, step: "state", codes: [] };
+        draw();
+        break;
+      case "new-codes":
+      case "off":
+        askPassword(action);
+        break;
+    }
+  });
+  // Enter in the code field confirms, as the button does.
+  host.addEventListener("keydown", (event) => {
+    if ((event.target as HTMLElement).id !== "two-step-code" || !isEnter(event)) return;
+    event.preventDefault();
+    host.querySelector<HTMLButtonElement>("[data-two-step=confirm]")?.click();
   });
 }
 
@@ -1089,7 +1245,13 @@ async function showPeople(): Promise<void> {
           lead: text.t("people.editHelp"),
           body:
             views.field({ id: "edit-username", name: "username", label: text.t("auth.username") }, text) +
-            views.field({ id: "edit-password", name: "password", label: text.t("people.newPassword"), type: "password", hint: text.t("people.newPasswordHelp") }, text),
+            views.field({ id: "edit-password", name: "password", label: text.t("people.newPassword"), type: "password", hint: text.t("people.newPasswordHelp") }, text) +
+            // Only for somebody who has a second step: the way back when the phone and the codes are both lost.
+            `<div class="field two-step-admin" hidden>
+              <label>${escapeHTML(text.t("twoStep.title"))}</label>
+              <p class="hint">${escapeHTML(text.t("twoStep.adminRemoveHint"))}</p>
+              <div><button class="button danger" type="button" data-remove-two-step>${escapeHTML(text.t("twoStep.adminRemove"))}</button></div>
+            </div>`,
           submit: text.t("action.save"),
           formClass: "person-edit-form",
         },
@@ -1116,9 +1278,23 @@ async function showPeople(): Promise<void> {
       if (name) name.value = button.dataset.username ?? "";
       const pass = root?.querySelector<HTMLInputElement>("#edit-password");
       if (pass) pass.value = "";
+      const twoStep = root?.querySelector<HTMLElement>(".two-step-admin");
+      if (twoStep) twoStep.hidden = !(body.people ?? []).find((p) => p.id === editing)?.two_step;
       openModal("person-edit");
     }),
   );
+  root?.querySelector<HTMLButtonElement>("[data-remove-two-step]")?.addEventListener("click", async () => {
+    const person = (body.people ?? []).find((p) => p.id === editing);
+    if (!person) return;
+    if (!(await askConfirm(i18n.t("twoStep.adminRemove"), i18n.t("twoStep.adminRemoveConfirm", { name: person.username })))) return;
+    try {
+      await api.del(`/api/people/${editing}/two-step`);
+      toast(i18n.t("twoStep.adminRemoved"));
+      await render();
+    } catch (err) {
+      toastError(i18n.t(err instanceof ApiError ? err.key : "error.internal"));
+    }
+  });
   onSubmit("form.person-edit-form", async (data) => {
     const payload: Record<string, string> = {};
     const name = String(data.get("username") ?? "");
@@ -2925,7 +3101,12 @@ async function showSignIn(): Promise<void> {
       // Not /api/setup: a fresh instance was sent to the wizard above, so that
       // branch could never be taken. A branch nothing can reach is a branch
       // nobody tests.
-      await api.post("/api/session", payload);
+      const answer = await api.post<{ two_step?: boolean; challenge?: string }>("/api/session", payload);
+      // An account with a second step answers with a challenge and no session.
+      if (answer?.two_step && answer.challenge) {
+        askSecondStep(answer.challenge);
+        return;
+      }
       me = await api.get<Me>("/api/me");
       go("/panel");
     } catch (err) {
@@ -2935,6 +3116,81 @@ async function showSignIn(): Promise<void> {
       }
     }
   });
+}
+
+/**
+ * The code that finishes a sign-in which passed the password. A code from the
+ * app or, switched to, a recovery code; back goes to the password, and so does a
+ * challenge that ran out.
+ */
+function askSecondStep(challenge: string): void {
+  const passwordForm = root?.querySelector<HTMLFormElement>("form.auth");
+  const form = root?.querySelector<HTMLFormElement>("form.auth-code");
+  const input = form?.querySelector<HTMLInputElement>("#auth-code");
+  const errorLine = form?.querySelector<HTMLParagraphElement>(".form-error");
+  if (!passwordForm || !form || !input) return;
+  let recovery = false;
+
+  const words = () => {
+    const set = (selector: string, key: string) => {
+      const el = form.querySelector<HTMLElement>(selector);
+      if (el) el.textContent = i18n.t(key);
+    };
+    set("[data-code-hint]", recovery ? "twoStep.enterRecovery" : "twoStep.enterCode");
+    set("[data-code-label]", recovery ? "twoStep.recoveryCode" : "twoStep.code");
+    set("[data-code-switch]", recovery ? "twoStep.useApp" : "twoStep.useRecovery");
+    input.inputMode = recovery ? "text" : "numeric";
+  };
+  const back = (key?: string) => {
+    form.hidden = true;
+    passwordForm.hidden = false;
+    const line = passwordForm.querySelector<HTMLParagraphElement>(".form-error");
+    if (line) {
+      line.textContent = key ? i18n.t(key) : "";
+      line.hidden = !key;
+    }
+    passwordForm.querySelector<HTMLInputElement>("#auth-password")?.focus();
+  };
+
+  passwordForm.hidden = true;
+  form.hidden = false;
+  input.value = "";
+  if (errorLine) errorLine.hidden = true;
+  words();
+  input.focus();
+
+  // Fresh listeners each time: the form is drawn anew with the sign-in page, and
+  // a second password step must not stack a second submit on the same one.
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const code = normalizeCode(input.value);
+    if (!code) return;
+    try {
+      await api.post("/api/session/second-step", { challenge, code });
+      me = await api.get<Me>("/api/me");
+      go("/panel");
+    } catch (err) {
+      const key = err instanceof ApiError ? err.key : "error.internal";
+      if (key === "error.sign_in_expired") return back(key);
+      if (errorLine) {
+        errorLine.textContent = i18n.t(key);
+        errorLine.hidden = false;
+      }
+      // A six-digit code that missed is typed again; a recovery code stays for the fix.
+      if (looksLikeAppCode(input.value)) input.value = "";
+      input.focus();
+    }
+  };
+  const switcher = form.querySelector<HTMLButtonElement>("[data-code-switch]");
+  if (switcher)
+    switcher.onclick = () => {
+      recovery = !recovery;
+      input.value = "";
+      words();
+      input.focus();
+    };
+  const backButton = form.querySelector<HTMLButtonElement>("[data-code-back]");
+  if (backButton) backButton.onclick = () => back();
 }
 
 /** How far back the overview's chart goes. A choice for as long as the page is open, and never needed. */

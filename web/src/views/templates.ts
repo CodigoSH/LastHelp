@@ -28,6 +28,7 @@ import { userAgentLabel, type BrowserId, type OsId } from "../services/userAgent
 import { sessionIsOnline, sessionsInOrder } from "../services/sessionsOrder";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
+import { CODE_MAX_LENGTH, formatSecret } from "../services/twoStep";
 import { actionButton, iconButton, modal } from "./modal";
 
 export { modal, actionButton, iconButton } from "./modal";
@@ -1271,7 +1272,37 @@ export function signInForm(text: Text, instance?: { name?: string; logo?: string
         </div>
       </div>
     </form>
+    ${secondStepForm(text)}
   </section>`;
+}
+
+/**
+ * The code after the password, for an account with a second step: the same
+ * card, the code from the app — or, one press away, a recovery code — and the
+ * way back to the password. Hidden until the password asks for it.
+ */
+export function secondStepForm(text: Text): string {
+  return `<form class="auth-code" hidden>
+      <div class="wizard-card">
+        <header class="signin-head">
+          <h1>${escapeHTML(text.t("twoStep.title"))}</h1>
+          <p class="lead" data-code-hint>${escapeHTML(text.t("twoStep.enterCode"))}</p>
+        </header>
+        <div class="wizard-fields">
+          <div class="field">
+            <label for="auth-code" data-code-label>${escapeHTML(text.t("twoStep.code"))}</label>
+            <input id="auth-code" name="code" type="text" required inputmode="numeric" autocomplete="one-time-code"
+              maxlength="${CODE_MAX_LENGTH}" autocapitalize="none" spellcheck="false" dir="ltr" />
+          </div>
+        </div>
+        <p class="form-error" role="alert" hidden></p>
+        <div class="wizard-actions">
+          <button class="button primary signin-go" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
+          <button class="button ghost" type="button" data-code-switch>${escapeHTML(text.t("twoStep.useRecovery"))}</button>
+          <button class="button ghost" type="button" data-code-back>${escapeHTML(text.t("nav.back"))}</button>
+        </div>
+      </div>
+    </form>`;
 }
 
 /**
@@ -3063,6 +3094,7 @@ export function profileScreen(
   me: { username: string; avatar?: string; role: string },
   text: Text,
   sessions: SessionRow[] | null = null,
+  twoStep: TwoStepView | null = null,
 ): string {
   // Profile and password, a card each: the picture, the name and the role; the username — the one name an account
   // has, to sign in with and to sign replies — with its save button on the same
@@ -3107,8 +3139,91 @@ export function profileScreen(
         </form>`,
         { lead: text.t("profile.passwordHelp") },
       )}
+      ${twoStep ? `<div class="two-step-host" data-two-step-host>${twoStepCard(twoStep, text)}</div>${twoStepPasswordDialog(text)}` : ""}
       ${sessions ? sessionsCard(sessions, text) : ""}
     </div>`;
+}
+
+/**
+ * The account's second step, as the card shows it: `step` is which screen of
+ * the card is up — the plain state, the setup (QR, key and the code that
+ * confirms it) or the recovery codes, which are shown once.
+ */
+export interface TwoStepView {
+  enabled: boolean;
+  recoveryLeft: number;
+  step: "state" | "setup" | "codes";
+  secret: string;
+  /** The QR as markup, drawn by the caller. */
+  qr: string;
+  codes: string[];
+}
+
+export const twoStepIdle: TwoStepView = { enabled: false, recoveryLeft: 0, step: "state", secret: "", qr: "", codes: [] };
+
+/** Below this many recovery codes left, the card says to draw new ones. */
+const RECOVERY_LOW = 2;
+
+export function twoStepCard(v: TwoStepView, text: Text): string {
+  const button = (action: string, label: string, kind = "") =>
+    `<button class="button ${kind}" type="button" data-two-step="${action}">${escapeHTML(label)}</button>`;
+  let body: string;
+  let lead: string | undefined;
+  if (v.step === "setup") {
+    body = `<p class="card-sub">${escapeHTML(text.t("twoStep.scan"))}</p>
+      <div class="two-step-qr">${v.qr}</div>
+      <div class="field">
+        <label>${escapeHTML(text.t("twoStep.setupKey"))}</label>
+        <div class="input-row">
+          <code class="two-step-secret" dir="ltr">${escapeHTML(formatSecret(v.secret))}</code>
+          ${button("copy-key", text.t("twoStep.copyKey"))}
+        </div>
+      </div>
+      <div class="field">
+        <label for="two-step-code">${escapeHTML(text.t("twoStep.confirmCode"))}</label>
+        <input id="two-step-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="${CODE_MAX_LENGTH}"
+          placeholder="123456" spellcheck="false" dir="ltr" />
+      </div>
+      <p class="form-error" role="alert" hidden></p>
+      <div class="settings-actions">${button("cancel", text.t("action.cancel"), "ghost")}${button("confirm", text.t("action.confirm"), "primary")}</div>`;
+  } else if (v.step === "codes") {
+    body = `<p class="card-sub">${escapeHTML(text.t("twoStep.codesWarning"))}</p>
+      <ul class="two-step-codes" dir="ltr">${v.codes.map((c) => `<li>${escapeHTML(c)}</li>`).join("")}</ul>
+      <div class="settings-actions">${button("copy-codes", text.t("twoStep.copy"))}${button("download-codes", text.t("twoStep.download"))}${button(
+        "done",
+        text.t("twoStep.done"),
+        "primary",
+      )}</div>`;
+  } else if (!v.enabled) {
+    lead = text.t("twoStep.offHint");
+    body = `<div class="settings-actions">${button("start", text.t("twoStep.turnOn"), "primary")}</div>`;
+  } else {
+    const left = text.t("twoStep.recoveryLeft", { count: text.number(v.recoveryLeft) });
+    body = `<p class="card-sub${v.recoveryLeft <= RECOVERY_LOW ? " two-step-low" : ""}">${escapeHTML(left)}${
+      v.recoveryLeft <= RECOVERY_LOW ? ` ${escapeHTML(text.t("twoStep.recoveryLow"))}` : ""
+    }</p>
+      <div class="settings-actions">${button("new-codes", text.t("twoStep.newCodes"))}${button("off", text.t("twoStep.turnOff"), "danger")}</div>`;
+  }
+  const chip = v.enabled && v.step === "state" ? `<span class="ov-chip two-step-on">${escapeHTML(text.t("twoStep.on"))}</span>` : "";
+  return settingsCard(text.t("twoStep.title"), body, { lead, action: chip });
+}
+
+/** The password asked before new recovery codes or turning it off; the words are set for each. */
+function twoStepPasswordDialog(text: Text): string {
+  return modal(
+    {
+      id: "two-step-password",
+      title: text.t("twoStep.turnOff"),
+      lead: text.t("twoStep.turnOffMessage"),
+      body: field(
+        { id: "two-step-current", name: "current", label: text.t("profile.current"), type: "password", required: true, autocomplete: "current-password" },
+        text,
+      ),
+      submit: text.t("twoStep.turnOff"),
+      formClass: "two-step-password",
+    },
+    text,
+  );
 }
 
 /** One sign-in of this account, as the server lists it. */
@@ -4581,6 +4696,8 @@ export function peopleScreen(
     avatar?: string;
     admin: boolean;
     disabled: boolean;
+    /** Signs in with a code after the password. */
+    two_step?: boolean;
     grants: { scope: string; role: string; where?: string; organization?: string; repository?: string }[];
   }[],
   text: Text,
@@ -4594,6 +4711,7 @@ export function peopleScreen(
         tags: [
           p.admin ? `<span class="mono-tag accent">${escapeHTML(text.t("people.administrator"))}</span>` : "",
           p.disabled ? `<span class="mono-tag">${escapeHTML(text.t("people.disabled"))}</span>` : "",
+          p.two_step ? `<span class="mono-tag">${escapeHTML(text.t("twoStep.tag"))}</span>` : "",
           p.grants.length === 0 && !p.admin
             ? `<span class="mono-tag">${escapeHTML(text.t("people.noRoles"))}</span>`
             : p.grants

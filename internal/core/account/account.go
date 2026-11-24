@@ -325,6 +325,25 @@ func (s Store) Memberships(userID int64) ([]authz.Membership, error) {
 	return actor.Memberships, nil
 }
 
+// CheckPassword proves the password of an account that is already signed in,
+// for a change that asks for it again. A wrong password and a missing account
+// answer the same.
+func (s Store) CheckPassword(userID int64, plainPassword string) error {
+	var storedHash string
+	err := s.DB.QueryRow(`SELECT password_hash FROM app_user WHERE id = ?`, userID).Scan(&storedHash)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		_ = password.Verify(plainPassword, decoy())
+		return ErrNotFound
+	case err != nil:
+		return fmt.Errorf("looking up the account: %w", err)
+	}
+	if err := password.Verify(plainPassword, storedHash); err != nil {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // SetPassword replaces a password, and only after the old one is proved.
 //
 // Proving it is the point: a session left open on a shared machine is the
