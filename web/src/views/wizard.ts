@@ -10,6 +10,7 @@
  * what went in each box, because the boxes asked for formats and showed none.
  */
 import { escapeAttr, escapeHTML } from "../escape";
+import { infoTip } from "./infoTip";
 import type { Text } from "./templates";
 
 /**
@@ -88,6 +89,23 @@ export interface FieldSpec {
 }
 
 /**
+ * A field's label, with its help behind the "i" beside it rather than in a
+ * line under the box. The example rides in the same sentence; the placeholder
+ * still shows it in the box.
+ */
+function fieldHead(id: string, label: string, help: string): string {
+  return help
+    ? `<div class="field-head"><label for="${escapeAttr(id)}">${escapeHTML(label)}</label>${infoTip(help, `${id}-help`)}</div>`
+    : `<label for="${escapeAttr(id)}">${escapeHTML(label)}</label>`;
+}
+
+/** The words of a field's help: the hint, then the example. */
+function helpOf(spec: { hint?: string; example?: string }, text?: Text): string {
+  const example = spec.example && text ? `${text.t("wizard.example")} ${spec.example}` : "";
+  return [spec.hint ?? "", example].filter(Boolean).join(" ");
+}
+
+/**
  * One labelled field.
  *
  * The example goes in the hint line as well as in the placeholder. A
@@ -111,15 +129,10 @@ export function field(spec: FieldSpec, text?: Text): string {
     .filter(Boolean)
     .join(" ");
 
-  const example =
-    spec.example && text
-      ? ` ${escapeHTML(text.t("wizard.example"))} <code class="example">${escapeHTML(spec.example)}</code>`
-      : "";
-
+  const help = helpOf(spec, text);
   return `<div class="field">
-    <label for="${escapeAttr(spec.id)}">${escapeHTML(spec.label)}</label>
-    <input ${attrs} />
-    ${spec.hint || example ? `<p class="hint">${escapeHTML(spec.hint ?? "")}${example}</p>` : ""}
+    ${fieldHead(spec.id, spec.label, help)}
+    <input ${attrs}${help ? ` aria-describedby="${escapeAttr(spec.id)}-help"` : ""} />
   </div>`;
 }
 
@@ -134,17 +147,12 @@ export function areaField(
   spec: Omit<FieldSpec, "type" | "pattern" | "autocomplete"> & { rows?: number },
   text?: Text,
 ): string {
-  const example =
-    spec.example && text
-      ? ` ${escapeHTML(text.t("wizard.example"))} <code class="example">${escapeHTML(spec.example)}</code>`
-      : "";
-
+  const help = helpOf(spec, text);
   return `<div class="field">
-    <label for="${escapeAttr(spec.id)}">${escapeHTML(spec.label)}</label>
-    <textarea id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}" rows="${spec.rows ?? 5}"
+    ${fieldHead(spec.id, spec.label, help)}
+    <textarea id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}" rows="${spec.rows ?? 5}"${help ? ` aria-describedby="${escapeAttr(spec.id)}-help"` : ""}
       ${spec.required ? "required" : ""}
       ${spec.example ? `placeholder="${escapeAttr(spec.example)}"` : ""}>${escapeHTML(spec.value ?? "")}</textarea>
-    ${spec.hint || example ? `<p class="hint">${escapeHTML(spec.hint ?? "")}${example}</p>` : ""}
   </div>`;
 }
 
@@ -159,8 +167,8 @@ export function choiceField(
   },
 ): string {
   return `<div class="field">
-    <label for="${escapeAttr(spec.id)}">${escapeHTML(spec.label)}</label>
-    <select id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}"${spec.required ? " required" : ""}>
+    ${fieldHead(spec.id, spec.label, spec.hint ?? "")}
+    <select id="${escapeAttr(spec.id)}" name="${escapeAttr(spec.name)}"${spec.required ? " required" : ""}${spec.hint ? ` aria-describedby="${escapeAttr(spec.id)}-help"` : ""}>
       ${spec.blank !== undefined ? `<option value="">${escapeHTML(spec.blank)}</option>` : ""}
       ${spec.options
         .map(
@@ -169,7 +177,6 @@ export function choiceField(
         )
         .join("")}
     </select>
-    ${spec.hint ? `<p class="hint">${escapeHTML(spec.hint)}</p>` : ""}
   </div>`;
 }
 

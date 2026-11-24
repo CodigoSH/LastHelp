@@ -30,6 +30,7 @@ import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
 import { CODE_MAX_LENGTH, formatSecret } from "../services/twoStep";
 import { actionButton, iconButton, modal } from "./modal";
+import { infoTip } from "./infoTip";
 import {
   isBlocked,
   OPTION_GROUPS,
@@ -1592,11 +1593,6 @@ const OPTION_FIELD: Record<OptionKey, string> = {
   roadmap: "roadmap_public",
 };
 
-/** A small round "i" that says what an option means on hover and on focus, so the rows stay one line each. */
-function infoTip(id: string, help: string): string {
-  return `<span class="po-tip" tabindex="0" aria-describedby="${escapeAttr(id)}">${icons.info(14)}<span class="po-tip-text" role="tooltip" id="${escapeAttr(id)}">${escapeHTML(help)}</span></span>`;
-}
-
 /** One option: a checkbox and its name, the "i" beside it, indented under the one it depends on. */
 function optionRow(text: Text, o: ProjectOptions, def: OptionDef, prefix: string): string {
   const { name, help } = optionWords(text, def.key);
@@ -1608,7 +1604,7 @@ function optionRow(text: Text, o: ProjectOptions, def: OptionDef, prefix: string
           aria-describedby="${escapeAttr(id)}-tip"${o[def.key] && !blocked ? " checked" : ""}${blocked ? " disabled" : ""} />
         <span>${escapeHTML(name)}</span>
       </label>
-      ${infoTip(`${id}-tip`, help)}
+      ${infoTip(help, `${id}-tip`)}
     </div>`;
 }
 
@@ -1698,7 +1694,7 @@ export function projectForm(text: Text, ctx: ProjectFormContext): string {
         <label for="${prefix}-forge">${escapeHTML(text.t("panel.forgeRepo"))}</label>
         <div class="po-field-row">
           <input id="${prefix}-forge" name="forge_repo" type="text" placeholder="${escapeAttr(example.repo)}" value="${escapeAttr(ctx.forgeRepo ?? "")}" />
-          ${infoTip(`${prefix}-forge-tip`, text.t("panel.forgeRepoHelp"))}
+          ${infoTip(text.t("panel.forgeRepoHelp"), `${prefix}-forge-tip`)}
         </div>
       </div>`
     : "";
@@ -1710,7 +1706,7 @@ export function projectForm(text: Text, ctx: ProjectFormContext): string {
             <option value="server" selected>${escapeHTML(text.t("panel.channelServer"))}</option>
             <option value="none">${escapeHTML(text.t("panel.channelNone"))}</option>
           </select>
-          ${infoTip(`${prefix}-channel-tip`, text.t("project.channelHelp"))}
+          ${infoTip(text.t("project.channelHelp"), `${prefix}-channel-tip`)}
         </div>
       </div>`
     : "";
@@ -1741,7 +1737,7 @@ export function visibilityField(text: Text, isPrivate: boolean): string {
 function toggleRow(name: string, title: string, help: string, on: boolean): string {
   return `<div class="settings-row">
     <div class="settings-info">
-      <h4>${escapeHTML(title)}</h4>${help ? `\n      <p>${escapeHTML(help)}</p>` : ""}
+      <h4>${escapeHTML(title)}${help ? infoTip(help) : ""}</h4>
     </div>
     <label class="toggle">
       <input type="checkbox" role="switch" name="${escapeAttr(name)}"${on ? " checked" : ""}
@@ -2113,7 +2109,7 @@ export function markOf(name: string, icon: string | undefined, cls: string): str
  */
 export function iconField(text: Text, name: string, icon = "", id = "icon"): string {
   return `<div class="field icon-field">
-    <label for="${escapeAttr(id)}-file">${escapeHTML(text.t("icon.label"))}</label>
+    <div class="field-head"><label for="${escapeAttr(id)}-file">${escapeHTML(text.t("icon.label"))}</label>${infoTip(text.t("icon.help"))}</div>
     <div class="picker">
       <button type="button" class="avatar-pick icon-pick" data-pick-icon aria-label="${escapeAttr(text.t("icon.label"))}">
         ${markOf(name, icon, "card-mark icon-preview")}
@@ -2124,7 +2120,6 @@ export function iconField(text: Text, name: string, icon = "", id = "icon"): str
       <input type="file" accept="image/*" id="${escapeAttr(id)}-file" data-icon-file hidden />
     </div>
     <input type="hidden" name="icon" value="${escapeAttr(icon)}" />
-    <p class="hint">${escapeHTML(text.t("icon.help"))}</p>
   </div>`;
 }
 
@@ -3195,12 +3190,18 @@ function settingsItem(spec: {
   sub?: string;
   /** Marks drawn by these templates after the sub line: what the thing is, beside its address. */
   subMarks?: string;
+  /** What the thing is, in a tag right after its name rather than at the far end of the row. */
+  nameMarks?: string;
   tags?: string;
   href?: string;
   actions?: string;
   attrs?: string;
 }): string {
-  const main = `${spec.lead}<span class="si-text"><span class="si-name">${escapeHTML(spec.name)}</span>${
+  const main = `${spec.lead}<span class="si-text">${
+    spec.nameMarks
+      ? `<span class="si-name-line"><span class="si-name">${escapeHTML(spec.name)}</span>${spec.nameMarks}</span>`
+      : `<span class="si-name">${escapeHTML(spec.name)}</span>`
+  }${
     spec.sub ? `<span class="si-sub">${escapeHTML(spec.sub)}${spec.subMarks ? `<span class="si-sub-marks">${spec.subMarks}</span>` : ""}</span>` : ""
   }</span>${spec.tags ? `<span class="si-tags">${spec.tags}</span>` : ""}`;
   return `<li class="settings-item" ${spec.attrs ?? ""}>
@@ -3250,13 +3251,12 @@ export function profileScreen(
         </div>
         <form class="profile-name">
           <div class="field">
-            <label for="profile-username">${escapeHTML(text.t("auth.username"))}</label>
+            <div class="field-head"><label for="profile-username">${escapeHTML(text.t("auth.username"))}</label>${infoTip(text.t("profile.usernameHelp"))}</div>
             <div class="input-row">
               <input type="text" id="profile-username" name="username" value="${escapeAttr(me.username)}" required
                 minlength="2" maxlength="60" autocomplete="username" autocapitalize="none" spellcheck="false" />
               <button class="button primary" type="submit">${escapeHTML(text.t("action.save"))}</button>
             </div>
-            <p class="hint">${escapeHTML(text.t("profile.usernameHelp"))}</p>
           </div>
           <p class="form-error" role="alert" hidden></p>
         </form>`,
@@ -3528,8 +3528,7 @@ export function pushCard(view: PushView, text: Text): string {
       ? ""
       : `<div class="settings-row">
           <div class="settings-info">
-            <h4>${escapeHTML(text.t("push.thisDevice"))}</h4>
-            <p>${escapeHTML(text.t("push.thisDeviceHelp"))}</p>
+            <h4>${escapeHTML(text.t("push.thisDevice"))}${infoTip(text.t("push.thisDeviceHelp"))}</h4>
           </div>
           <label class="toggle">
             <input type="checkbox" role="switch" data-push-toggle${view.thisDevice !== null ? " checked" : ""}
@@ -3955,7 +3954,7 @@ function accentChoice(current: string, text: Text): string {
   const preset = ACCENTS.find(([, hex]) => hex === (value || "#e8520e"));
   const custom = !preset;
   return `<div class="field">
-    <label>${escapeHTML(text.t("personalization.accent"))}</label>
+    <div class="field-head"><label>${escapeHTML(text.t("personalization.accent"))}</label>${infoTip(text.t("personalization.accentHelp"))}</div>
     <input type="hidden" name="accent" id="accent" value="${escapeAttr(value)}" />
     <div class="color-grid" role="radiogroup" aria-label="${escapeAttr(text.t("personalization.accent"))}">
       ${ACCENTS.map(([name, hex]) => {
@@ -3969,7 +3968,6 @@ function accentChoice(current: string, text: Text): string {
         <input type="color" data-accent-custom value="${escapeAttr(custom && value ? value : "#e8520e")}" />
       </label>
     </div>
-    <p class="hint">${escapeHTML(text.t("personalization.accentHelp"))}</p>
   </div>`;
 }
 
@@ -4099,12 +4097,14 @@ export function organizationScreen(
   const org = data.organization;
   const hasForge = !!org.forge && org.forge !== "none";
 
-  const summary = settingsCard(
-    org.name,
-    `<p class="org-tags"><span class="mono-tag">/${escapeHTML(org.slug)}</span>
-      ${hasForge ? `<span class="mono-tag accent">${escapeHTML(org.forge)}</span>` : ""}${org.private ? privateMark(text) : ""}</p>`,
-    { action: `<a class="button ghost" href="/${escapeAttr(org.slug)}">${escapeHTML(text.t("shell.publicBoard"))}</a>` },
-  );
+  const summary = pageHead({
+    name: org.name,
+    icon: org.icon,
+    tags: `<span class="mono-tag">/${escapeHTML(org.slug)}</span>
+      ${hasForge ? `<span class="mono-tag accent">${escapeHTML(org.forge)}</span>` : ""}${org.private ? privateMark(text) : ""}`,
+    action: `<a class="button ghost" href="/${escapeAttr(org.slug)}">${escapeHTML(text.t("shell.publicBoard"))}</a>`,
+  });
+  const crumb = panelCrumb([["/panel/organizations", text.t("shell.organizations")]], org.name);
 
   const rows = data.repositories
     .map((r) =>
@@ -4136,8 +4136,7 @@ export function organizationScreen(
   );
 
   if (!data.can_manage) {
-    return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a></p>
-      <h1 class="visually-hidden">${escapeHTML(org.name)}</h1>
+    return `${crumb}
       <div class="settings">${summary}${repositories}</div>`;
   }
 
@@ -4168,8 +4167,7 @@ export function organizationScreen(
       )
     : "";
 
-  return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a></p>
-    <h1 class="visually-hidden">${escapeHTML(org.name)}</h1>
+  return `${crumb}
     <div class="settings">
       ${summary}
       ${repositories}
@@ -4209,7 +4207,7 @@ function organizationTeam(
       name: m.username,
       // Where a collaborator works is what says what they are here.
       sub: owner ? "" : reposOf(m).map((r) => r.where).join(", "),
-      tags: owner
+      nameMarks: owner
         ? `<span class="mono-tag accent" data-role="owner">${escapeHTML(text.t("role.owner"))}</span>`
         : `<span class="mono-tag" data-role="collaborator">${escapeHTML(text.t("role.collaborator"))}</span>`,
       // Not yourself: changing or taking away your own role from this page
@@ -4315,8 +4313,7 @@ function organizationForge(data: OrganizationPanel, origin: string, text: Text):
     text.t("panel.connection"),
     `<div class="settings-row">
       <div class="settings-info">
-        <h4>${escapeHTML(where)}</h4>
-        <p>${escapeHTML(text.t(connected ? "org.connectedHelp" : "org.notConnectedHelp"))}</p>
+        <h4>${escapeHTML(where)}${infoTip(text.t(connected ? "org.connectedHelp" : "org.notConnectedHelp"))}</h4>
       </div>
       <span class="mono-tag${connected ? " accent" : ""}" data-connected="${connected}">${escapeHTML(text.t(connected ? "org.connected" : "org.notConnected"))}</span>
     </div>
@@ -4331,8 +4328,7 @@ function organizationForge(data: OrganizationPanel, origin: string, text: Text):
       org.webhook_path
         ? `<div class="settings-row">
             <div class="settings-info">
-              <h4>${escapeHTML(text.t("panel.webhookPath"))}</h4>
-              <p>${escapeHTML(text.t("panel.webhookPathHelp"))}</p>
+              <h4>${escapeHTML(text.t("panel.webhookPath"))}${infoTip(text.t("panel.webhookPathHelp"))}</h4>
               <code class="fact-value" data-webhook>${escapeHTML(origin + org.webhook_path)}</code>
             </div>
             ${actionButton("copy", text.t("action.copy"), "data-copy-webhook")}
@@ -4410,39 +4406,34 @@ export function repositoryScreen(
   // second place for the same work.
   const review = `/review?${new URLSearchParams({ mode: "all", moderation: "pending", board }).toString()}`;
   const reports = `/review?${new URLSearchParams({ mode: "all", board }).toString()}`;
-  const summary = settingsCard(
-    repo.name,
-    `<p class="org-tags"><span class="mono-tag">/${escapeHTML(board)}</span>${acceptsMarks(repo, text)}</p>
-    <div class="settings-row">
+  const summary = pageHead({
+    name: repo.name,
+    icon: repo.icon,
+    tags: `<span class="mono-tag">/${escapeHTML(board)}</span>${acceptsMarks(repo, text)}`,
+    action: `<a class="button ghost" href="/${escapeAttr(board)}">${escapeHTML(text.t("shell.publicBoard"))}</a>`,
+    rows: `<div class="settings-row">
       <div class="settings-info">
-        <h4>${escapeHTML(text.t("review.title"))}</h4>
-        <p>${escapeHTML(text.t("repo.reportsHelp"))}</p>
+        <h4>${escapeHTML(text.t("review.title"))}${infoTip(text.t("repo.reportsHelp"))}</h4>
       </div>
       <a class="button primary" href="${escapeAttr(reports)}" data-repo-reports>${escapeHTML(text.t("action.open"))}</a>
     </div>
     <div class="settings-row">
       <div class="settings-info">
-        <h4>${escapeHTML(text.t("repo.pending", { count: text.number(repo.pending) }))}</h4>
-        <p>${escapeHTML(text.t("repo.pendingHelp"))}</p>
+        <h4>${escapeHTML(text.t("repo.pending", { count: text.number(repo.pending) }))}${infoTip(text.t("repo.pendingHelp"))}</h4>
       </div>
       <a class="button ghost" href="${escapeAttr(review)}" data-repo-review>${escapeHTML(text.t("action.open"))}</a>
     </div>
     <div class="settings-row">
       <div class="settings-info">
-        <h4>${escapeHTML(text.t("panel.export", { repository: repo.name }))}</h4>
-        <p>${escapeHTML(text.t("repo.exportHelp"))}</p>
+        <h4>${escapeHTML(text.t("panel.export", { repository: repo.name }))}${infoTip(text.t("repo.exportHelp"))}</h4>
       </div>
       <a class="button ghost with-icon" href="/api/orgs/${escapeAttr(org.slug)}/repos/${escapeAttr(repo.slug)}/export"
          download data-export>${icons.download()}<span>${escapeHTML(text.t("repo.exportDownload"))}</span></a>
     </div>`,
-    {
-      action: `<a class="button ghost" href="/${escapeAttr(board)}">${escapeHTML(text.t("shell.publicBoard"))}</a>`,
-    },
-  );
+  });
 
   if (!repo.can_manage) {
-    return `${repositoryCrumb(org, text)}
-      <h1 class="visually-hidden">${escapeHTML(repo.name)}</h1>
+    return `${repositoryCrumb(org, repo.name, text)}
       <div class="settings">${summary}</div>`;
   }
 
@@ -4489,8 +4480,7 @@ export function repositoryScreen(
       )
     : "";
 
-  return `${repositoryCrumb(org, text)}
-    <h1 class="visually-hidden">${escapeHTML(repo.name)}</h1>
+  return `${repositoryCrumb(org, repo.name, text)}
     <div class="settings">
       ${summary}
       ${settings}
@@ -4574,10 +4564,35 @@ function questionModal(text: Text): string {
   );
 }
 
-function repositoryCrumb(org: { slug: string; name: string }, text: Text): string {
-  return `<p class="crumb"><a href="/panel/organizations">${escapeHTML(text.t("shell.organizations"))}</a>
-    <span aria-hidden="true">/</span>
-    <a href="/panel/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>`;
+/** Where a panel page sits: each step a link, the page itself last and not a link. */
+function panelCrumb(steps: [href: string, label: string][], here: string): string {
+  const sep = `<span class="crumb-sep" aria-hidden="true">›</span>`;
+  return `<nav class="crumb panel-crumb" aria-label="breadcrumb">${steps
+    .map(([href, label]) => `<a href="${escapeAttr(href)}">${escapeHTML(label)}</a>${sep}`)
+    .join("")}<span aria-current="page">${escapeHTML(here)}</span></nav>`;
+}
+
+/**
+ * The head of an organisation's or a project's page: its icon, its name as the
+ * page's title, what it is beside its address, and the way to its public page.
+ * The card's rows, when it has any, follow under it.
+ */
+function pageHead(spec: { name: string; icon?: string; tags: string; action: string; rows?: string }): string {
+  return `<section class="bento-card settings-card page-head-card">
+    <div class="page-head">
+      ${markOf(spec.name, spec.icon, "card-mark ph-mark")}
+      <div class="ph-text">
+        <h1 class="ph-name">${escapeHTML(spec.name)}</h1>
+        <p class="ph-tags">${spec.tags}</p>
+      </div>
+      ${spec.action}
+    </div>
+    ${spec.rows ?? ""}
+  </section>`;
+}
+
+function repositoryCrumb(org: { slug: string; name: string }, here: string, text: Text): string {
+  return panelCrumb([["/panel/organizations", text.t("shell.organizations")], [`/panel/${org.slug}`, org.name]], here);
 }
 
 /**
@@ -4601,7 +4616,7 @@ function repositoryTeam(
       attrs: `data-member="${escapeAttr(m.username)}"`,
       lead: avatar(m.avatar),
       name: m.username,
-      tags: `<span class="mono-tag${role === "owner" ? " accent" : ""}" data-role="${role}">${escapeHTML(text.t(`role.${role}`))}</span>`,
+      nameMarks: `<span class="mono-tag${role === "owner" ? " accent" : ""}" data-role="${role}">${escapeHTML(text.t(`role.${role}`))}</span>`,
       actions: removable
         ? iconButton("remove", text.t("people.revoke"), `class="icon-button danger" data-revoke="${escapeAttr(m.username)}" data-name="${escapeAttr(m.username)}"`)
         : "",
@@ -4697,9 +4712,8 @@ export function itemTeamView(
           ${
             item.team?.can_add_words
               ? `<div class="field add-word">
-                  <label for="add-word">${escapeHTML(text.t("item.addWordLabel"))}</label>
+                  <div class="field-head"><label for="add-word">${escapeHTML(text.t("item.addWordLabel"))}</label>${infoTip(text.t("item.addWordHelp"))}</div>
                   <input type="text" id="add-word" name="add_word" autocomplete="off" maxlength="60" />
-                  <p class="hint">${escapeHTML(text.t("item.addWordHelp"))}</p>
                 </div>`
               : ""
           }`,
@@ -4738,22 +4752,19 @@ export function itemTeamView(
     item.issue
       ? `<div class="settings-row">
           <div class="settings-info">
-            <h4>${escapeHTML(text.t("item.trackedAs", { number: text.number(item.issue.number) }))}</h4>
-            <p>${escapeHTML(text.t("item.issueLinkedHelp"))}</p>
+            <h4>${escapeHTML(text.t("item.trackedAs", { number: text.number(item.issue.number) }))}${infoTip(text.t("item.issueLinkedHelp"))}</h4>
           </div>
           <a class="button ghost with-icon" href="${escapeAttr(item.issue.url)}" target="_blank" rel="noopener" data-issue-link>${icons.open(15)}<span>${escapeHTML(text.t("item.issueOpenIt"))}</span></a>
         </div>`
       : `<div class="settings-row">
           <div class="settings-info">
-            <h4>${escapeHTML(text.t("panel.createIssue"))}</h4>
-            <p>${escapeHTML(text.t("item.issueCreateHelp"))}</p>
+            <h4>${escapeHTML(text.t("panel.createIssue"))}${infoTip(text.t("item.issueCreateHelp"))}</h4>
           </div>
           <button class="button primary" type="button" data-create-issue>${escapeHTML(text.t("item.issueCreate"))}</button>
         </div>
         <form class="settings-row attach">
           <div class="settings-info">
-            <h4>${escapeHTML(text.t("panel.attachIssue"))}</h4>
-            <p>${escapeHTML(text.t("item.issueAttachHelp"))}</p>
+            <h4>${escapeHTML(text.t("panel.attachIssue"))}${infoTip(text.t("item.issueAttachHelp"))}</h4>
           </div>
           <div class="inline-field">
             <input name="issue" required placeholder="${escapeAttr(text.t("panel.attachPlaceholder"))}"
@@ -4800,10 +4811,9 @@ export function itemTeamView(
         ? `<p class="hint comment-closed">${escapeHTML(text.t("item.commentsClosed"))}</p>`
         : `${commentWindow(item, text)}<form class="team-reply">
       <div class="field">
-        <label for="team-reply-body">${escapeHTML(text.t("panel.reply"))}</label>
+        <div class="field-head"><label for="team-reply-body">${escapeHTML(text.t("panel.reply"))}</label>${infoTip(text.t("item.replyHelp"))}</div>
         <textarea id="team-reply-body" name="body" rows="3" required
                   placeholder="${escapeAttr(text.t("item.commentPlaceholder"))}"></textarea>
-        <p class="hint">${escapeHTML(text.t("item.replyHelp"))}</p>
         ${pictures > 0 ? pictureTray("team-reply-pictures", pictures, text) : ""}
       </div>
       <div class="settings-actions">
@@ -4948,15 +4958,13 @@ export function backupScreen(text: Text): string {
         text.t("shell.backups"),
         `<div class="settings-row">
           <div class="settings-info">
-            <h4>${escapeHTML(text.t("backups.take"))}</h4>
-            <p>${escapeHTML(text.t("backups.help"))}</p>
+            <h4>${escapeHTML(text.t("backups.take"))}${infoTip(text.t("backups.help"))}</h4>
           </div>
           <a class="button primary with-icon" href="/api/backup" download>${icons.download()}<span>${escapeHTML(text.t("backups.download"))}</span></a>
         </div>
         <div class="settings-row">
           <div class="settings-info">
-            <h4>${escapeHTML(text.t("backups.restore"))}</h4>
-            <p>${escapeHTML(text.t("backups.restoreHelp"))}</p>
+            <h4>${escapeHTML(text.t("backups.restore"))}${infoTip(text.t("backups.restoreHelp"))}</h4>
             <p class="settings-danger">${escapeHTML(text.t("backups.restoreWarning"))}</p>
           </div>
           <div>
@@ -5257,8 +5265,7 @@ export function aboutScreen(facts: ServerFacts, attention: AttentionItem[], text
       <section class="bento-card">
         <div class="settings-row">
           <div class="settings-info">
-            <h4>${escapeHTML(text.t("update.beta"))}</h4>
-            <p>${escapeHTML(text.t("update.channelHelp"))}</p>
+            <h4>${escapeHTML(text.t("update.beta"))}${infoTip(text.t("update.channelHelp"))}</h4>
           </div>
           <label class="toggle">
             <input type="checkbox" role="switch" data-beta disabled

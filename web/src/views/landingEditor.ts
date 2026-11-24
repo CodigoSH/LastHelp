@@ -5,6 +5,7 @@
  *
  * Pure functions, like every view, so the text comes in as a parameter.
  */
+import { infoTip } from "./infoTip";
 import { escapeAttr, escapeHTML } from "../escape";
 import { icons } from "./icons";
 import {
@@ -147,11 +148,10 @@ function choice(bind: string, current: string, options: Array<[string, string]>,
 function input(bind: string, label: string, value: string, opts: { placeholder?: string; hint?: string; max?: number; required?: boolean; type?: string } = {}): string {
   const id = `lpe-${bind.replace(/\W/g, "-")}`;
   return `<div class="field">
-    <label for="${escapeAttr(id)}">${escapeHTML(label)}</label>
+    ${opts.hint ? `<div class="field-head"><label for="${escapeAttr(id)}">${escapeHTML(label)}</label>${infoTip(opts.hint)}</div>` : `<label for="${escapeAttr(id)}">${escapeHTML(label)}</label>`}
     <input id="${escapeAttr(id)}" type="${escapeAttr(opts.type ?? "text")}" data-bind="${escapeAttr(bind)}"
       value="${escapeAttr(value)}" ${opts.placeholder ? `placeholder="${escapeAttr(opts.placeholder)}"` : ""}
       ${opts.max ? `maxlength="${opts.max}"` : ""} ${opts.required ? "required" : ""} autocomplete="off" />
-    ${opts.hint ? `<p class="hint">${escapeHTML(opts.hint)}</p>` : ""}
   </div>`;
 }
 

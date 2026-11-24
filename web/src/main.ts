@@ -47,6 +47,7 @@ import { SECRET_MASK, secretChange } from "./services/secretField";
 import { channelPayload, credentialsPayload } from "./services/secretPayload";
 import { looksLikeAppCode, normalizeCode, recoveryCodesText } from "./services/twoStep";
 import { qrMatrix, qrSvg } from "./services/qrCode";
+import { installInfoTips } from "./services/infoTips";
 import {
   applyPreset,
   defaultOptions,
@@ -4880,6 +4881,7 @@ void (async () => {
   i18n.subscribe(() => renderNav());
   // Once, for every dialog the product will ever draw.
   wireDialogs();
+  installInfoTips();
   wirePanelToggle();
   // And for every select: the house dropdown over each one, wherever it is
   // drawn, now or later.
