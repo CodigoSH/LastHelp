@@ -4224,27 +4224,34 @@ function organizationTeam(
 
   const taken = new Set(team.members.map((m) => m.username));
   const candidates = team.accounts.filter((a) => !taken.has(a.username));
+  // The list is the card; adding somebody is a button on its head and a dialog,
+  // the way a project is added — not a form left open under the list.
   const add =
     candidates.length === 0
       ? ""
-      : `<form class="member-add">
-          <div class="member-add-fields">
-            ${choiceField({
-              id: "member-who",
-              name: "username",
-              label: text.t("auth.username"),
-              options: candidates.map((a) => [a.username, a.username] as [string, string]),
-            })}
-            ${choiceField({
-              id: "member-role",
-              name: "role",
-              label: text.t("people.role"),
-              options: teamRoleOptions(data, text),
-            })}
-          </div>
-          <div class="settings-actions">
-            <button class="button primary" type="submit">${escapeHTML(text.t("org.addMember"))}</button></div>
-        </form>`;
+      : modal(
+          {
+            id: "member-add-modal",
+            title: text.t("org.addMember"),
+            body: `<div class="member-add-fields">
+              ${choiceField({
+                id: "member-who",
+                name: "username",
+                label: text.t("auth.username"),
+                options: candidates.map((a) => [a.username, a.username] as [string, string]),
+              })}
+              ${choiceField({
+                id: "member-role",
+                name: "role",
+                label: text.t("people.role"),
+                options: teamRoleOptions(data, text),
+              })}
+            </div>`,
+            submit: text.t("org.addMember"),
+            formClass: "member-add",
+          },
+          text,
+        );
 
   return settingsCard(
     text.t("repo.team"),
@@ -4253,7 +4260,10 @@ function organizationTeam(
       ${collaborators.map(row).join("")}
     </ul>
     ${add}`,
-    { lead: text.t("org.teamLead", { organization: data.organization.name }) },
+    {
+      lead: text.t("org.teamLead", { organization: data.organization.name }),
+      action: add ? actionButton("add", text.t("org.addMember"), 'data-open-modal="member-add-modal"', "primary") : "",
+    },
   );
 }
 
@@ -4602,16 +4612,21 @@ function repositoryTeam(
   const add =
     candidates.length === 0
       ? ""
-      : `<form class="team-add">
-          ${choiceField({
-            id: "team-who",
-            name: "username",
-            label: text.t("repo.addCollaborator"),
-            options: candidates.map((a) => [a.username, a.username] as [string, string]),
-          })}
-          <div class="settings-actions">
-            <button class="button primary" type="submit">${escapeHTML(text.t("people.grant"))}</button></div>
-        </form>`;
+      : modal(
+          {
+            id: "team-add-modal",
+            title: text.t("repo.addCollaborator"),
+            body: choiceField({
+              id: "team-who",
+              name: "username",
+              label: text.t("auth.username"),
+              options: candidates.map((a) => [a.username, a.username] as [string, string]),
+            }),
+            submit: text.t("people.grant"),
+            formClass: "team-add",
+          },
+          text,
+        );
 
   return settingsCard(
     text.t("repo.team"),
@@ -4621,7 +4636,10 @@ function repositoryTeam(
     </ul>
     ${collaborators.length === 0 ? `<p class="card-sub">${escapeHTML(text.t("repo.noCollaborators"))}</p>` : ""}
     ${add}`,
-    { lead: text.t("repo.teamLead", { organization: repo.organization.name }) },
+    {
+      lead: text.t("repo.teamLead", { organization: repo.organization.name }),
+      action: add ? actionButton("add", text.t("repo.addCollaborator"), 'data-open-modal="team-add-modal"', "primary") : "",
+    },
   );
 }
 

@@ -1800,7 +1800,9 @@ summary:focus-visible,
 }
 .update-note { font-size: 0.875rem; color: var(--text-dim); }
 
-.credentials, .channel { max-inline-size: 28rem; }
+/* The fields keep their measure; the buttons run to the card's edge, where every action ends. */
+.credentials > :not(.settings-actions),
+.channel > :not(.settings-actions) { max-inline-size: 28rem; }
 .channel-fields, .channel-mail { display: grid; gap: 0.35rem; }
 .webhook-path {
   font-family: var(--font-mono);
@@ -7574,8 +7576,9 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
 .input-row input { flex: 1; }
 .input-row .button { flex: none; }
 
-/* What closes a form: aligned with the fields, as wide as its label. */
-.settings-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-block-start: 24px; }
+/* What closes a form. House rule: every action ends on the right edge — a form's Save as well as a
+   card's Add and a row's Delete — so a page's buttons line up on one side instead of two. */
+.settings-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-block-start: 24px; }
 .settings-actions .button { min-inline-size: 160px; }
 
 /* Buttons. */
