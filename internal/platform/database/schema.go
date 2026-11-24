@@ -655,6 +655,18 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 22,
+		name:    "a project chooses whether its ideas are voted and whether its roadmap is public",
+		// Both on, as every project has been until now: nothing changes for one
+		// that exists, and a new one is made with whatever its team chose.
+		fn: func(tx *sql.Tx) error {
+			if err := addColumn(tx, "repository", "votes_on", "INTEGER NOT NULL DEFAULT 1"); err != nil {
+				return err
+			}
+			return addColumn(tx, "repository", "roadmap_public", "INTEGER NOT NULL DEFAULT 1")
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

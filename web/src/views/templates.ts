@@ -30,6 +30,21 @@ import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
 import { CODE_MAX_LENGTH, formatSecret } from "../services/twoStep";
 import { actionButton, iconButton, modal } from "./modal";
+import {
+  isBlocked,
+  OPTION_GROUPS,
+  presetOf,
+  PRESET_IDS,
+  receivesSomething,
+  summary,
+  type OptionDef,
+  type OptionGroup,
+  type OptionKey,
+  type PresetName,
+  type ProjectOptions,
+  defaultOptions,
+  fromProject,
+} from "../services/projectOptions";
 
 export { modal, actionButton, iconButton } from "./modal";
 export { field, choiceField, areaField } from "./wizard";
@@ -261,7 +276,22 @@ export function board(
 
   // Two tiles that say how much is open and how much is closed, and one that is a way
   // to somewhere else: the roadmap, which is where the work that was done is seen.
-  const tileRow = `<div class="bd-tiles">
+  // A roadmap the team keeps to itself is a tile only for the team, who can read it.
+  const roadTile =
+    repo.roadmap_public === false && roadmap === null
+      ? ""
+      : `<a class="bd-tile road" href="${base}/roadmap">
+      <span class="bd-tile-top">${escapeHTML(text.t("nav.roadmap"))}<span class="bd-tile-go" aria-hidden="true">${icons.arrow(14)}</span></span>
+      <span class="bd-tile-n">${
+        roadmap ? `${escapeHTML(text.number(roadmap.done))}<span class="bd-tile-unit">${escapeHTML(text.t("roadmap.done"))}</span>` : "&nbsp;"
+      }</span>
+      <span class="bd-tile-sub">${
+        roadmap
+          ? `${escapeHTML(text.t("roadmap.in_progress"))} ${escapeHTML(text.number(roadmap.inProgress))} · ${escapeHTML(text.t("roadmap.planned"))} ${escapeHTML(text.number(roadmap.planned))}`
+          : ""
+      }</span>
+    </a>`;
+  const tileRow = `<div class="bd-tiles${roadTile ? "" : " two"}">
     <div class="bd-tile" data-tile="open">
       <span class="bd-tile-top">${escapeHTML(text.t("board.open"))}</span>
       <span class="bd-tile-n">${escapeHTML(text.number(tiles.open))}</span>
@@ -272,17 +302,7 @@ export function board(
       <span class="bd-tile-n">${escapeHTML(text.number(tiles.closed))}</span>
       <span class="bd-tile-sub">${outcome("done", tiles.done)}${outcome("undone", tiles.undone)}</span>
     </div>
-    <a class="bd-tile road" href="${base}/roadmap">
-      <span class="bd-tile-top">${escapeHTML(text.t("nav.roadmap"))}<span class="bd-tile-go" aria-hidden="true">${icons.arrow(14)}</span></span>
-      <span class="bd-tile-n">${
-        roadmap ? `${escapeHTML(text.number(roadmap.done))}<span class="bd-tile-unit">${escapeHTML(text.t("roadmap.done"))}</span>` : "&nbsp;"
-      }</span>
-      <span class="bd-tile-sub">${
-        roadmap
-          ? `${escapeHTML(text.t("roadmap.in_progress"))} ${escapeHTML(text.number(roadmap.inProgress))} · ${escapeHTML(text.t("roadmap.planned"))} ${escapeHTML(text.number(roadmap.planned))}`
-          : ""
-      }</span>
-    </a>
+    ${roadTile}
   </div>`;
 
   // Open or closed is the way into the list, not one more filter: two tabs with what each holds, above the bar.
@@ -583,7 +603,7 @@ export function roadmap(
   const tiles = `<div class="rm-tiles">${[inProgress, planned, done, declined].map((l) => tile(l)).join("")}</div>`;
 
   if (everything === 0) {
-    return `<div class="page rm">${header}${tiles}
+    return `<div class="page rm" data-votes="${repo.votes !== false}">${header}${tiles}
       <div class="rm-quiet">
         <p><b>${escapeHTML(text.t("roadmap.quietTitle"))}</b></p>
         <p>${escapeHTML(text.t("roadmap.quietBody"))}</p>
@@ -592,7 +612,7 @@ export function roadmap(
     </div>`;
   }
 
-  return `<div class="page rm" data-rm data-planned-rows="${ROADMAP_PLANNED_ROWS}" data-months="${ROADMAP_MONTHS}" data-history-rows="${ROADMAP_HISTORY_ROWS}" data-now-cards="${ROADMAP_NOW_CARDS}">
+  return `<div class="page rm" data-votes="${repo.votes !== false}" data-rm data-planned-rows="${ROADMAP_PLANNED_ROWS}" data-months="${ROADMAP_MONTHS}" data-history-rows="${ROADMAP_HISTORY_ROWS}" data-now-cards="${ROADMAP_NOW_CARDS}">
     ${header}
     ${tiles}
     <div class="fb">
@@ -610,7 +630,7 @@ export function roadmap(
         <div class="rm-cards">${inProgress.items
           .map(
             (i) => `<a class="rm-card" href="/i/${escapeAttr(i.public_id)}" data-rm-row data-kind="${escapeAttr(i.kind)}">
-              ${voteTile(text, i)}
+              ${voteTile(text, i, repo.votes !== false)}
               <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span><span class="rm-meta">${roadmapKind(text, i.kind)}</span></span>
             </a>`,
           )
@@ -625,7 +645,7 @@ export function roadmap(
           .map(
             (i, n) => `<a class="rm-row" href="/i/${escapeAttr(i.public_id)}" data-rm-row data-kind="${escapeAttr(i.kind)}">
               <span class="rm-rank" data-rm-rank>${n + 1}</span>
-              ${voteTile(text, i)}
+              ${voteTile(text, i, repo.votes !== false)}
               <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span>
                 <span class="rm-meta">${roadmapKind(text, i.kind)}<span class="rm-age">${escapeHTML(text.age(Math.max(0, now - i.created_at)))}</span></span></span>
               <span class="rm-go" aria-hidden="true">${icons.chevron(16)}</span>
@@ -1069,8 +1089,11 @@ function answers(fields: ReportField[], text: Text): string {
 function reportArticle(item: ItemDetail, text: Text, pencil = "", view: PictureView = {}): string {
   // An answered idea keeps its count and loses the button: the number is then
   // the record of how many people wanted it when it was answered.
+  // A project that does not take votes shows none: not a button, not a count.
   const vote =
-    item.kind === "idea" && item.votable === false
+    item.repository?.votes === false
+      ? ""
+      : item.kind === "idea" && item.votable === false
       ? `<div class="vote-block closed">
            <span class="count">${escapeHTML(text.number(item.votes))}</span>
            <span class="label">${escapeHTML(text.t("item.votesLabel"))}</span>
@@ -1520,70 +1543,192 @@ export function organizationFields(text: Text, forge: string): string {
   );
 }
 
-export function repositoryFields(text: Text, forge: string, hasForge: boolean): string {
-  const example = exampleFor(forge);
-  return (
-    field({
-      id: "repo-name",
-      name: "name",
-      label: text.t("panel.name"),
-      hint: text.t("panel.nameHelp"),
-      example: example.repo,
-      required: true,
-    }, text) +
-    field({
-      id: "repo-slug",
-      name: "slug",
-      label: text.t("panel.address"),
-      hint: text.t("panel.addressHelp"),
-      example: example.repo.toLowerCase(),
-      required: true,
-      pattern: "[a-z0-9]+(-[a-z0-9]+)*",
-    }, text) +
-    (hasForge
-      ? field({
-          id: "repo-forge",
-          name: "forge_repo",
-          label: text.t("panel.forgeRepo"),
-          hint: text.t("panel.forgeRepoHelp"),
-          example: example.repo,
-        }, text)
-      : "")
-  );
+/* -------------------------------------------------------- project options */
+
+/** What the project dialog and the project's settings need besides the choices themselves. */
+export interface ProjectFormContext {
+  options: ProjectOptions;
+  /** "create" asks for the name and the address; "settings" for the name only, the address being fixed. */
+  mode: "create" | "settings";
+  forge: string;
+  name?: string;
+  icon?: string;
+  forgeRepo?: string;
+  /** Create only: the server's channel, offered when it would send something. */
+  serverChannel?: { configured: boolean; kind: string };
 }
 
-/** What a board takes. Both kinds on by default: a board that accepts nothing is
- *  refused by the server, and defaulting to off makes that the common mistake.
- *  Pictures are a field of their own: they are not a kind of report, and the
- *  "at least one" under the kinds is not about them. */
-export function acceptsFields(
-  text: Text,
-  current?: {
-    bugs: boolean;
-    ideas: boolean;
-    images?: boolean;
-    private?: boolean;
-    /** The problem form's two questions. Absent draws neither: a project is
-     *  created without them and they are turned on from its settings. */
-    version?: boolean;
-    steps?: boolean;
-  },
-): string {
-  // What a board takes and who may see it are switches, on rows of their own:
-  // the control the panel uses for a thing that is on or off, with what it
-  // means beside it. Boxed checkboxes read as a form to fill in, and these are
-  // not answers but settings.
-  const asks =
-    current?.version === undefined
-      ? ""
-      : `${toggleRow("asks_version", text.t("repo.askVersion"), text.t("repo.askVersionHelp"), current.version)}
-    ${toggleRow("asks_steps", text.t("repo.askSteps"), text.t("repo.askStepsHelp"), current.steps ?? false)}`;
-  return `<div class="toggle-rows">
-    ${toggleRow("accepts_bugs", text.t("repo.acceptsBugs"), "", current?.bugs ?? true)}
-    ${asks}
-    ${toggleRow("accepts_ideas", text.t("repo.acceptsIdeas"), text.t("repo.acceptsHelp"), current?.ideas ?? true)}
-    ${toggleRow("accepts_images", text.t("repo.acceptsImages"), text.t("repo.imagesHelp"), current?.images ?? true)}
-    ${toggleRow("private", text.t("visibility.private"), text.t("visibility.help"), current?.private ?? false)}
+/** The words of one option: what it is, and what it means. */
+function optionWords(text: Text, key: OptionKey): { name: string; help: string } {
+  switch (key) {
+    case "bugs":
+      return { name: text.t("repo.acceptsBugs"), help: text.t("project.bugsHelp") };
+    case "version":
+      return { name: text.t("repo.askVersion"), help: text.t("repo.askVersionHelp") };
+    case "steps":
+      return { name: text.t("repo.askSteps"), help: text.t("repo.askStepsHelp") };
+    case "ideas":
+      return { name: text.t("repo.acceptsIdeas"), help: text.t("project.ideasHelp") };
+    case "votes":
+      return { name: text.t("project.votes"), help: text.t("project.votesHelp") };
+    case "images":
+      return { name: text.t("project.images"), help: text.t("repo.imagesHelp") };
+    case "private":
+      return { name: text.t("project.private"), help: text.t("visibility.help") };
+    case "roadmap":
+      return { name: text.t("project.roadmap"), help: text.t("project.roadmapHelp") };
+  }
+}
+
+/** The request field an option travels as, which is also its checkbox's name. */
+const OPTION_FIELD: Record<OptionKey, string> = {
+  bugs: "accepts_bugs",
+  version: "asks_version",
+  steps: "asks_steps",
+  ideas: "accepts_ideas",
+  votes: "votes",
+  images: "accepts_images",
+  private: "private",
+  roadmap: "roadmap_public",
+};
+
+/** A small round "i" that says what an option means on hover and on focus, so the rows stay one line each. */
+function infoTip(id: string, help: string): string {
+  return `<span class="po-tip" tabindex="0" aria-describedby="${escapeAttr(id)}">${icons.info(14)}<span class="po-tip-text" role="tooltip" id="${escapeAttr(id)}">${escapeHTML(help)}</span></span>`;
+}
+
+/** One option: a checkbox and its name, the "i" beside it, indented under the one it depends on. */
+function optionRow(text: Text, o: ProjectOptions, def: OptionDef, prefix: string): string {
+  const { name, help } = optionWords(text, def.key);
+  const blocked = isBlocked(o, def.key);
+  const id = `${prefix}-${def.key}`;
+  return `<div class="po-opt${def.needs ? " is-sub" : ""}${blocked ? " is-blocked" : ""}">
+      <label class="po-check" for="${escapeAttr(id)}">
+        <input type="checkbox" id="${escapeAttr(id)}" name="${OPTION_FIELD[def.key]}" data-option="${def.key}"
+          aria-describedby="${escapeAttr(id)}-tip"${o[def.key] && !blocked ? " checked" : ""}${blocked ? " disabled" : ""} />
+        <span>${escapeHTML(name)}</span>
+      </label>
+      ${infoTip(`${id}-tip`, help)}
+    </div>`;
+}
+
+/** The four cards: the three uses and "custom", the one these choices are marked. */
+export function projectPresets(text: Text, chosen: PresetName): string {
+  return [...PRESET_IDS, "custom" as const]
+    .map(
+      (id) => `<button type="button" class="po-preset${id === chosen ? " is-selected" : ""}" role="radio"
+        aria-checked="${id === chosen}" data-preset="${id}">
+        <span class="po-preset-name">${escapeHTML(text.t(`project.preset.${id}`))}</span>
+        <span class="po-preset-desc">${escapeHTML(text.t(`project.preset.${id}Help`))}</span>
+      </button>`,
+    )
+    .join("");
+}
+
+/** "It will have / It will not have", then who sees it and who is told. */
+export function projectSummary(text: Text, o: ProjectOptions, channel?: { server: boolean; kind: string }): string {
+  const s = summary(o);
+  const list = (keys: OptionKey[], cls: string) =>
+    keys.length
+      ? `<ul class="po-list ${cls}">${keys.map((k) => `<li>${escapeHTML(optionWords(text, k).name)}</li>`).join("")}</ul>`
+      : `<p class="po-none">${escapeHTML(text.t("project.summaryNothing"))}</p>`;
+  const lines = [o.private ? text.t("project.summaryPrivate") : text.t("project.summaryPublic")];
+  if (channel) lines.push(channel.server ? text.t("project.summaryChannel") : text.t("project.summaryNoChannel"));
+  return `<div class="po-summary-col">
+      <div class="po-summary-head">${escapeHTML(text.t("project.summaryOn"))}</div>
+      ${list(s.on, "is-on")}
+    </div>
+    <div class="po-summary-col">
+      <div class="po-summary-head">${escapeHTML(text.t("project.summaryOff"))}</div>
+      ${list(s.off, "is-off")}
+    </div>
+    <p class="po-summary-note">${lines.map(escapeHTML).join(" ")}</p>
+    ${receivesSomething(o) ? "" : `<p class="po-summary-warn" role="alert">${escapeHTML(text.t("error.accepts_nothing"))}</p>`}`;
+}
+
+/**
+ * A project's choices, the same in the dialog that creates it and on its
+ * settings: who it is, what it receives — a use to start from, and the options
+ * folded under it — and what it all comes to.
+ */
+export function projectForm(text: Text, ctx: ProjectFormContext): string {
+  const o = ctx.options;
+  const prefix = ctx.mode === "create" ? "np" : "ps";
+  const example = exampleFor(ctx.forge);
+  const hasForge = ctx.forge !== "none";
+  const channelOn = ctx.mode === "create" && ctx.serverChannel?.configured === true;
+
+  const step = (n: number, title: string, body: string, extra = "") =>
+    `<section class="po-step"${extra}>
+      <h3 class="po-step-title"><span class="po-num">${n}</span>${escapeHTML(title)}</h3>
+      ${body}
+    </section>`;
+
+  const identity = `<div class="po-identity">
+      <div class="icon-field po-icon">
+        <span class="visually-hidden">${escapeHTML(text.t("icon.label"))}</span>
+        <div class="picker">
+          <button type="button" class="avatar-pick icon-pick" data-pick-icon
+            title="${escapeAttr(text.t("icon.help"))}" aria-label="${escapeAttr(text.t("icon.label"))}">
+            ${markOf(ctx.name || "?", ctx.icon ?? "", "card-mark icon-preview")}
+          </button>
+          <button type="button" class="picker-clear" data-clear-icon ${ctx.icon ? "" : "hidden"}
+            title="${escapeAttr(text.t("action.remove"))}" aria-label="${escapeAttr(text.t("action.remove"))}">${icons.close(12)}</button>
+          <input type="file" accept="image/*" id="${prefix}-icon-file" data-icon-file hidden />
+        </div>
+        <input type="hidden" name="icon" value="${escapeAttr(ctx.icon ?? "")}" />
+      </div>
+      ${field({ id: `${prefix}-name`, name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), example: ctx.mode === "create" ? example.repo : undefined, required: true, value: ctx.name }, ctx.mode === "create" ? text : undefined)}
+      ${
+        ctx.mode === "create"
+          ? field({ id: `${prefix}-slug`, name: "slug", label: text.t("panel.address"), hint: text.t("panel.addressHelp"), example: example.repo.toLowerCase(), required: true, pattern: "[a-z0-9]+(-[a-z0-9]+)*" }, text)
+          : ""
+      }
+    </div>`;
+
+  const group = (g: OptionGroup, tail = "") =>
+    `<div class="po-group">
+      <div class="po-group-title">${escapeHTML(text.t(`project.group.${g.id}`))}</div>
+      ${g.options.map((d) => optionRow(text, o, d, prefix)).join("")}
+      ${tail}
+    </div>`;
+
+  const forgeRow = hasForge
+    ? `<div class="po-field">
+        <label for="${prefix}-forge">${escapeHTML(text.t("panel.forgeRepo"))}</label>
+        <div class="po-field-row">
+          <input id="${prefix}-forge" name="forge_repo" type="text" placeholder="${escapeAttr(example.repo)}" value="${escapeAttr(ctx.forgeRepo ?? "")}" />
+          ${infoTip(`${prefix}-forge-tip`, text.t("panel.forgeRepoHelp"))}
+        </div>
+      </div>`
+    : "";
+  const channelRow = channelOn
+    ? `<div class="po-field">
+        <label for="${prefix}-channel">${escapeHTML(text.t("project.channel"))}</label>
+        <div class="po-field-row">
+          <select id="${prefix}-channel" name="channel" data-channel>
+            <option value="server" selected>${escapeHTML(text.t("panel.channelServer"))}</option>
+            <option value="none">${escapeHTML(text.t("panel.channelNone"))}</option>
+          </select>
+          ${infoTip(`${prefix}-channel-tip`, text.t("project.channelHelp"))}
+        </div>
+      </div>`
+    : "";
+
+  const [reports, visibility] = OPTION_GROUPS as [OptionGroup, OptionGroup];
+  const chosen = presetOf(o);
+  return `<div class="po" data-project-options data-mode="${ctx.mode}">
+    ${step(1, text.t("project.stepProject"), identity)}
+    ${step(
+      2,
+      text.t("project.stepReceives"),
+      `<div class="po-presets" role="radiogroup" aria-label="${escapeAttr(text.t("project.stepReceives"))}" data-presets>${projectPresets(text, chosen)}</div>
+      <details class="po-custom" data-custom${ctx.mode === "settings" || chosen === "custom" ? " open" : ""}>
+        <summary>${icons.chevron(14)}<span>${escapeHTML(text.t("project.customize"))}</span></summary>
+        <div class="po-groups">${group(reports)}${group(visibility, forgeRow + channelRow)}</div>
+      </details>`,
+    )}
+    ${step(3, text.t("project.stepSummary"), `<div class="po-summary" aria-live="polite" data-summary>${projectSummary(text, o, channelOn ? { server: true, kind: ctx.serverChannel?.kind ?? "" } : undefined)}</div>`)}
   </div>`;
 }
 
@@ -1756,41 +1901,22 @@ export function organizationWizard(step: number, text: Text, forge = "none", ico
   );
 }
 
-/** Adding a board to an organisation that already exists. */
+/** Adding a board to an organisation that already exists, as a page of its own: the dialog's form. */
 export function repositoryWizard(
   org: OrganizationSummary & { forge?: string },
-  step: number,
   text: Text,
+  serverChannel?: { configured: boolean; kind: string },
 ): string {
-  const names = [text.t("org.stepIdentity"), text.t("repo.stepAccepts")];
-  const forge = org.forge ?? "none";
-
-  if (step === 1) {
-    return wizard(
-      {
-        step: 1,
-        names,
-        title: text.t("panel.newRepository"),
-        lead: text.t("repo.lead"),
-        body: repositoryFields(text, forge, forge !== "none"),
-        submit: text.t("wizard.continue"),
-        back: { href: `/panel/${escapeAttr(org.slug)}`, label: text.t("nav.back") },
-        formClass: "setup-repository-identity",
-      },
-      text,
-    );
-  }
-
   return wizard(
     {
-      step: 2,
-      names,
-      title: text.t("repo.stepAccepts"),
-      lead: text.t("repo.acceptsLead"),
-      body: acceptsFields(text),
-      submit: text.t("wizard.finish"),
+      step: 1,
+      names: [text.t("panel.newRepository")],
+      title: text.t("panel.newRepository"),
+      lead: text.t("repo.lead"),
+      body: projectForm(text, { options: defaultOptions(), mode: "create", forge: org.forge ?? "none", serverChannel }),
+      submit: text.t("auth.create"),
       back: { href: `/panel/${escapeAttr(org.slug)}`, label: text.t("nav.back") },
-      formClass: "setup-repository-accepts",
+      formClass: "setup-repository repo-form",
     },
     text,
   );
@@ -3946,6 +4072,8 @@ export interface OrganizationPanel {
   can_delete: boolean;
   /** Deleting one of its repositories: whoever runs it. */
   can_delete_repos?: boolean;
+  /** For whoever runs it: whether a new project can start on the server's channel. */
+  server_channel?: { configured: boolean; kind: string };
 }
 
 /**
@@ -4220,6 +4348,9 @@ export interface RepositoryPanel {
   fields?: Question[];
   /** Hidden from everybody who is not on the team. */
   private?: boolean;
+  /** Whether visitors vote on its ideas and read its roadmap. */
+  votes?: boolean;
+  roadmap_public?: boolean;
   /** A data URL, or absent for the initials of the name. */
   icon?: string;
   /** Which channel tells the team. Empty for none. */
@@ -4308,16 +4439,13 @@ export function repositoryScreen(
   const settings = settingsCard(
     text.t("repo.settings"),
     `<form class="repo-settings">
-      ${iconField(text, repo.name, repo.icon ?? "")}
-      ${field({ id: "rs-name", name: "name", label: text.t("panel.name"), hint: text.t("panel.nameHelp"), required: true, value: repo.name }, text)}
-      ${hasForge ? field({ id: "rs-forge", name: "forge_repo", label: text.t("panel.forgeRepo"), hint: text.t("panel.forgeRepoHelp"), value: repo.forge_repo }, text) : ""}
-      ${acceptsFields(text, {
-        bugs: repo.accepts_bugs,
-        ideas: repo.accepts_ideas,
-        images: repo.accepts_images ?? true,
-        private: repo.private ?? false,
-        version: repo.asks_version ?? false,
-        steps: repo.asks_steps ?? false,
+      ${projectForm(text, {
+        options: fromProject(repo),
+        mode: "settings",
+        forge: hasForge ? org.forge : "none",
+        name: repo.name,
+        icon: repo.icon ?? "",
+        forgeRepo: repo.forge_repo,
       })}
       <p class="form-error" role="alert" hidden></p>
       <div class="settings-actions">

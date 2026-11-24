@@ -76,7 +76,9 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		add("/" + b.OrgSlug + "/" + b.Slug)
-		add("/" + b.OrgSlug + "/" + b.Slug + "/roadmap")
+		if b.RoadmapPublic {
+			add("/" + b.OrgSlug + "/" + b.Slug + "/roadmap")
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")

@@ -117,6 +117,12 @@ type Repository struct {
 	AsksVersion bool
 	AsksSteps   bool
 
+	// Votes is whether visitors vote on its ideas, and RoadmapPublic whether its
+	// roadmap is shown to them. Both on unless the team turned them off; the team
+	// itself always sees the roadmap.
+	Votes         bool
+	RoadmapPublic bool
+
 	// NotifyConfig is the channel this board's team reads, stored as JSON. It
 	// is opaque here on purpose: the domain has no business knowing what a
 	// Gotify token is.
@@ -249,9 +255,10 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 	// moderation_mode is not written: nothing reads it, and the column carries
 	// its own default. Named here so that the next person to see it in the
 	// schema does not go looking for the code that fills it.
-	// Pictures are on for a new board: the column's default, said here too so
-	// what is returned matches what was stored.
-	r.AcceptsImages = true
+	// Pictures, votes and the public roadmap are on for a new board: their
+	// columns' defaults, said here too so what is returned matches what was
+	// stored. A team that wants one off turns it off after, as the panel does.
+	r.AcceptsImages, r.Votes, r.RoadmapPublic = true, true, true
 	// The version and steps questions are written as given, never left to the
 	// column's default: that default is 1, for the projects that existed before
 	// the switches, and a new project starts with whatever the caller chose.
@@ -280,7 +287,7 @@ func (s Store) CreateRepository(r Repository, now time.Time) (Repository, error)
 func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.asks_version, r.asks_steps,
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.asks_version, r.asks_steps, r.votes_on, r.roadmap_public,
 		       r.notify_config, r.icon, r.is_private, r.created_at
 		FROM repository r
 		JOIN organization o ON o.id = r.org_id
@@ -290,7 +297,7 @@ func (s Store) RepositoryBySlugs(orgSlug, repoSlug string) (Repository, error) {
 func (s Store) RepositoryByID(id int64) (Repository, error) {
 	return s.scanRepository(s.DB.QueryRow(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, accepts_images, asks_version, asks_steps,
+		       accepts_bugs, accepts_ideas, accepts_images, asks_version, asks_steps, votes_on, roadmap_public,
 		       notify_config, icon, is_private, created_at
 		FROM repository WHERE id = ?`, id))
 }
@@ -298,7 +305,7 @@ func (s Store) RepositoryByID(id int64) (Repository, error) {
 func (s Store) ListRepositories(orgID int64) ([]Repository, error) {
 	rows, err := s.DB.Query(`
 		SELECT id, org_id, slug, name, forge_repo,
-		       accepts_bugs, accepts_ideas, accepts_images, asks_version, asks_steps,
+		       accepts_bugs, accepts_ideas, accepts_images, asks_version, asks_steps, votes_on, roadmap_public,
 		       notify_config, icon, is_private, created_at
 		FROM repository WHERE org_id = ? ORDER BY name COLLATE NOCASE, id`, orgID)
 	if err != nil {
@@ -350,7 +357,7 @@ func scanRepositoryRow(row scanner) (Repository, error) {
 	var r Repository
 	var created int64
 	err := row.Scan(&r.ID, &r.OrgID, &r.Slug, &r.Name, &r.ForgeRepo,
-		&r.AcceptsBugs, &r.AcceptsIdeas, &r.AcceptsImages, &r.AsksVersion, &r.AsksSteps,
+		&r.AcceptsBugs, &r.AcceptsIdeas, &r.AcceptsImages, &r.AsksVersion, &r.AsksSteps, &r.Votes, &r.RoadmapPublic,
 		&r.NotifyConfig, &r.Icon, &r.Private, &created)
 	if err != nil {
 		return Repository{}, err
@@ -449,6 +456,20 @@ func (s Store) SetFormFields(id int64, version, steps bool) error {
 	return nil
 }
 
+// SetPublicParts turns on or off, for one project, voting on its ideas and the
+// roadmap visitors see. Apart from UpdateRepository, like the pictures, so an
+// edit from a page that does not know them leaves them as they were.
+func (s Store) SetPublicParts(id int64, votes, roadmap bool) error {
+	res, err := s.DB.Exec(`UPDATE repository SET votes_on = ?, roadmap_public = ? WHERE id = ?`, votes, roadmap, id)
+	if err != nil {
+		return fmt.Errorf("setting the public parts of the repository: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // SetOrganizationIcon replaces an organisation's icon; empty goes back to the
 // initials. Apart from the rename, so that one that does not mention the icon
 // leaves it alone.
@@ -512,7 +533,7 @@ func (b Board) Hidden() bool { return b.Private || b.OrgPrivate }
 func (s Store) ListBoards() ([]Board, error) {
 	rows, err := s.DB.Query(`
 		SELECT r.id, r.org_id, r.slug, r.name, r.forge_repo,
-		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.asks_version, r.asks_steps,
+		       r.accepts_bugs, r.accepts_ideas, r.accepts_images, r.asks_version, r.asks_steps, r.votes_on, r.roadmap_public,
 		       r.notify_config, r.icon, r.is_private, r.created_at,
 		       o.slug, o.name, o.is_private
 		FROM repository r
@@ -528,7 +549,7 @@ func (s Store) ListBoards() ([]Board, error) {
 		var b Board
 		var created int64
 		err := rows.Scan(&b.ID, &b.OrgID, &b.Slug, &b.Name, &b.ForgeRepo,
-			&b.AcceptsBugs, &b.AcceptsIdeas, &b.AcceptsImages, &b.AsksVersion, &b.AsksSteps,
+			&b.AcceptsBugs, &b.AcceptsIdeas, &b.AcceptsImages, &b.AsksVersion, &b.AsksSteps, &b.Votes, &b.RoadmapPublic,
 			&b.NotifyConfig, &b.Icon, &b.Private, &created,
 			&b.OrgSlug, &b.OrgName, &b.OrgPrivate)
 		if err != nil {

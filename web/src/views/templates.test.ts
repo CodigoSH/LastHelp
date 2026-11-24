@@ -5,6 +5,8 @@
 import { describe, expect, test } from "bun:test";
 import { accountRole, avatar, board, boardDialogList, commentEditForm, monthGroups, roadmap, roadmapDialogList, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
+import { projectForm, projectSummary } from "./templates";
+import { applyPreset, defaultOptions } from "../services/projectOptions";
 
 /** A catalogue that answers with the key, so a test can see which one was used. */
 const text: Text = {
@@ -95,6 +97,12 @@ describe("the vote", () => {
     expect(html).toContain(">12<");
     expect(html).not.toContain("data-vote");
     expect(html).not.toContain("<button class=\"vote-block");
+  });
+
+  test("a project without votes shows neither a button nor a count", () => {
+    const html = itemView(report({ kind: "idea", votes: 4, repository: { slug: "atlas", name: "Atlas", votes: false } }), text);
+    expect(html).not.toContain("vote-block");
+    expect(html).not.toContain("data-vote");
   });
 
   test("an idea with no word about it is still votable", () => {
@@ -792,6 +800,16 @@ describe("the board page", () => {
     expect(html({}, lanes, tiles, null)).toContain('href="/acme/atlas/roadmap"');
   });
 
+  test("a roadmap the team keeps to itself is no tile for anybody who cannot read it", () => {
+    const own = (road: { inProgress: number; planned: number; done: number } | null) =>
+      board(org as never, { ...repo, roadmap_public: false } as never, lanes as never, filters, tiles, road, "idea", text);
+    // The public's read was refused: no tile, and two columns instead of a gap.
+    expect(own(null)).not.toContain("/roadmap");
+    expect(own(null)).toContain('class="bd-tiles two"');
+    // The team read it, so the tile is theirs.
+    expect(own({ inProgress: 1, planned: 2, done: 3 })).toContain('href="/acme/atlas/roadmap"');
+  });
+
   test("the roadmap tile says what was delivered as the big number, and what is under way and coming under it", () => {
     const page = html();
     const tile = page.slice(page.indexOf('<a class="bd-tile road"'), page.indexOf("</a>", page.indexOf('<a class="bd-tile road"')));
@@ -917,5 +935,52 @@ describe("the dialog of a board lane", () => {
   });
   test("says nothing matches rather than drawing an empty list", () => {
     expect(boardDialogList([], 0, text)).toContain("review.nothingMatches");
+  });
+});
+
+describe("a project's choices", () => {
+  const form = (over: Partial<Parameters<typeof projectForm>[1]> = {}) =>
+    projectForm(text, { options: defaultOptions(), mode: "create", forge: "none", ...over });
+
+  test("creating asks for the address; the settings do not, since it cannot change", () => {
+    expect(form()).toContain('name="slug"');
+    expect(form({ mode: "settings", name: "Atlas" })).not.toContain('name="slug"');
+  });
+
+  test("every option travels under the name the server reads", () => {
+    const html = form();
+    for (const name of ["accepts_bugs", "asks_version", "asks_steps", "accepts_ideas", "votes", "accepts_images", "private", "roadmap_public"]) {
+      expect(html).toContain(`name="${name}"`);
+    }
+  });
+
+  test("the forge's repository is asked only when the organisation has a forge", () => {
+    expect(form()).not.toContain('name="forge_repo"');
+    expect(form({ forge: "forgejo" })).toContain('name="forge_repo"');
+  });
+
+  test("the server's channel is offered only when it would send something, and only when creating", () => {
+    expect(form()).not.toContain('name="channel"');
+    expect(form({ serverChannel: { configured: false, kind: "" } })).not.toContain('name="channel"');
+    expect(form({ serverChannel: { configured: true, kind: "push" } })).toContain('name="channel"');
+    expect(form({ mode: "settings", serverChannel: { configured: true, kind: "push" } })).not.toContain('name="channel"');
+  });
+
+  test("an option that depends on one switched off is drawn off and cannot be ticked", () => {
+    const html = form({ options: applyPreset(defaultOptions(), "ideas") });
+    const version = html.slice(html.indexOf('name="asks_version"'), html.indexOf("/>", html.indexOf('name="asks_version"')));
+    expect(version).toContain("disabled");
+    expect(version).not.toContain("checked");
+  });
+
+  test("the options are folded on creation unless they are custom, and open in the settings", () => {
+    expect(form()).not.toMatch(/data-custom open/);
+    expect(form({ mode: "settings" })).toMatch(/data-custom open/);
+  });
+
+  test("the summary warns when the project would receive nothing", () => {
+    const nothing = { ...defaultOptions(), bugs: false, ideas: false, version: false, steps: false, votes: false };
+    expect(projectSummary(text, nothing)).toContain("[error.accepts_nothing]");
+    expect(projectSummary(text, defaultOptions())).not.toContain("[error.accepts_nothing]");
   });
 });

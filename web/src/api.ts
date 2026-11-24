@@ -173,6 +173,9 @@ export interface RepositorySummary {
   /** Which of the problem form's two questions this project asks. */
   asks_version?: boolean;
   asks_steps?: boolean;
+  /** Whether visitors vote on its ideas and read its roadmap. Absent means yes. */
+  votes?: boolean;
+  roadmap_public?: boolean;
   /** A data URL, or absent for the initials of the name. */
   icon?: string;
   /** Whether a mail relay exists. Without one the form does not ask for an
@@ -216,7 +219,7 @@ export interface ItemDetail extends ItemSummary {
   mine: boolean;
   /** Where it was reported, so a link somebody was sent says what it is about
    *  and leads back to the board rather than nowhere. */
-  repository?: { slug: string; name: string; accepts_images?: boolean; organization?: { slug: string; name: string } };
+  repository?: { slug: string; name: string; accepts_images?: boolean; votes?: boolean; organization?: { slug: string; name: string } };
   /** Whether it is on the board yet. Only the reporter is ever here before it
    *  is, and only they are told so. */
   moderation?: string;

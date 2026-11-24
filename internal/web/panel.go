@@ -109,6 +109,13 @@ type newRepository struct {
 	Icon string `json:"icon"`
 	// Private keeps the board from the public; public unless chosen.
 	Private bool `json:"private"`
+	// Votes and RoadmapPublic are on unless they are sent off.
+	Votes         *bool `json:"votes"`
+	RoadmapPublic *bool `json:"roadmap_public"`
+	// Channel is "none" for a board that starts with no channel; anything else
+	// starts it on the server's, when the server has one. A channel of its own,
+	// with its address and token, is set from the board's page.
+	Channel string `json:"channel"`
 }
 
 // maxIconBytes keeps a repository's icon small enough to travel inline in
@@ -174,11 +181,18 @@ func (s *Server) handleCreateRepository(w http.ResponseWriter, r *http.Request) 
 		}
 		created.AcceptsImages = false
 	}
+	if !accepts(in.Votes) || !accepts(in.RoadmapPublic) {
+		if err := s.orgs().SetPublicParts(created.ID, accepts(in.Votes), accepts(in.RoadmapPublic)); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+		created.Votes, created.RoadmapPublic = accepts(in.Votes), accepts(in.RoadmapPublic)
+	}
 	// A board made while the server has a channel starts on it, so that the one the administrator set
 	// reaches the boards made after it without somebody having to choose it on each. Only a new one:
 	// a board that exists keeps what it has, and nothing already in use starts telling a team something
 	// it did not choose to hear. The board can still pick another channel, or none.
-	if s.serverChannel().Active() {
+	if in.Channel != "none" && s.serverChannel().Active() {
 		encoded, err := json.Marshal(notify.Config{Kind: notify.Server})
 		if err == nil {
 			err = s.orgs().SetNotifyConfig(created.ID, string(encoded))

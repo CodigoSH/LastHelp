@@ -55,6 +55,8 @@ func (s *Server) handleRepositoryPanel(w http.ResponseWriter, r *http.Request) {
 		"asks_version":   repo.AsksVersion,
 		"asks_steps":     repo.AsksSteps,
 		"private":        repo.Private,
+		"votes":          repo.Votes,
+		"roadmap_public": repo.RoadmapPublic,
 		"icon":           repo.Icon,
 		// Which channel. The address and the recipient go only to whoever may
 		// change them, and the token to nobody: an endpoint that returns a stored
@@ -154,6 +156,12 @@ func (s *Server) handleOrganizationPanel(w http.ResponseWriter, r *http.Request)
 		// by whoever runs it. Two answers, because the page shows both bins.
 		"can_delete":       actor.Can(authz.ManageServer, authz.Scope{}),
 		"can_delete_repos": manage,
+	}
+	// Whether a new project can start on the server's channel, so the create
+	// dialog offers that choice only when it would send something.
+	if manage {
+		server := s.serverChannel()
+		body["server_channel"] = map[string]any{"configured": server.Active(), "kind": string(server.Kind)}
 	}
 
 	// Where the forge is and whether it is connected, for whoever runs it:

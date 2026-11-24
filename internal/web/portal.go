@@ -213,7 +213,7 @@ func (s *Server) handleListItems(w http.ResponseWriter, r *http.Request) {
 // nothing to forget to update.
 func (s *Server) handleRoadmap(w http.ResponseWriter, r *http.Request) {
 	repo, _, ok := s.lookupRepository(w, r)
-	if !ok {
+	if !ok || !s.roadmapVisible(w, r, repo) {
 		return
 	}
 
@@ -268,7 +268,7 @@ func (s *Server) handleRoadmap(w http.ResponseWriter, r *http.Request) {
 // board answers as one that does not exist.
 func (s *Server) handleRoadmapLane(w http.ResponseWriter, r *http.Request) {
 	repo, _, ok := s.lookupRepository(w, r)
-	if !ok {
+	if !ok || !s.roadmapVisible(w, r, repo) {
 		return
 	}
 	lane := item.Lane(r.PathValue("lane"))
@@ -640,7 +640,7 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	if repo, err := s.orgs().RepositoryByID(it.RepoID); err == nil {
 		// accepts_images: whether the reporter's follow-up and the team's reply
 		// offer pictures on this page.
-		board := map[string]any{"slug": repo.Slug, "name": repo.Name, "accepts_images": repo.AcceptsImages}
+		board := map[string]any{"slug": repo.Slug, "name": repo.Name, "accepts_images": repo.AcceptsImages, "votes": repo.Votes}
 		if o, err := s.orgs().OrganizationByID(repo.OrgID); err == nil {
 			board["organization"] = map[string]any{"slug": o.Slug, "name": o.Name}
 		}
@@ -669,10 +669,39 @@ func (s *Server) handleItem(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, body)
 }
 
+// roadmapVisible says whether this request may read a board's roadmap, and
+// answers "not here" when it may not: a roadmap the team keeps to itself is
+// seen by the team and nobody else.
+func (s *Server) roadmapVisible(w http.ResponseWriter, r *http.Request, repo org.Repository) bool {
+	if repo.RoadmapPublic {
+		return true
+	}
+	if actor, ok := middleware.ActorFrom(r); ok && actor.Can(authz.Triage, authz.Repository(repo.ID, repo.OrgID)) {
+		return true
+	}
+	writeError(w, http.StatusNotFound, "error.not_found")
+	return false
+}
+
+// votingOpen says whether the board an item is on takes votes, and refuses
+// when it does not.
+func (s *Server) votingOpen(w http.ResponseWriter, it item.Item) bool {
+	repo, err := s.orgs().RepositoryByID(it.RepoID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "error.internal")
+		return false
+	}
+	if !repo.Votes {
+		writeError(w, http.StatusConflict, "error.votes_off")
+		return false
+	}
+	return true
+}
+
 // handleVote records a vote for an idea.
 func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 	it, ok := s.lookupItem(w, r)
-	if !ok {
+	if !ok || !s.votingOpen(w, it) {
 		return
 	}
 	voter := s.voterID(w, r)
@@ -702,7 +731,7 @@ func (s *Server) handleVote(w http.ResponseWriter, r *http.Request) {
 // handleUnvote takes a vote back.
 func (s *Server) handleUnvote(w http.ResponseWriter, r *http.Request) {
 	it, ok := s.lookupItem(w, r)
-	if !ok {
+	if !ok || !s.votingOpen(w, it) {
 		return
 	}
 	voter := s.voterID(w, r)
@@ -847,7 +876,11 @@ func describeRepository(r org.Repository, mailConfigured bool) map[string]any {
 		// somebody typing into a box that goes nowhere.
 		"asks_version": r.AsksVersion,
 		"asks_steps":   r.AsksSteps,
-		"icon":         r.Icon,
+		// Whether visitors vote on its ideas and see its roadmap: the page draws
+		// neither the button nor the link when it is off.
+		"votes":          r.Votes,
+		"roadmap_public": r.RoadmapPublic,
+		"icon":           r.Icon,
 		// With no relay there is nothing to notify anybody with, so the form
 		// does not ask for an address rather than collecting one it cannot use.
 		"can_notify": mailConfigured,

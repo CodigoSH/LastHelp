@@ -106,6 +106,9 @@ type repositoryChange struct {
 	AsksSteps   *bool `json:"asks_steps"`
 	// Private likewise.
 	Private *bool `json:"private"`
+	// Votes and RoadmapPublic likewise, each on its own.
+	Votes         *bool `json:"votes"`
+	RoadmapPublic *bool `json:"roadmap_public"`
 }
 
 func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +174,19 @@ func (s *Server) handleUpdateRepository(w http.ResponseWriter, r *http.Request) 
 	}
 	if in.Private != nil {
 		if err := s.orgs().SetRepositoryPrivate(repo.ID, *in.Private); err != nil {
+			writeError(w, http.StatusInternalServerError, "error.internal")
+			return
+		}
+	}
+	if in.Votes != nil || in.RoadmapPublic != nil {
+		votes, roadmap := repo.Votes, repo.RoadmapPublic
+		if in.Votes != nil {
+			votes = *in.Votes
+		}
+		if in.RoadmapPublic != nil {
+			roadmap = *in.RoadmapPublic
+		}
+		if err := s.orgs().SetPublicParts(repo.ID, votes, roadmap); err != nil {
 			writeError(w, http.StatusInternalServerError, "error.internal")
 			return
 		}

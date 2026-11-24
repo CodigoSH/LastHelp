@@ -26,10 +26,12 @@ export interface ModalSpec {
   /** Marks the action as the destructive one, which reads and colours apart. */
   danger?: boolean;
   formClass: string;
+  /** A class for the dialog itself, for one that needs its own width. */
+  className?: string;
 }
 
 export function modal(spec: ModalSpec, text: Text): string {
-  return `<dialog class="modal" id="${escapeAttr(spec.id)}">
+  return `<dialog class="modal${spec.className ? ` ${escapeAttr(spec.className)}` : ""}" id="${escapeAttr(spec.id)}">
     <form class="${escapeAttr(spec.formClass)}" method="dialog">
       <header class="modal-head">
         <h2>${escapeHTML(spec.title)}</h2>

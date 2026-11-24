@@ -31,8 +31,9 @@ export function roadmapKind(text: Text, kind: string): string {
   return `<span class="kind kind-${escapeAttr(kind)}">${kind === "bug" ? icons.bug(13) : icons.idea(13)}<span class="kind-name">${escapeHTML(text.t(`kind.${kind}`))}</span></span>`;
 }
 
-/** An idea's votes in a tile; a bug, which is not voted on, its icon. */
-export function voteTile(text: Text, item: ItemSummary): string {
+/** An idea's votes in a tile; a bug, which is not voted on, its icon — and an idea too, on a project without votes. */
+export function voteTile(text: Text, item: ItemSummary, votes = true): string {
+  if (item.kind === "idea" && !votes) return `<span class="rm-vote bug" aria-hidden="true">${icons.idea(18)}</span>`;
   return item.kind === "idea"
     ? `<span class="rm-vote"><b>${escapeHTML(text.number(item.votes))}</b><small>${escapeHTML(text.t("roadmap.votes"))}</small></span>`
     : `<span class="rm-vote bug" aria-hidden="true">${icons.bug(18)}</span>`;
@@ -100,6 +101,7 @@ export function roadmapDialogList(
   total: number,
   now: number,
   text: Text,
+  votes = true,
 ): string {
   if (items.length === 0) return `<p class="ov-empty">${escapeHTML(text.t("review.nothingMatches"))}</p>`;
 
@@ -108,11 +110,11 @@ export function roadmapDialogList(
     finished
       ? `<a class="rm-done-row" href="/i/${escapeAttr(i.public_id)}">
           ${marker(lane)}
-          <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span><span class="rm-meta">${roadmapKind(text, i.kind)}${i.kind === "idea" ? `<span class="rm-age">${escapeHTML(`${text.number(i.votes)} ${text.t("roadmap.votes")}`)}</span>` : ""}</span></span>
+          <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span><span class="rm-meta">${roadmapKind(text, i.kind)}${i.kind === "idea" && votes ? `<span class="rm-age">${escapeHTML(`${text.number(i.votes)} ${text.t("roadmap.votes")}`)}</span>` : ""}</span></span>
           <span class="rm-when">${escapeHTML(text.shortDate(i.closed_at ?? i.created_at))}</span>
         </a>`
       : `<a class="rm-row rm-mrow" href="/i/${escapeAttr(i.public_id)}">
-          ${voteTile(text, i)}
+          ${voteTile(text, i, votes)}
           <span class="rm-text"><span class="rm-title">${escapeHTML(i.title)}</span>
             <span class="rm-meta">${roadmapKind(text, i.kind)}<span class="rm-age">${escapeHTML(text.age(Math.max(0, now - i.created_at)))}</span></span></span>
           <span class="rm-go" aria-hidden="true">${icons.chevron(16)}</span>

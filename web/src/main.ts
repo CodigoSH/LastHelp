@@ -48,6 +48,18 @@ import { channelPayload, credentialsPayload } from "./services/secretPayload";
 import { looksLikeAppCode, normalizeCode, recoveryCodesText } from "./services/twoStep";
 import { qrMatrix, qrSvg } from "./services/qrCode";
 import {
+  applyPreset,
+  defaultOptions,
+  fromProject,
+  isBlocked,
+  normalize,
+  presetOf,
+  toRequest,
+  type OptionKey,
+  type PresetId,
+  type ProjectOptions,
+} from "./services/projectOptions";
+import {
   assertionToFinishBody,
   attestationToFinishBody,
   creationOptionsFromServer,
@@ -703,6 +715,87 @@ function wireIconPicker(changed?: (icon: string) => void): void {
     clear?.addEventListener("click", () => paint(""));
     name?.addEventListener("input", () => {
       if (!value?.value) paint("");
+    });
+  }
+}
+
+/** The choices a project form holds: a checkbox counts while it is ticked and not switched off by another. */
+function optionsIn(form: HTMLElement): ProjectOptions {
+  const out = { ...defaultOptions() };
+  for (const box of form.querySelectorAll<HTMLInputElement>("input[data-option]")) {
+    out[box.dataset.option as OptionKey] = box.checked && !box.disabled;
+  }
+  return normalize(out);
+}
+
+/** What creating a project sends: who it is, its choices, and whether it starts on the server's channel. */
+function newProjectBody(data: FormData): Record<string, unknown> {
+  const form = root?.querySelector<HTMLFormElement>("form.repo-form, form.setup-repository");
+  return {
+    name: String(data.get("name") ?? ""),
+    slug: String(data.get("slug") ?? ""),
+    forge_repo: String(data.get("forge_repo") ?? ""),
+    icon: String(data.get("icon") ?? ""),
+    channel: data.get("channel") === "none" ? "none" : "server",
+    ...toRequest(form ? optionsIn(form) : defaultOptions()),
+  };
+}
+
+/**
+ * A project's choices, kept in step as they change: a use sets the reports
+ * group, a box switches off the ones that depend on it, and the cards and the
+ * summary say what it now comes to. Only the cards, the boxes' states and the
+ * summary are repainted — never the fields, so nothing typed is lost.
+ */
+function wireProjectOptions(serverChannel?: { configured: boolean; kind: string }): void {
+  for (const box of root?.querySelectorAll<HTMLElement>("[data-project-options]") ?? []) {
+    const custom = box.querySelector<HTMLDetailsElement>("[data-custom]");
+    let chosen: ReturnType<typeof presetOf> = presetOf(optionsIn(box));
+
+    const paint = (o: ProjectOptions) => {
+      for (const input of box.querySelectorAll<HTMLInputElement>("input[data-option]")) {
+        const key = input.dataset.option as OptionKey;
+        const row = input.closest(".po-opt");
+        const blocked = isBlocked(o, key);
+        input.disabled = blocked;
+        input.checked = o[key];
+        row?.classList.toggle("is-blocked", blocked);
+      }
+      const presets = box.querySelector("[data-presets]");
+      if (presets) presets.innerHTML = views.projectPresets(text, chosen);
+      const channelSelect = box.querySelector<HTMLSelectElement>("[data-channel]");
+      const channel = box.dataset.mode === "create" && serverChannel?.configured
+        ? { server: channelSelect?.value !== "none", kind: serverChannel.kind }
+        : undefined;
+      const summary = box.querySelector("[data-summary]");
+      if (summary) summary.innerHTML = views.projectSummary(text, o, channel);
+    };
+
+    box.addEventListener("click", (event) => {
+      const card = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-preset]");
+      if (!card) return;
+      const id = card.dataset.preset ?? "";
+      if (id === "custom") {
+        chosen = "custom";
+        if (custom) custom.open = true;
+        paint(optionsIn(box));
+        box.querySelector<HTMLInputElement>("input[data-option]:not(:disabled)")?.focus();
+        return;
+      }
+      const o = applyPreset(optionsIn(box), id as PresetId);
+      chosen = presetOf(o);
+      paint(o);
+      box.querySelector<HTMLButtonElement>(`[data-preset="${id}"]`)?.focus();
+    });
+    box.addEventListener("change", (event) => {
+      const target = event.target as HTMLElement;
+      if (target instanceof HTMLInputElement && target.dataset.option) {
+        const o = optionsIn(box);
+        chosen = presetOf(o);
+        paint(o);
+      } else if (target.matches("[data-channel]")) {
+        paint(optionsIn(box));
+      }
     });
   }
 }
@@ -1698,11 +1791,8 @@ async function render(): Promise<void> {
     // anybody would be able to open.
     if (path === "/panel/new") return await showOrganizationWizard(1);
     if (path === "/panel/new/connection") return await showOrganizationWizard(2);
-    if (parts[0] === "panel" && parts[2] === "new" && parts[1]) {
-      return await showRepositoryWizard(parts[1], 1);
-    }
-    if (parts[0] === "panel" && parts[2] === "accepts" && parts[1]) {
-      return await showRepositoryWizard(parts[1], 2);
+    if (parts[0] === "panel" && (parts[2] === "new" || parts[2] === "accepts") && parts[1]) {
+      return await showRepositoryWizard(parts[1]);
     }
     if (parts[0] === "panel" && parts[1] && parts.length === 2) {
       return await showPanelOrganization(parts[1]);
@@ -2191,7 +2281,7 @@ function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string)
   const draw = () => {
     if (bar) syncFilterBar(bar, { kind: ask.kind, sort: ask.sort }, ask.q);
     count.textContent = text.number(ask.total);
-    body.innerHTML = views.roadmapDialogList(ask.lane, ask.sort, ask.items, ask.total, Math.floor(Date.now() / 1000), text);
+    body.innerHTML = views.roadmapDialogList(ask.lane, ask.sort, ask.items, ask.total, Math.floor(Date.now() / 1000), text, page.dataset.votes !== "false");
   };
 
   const read = async (append: boolean) => {
@@ -3120,55 +3210,20 @@ async function showOrganizationWizard(step: 1 | 2): Promise<void> {
   );
 }
 
-async function showRepositoryWizard(orgSlug: string, step: 1 | 2): Promise<void> {
+async function showRepositoryWizard(orgSlug: string): Promise<void> {
   if (!(await requireOwner(orgSlug))) return;
   const body = await api.get<{
     organization: OrganizationSummary & { forge?: string };
   }>(`/api/orgs/${encodeURIComponent(orgSlug)}/repos`);
-  draft.orgSlug = orgSlug;
-  await showInShell(views.repositoryWizard(body.organization, step, text), `/panel/${orgSlug}`);
-
-  root?.querySelector<HTMLFormElement>("form.setup-repository-identity")?.addEventListener(
-    "submit",
-    (event) => {
-      event.preventDefault();
-      const data = new FormData(event.currentTarget as HTMLFormElement);
-      draft.repoSlug = String(data.get("slug") ?? "");
-      pendingRepository = {
-        name: String(data.get("name") ?? ""),
-        slug: draft.repoSlug,
-        forge_repo: String(data.get("forge_repo") ?? ""),
-      };
-      go(`/panel/${orgSlug}/accepts`);
-    },
-  );
-
-  root?.querySelector<HTMLFormElement>("form.setup-repository-accepts")?.addEventListener(
-    "submit",
-    async (event) => {
-      event.preventDefault();
-      const data = new FormData(event.currentTarget as HTMLFormElement);
-      try {
-        await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/repositories`, {
-          ...pendingRepository,
-          accepts_bugs: data.get("accepts_bugs") !== null,
-          accepts_ideas: data.get("accepts_ideas") !== null,
-          accepts_images: data.get("accepts_images") !== null,
-          private: data.get("private") !== null,
-        });
-        go(`/panel/${orgSlug}`);
-      } catch (err) {
-        showFormError(err);
-      }
-    },
-  );
+  const panel = await api.get<views.OrganizationPanel>(`/api/orgs/${encodeURIComponent(orgSlug)}/panel`).catch(() => null);
+  await showInShell(views.repositoryWizard(body.organization, text, panel?.server_channel), `/panel/${orgSlug}`);
+  wireIconPicker();
+  wireProjectOptions(panel?.server_channel);
+  onSubmit("form.setup-repository", async (data) => {
+    await api.post(`/api/orgs/${encodeURIComponent(orgSlug)}/repositories`, newProjectBody(data));
+    go(`/panel/${orgSlug}`);
+  });
 }
-
-let pendingRepository: { name: string; slug: string; forge_repo: string } = {
-  name: "",
-  slug: "",
-  forge_repo: "",
-};
 
 async function showSignIn(): Promise<void> {
   const status = await api.get<Status>("/api/status");
@@ -4473,9 +4528,15 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
           id: "repo-modal",
           title: text.t("panel.newRepository"),
           lead: text.t("repo.lead"),
-          body: views.iconField(text, "") + views.repositoryFields(text, forge, forge !== "none") + views.acceptsFields(text),
+          body: views.projectForm(text, {
+            options: defaultOptions(),
+            mode: "create",
+            forge,
+            serverChannel: data.server_channel,
+          }),
           submit: text.t("auth.create"),
           formClass: "repo-form",
+          className: "project-modal",
         },
         text,
       ) +
@@ -4514,19 +4575,11 @@ async function showPanelOrganization(orgSlug: string): Promise<void> {
   );
 
   onSubmit("form.repo-form", async (formData) => {
-    await api.post(`${base}/repositories`, {
-      name: String(formData.get("name") ?? ""),
-      slug: String(formData.get("slug") ?? ""),
-      forge_repo: String(formData.get("forge_repo") ?? ""),
-      accepts_bugs: formData.get("accepts_bugs") !== null,
-      accepts_ideas: formData.get("accepts_ideas") !== null,
-      accepts_images: formData.get("accepts_images") !== null,
-      private: formData.get("private") !== null,
-      icon: String(formData.get("icon") ?? ""),
-    });
+    await api.post(`${base}/repositories`, newProjectBody(formData));
     await render();
   });
   wireIconPicker();
+  wireProjectOptions(data.server_channel);
 
   root?.querySelectorAll<HTMLButtonElement>("[data-delete-repo]").forEach((button) =>
     button.addEventListener("click", async () => {
@@ -4726,16 +4779,12 @@ async function showPanelRepository(orgSlug: string, repoSlug: string): Promise<v
   await showInShell(views.repositoryScreen(repo, team, text), `/panel/${orgSlug}`);
 
   onSubmit("form.repo-settings", async (data) => {
+    const form = root?.querySelector<HTMLFormElement>("form.repo-settings");
     await api.patch(base, {
       name: String(data.get("name") ?? ""),
       forge_repo: String(data.get("forge_repo") ?? repo.forge_repo),
-      accepts_bugs: data.get("accepts_bugs") !== null,
-      accepts_ideas: data.get("accepts_ideas") !== null,
-      accepts_images: data.get("accepts_images") !== null,
-      asks_version: data.get("asks_version") !== null,
-      asks_steps: data.get("asks_steps") !== null,
-      private: data.get("private") !== null,
       icon: String(data.get("icon") ?? ""),
+      ...toRequest(form ? optionsIn(form) : fromProject(repo)),
     });
     toast(i18n.t("panel.saved"));
     await render();

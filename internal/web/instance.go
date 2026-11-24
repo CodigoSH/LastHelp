@@ -310,8 +310,16 @@ func (s *Server) comingIn(boards []org.Board) map[string]any {
 	ids := make([]int64, 0, len(boards))
 	byID := make(map[int64]org.Board, len(boards))
 	for _, b := range boards {
+		// A board whose team keeps its roadmap to itself is left out of the
+		// front page's roadmap as well.
+		if !b.RoadmapPublic {
+			continue
+		}
 		ids = append(ids, b.ID)
 		byID[b.ID] = b
+	}
+	if len(ids) == 0 {
+		return out
 	}
 
 	columns, err := s.items().RoadmapAcross(ids, roadmapOnTheFrontPage)

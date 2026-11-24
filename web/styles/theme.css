@@ -1603,6 +1603,7 @@ summary:focus-visible,
    lane shows its first rows and opens whole in a dialog, so the page is as long
    as two lanes however many reports there are. */
 .bd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.bd-tiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .bd-tile {
   position: relative;
   display: flex;
@@ -8658,3 +8659,214 @@ button.rev-group.shut .icon { transform: rotate(0deg); }
 .rev-bulk-do { display: inline-flex; align-items: center; gap: 6px; flex-basis: 100%; justify-content: flex-end; }
 .rev-bulk-do .confirming { outline: 2px solid var(--accent); outline-offset: 1px; }
 .rev-bulk-do button[disabled] { opacity: 0.45; cursor: default; }
+
+/* ------------------------------------------------------- a project's choices */
+
+/* Creating a project and its settings, as one form in three numbered steps: who
+   it is, what it receives — a use to start from, the options folded under it —
+   and what it all comes to. Checkboxes in two grouped columns rather than a
+   switch per row: eight settings as switches were a page of rows, and these are
+   choices made together, not things flipped one at a time. */
+.modal.project-modal { inline-size: min(44rem, calc(100vw - 2rem)); max-block-size: calc(100dvh - 2rem); }
+.modal.project-modal .modal-body { margin-top: 0.5rem; }
+
+.po-step { margin-block-start: 20px; }
+.po-step:first-child { margin-block-start: 0; }
+.po .po-step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.po-num {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 18px;
+  block-size: 18px;
+  border: 1px solid var(--accent-line);
+  border-radius: 50%;
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+/* Icon, name and address on one line; the address drops under the name when there is no room. */
+.po-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 16px;
+  align-items: start;
+}
+.po-identity .field { margin: 0; max-inline-size: none; }
+.po .po-identity .field input { max-inline-size: none; }
+.po[data-mode="settings"] .po-identity { grid-template-columns: auto minmax(0, 1fr); }
+.po-icon { padding-block-start: 20px; }
+.po-icon .icon-pick .card-mark { inline-size: 48px; block-size: 48px; border-radius: 12px; font-size: 1rem; }
+.po-icon .icon-pick { border-radius: 12px; }
+
+.po-presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.po-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--sheet);
+  color: var(--text-main);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.po-preset:hover { border-color: var(--accent-line); }
+.po-preset:focus-visible { outline: none; box-shadow: var(--ring); }
+.po-preset.is-selected { border-color: var(--accent); background: var(--accent-wash); }
+.po-preset-name { font-size: 13px; font-weight: 600; }
+.po-preset-desc { font-size: 11px; line-height: 1.4; color: var(--text-dim); }
+
+.po-custom { margin-block-start: 12px; }
+.po-custom > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  list-style: none;
+}
+.po-custom > summary::-webkit-details-marker { display: none; }
+.po-custom > summary svg { transition: transform 0.15s var(--ease); transform: scaleX(var(--rtl-flip, 1)); }
+.po-custom[open] > summary svg { transform: rotate(90deg); }
+.po-custom > summary:hover,
+.po-custom[open] > summary { color: var(--text-main); }
+
+.po-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 24px;
+  margin-block-start: 4px;
+}
+.po-group-title {
+  margin-block: 10px 4px;
+  padding-block-end: 4px;
+  border-block-end: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-alt);
+}
+
+/* The row is what a tip is placed against, so it opens above its own row and never past the column's edge. */
+.po-opt { position: relative; display: flex; align-items: center; gap: 6px; min-block-size: 32px; }
+.po-opt.is-sub { padding-inline-start: 24px; }
+.po-opt.is-blocked { opacity: 0.45; }
+.po-check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.po .po-check { font-weight: 400; margin: 0; color: var(--text-main); }
+.po-check input { inline-size: 1rem; block-size: 1rem; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.po-check input:disabled { cursor: default; }
+
+/* What an option means: on the "i", on hover and on focus, so the rows stay one line each. */
+.po-tip {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 18px;
+  block-size: 18px;
+  border-radius: 50%;
+  color: var(--text-dim);
+  cursor: help;
+}
+.po-tip:hover,
+.po-tip:focus-visible { color: var(--accent); outline: none; }
+.po-tip-text {
+  position: absolute;
+  inset-block-end: calc(100% + 2px);
+  inset-inline-start: 0;
+  z-index: 5;
+  inline-size: max-content;
+  max-inline-size: min(18rem, 100%);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--sheet);
+  box-shadow: var(--shadow-md);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: start;
+  white-space: normal;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s var(--ease);
+  pointer-events: none;
+}
+.po-tip:hover .po-tip-text,
+.po-tip:focus-visible .po-tip-text { opacity: 1; visibility: visible; }
+
+.po-field { margin-block-start: 10px; }
+.po .po-field > label { display: block; margin-block-end: 6px; font-size: 12px; font-weight: 500; color: var(--text-dim); }
+.po-field-row { position: relative; display: flex; align-items: center; gap: 6px; }
+.po-field-row > input,
+.po-field-row > .sel { flex: 1; min-inline-size: 0; }
+.po-field-row > input {
+  box-sizing: border-box;
+  min-block-size: var(--control-h);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.po-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-dim);
+}
+.po-summary-head {
+  margin-block-end: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.po-list { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.po-list li::before { display: inline-block; inline-size: 1.2em; font-weight: 700; }
+.po-list.is-on li::before { content: "✓"; color: var(--success-color); }
+.po-list.is-off li { color: var(--text-dim); }
+.po-list.is-off li::before { content: "–"; }
+.po-none { margin: 0; font-size: 12px; color: var(--text-dim); }
+.po-summary-note,
+.po-summary-warn { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--text-dim); }
+.po-summary-warn { color: var(--danger-color); }
+
+/* On the project's page the form sits in a settings card, not a dialog. */
+.repo-settings .po { max-inline-size: 44rem; }
+
+@media (max-width: 640px) {
+  .po-identity { grid-template-columns: auto minmax(0, 1fr); gap: 12px 12px; }
+  .po-identity > .field:last-child:nth-child(3) { grid-column: 1 / -1; }
+  .po-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .po-groups { grid-template-columns: minmax(0, 1fr); }
+  .po-summary { grid-template-columns: minmax(0, 1fr); }
+}
