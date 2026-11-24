@@ -6045,6 +6045,20 @@ a.ov-row:hover { background: var(--surface-dim); }
   color: var(--text-main);
 }
 .two-step-low { color: var(--warning-color); }
+
+/* A passkey in the list: a key in the round place a person's picture takes in the other lists. */
+.passkey-mark {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+/* The key on the username field: the eye's twin, and the accent when the pointer is on it. */
+.passkey-key:hover, .passkey-key:focus-visible { color: var(--accent); }
 .sessions-modal .ov-modal-body { gap: 0; }
 /* One grid for the head and every line, each line a subgrid of it, so a column is as wide as its widest
    cell from the head to the last line and the heads stand over what they name. */

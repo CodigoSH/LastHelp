@@ -21,6 +21,7 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/item"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/outbox"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/core/passkey"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/session"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/settings"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/twostep"
@@ -81,6 +82,9 @@ type Server struct {
 	// every sign-in it starts: a challenge counts its own five, and a guesser
 	// with the password would otherwise just ask for another.
 	secondStep *middleware.Lockout
+	// passkeyIn locks an address after repeated passkey sign-ins that failed: there
+	// is no name to lock until the passkey is known, and an unknown passkey is a failure.
+	passkeyIn *middleware.Lockout
 
 	// wordsMu makes changing the operator's word list one step: it is read,
 	// changed and written back, and two changes at once lose one of them.
@@ -180,6 +184,7 @@ func New(cfg config.Config, db *sql.DB) (*Server, error) {
 	s.perBlock = middleware.NewLimiter(600, time.Minute, 20_000, s.now)
 	s.signIn = middleware.NewLockout(5, time.Minute, 5*time.Minute, 10_000, s.now)
 	s.secondStep = middleware.NewLockout(5, time.Minute, 5*time.Minute, 10_000, s.now)
+	s.passkeyIn = middleware.NewLockout(5, time.Minute, 5*time.Minute, 10_000, s.now)
 	s.releaseAPI = ReleaseAPI
 
 	s.routes()
@@ -227,6 +232,9 @@ func (s *Server) routes() {
 	// The code after the password: public for the same reason, since there is
 	// no session until it is right.
 	s.mux.HandleFunc("POST /api/session/second-step", s.handleSecondStep)
+	// Signing in with a passkey instead of the password: public for the same reason.
+	s.mux.HandleFunc("POST /api/session/passkey/begin", s.handlePasskeySignInBegin)
+	s.mux.HandleFunc("POST /api/session/passkey/finish", s.handlePasskeySignInFinish)
 
 	s.mux.HandleFunc("GET /api/orgs", s.handleOrganizations)
 
@@ -327,6 +335,10 @@ func (s *Server) routes() {
 	private("POST /api/me/two-step/enable", s.handleTwoStepEnable)
 	private("POST /api/me/two-step/disable", s.handleTwoStepDisable)
 	private("POST /api/me/two-step/recovery-codes", s.handleTwoStepRecoveryCodes)
+	private("GET /api/me/passkeys", s.handleListPasskeys)
+	private("POST /api/me/passkeys/register/begin", s.handlePasskeyRegisterBegin)
+	private("POST /api/me/passkeys/register/finish", s.handlePasskeyRegisterFinish)
+	private("DELETE /api/me/passkeys/{id}", s.handleDeletePasskey)
 	private("POST /api/me/profile", s.handleChangeProfile)
 	private("POST /api/me/language", s.handleChangeLanguage)
 	private("POST /api/me/avatar", s.handleChangeAvatar)
@@ -495,6 +507,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) accounts() account.Store  { return account.Store{DB: s.db} }
 func (s *Server) sessions() session.Store  { return session.Store{DB: s.db} }
+func (s *Server) passkeys() passkey.Store  { return passkey.Store{DB: s.db} }
 func (s *Server) twoStep() twostep.Store   { return twostep.Store{DB: s.db} }
 func (s *Server) orgs() org.Store          { return org.Store{DB: s.db} }
 func (s *Server) items() item.Store        { return item.Store{DB: s.db} }

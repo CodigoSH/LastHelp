@@ -3095,6 +3095,7 @@ export function profileScreen(
   text: Text,
   sessions: SessionRow[] | null = null,
   twoStep: TwoStepView | null = null,
+  passkeys: PasskeysView | null = null,
 ): string {
   // Profile and password, a card each: the picture, the name and the role; the username — the one name an account
   // has, to sign in with and to sign replies — with its save button on the same
@@ -3140,6 +3141,7 @@ export function profileScreen(
         { lead: text.t("profile.passwordHelp") },
       )}
       ${twoStep ? `<div class="two-step-host" data-two-step-host>${twoStepCard(twoStep, text)}</div>${twoStepPasswordDialog(text)}` : ""}
+      ${passkeys ? `<div class="two-step-host" data-passkeys-host>${passkeysCard(passkeys, text)}</div>` : ""}
       ${sessions ? sessionsCard(sessions, text) : ""}
     </div>`;
 }
@@ -3206,6 +3208,46 @@ export function twoStepCard(v: TwoStepView, text: Text): string {
   }
   const chip = v.enabled && v.step === "state" ? `<span class="ov-chip two-step-on">${escapeHTML(text.t("twoStep.on"))}</span>` : "";
   return settingsCard(text.t("twoStep.title"), body, { lead, action: chip });
+}
+
+/** One of the account's passkeys, as the server lists it. */
+export interface PasskeyRow {
+  id: number;
+  name: string;
+  created_at: number;
+  last_used_at: number | null;
+}
+
+/** The account's passkeys, and whether a new one can be made here: the server and the browser both have to say yes. */
+export interface PasskeysView {
+  canAdd: boolean;
+  items: PasskeyRow[];
+}
+
+export function passkeysCard(v: PasskeysView, text: Text): string {
+  const rows = v.items
+    .map((p) => {
+      const added = text.t("passkey.added", { date: text.date(p.created_at) });
+      const used = p.last_used_at ? text.t("passkey.lastUsed", { date: text.date(p.last_used_at) }) : text.t("passkey.neverUsed");
+      return settingsItem({
+        lead: `<span class="passkey-mark">${icons.key(16)}</span>`,
+        name: p.name,
+        sub: `${added} · ${used}`,
+        actions: iconButton(
+          "remove",
+          text.t("passkey.remove"),
+          `class="icon-button danger" data-remove-passkey="${p.id}" data-name="${escapeAttr(p.name)}"`,
+        ),
+      });
+    })
+    .join("");
+  const body = `${rows ? `<ul class="settings-list">${rows}</ul>` : ""}
+    ${
+      v.canAdd
+        ? `<div class="settings-actions">${actionButton("add", text.t("passkey.add"), "data-add-passkey", "primary")}</div>`
+        : `<p class="card-sub">${escapeHTML(text.t("passkey.needHttps"))}</p>`
+    }`;
+  return settingsCard(text.t("passkey.title"), body, { lead: text.t("passkey.hint") });
 }
 
 /** The password asked before new recovery codes or turning it off; the words are set for each. */

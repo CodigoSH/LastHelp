@@ -612,6 +612,49 @@ var migrations = []migration{
 			return nil
 		},
 	},
+	{
+		version: 21,
+		name:    "an account can sign in with a passkey instead of its password",
+		// passkey is each passkey's public key — never anything secret: the
+		// private half never leaves the person's device — with the id the device
+		// knows it by, its signature counter and the name its owner gave it.
+		// passkey_handle is the id a device stores for the account: random, so it
+		// says nothing about the account to whoever reads the device.
+		// passkey_challenge is a challenge handed to a browser, by its hash, until
+		// it is answered or runs out: one to add a passkey, for an account signed
+		// in; one to sign in, for nobody yet. Nobody has a passkey until they add one.
+		fn: func(tx *sql.Tx) error {
+			for _, stmt := range []string{
+				`CREATE TABLE IF NOT EXISTS passkey (
+					id            INTEGER PRIMARY KEY,
+					user_id       INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+					credential_id TEXT    NOT NULL UNIQUE,
+					public_key    BLOB    NOT NULL,
+					alg           INTEGER NOT NULL,
+					sign_count    INTEGER NOT NULL DEFAULT 0,
+					name          TEXT    NOT NULL DEFAULT '',
+					created_at    INTEGER NOT NULL,
+					last_used_at  INTEGER
+				)`,
+				`CREATE INDEX IF NOT EXISTS passkey_by_user ON passkey (user_id)`,
+				`CREATE TABLE IF NOT EXISTS passkey_handle (
+					user_id INTEGER PRIMARY KEY REFERENCES app_user(id) ON DELETE CASCADE,
+					handle  BLOB    NOT NULL UNIQUE
+				)`,
+				`CREATE TABLE IF NOT EXISTS passkey_challenge (
+					challenge_hash TEXT    PRIMARY KEY,
+					purpose        TEXT    NOT NULL,
+					user_id        INTEGER REFERENCES app_user(id) ON DELETE CASCADE,
+					expires_at     INTEGER NOT NULL
+				)`,
+			} {
+				if _, err := tx.Exec(stmt); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	},
 }
 
 // renameEmailToUsername is a no-op on any database that already has the column.

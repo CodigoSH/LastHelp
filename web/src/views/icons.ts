@@ -46,6 +46,9 @@ export const icons = {
   done: doneIcon,
   add: (s?: number) => stroke(`<path d="M12 5v14M5 12h14"/>`, s),
   minus: (s?: number) => stroke(`<path d="M5 12h14"/>`, s),
+  /** A passkey: the key that signs in without a password. */
+  key: (s?: number) =>
+    stroke(`<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2"/><path d="M16 7l3 3"/><path d="M18.5 4.5l2.5 2.5"/>`, s),
   /** A message on a report: the speech bubble the product already draws. */
   comment: (s?: number) =>
     stroke(`<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`, s),

@@ -47,6 +47,14 @@ import { SECRET_MASK, secretChange } from "./services/secretField";
 import { channelPayload, credentialsPayload } from "./services/secretPayload";
 import { looksLikeAppCode, normalizeCode, recoveryCodesText } from "./services/twoStep";
 import { qrMatrix, qrSvg } from "./services/qrCode";
+import {
+  assertionToFinishBody,
+  attestationToFinishBody,
+  creationOptionsFromServer,
+  defaultPasskeyName,
+  passkeysSupported,
+  requestOptionsFromServer,
+} from "./services/passkeys";
 
 const text: views.Text = {
   t: (key, params) => i18n.t(key, params),
@@ -892,12 +900,20 @@ async function showProfile(): Promise<void> {
     .get<{ enabled: boolean; recovery_left: number }>("/api/me/two-step")
     .then((r): views.TwoStepView => ({ ...views.twoStepIdle, enabled: !!r.enabled, recoveryLeft: r.recovery_left || 0 }))
     .catch(() => null);
+  const passkeys = await loadPasskeys();
   await showInShell(
-    views.profileScreen({ username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) }, text, sessions, twoStep),
+    views.profileScreen(
+      { username: me?.username ?? "", avatar: me?.avatar, role: views.accountRole(me, text) },
+      text,
+      sessions,
+      twoStep,
+      passkeys,
+    ),
     "/panel/account",
   );
   wireSessions();
   if (twoStep) wireTwoStep(twoStep);
+  if (passkeys) wirePasskeys();
 
   // The picture, which is read in the browser and sent as a data URL. A file
   // upload would need a store, a route to serve it from and a second thing to
@@ -945,6 +961,69 @@ async function showProfile(): Promise<void> {
       await render();
     } catch (err) {
       showFormError(err);
+    }
+  });
+}
+
+/** The account's passkeys, and whether this page may make one: the server says for the address, the browser for itself. */
+async function loadPasskeys(): Promise<views.PasskeysView | null> {
+  return api
+    .get<{ available: boolean; passkeys: views.PasskeyRow[] }>("/api/me/passkeys")
+    .then((r) => ({ canAdd: !!r.available && passkeysSupported(window), items: r.passkeys ?? [] }))
+    .catch(() => null);
+}
+
+/** Adding a passkey on this device and removing one, drawn again in place from the server's list. */
+function wirePasskeys(): void {
+  const host = root?.querySelector<HTMLElement>("[data-passkeys-host]");
+  if (!host) return;
+  const redraw = async () => {
+    const view = await loadPasskeys();
+    if (view) host.innerHTML = views.passkeysCard(view, text);
+  };
+  host.addEventListener("click", async (event) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-add-passkey]")) {
+      try {
+        const options = creationOptionsFromServer(await api.post<Record<string, unknown>>("/api/me/passkeys/register/begin", {}));
+        let credential: PublicKeyCredential | null;
+        try {
+          credential = (await navigator.credentials.create({
+            publicKey: options as unknown as PublicKeyCredentialCreationOptions,
+          })) as PublicKeyCredential | null;
+        } catch (err) {
+          const name = (err as { name?: string } | null)?.name;
+          if (name === "NotAllowedError" || name === "AbortError") return;
+          if (name === "InvalidStateError") return toastError(i18n.t("passkey.deviceHasOne"));
+          throw err;
+        }
+        if (!credential) return;
+        const res = credential.response as AuthenticatorAttestationResponse;
+        await api.post(
+          "/api/me/passkeys/register/finish",
+          attestationToFinishBody(defaultPasskeyName(navigator.userAgent), {
+            clientDataJSON: res.clientDataJSON,
+            attestationObject: res.attestationObject,
+          }),
+        );
+        toast(i18n.t("passkey.created"));
+      } catch (err) {
+        toastError(i18n.t(err instanceof ApiError ? err.key : "error.passkey_refused"));
+      }
+      await redraw();
+      return;
+    }
+    const remove = target.closest<HTMLElement>("[data-remove-passkey]");
+    if (remove) {
+      const name = remove.dataset.name ?? "";
+      if (!(await askConfirm(i18n.t("passkey.remove"), i18n.t("passkey.removeConfirm", { name })))) return;
+      try {
+        await api.del(`/api/me/passkeys/${remove.dataset.removePasskey}`);
+        toast(i18n.t("passkey.removed"));
+      } catch (err) {
+        toastError(i18n.t(err instanceof ApiError ? err.key : "error.internal"));
+      }
+      await redraw();
     }
   });
 }
@@ -3085,6 +3164,7 @@ async function showSignIn(): Promise<void> {
 
   const form = root?.querySelector<HTMLFormElement>("form.auth");
   const errorLine = root?.querySelector<HTMLParagraphElement>(".form-error");
+  offerPasskeys(errorLine ?? null);
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -3116,6 +3196,86 @@ async function showSignIn(): Promise<void> {
       }
     }
   });
+}
+
+/** The passkey request the username field's suggestions are waiting on, so the key can take over from it. */
+let passkeyWaiting: AbortController | null = null;
+
+/**
+ * Passkeys on the sign-in card, without a second big button: a key at the end of the username field,
+ * where the eye sits on the password, and the account's passkeys among the field's own suggestions
+ * where the browser can list them. Only where a passkey can work at all — https with a name, or
+ * localhost — so nobody is shown a key that cannot open anything.
+ */
+function offerPasskeys(errorLine: HTMLParagraphElement | null): void {
+  const field = root?.querySelector<HTMLInputElement>("#auth-username");
+  if (!field || !passkeysSupported(window)) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "pw-wrap";
+  field.parentElement?.insertBefore(wrap, field);
+  wrap.appendChild(field);
+  const key = document.createElement("button");
+  key.type = "button";
+  key.className = "pw-toggle passkey-key";
+  key.innerHTML = icons.key(16);
+  key.title = i18n.t("passkey.signIn");
+  key.setAttribute("aria-label", i18n.t("passkey.signIn"));
+  wrap.appendChild(key);
+
+  const fail = (err: unknown) => {
+    const message = i18n.t(err instanceof ApiError ? err.key : "error.passkey_refused");
+    if (err instanceof ApiError && err.key === "error.passkey_unavailable") wrap.replaceWith(field);
+    if (errorLine) {
+      errorLine.textContent = message;
+      errorLine.hidden = false;
+    }
+  };
+  key.addEventListener("click", () => void passkeySignIn("button").catch(fail));
+
+  // The suggestions: the browser keeps this request open and answers it when a passkey is picked
+  // from the list under the field. A browser that cannot do it keeps the key alone.
+  field.autocomplete = "username webauthn";
+  const pkc = window.PublicKeyCredential as unknown as { isConditionalMediationAvailable?: () => Promise<boolean> };
+  void pkc.isConditionalMediationAvailable?.().then((yes) => {
+    if (yes) void passkeySignIn("conditional").catch(fail);
+  });
+}
+
+/** Asks the browser for a passkey and signs in with it: from the key, or from the field's suggestions. */
+async function passkeySignIn(how: "button" | "conditional"): Promise<void> {
+  passkeyWaiting?.abort();
+  const control = new AbortController();
+  passkeyWaiting = control;
+  const options = requestOptionsFromServer(await api.post<Record<string, unknown>>("/api/session/passkey/begin", {}));
+  let credential: PublicKeyCredential | null;
+  try {
+    credential = (await navigator.credentials.get({
+      publicKey: options as unknown as PublicKeyCredentialRequestOptions,
+      signal: control.signal,
+      ...(how === "conditional" ? { mediation: "conditional" as CredentialMediationRequirement } : {}),
+    })) as PublicKeyCredential | null;
+  } catch (err) {
+    // Closing the browser's dialog, or the key taking over from the suggestions, is a choice.
+    const name = (err as { name?: string } | null)?.name;
+    if (name === "NotAllowedError" || name === "AbortError") return;
+    throw err;
+  }
+  if (!credential) return;
+  const res = credential.response as AuthenticatorAssertionResponse;
+  await api.post(
+    "/api/session/passkey/finish",
+    assertionToFinishBody({
+      rawId: credential.rawId,
+      clientDataJSON: res.clientDataJSON,
+      authenticatorData: res.authenticatorData,
+      signature: res.signature,
+      userHandle: res.userHandle,
+    }),
+  );
+  passkeyWaiting = null;
+  me = await api.get<Me>("/api/me");
+  go("/panel");
 }
 
 /**
