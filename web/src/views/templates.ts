@@ -1268,7 +1268,12 @@ export function signInForm(text: Text, instance?: { name?: string; logo?: string
         </div>
         <p class="form-error" role="alert" hidden></p>
         <div class="wizard-actions">
-          <button class="button primary signin-go" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
+          <div class="signin-row">
+            <button class="button primary signin-go" type="submit">${escapeHTML(text.t("nav.signIn"))}</button>
+            <!-- A passkey, beside the way in and quieter than it: shown only where one can work. -->
+            <button class="button passkey-go" type="button" data-passkey-signin hidden
+              aria-label="${escapeAttr(text.t("passkey.signIn"))}" title="${escapeAttr(text.t("passkey.signIn"))}">${icons.key(18)}</button>
+          </div>
         </div>
       </div>
     </form>

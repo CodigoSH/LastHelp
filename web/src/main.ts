@@ -3202,30 +3202,20 @@ async function showSignIn(): Promise<void> {
 let passkeyWaiting: AbortController | null = null;
 
 /**
- * Passkeys on the sign-in card, without a second big button: a key at the end of the username field,
- * where the eye sits on the password, and the account's passkeys among the field's own suggestions
- * where the browser can list them. Only where a passkey can work at all — https with a name, or
- * localhost — so nobody is shown a key that cannot open anything.
+ * Passkeys on the sign-in card, without a second big button: a square key beside "Sign in", quieter
+ * than it, and the account's passkeys among the username field's own suggestions where the browser
+ * can list them. Only where a passkey can work at all — https with a name, or localhost — so nobody
+ * is shown a key that cannot open anything.
  */
 function offerPasskeys(errorLine: HTMLParagraphElement | null): void {
   const field = root?.querySelector<HTMLInputElement>("#auth-username");
-  if (!field || !passkeysSupported(window)) return;
-
-  const wrap = document.createElement("div");
-  wrap.className = "pw-wrap";
-  field.parentElement?.insertBefore(wrap, field);
-  wrap.appendChild(field);
-  const key = document.createElement("button");
-  key.type = "button";
-  key.className = "pw-toggle passkey-key";
-  key.innerHTML = icons.key(16);
-  key.title = i18n.t("passkey.signIn");
-  key.setAttribute("aria-label", i18n.t("passkey.signIn"));
-  wrap.appendChild(key);
+  const key = root?.querySelector<HTMLButtonElement>("[data-passkey-signin]");
+  if (!field || !key || !passkeysSupported(window)) return;
+  key.hidden = false;
 
   const fail = (err: unknown) => {
     const message = i18n.t(err instanceof ApiError ? err.key : "error.passkey_refused");
-    if (err instanceof ApiError && err.key === "error.passkey_unavailable") wrap.replaceWith(field);
+    if (err instanceof ApiError && err.key === "error.passkey_unavailable") key.hidden = true;
     if (errorLine) {
       errorLine.textContent = message;
       errorLine.hidden = false;

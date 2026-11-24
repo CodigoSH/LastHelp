@@ -6057,8 +6057,19 @@ a.ov-row:hover { background: var(--surface-dim); }
   background: var(--accent-wash);
   color: var(--accent);
 }
-/* The key on the username field: the eye's twin, and the accent when the pointer is on it. */
-.passkey-key:hover, .passkey-key:focus-visible { color: var(--accent); }
+/* The way in and, beside it, a passkey: a square key as tall as the button, outlined rather than
+   filled, so it reads as the second way and not a rival to the first. */
+.signin-row { display: flex; gap: 8px; align-items: stretch; }
+.signin-row .signin-go { flex: 1; inline-size: auto; min-inline-size: 0; }
+.passkey-go {
+  flex: none;
+  inline-size: 2.75rem;
+  padding: 0;
+  justify-content: center;
+  color: var(--text-dim);
+}
+.passkey-go[hidden] { display: none; }
+.passkey-go:hover, .passkey-go:focus-visible { color: var(--accent); border-color: var(--accent-line); }
 .sessions-modal .ov-modal-body { gap: 0; }
 /* One grid for the head and every line, each line a subgrid of it, so a column is as wide as its widest
    cell from the head to the last line and the heads stand over what they name. */
