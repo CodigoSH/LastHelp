@@ -77,8 +77,8 @@ func TestTheAccountSeesWhereItIsSignedIn(t *testing.T) {
 }
 
 // A session that does not know its browser — one opened before the list
-// existed — learns it on its next use, not an hour later; and after that it
-// follows a new address once an hour.
+// existed — learns it on its next use; and after that it follows a new
+// address at most once a minute.
 func TestASessionLearnsItsBrowserWhenNextUsed(t *testing.T) {
 	i := newInstance(t)
 	i.claim() // written without a browser or an address, as a session from before is
@@ -90,11 +90,11 @@ func TestASessionLearnsItsBrowserWhenNextUsed(t *testing.T) {
 	}
 	_ = i.sessionsList()
 	if s := i.sessionsList()[0]; s.IP != "192.0.2.1" {
-		t.Errorf("within the hour the address became %q, want it left alone", s.IP)
+		t.Errorf("within the minute the address became %q, want it left alone", s.IP)
 	}
-	i.tick.advance(2 * time.Hour)
+	i.tick.advance(2 * time.Minute)
 	if s := i.sessionsList()[0]; s.IP != "127.0.0.1" {
-		t.Errorf("after an hour the address is %q, want the one it came from", s.IP)
+		t.Errorf("two minutes later the address is %q, want the one it came from", s.IP)
 	}
 }
 

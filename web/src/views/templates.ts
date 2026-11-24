@@ -25,6 +25,7 @@ import { choiceMenu, chosenValues, filterChips, filterChipsHost, filterMenu, seg
 import { roadmapKindGroup } from "./roadmapModal";
 import type { PushView } from "../services/pushClient";
 import { userAgentLabel, type BrowserId, type OsId } from "../services/userAgentLabel";
+import { sessionIsOnline, sessionsInOrder } from "../services/sessionsOrder";
 import { modKey } from "../services/searchShortcut";
 import { SECRET_MASK } from "../services/secretField";
 import { actionButton, iconButton, modal } from "./modal";
@@ -3136,44 +3137,74 @@ export function deviceName(userAgent: string, text: Text): string {
   return os === "unknown" ? b : `${b} · ${OS_NAMES[os]}`;
 }
 
+/** One sign-in, on one line, in the columns the head names. */
+function sessionRow(s: SessionRow, text: Text): string {
+  const name = deviceName(s.user_agent, text);
+  // What the confirmation calls it: the name, and the address when there is one to tell two apart.
+  const called = s.ip ? `${name} (${s.ip})` : name;
+  const online = text.t("sessions.online");
+  return `<div class="sessions-row${s.current ? " is-current" : ""}" data-session="${escapeAttr(s.id)}">
+      <span class="sessions-row__who">${
+        sessionIsOnline(s)
+          ? `<i class="sessions-dot sessions-dot--on" role="img" title="${escapeAttr(online)}" aria-label="${escapeAttr(online)}"></i>`
+          : `<i class="sessions-dot" aria-hidden="true"></i>`
+      }<b class="sessions-row__device">${escapeHTML(name)}</b></span>
+      <span class="sessions-row__ip" dir="ltr">${escapeHTML(s.ip || "—")}</span>
+      <span class="sessions-row__seen">${escapeHTML(text.dateTime(s.last_seen))}</span>
+      <span class="sessions-row__act">${
+        s.current
+          ? `<span class="mono-tag accent">${escapeHTML(text.t("sessions.thisDevice"))}</span>`
+          : `<button class="button" type="button" data-session-close="${escapeAttr(s.id)}" data-device="${escapeAttr(called)}">${escapeHTML(
+              text.t("sessions.closeShort"),
+            )}</button>`
+      }</span>
+    </div>`;
+}
+
 /**
- * Where this account is signed in: this browser first, then the rest by when they were last seen, each
- * of the others with a way to sign it out, and one to sign them all out at once.
+ * What is inside the sessions dialog: the list under its column heads, which scrolls when it is long,
+ * and the one action on all the others.
  */
-export function sessionsCard(sessions: SessionRow[], text: Text): string {
-  const ordered = [...sessions].sort((a, b) => Number(b.current) - Number(a.current) || b.last_seen - a.last_seen);
-  const rows = ordered
-    .map((s) => {
-      const name = deviceName(s.user_agent, text);
-      const address = s.ip || "—";
-      // What the confirmation calls it: the name, and the address when there is one to tell two apart.
-      const called = s.ip ? `${name} (${s.ip})` : name;
-      return settingsItem({
-        attrs: `data-session="${escapeAttr(s.id)}"`,
-        lead: `<span class="si-mark">${icons.monitor(16)}</span>`,
-        name,
-        sub: text.t("sessions.seen", { address, date: text.dateTime(s.last_seen) }),
-        tags: s.current ? `<span class="mono-tag accent">${escapeHTML(text.t("sessions.thisDevice"))}</span>` : "",
-        actions: s.current
-          ? ""
-          : iconButton(
-              "signOut",
-              text.t("sessions.close"),
-              `class="icon-button danger" data-session-close="${escapeAttr(s.id)}" data-device="${escapeAttr(called)}"`,
-            ),
-      });
-    })
-    .join("");
-  const others = ordered.some((s) => !s.current)
-    ? `<div class="settings-actions"><button class="button danger" type="button" data-sessions-close-others>${escapeHTML(
+export function sessionsList(sessions: SessionRow[], text: Text): string {
+  const others = sessions.some((s) => !s.current)
+    ? `<div class="ov-modal-foot"><button class="button danger" type="button" data-sessions-close-others>${escapeHTML(
         text.t("sessions.closeOthers"),
       )}</button></div>`
     : "";
-  return settingsCard(
+  return `<div class="sessions-list">
+      <div class="sessions-head" aria-hidden="true"><span>${escapeHTML(text.t("sessions.colDevice"))}</span><span>${escapeHTML(
+        text.t("sessions.colAddress"),
+      )}</span><span>${escapeHTML(text.t("sessions.colSeen"))}</span><span></span></div>
+      ${sessionsInOrder(sessions)
+        .map((s) => sessionRow(s, text))
+        .join("")}
+    </div>
+    <p class="form-error" data-sessions-error role="alert" hidden></p>
+    ${others}`;
+}
+
+/**
+ * Where this account is signed in, on the profile: how many, and the way to the list. The list itself
+ * is a dialog, so a long one does not stretch the page.
+ */
+export function sessionsCard(sessions: SessionRow[], text: Text): string {
+  const count = String(sessions.length);
+  return `${settingsCard(
     text.t("sessions.title"),
-    `<ul class="settings-list sessions">${rows}</ul>${others}<p class="form-error" data-sessions-error role="alert" hidden></p>`,
+    `<div class="sessions-summary">
+      <p data-sessions-count>${escapeHTML(text.t("sessions.count", { count }))}</p>
+      <button class="button" type="button" data-open-modal="sessions-modal">${escapeHTML(text.t("sessions.manage"))}</button>
+    </div>`,
     { lead: text.t("sessions.lead") },
-  );
+  )}
+  <dialog class="modal ov-modal sessions-modal" id="sessions-modal" aria-labelledby="sessions-modal-title">
+    <header class="ov-modal-head">
+      <h2 id="sessions-modal-title">${escapeHTML(text.t("sessions.title"))}</h2>
+      <span class="ov-chip" data-sessions-chip>${escapeHTML(count)}</span>
+      <button type="button" class="icon-button" data-close aria-label="${escapeAttr(text.t("action.close"))}">${icons.close()}</button>
+    </header>
+    <div class="ov-modal-body" data-sessions-body>${sessionsList(sessions, text)}</div>
+  </dialog>`;
 }
 
 /**

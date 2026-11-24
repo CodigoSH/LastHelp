@@ -193,7 +193,7 @@ func TestPurgeRemovesOnlyWhatExpired(t *testing.T) {
 var firefox = Device{UserAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0", IP: "192.0.2.7"}
 
 // The list says where each session was opened from, and what it says about one
-// moves with it only once an hour, which is when the expiry slides too.
+// moves with it at most once a minute, which is when the expiry slides too.
 func TestTheListShowsTheDeviceAndFollowsItHourly(t *testing.T) {
 	s := store(t)
 	token, err := s.Create(7, epoch, 24*time.Hour, firefox)
@@ -217,7 +217,7 @@ func TestTheListShowsTheDeviceAndFollowsItHourly(t *testing.T) {
 		t.Errorf("the token resolved to session %q, the list names it %q", found.ID, list[0].ID)
 	}
 	if list, _ = s.List(7, epoch); list[0].IP != firefox.IP {
-		t.Errorf("a minute later the address is %q, want it unchanged", list[0].IP)
+		t.Errorf("within the minute the address is %q, want it unchanged", list[0].IP)
 	}
 	if _, err := s.Resolve(token, epoch.Add(2*time.Hour), 24*time.Hour, phone); err != nil {
 		t.Fatal(err)

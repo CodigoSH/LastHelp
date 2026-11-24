@@ -40,6 +40,9 @@ type Device struct {
 	IP        string
 }
 
+// touchEvery is how often a session in use writes down that it was seen.
+const touchEvery = time.Minute
+
 // maxUserAgent caps what is kept of a browser's description. A real one is a
 // few hundred characters; the header is the caller's to fill with anything.
 const maxUserAgent = 512
@@ -109,13 +112,12 @@ func (s Store) Create(userID int64, now time.Time, ttl time.Duration, on Device)
 //
 // It also slides the expiry forward, so somebody using the panel every day is
 // not signed out on the thirtieth, and notes the browser and address it came
-// from for the list of sessions. The write is skipped when nothing would
-// change by more than an hour, because a session lookup happens on every
-// request and this is the one that would otherwise be a write on every one;
-// so the address in the list is the one of the last hour, not of this second.
+// from for the list of sessions. The write is skipped within a minute of the
+// last one, because a session lookup happens on every request and this is the
+// one that would otherwise be a write on every one; a minute is still fine
+// enough for the list to say which sessions are in use right now.
 // A session that does not know its browser yet — one opened before the list
-// existed — is written once on its next use, so the list does not call it an
-// unknown device for an hour after an update.
+// existed — is written on its next use, whatever the time.
 func (s Store) Resolve(token string, now time.Time, ttl time.Duration, from Device) (Found, error) {
 	if token == "" {
 		return Found{}, ErrInvalid
@@ -150,7 +152,7 @@ func (s Store) Resolve(token string, now time.Time, ttl time.Duration, from Devi
 		return Found{}, ErrInvalid
 	}
 
-	if now.Unix()-lastSeen > int64(time.Hour.Seconds()) || (agent == "" && from.UserAgent != "") {
+	if now.Unix()-lastSeen > int64(touchEvery.Seconds()) || (agent == "" && from.UserAgent != "") {
 		from = from.clean()
 		_, _ = s.DB.Exec(`UPDATE session SET last_seen = ?, expires_at = ?, user_agent = ?, ip = ? WHERE token_hash = ?`,
 			now.Unix(), now.Add(ttl).Unix(), from.UserAgent, from.IP, hash)

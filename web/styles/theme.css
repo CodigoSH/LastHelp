@@ -5866,6 +5866,48 @@ a.ov-row:hover { background: var(--surface-dim); }
 }
 
 .ov-modal-body > * { flex-shrink: 0; }
+
+/* Active sessions: on the profile, how many and the way in; in the dialog, one line per sign-in in
+   columns under their heads, which scroll when there are many. The device is the column that gives
+   way, so the button and the tag at the end keep their words whole in any language. */
+.sessions-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.sessions-summary p { margin: 0; color: var(--text-dim); }
+.sessions-summary .button { flex: none; }
+.sessions-modal .ov-modal-body { gap: 0; }
+/* One grid for the head and every line, each line a subgrid of it, so a column is as wide as its widest
+   cell from the head to the last line and the heads stand over what they name. */
+.sessions-list { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; column-gap: 18px; row-gap: 6px; }
+.sessions-head,
+.sessions-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
+.sessions-head { padding: 4px 13px 2px; font: 600 10.5px/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); }
+.sessions-row { min-block-size: 52px; padding: 6px 12px; border: 1px solid var(--card-border); border-radius: 10px; background: var(--panel); }
+.sessions-row.is-current { border-color: var(--accent-line); background: var(--accent-wash); }
+.sessions-row__who { display: flex; align-items: center; gap: 10px; min-inline-size: 0; }
+.sessions-dot { flex: none; inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--text-dim); opacity: 0.35; }
+.sessions-dot--on { background: var(--success-color); opacity: 1; box-shadow: 0 0 0 3px rgba(var(--success-rgb), 0.16); }
+.sessions-row__device { min-inline-size: 0; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.sessions-row__ip { overflow: hidden; font: 500 12px/1.3 var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+/* The address is a run of digits read left to right; in a right-to-left page it still sits at its column's start. */
+[dir="rtl"] .sessions-row__ip { text-align: end; }
+.sessions-row__seen { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
+.sessions-row__act { display: flex; justify-content: flex-end; }
+.sessions-row__act .button,
+.sessions-row__act .mono-tag { min-inline-size: 128px; text-align: center; white-space: nowrap; box-sizing: border-box; }
+.sessions-modal .ov-modal-foot { margin-block-start: 16px; }
+.sessions-modal .form-error { margin: 10px 0 0; }
+
+@media (max-width: 40rem) {
+  .sessions-head { display: none; }
+  .sessions-list { display: flex; flex-direction: column; gap: 6px; }
+  .sessions-row { grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; row-gap: 2px; padding-block: 8px; }
+  .sessions-row__who { grid-column: 1 / -1; }
+  .sessions-row__ip,
+  .sessions-row__seen { grid-column: 1; }
+  .sessions-row__act { grid-column: 2; grid-row: 2 / span 2; }
+  .sessions-row__act .button,
+  .sessions-row__act .mono-tag { min-inline-size: 0; }
+  .sessions-modal .ov-modal-foot .button { inline-size: 100%; }
+}
 .ov-modal-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 16px; }
 .ov-sub { margin: 4px 0 -4px; font: 700 10px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
 .ov-box-foot { display: flex; justify-content: flex-end; margin-block-start: 10px; }
@@ -7574,9 +7616,6 @@ button.ov-unit { inline-size: 100%; font: inherit; text-align: start; cursor: po
   .settings-row:has(> .toggle) { grid-template-columns: minmax(0, 1fr) auto; }
   .profile-head { flex-direction: column; align-items: flex-start; }
   .si-tags { display: none; }
-  /* Except where the tag is the point of the row: which session is this browser. That row has no
-     button, so the tag takes the place the button would. */
-  .sessions .si-tags { display: flex; white-space: nowrap; }
 }
 
 /* The logo is a square tile with a border beside the name, not a round

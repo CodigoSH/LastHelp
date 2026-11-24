@@ -890,33 +890,48 @@ async function showProfile(): Promise<void> {
   });
 }
 
-/** Signing out one of this account's other browsers, or all of them. */
+/**
+ * Signing out one of this account's other browsers, or all of them, from the sessions dialog. The
+ * dialog stays open and is drawn again from the server's answer, with the count on the card and on
+ * the dialog's head, so what is left is what the list shows.
+ */
 function wireSessions(): void {
+  const body = root?.querySelector<HTMLElement>("[data-sessions-body]");
+  if (!body) return;
   const fail = (err: unknown) => {
-    const line = root?.querySelector<HTMLParagraphElement>("[data-sessions-error]");
+    const line = body.querySelector<HTMLParagraphElement>("[data-sessions-error]");
     if (!line) return;
     line.textContent = i18n.t(err instanceof ApiError ? err.key : "error.internal");
     line.hidden = false;
   };
-  root?.querySelectorAll<HTMLButtonElement>("[data-session-close]").forEach((button) =>
-    button.addEventListener("click", async () => {
-      const device = button.dataset.device ?? "";
-      if (!(await askConfirm(i18n.t("sessions.close"), i18n.t("sessions.closeOneConfirm", { device })))) return;
-      try {
-        await api.del(`/api/sessions/${encodeURIComponent(button.dataset.sessionClose ?? "")}`);
-        await showProfile();
-        toast(i18n.t("sessions.closed"));
-      } catch (err) {
-        fail(err);
-      }
-    }),
-  );
-  root?.querySelector<HTMLButtonElement>("[data-sessions-close-others]")?.addEventListener("click", async () => {
-    if (!(await askConfirm(i18n.t("sessions.closeOthers"), i18n.t("sessions.closeOthersConfirm")))) return;
+  const redraw = async () => {
+    const { sessions } = await api.get<{ sessions: views.SessionRow[] }>("/api/sessions");
+    body.innerHTML = views.sessionsList(sessions, text);
+    const count = String(sessions.length);
+    const chip = root?.querySelector<HTMLElement>("[data-sessions-chip]");
+    if (chip) chip.textContent = count;
+    const line = root?.querySelector<HTMLElement>("[data-sessions-count]");
+    if (line) line.textContent = i18n.t("sessions.count", { count });
+  };
+  // One listener on the dialog's body, so a list drawn again needs no wiring of its own.
+  body.addEventListener("click", async (event) => {
+    const target = event.target as HTMLElement | null;
+    const one = target?.closest<HTMLButtonElement>("[data-session-close]");
+    const all = target?.closest<HTMLButtonElement>("[data-sessions-close-others]");
+    if (!one && !all) return;
     try {
-      await api.post("/api/sessions/close-others", {});
-      await showProfile();
-      toast(i18n.t("sessions.closedOthers"));
+      if (one) {
+        const device = one.dataset.device ?? "";
+        if (!(await askConfirm(i18n.t("sessions.close"), i18n.t("sessions.closeOneConfirm", { device })))) return;
+        await api.del(`/api/sessions/${encodeURIComponent(one.dataset.sessionClose ?? "")}`);
+        await redraw();
+        toast(i18n.t("sessions.closed"));
+      } else {
+        if (!(await askConfirm(i18n.t("sessions.closeOthers"), i18n.t("sessions.closeOthersConfirm")))) return;
+        await api.post("/api/sessions/close-others", {});
+        await redraw();
+        toast(i18n.t("sessions.closedOthers"));
+      }
     } catch (err) {
       fail(err);
     }
