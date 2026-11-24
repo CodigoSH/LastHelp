@@ -504,6 +504,9 @@ async function showInShell(content: string, path: string): Promise<void> {
     inside.repos = (body.repositories ?? []).map((r) => ({ slug: r.slug, name: r.name }));
   }
 
+  // Where the phone's menu band was scrolled to, so drawing the next screen does not throw it back to
+  // its start under the finger that just chose a place on it.
+  const bandAt = root?.querySelector<HTMLElement>(".side-band")?.scrollLeft;
   if (root) {
     root.innerHTML = views.adminShell(
       {
@@ -538,6 +541,54 @@ async function showInShell(content: string, path: string): Promise<void> {
   }
   attachPasswordToggles(root);
   wireShell();
+  watchSideBand(bandAt);
+}
+
+/**
+ * Says which way the menu band still has places, on a phone, so its edge can fade there and stop
+ * pretending the list ends at the screen.
+ *
+ * Asked of the boxes rather than of scrollLeft, whose value at the far edge of a mirrored page differs
+ * between engines; and of the far ends of the row rather than of the first and last link, which swap
+ * sides when the page is mirrored. On a wide screen the band has no box and no style uses the classes.
+ */
+function watchSideBand(at?: number): void {
+  const band = root?.querySelector<HTMLElement>(".side-band");
+  if (!band) return;
+  const update = () => {
+    const links = band.querySelectorAll<HTMLElement>(".side-item");
+    if (links.length === 0) return;
+    const view = band.getBoundingClientRect();
+    let left = Infinity;
+    let right = -Infinity;
+    links.forEach((link) => {
+      const box = link.getBoundingClientRect();
+      left = Math.min(left, box.left);
+      right = Math.max(right, box.right);
+    });
+    // A pixel of slack: rounding alone should not draw a fade over nothing.
+    band.classList.toggle("side-band--fade-left", left < view.left - 1);
+    band.classList.toggle("side-band--fade-right", right > view.right + 1);
+  };
+  band.addEventListener("scroll", update, { passive: true });
+  // Only on a phone, where the band scrolls; on a wide screen the column already shows every place.
+  if (getComputedStyle(band).display !== "contents") {
+    // The band stays where it was: the value is put back as it was read from the same kind of box, so
+    // its sign on a mirrored page is whatever this engine uses and needs no reading.
+    if (at !== undefined) band.scrollLeft = at;
+    // And the screen you are on is somewhere in view. A link just tapped always is, even half under
+    // the edge, so the band does not move then; it moves only when the place is wholly out of sight —
+    // on arriving, or reached some other way than by its link.
+    const here = band.querySelector<HTMLElement>('[aria-current="page"]');
+    if (here) {
+      const box = here.getBoundingClientRect();
+      const view = band.getBoundingClientRect();
+      if (box.right <= view.left || box.left >= view.right) here.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }
+  // Fonts and the picture land after the first paint and move the ends.
+  requestAnimationFrame(update);
+  setTimeout(update, 300);
 }
 
 /**

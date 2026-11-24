@@ -3402,6 +3402,10 @@ body.admin-view > main {
   background: rgba(var(--accent-rgb), 0.2);
 }
 
+/* On a wide screen the band is no box at all: the column lays out its links as
+   if it were not there. */
+.side-band { display: contents; }
+
 .side-foot {
   margin-top: auto;
   padding-top: 1rem;
@@ -3460,19 +3464,54 @@ body.admin-view > main {
     block-size: auto;
     flex-direction: row;
     align-items: center;
-    gap: 0.4rem;
-    overflow-x: auto;
+    gap: 4px;
+    overflow: visible;
+    /* A grid item is as wide as its content unless told otherwise, and the
+       band's content is every link side by side: without this the page grew
+       to the band's full length instead of the band scrolling. */
+    min-inline-size: 0;
     border-inline-end: 0;
     border-block-end: 1px solid var(--border);
-    padding: 0.6rem 0.75rem;
+    padding: 0 8px;
   }
 
-  /* In a strip there is no room for the header: the name is on the Profile
-     screen anyway, and a band only has space for the places to go. */
-  .side-head,
+  /* The band: the picture of who is acting at its start, the places to go in
+     the middle, which scroll, and sign out pinned in the far corner. The name
+     and the role are on the Profile screen anyway; in a band they only take
+     the room the places need. */
+  .side-head {
+    flex-direction: row;
+    margin: 0;
+    padding: 8px 4px 8px 0;
+    border: 0;
+  }
+
+  .side-head .avatar {
+    inline-size: 32px;
+    block-size: 32px;
+    font-size: 13px;
+    margin: 0;
+  }
+
+  .side-head .who,
+  .side-role,
   .side-label {
     display: none;
   }
+
+  .side-band {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1;
+    min-inline-size: 0;
+    padding-block: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .side-band::-webkit-scrollbar { display: none; }
 
   .side-item {
     white-space: nowrap;
@@ -3512,18 +3551,43 @@ body.admin-view > main {
     white-space: nowrap;
   }
 
-  /* To the end of the strip, in the reading direction: a physical left margin
-     would push it the wrong way in Arabic. */
+  /* Sign out stays in this corner rather than riding the band with the
+     places: in the band it would scroll out of sight with them, and finding
+     it would mean looking for it. Only its icon fits, so it takes its size
+     from the box: 44px, the smallest target a finger hits reliably. */
   .side-foot {
     margin: 0;
-    margin-inline-start: auto;
-    padding: 0;
+    padding: 8px 0;
+    padding-inline-start: 8px;
     border: 0;
-    grid-auto-flow: column;
-    align-items: center;
+    border-inline-start: 1px solid var(--border);
   }
 
-  .side-foot .link { white-space: nowrap; }
+  .side .side-foot .link {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .side-foot .link span { display: none; }
+
+  /* Measured at 375px: the band shows a third of its places with nothing
+     saying there are more. The edge fades on whichever side still holds some,
+     and stops once that side is reached. Physical names on purpose: the class
+     is set from the boxes themselves rather than from scrollLeft, which each
+     engine counts its own way when the page is mirrored. */
+  .side-band--fade-right {
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+
+  .side-band--fade-left {
+    mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+  }
+
+  .side-band--fade-left.side-band--fade-right {
+    mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  }
 }
 
 /* The theme choice: three tiles with a drawing on each, the chosen one outlined

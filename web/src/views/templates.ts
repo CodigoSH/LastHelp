@@ -1854,6 +1854,9 @@ export function adminShell(spec: ShellSpec, text: Text): string {
         <span class="who">${escapeHTML(spec.who)}</span>
         ${spec.role ? `<span class="side-role">${escapeHTML(spec.role)}</span>` : ""}
       </div>
+      <!-- The places to go. A wrapper with no box on a wide screen; on a phone it is the part of the
+           band that scrolls, between the picture and sign out, which stay where they are. -->
+      <div class="side-band">
       <nav aria-label="${escapeAttr(text.t("nav.panel"))}">
         ${group(
           text.t("shell.groupWork"),
@@ -1893,8 +1896,12 @@ export function adminShell(spec: ShellSpec, text: Text): string {
       <a class="side-item side-public" href="/">
         ${icons.open()}<span>${escapeHTML(text.t("shell.publicSite"))}</span>
       </a>
+      </div>
       <div class="side-foot">
-        <button class="link with-icon" data-signout>${icons.signOut(16)}<span>${escapeHTML(text.t("nav.signOut"))}</span></button>
+        <!-- Named on the button itself: on a phone only its icon shows. -->
+        <button class="link with-icon" data-signout aria-label="${escapeAttr(text.t("nav.signOut"))}" title="${escapeAttr(
+          text.t("nav.signOut"),
+        )}">${icons.signOut(16)}<span>${escapeHTML(text.t("nav.signOut"))}</span></button>
       </div>
     </aside>
     <main class="admin-main">${spec.content}</main>
