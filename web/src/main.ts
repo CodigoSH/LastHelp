@@ -1315,7 +1315,7 @@ function showAttention(items: views.AttentionItem[]): void {
 function wireAttention(_items: views.AttentionItem[], facts: views.ServerFacts): void {
   root?.addEventListener("keydown", (event) => {
     const card = (event.target as HTMLElement).closest<HTMLElement>("[data-attention][data-open-modal]");
-    if (!card || (event.key !== "Enter" && event.key !== " ")) return;
+    if (!card || (!isEnter(event) && event.key !== " ")) return;
     event.preventDefault();
     root?.querySelector<HTMLDialogElement>("#attention-modal")?.showModal();
   });
