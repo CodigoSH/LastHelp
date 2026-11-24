@@ -22,6 +22,7 @@
   "about.proxyYes": "ہاں (ہاپس: {hops})",
   "about.publicUrl": "عوامی پتہ",
   "about.mail": "باہر جانے والی ای میل",
+  "about.authProxy": "لاگ ان پراکسی",
   "about.outbound": "بیرونی کنکشن",
   "about.https": "HTTPS",
   "about.yes": "ہاں",

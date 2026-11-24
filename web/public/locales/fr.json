@@ -22,6 +22,7 @@
   "about.proxyYes": "Oui (sauts : {hops})",
   "about.publicUrl": "Adresse publique",
   "about.mail": "Courriel sortant",
+  "about.authProxy": "Proxy de connexion",
   "about.outbound": "Connexions sortantes",
   "about.https": "HTTPS",
   "about.yes": "Oui",

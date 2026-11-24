@@ -22,6 +22,7 @@
   "about.proxyYes": "Ja (Sprünge: {hops})",
   "about.publicUrl": "Öffentliche Adresse",
   "about.mail": "Ausgehende E-Mail",
+  "about.authProxy": "Anmelde-Proxy",
   "about.outbound": "Ausgehende Verbindungen",
   "about.https": "HTTPS",
   "about.yes": "Ja",

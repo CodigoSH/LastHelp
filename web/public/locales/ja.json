@@ -22,6 +22,7 @@
   "about.proxyYes": "あり（ホップ数: {hops}）",
   "about.publicUrl": "公開アドレス",
   "about.mail": "送信メール",
+  "about.authProxy": "ログインプロキシ",
   "about.outbound": "外部への接続",
   "about.https": "HTTPS",
   "about.yes": "はい",

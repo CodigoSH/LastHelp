@@ -22,6 +22,7 @@
   "about.proxyYes": "হ্যাঁ (হপ: {hops})",
   "about.publicUrl": "পাবলিক ঠিকানা",
   "about.mail": "বহির্গামী মেইল",
+  "about.authProxy": "সাইন-ইন প্রক্সি",
   "about.outbound": "বহির্গামী সংযোগ",
   "about.https": "HTTPS",
   "about.yes": "হ্যাঁ",

@@ -11,6 +11,30 @@ import (
 
 var envVar = regexp.MustCompile(`"(LASTHELP_[A-Z0-9_]+)"`)
 
+// configSource is the code of the one package allowed to read the environment,
+// every file of it but the tests: a setting read in a file of its own is still
+// a setting the binary reads.
+func configSource(t *testing.T, root string) string {
+	t.Helper()
+	dir := filepath.Join(root, "internal/platform/config")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		code, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.Write(code)
+	}
+	return b.String()
+}
+
 // TestEverySettingIsDocumented.
 //
 // The failure this prevents has happened in this house: ten environment
@@ -23,13 +47,10 @@ var envVar = regexp.MustCompile(`"(LASTHELP_[A-Z0-9_]+)"`)
 func TestEverySettingIsDocumented(t *testing.T) {
 	root := repoRoot(t)
 
-	source, err := os.ReadFile(filepath.Join(root, "internal/platform/config/config.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	source := configSource(t, root)
 
 	seen := map[string]bool{}
-	for _, match := range envVar.FindAllStringSubmatch(string(source), -1) {
+	for _, match := range envVar.FindAllStringSubmatch(source, -1) {
 		seen[match[1]] = true
 	}
 	if len(seen) == 0 {
@@ -65,10 +86,7 @@ func TestEverySettingIsDocumented(t *testing.T) {
 func TestTheExampleDoesNotInventSettings(t *testing.T) {
 	root := repoRoot(t)
 
-	source, err := os.ReadFile(filepath.Join(root, "internal/platform/config/config.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	source := configSource(t, root)
 	example, err := os.ReadFile(filepath.Join(root, ".env.example"))
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +96,7 @@ func TestTheExampleDoesNotInventSettings(t *testing.T) {
 
 	var invented []string
 	for _, match := range declared.FindAllStringSubmatch(string(example), -1) {
-		if !strings.Contains(string(source), `"`+match[1]+`"`) {
+		if !strings.Contains(source, `"`+match[1]+`"`) {
 			invented = append(invented, match[1])
 		}
 	}

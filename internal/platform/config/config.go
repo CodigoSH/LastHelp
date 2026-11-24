@@ -66,13 +66,23 @@ type Config struct {
 	// so it never reaches a process started later, where the number would mean
 	// something else.
 	ListenFD string
+
+	// AuthProxy is signing in through a proxy in front that has already signed
+	// the person in; off unless its header and its addresses are both set.
+	AuthProxy AuthProxy
+	// Problems are the settings that were set and could not be used, in
+	// sentences for the log at start.
+	Problems []string
 }
 
 // Load reads the environment. It never fails: every value has a working
 // default, because a server that refuses to start over an unset variable is a
 // server that gets started with the variable set to something wrong.
 func Load() Config {
+	proxy, problems := ReadAuthProxy(os.Getenv)
 	return Config{
+		AuthProxy:      proxy,
+		Problems:       problems,
 		Addr:           addr(),
 		DBFile:         str("LASTHELP_DB_FILE", "lasthelp.db"),
 		KeyFile:        keyFile(),

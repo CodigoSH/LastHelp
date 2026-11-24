@@ -53,6 +53,13 @@ func (c *testClock) advance(d time.Duration) {
 
 func newInstance(t *testing.T) *instance {
 	t.Helper()
+	return newInstanceWith(t, nil)
+}
+
+// newInstanceWith is newInstance with the configuration changed first, for the
+// tests of a setting that is off by default.
+func newInstanceWith(t *testing.T, change func(*config.Config)) *instance {
+	t.Helper()
 
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	db, err := database.Open(dbPath)
@@ -66,10 +73,14 @@ func newInstance(t *testing.T) *instance {
 	// DBFile as well as the key file: the About screen stats it to report how
 	// large the database has grown, and a harness that leaves it empty is a
 	// harness where that screen is tested against a path that does not exist.
-	srv, err := New(config.Config{
+	cfg := config.Config{
 		DBFile:  dbPath,
 		KeyFile: filepath.Join(filepath.Dir(dbPath), "test.key"),
-	}, db)
+	}
+	if change != nil {
+		change(&cfg)
+	}
+	srv, err := New(cfg, db)
 	if err != nil {
 		t.Fatal(err)
 	}

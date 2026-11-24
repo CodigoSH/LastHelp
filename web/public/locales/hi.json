@@ -22,6 +22,7 @@
   "about.proxyYes": "हाँ (हॉप: {hops})",
   "about.publicUrl": "सार्वजनिक पता",
   "about.mail": "बाहर जाने वाला मेल",
+  "about.authProxy": "साइन-इन प्रॉक्सी",
   "about.outbound": "बाहरी कनेक्शन",
   "about.https": "HTTPS",
   "about.yes": "हाँ",

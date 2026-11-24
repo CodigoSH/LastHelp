@@ -347,7 +347,7 @@ function renderNav(): void {
   );
 
   nav.querySelector<HTMLButtonElement>("[data-signout]")?.addEventListener("click", async () => {
-    await api.del("/api/session").catch(() => undefined);
+    if (await signOut()) return;
     me = null;
     go("/");
   });
@@ -623,10 +623,25 @@ async function loadInstance(): Promise<void> {
   applyAccent(instanceAccent);
 }
 
+/**
+ * Ends the session. Behind a proxy that signs people in, the server answers with the proxy's own
+ * sign-out, which the page goes on to — signing out here alone would be undone by the next request —
+ * and says so, so the caller does not draw a screen that is about to be left.
+ */
+async function signOut(): Promise<boolean> {
+  const answer = await api.del<{ logout_url?: string } | undefined>("/api/session").catch(() => undefined);
+  const next = answer?.logout_url;
+  if (next && /^https?:\/\//i.test(next)) {
+    window.location.href = next;
+    return true;
+  }
+  return false;
+}
+
 /** The controls that live in the shell rather than in any one screen. */
 function wireShell(): void {
   root?.querySelector<HTMLButtonElement>(".side [data-signout]")?.addEventListener("click", async () => {
-    await api.del("/api/session").catch(() => undefined);
+    if (await signOut()) return;
     me = null;
     instanceName = "";
     go("/");

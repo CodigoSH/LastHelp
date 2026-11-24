@@ -9,6 +9,7 @@ import (
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/account"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/session"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
 )
 
 // SessionCookie carries the token. HttpOnly so no script can read it, SameSite
@@ -29,6 +30,10 @@ type Authenticator struct {
 	// Device says which browser and address a request came from, for the
 	// account's list of sessions.
 	Device func(*http.Request) session.Device
+	// Proxy is signing in through a proxy in front, when the operator turned
+	// it on; Secure says whether a request came over TLS, for the cookie it opens.
+	Proxy  config.AuthProxy
+	Secure func(*http.Request) bool
 }
 
 // Attach reads the session if there is one and puts the actor on the context.
@@ -36,6 +41,9 @@ type Authenticator struct {
 // one, and [RequireActor] is what closes the door where the door belongs.
 func (a Authenticator) Attach(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if a.proxied(w, r, next) {
+			return
+		}
 		cookie, err := r.Cookie(SessionCookie)
 		if err != nil || cookie.Value == "" {
 			next.ServeHTTP(w, r)

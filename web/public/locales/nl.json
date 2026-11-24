@@ -22,6 +22,7 @@
   "about.proxyYes": "Ja (sprongen: {hops})",
   "about.publicUrl": "Openbaar adres",
   "about.mail": "Uitgaande e-mail",
+  "about.authProxy": "Aanmeldproxy",
   "about.outbound": "Uitgaande verbindingen",
   "about.https": "HTTPS",
   "about.yes": "Ja",

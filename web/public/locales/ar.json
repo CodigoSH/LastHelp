@@ -22,6 +22,7 @@
   "about.proxyYes": "نعم (القفزات: {hops})",
   "about.publicUrl": "العنوان العام",
   "about.mail": "البريد الصادر",
+  "about.authProxy": "وكيل تسجيل الدخول",
   "about.outbound": "الاتصالات الصادرة",
   "about.https": "HTTPS",
   "about.yes": "نعم",

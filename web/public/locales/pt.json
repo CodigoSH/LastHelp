@@ -22,6 +22,7 @@
   "about.proxyYes": "Sim (saltos: {hops})",
   "about.publicUrl": "Endereço público",
   "about.mail": "Correio de saída",
+  "about.authProxy": "Proxy de login",
   "about.outbound": "Ligações de saída",
   "about.https": "HTTPS",
   "about.yes": "Sim",

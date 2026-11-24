@@ -4837,7 +4837,7 @@ export interface ServerFacts {
   /** The machine, where the system says. */
   host?: { cpu_percent: number; cores: number; mem_total_bytes: number; mem_used_bytes: number };
   /** How the server is set up, as far as it changes what people get. */
-  config?: { trust_proxy: boolean; proxy_hops: number; public_url: string; mail: boolean; offline: boolean; https: boolean };
+  config?: { trust_proxy: boolean; proxy_hops: number; public_url: string; mail: boolean; auth_proxy?: boolean; offline: boolean; https: boolean };
 }
 
 /** One thing the administrator should know and can fix, as the server lists it. */
@@ -5039,6 +5039,7 @@ export function serverDialog(facts: ServerFacts, text: Text): string {
         row(text.t("about.proxyRow"), state(c.trust_proxy, c.trust_proxy ? text.t("about.proxyYes", { hops: text.number(c.proxy_hops) }) : text.t("about.no"))),
         row(text.t("about.publicUrl"), c.public_url ? `${state(true, "")}<span dir="ltr">${escapeHTML(c.public_url)}</span>` : state(false, text.t("about.notSet"))),
         row(text.t("about.mail"), state(c.mail, text.t(c.mail ? "about.set" : "about.notSet"))),
+        row(text.t("about.authProxy"), state(!!c.auth_proxy, text.t(c.auth_proxy ? "about.set" : "about.notSet"))),
         row(text.t("about.outbound"), state(!c.offline, text.t(c.offline ? "about.off" : "about.on"))),
         row(text.t("about.https"), state(c.https, text.t(c.https ? "about.yes" : "about.no"))),
       ]

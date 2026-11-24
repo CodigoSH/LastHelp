@@ -166,6 +166,12 @@ func (s *Server) handleSignOut(w http.ResponseWriter, r *http.Request) {
 		Secure:   s.isSecure(r),
 		SameSite: http.SameSiteLaxMode,
 	})
+	// Behind a proxy that signs people in, signing out here alone would be
+	// undone by the next request: the page goes on to the proxy's own sign-out.
+	if s.cfg.AuthProxy.LogoutURL != "" && middleware.FromAuthProxy(s.cfg.AuthProxy, r) {
+		writeJSON(w, http.StatusOK, map[string]string{"logout_url": s.cfg.AuthProxy.LogoutURL})
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 

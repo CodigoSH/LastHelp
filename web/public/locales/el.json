@@ -22,6 +22,7 @@
   "about.proxyYes": "Ναι (βήματα: {hops})",
   "about.publicUrl": "Δημόσια διεύθυνση",
   "about.mail": "Εξερχόμενη αλληλογραφία",
+  "about.authProxy": "Διακομιστής μεσολάβησης σύνδεσης",
   "about.outbound": "Εξερχόμενες συνδέσεις",
   "about.https": "HTTPS",
   "about.yes": "Ναι",

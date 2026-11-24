@@ -474,6 +474,8 @@ func (s *Server) wrap() http.Handler {
 		Accounts: s.accounts(),
 		Now:      s.now,
 		Device:   s.deviceOf,
+		Proxy:    s.cfg.AuthProxy,
+		Secure:   s.isSecure,
 	}
 
 	var h http.Handler = s.mux

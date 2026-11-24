@@ -51,6 +51,9 @@ func main() {
 
 	slog.Info("starting LastHelp",
 		"version", version.Current, "commit", version.Commit, "addr", cfg.Addr, "database", cfg.DBFile)
+	for _, problem := range cfg.Problems {
+		slog.Warn("configuration ignored", "problem", problem)
+	}
 
 	// Opening also migrates. A schema problem should stop the server here,
 	// where the message is read, rather than on somebody's first request.

@@ -22,6 +22,7 @@
   "about.proxyYes": "بله (گام‌ها: {hops})",
   "about.publicUrl": "نشانی عمومی",
   "about.mail": "ایمیل خروجی",
+  "about.authProxy": "پراکسی ورود",
   "about.outbound": "اتصال‌های خروجی",
   "about.https": "HTTPS",
   "about.yes": "بله",

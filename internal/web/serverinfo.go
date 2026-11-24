@@ -86,6 +86,7 @@ func (s *Server) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 		"proxy_hops":  s.cfg.TrustProxyHops,
 		"public_url":  s.cfg.PublicURL,
 		"mail":        s.cfg.Mail.Host != "",
+		"auth_proxy":  s.cfg.AuthProxy.Enabled(),
 		"offline":     s.cfg.Offline,
 		"https":       s.isSecure(r),
 	}

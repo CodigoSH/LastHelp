@@ -22,6 +22,7 @@
   "about.proxyYes": "Tak (przeskoki: {hops})",
   "about.publicUrl": "Adres publiczny",
   "about.mail": "Poczta wychodząca",
+  "about.authProxy": "Proxy logowania",
   "about.outbound": "Połączenia wychodzące",
   "about.https": "HTTPS",
   "about.yes": "Tak",

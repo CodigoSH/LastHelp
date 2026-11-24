@@ -22,6 +22,7 @@
   "about.proxyYes": "Да (переходов: {hops})",
   "about.publicUrl": "Публичный адрес",
   "about.mail": "Исходящая почта",
+  "about.authProxy": "Прокси входа",
   "about.outbound": "Исходящие соединения",
   "about.https": "HTTPS",
   "about.yes": "Да",

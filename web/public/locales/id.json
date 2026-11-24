@@ -22,6 +22,7 @@
   "about.proxyYes": "Ya (lompatan: {hops})",
   "about.publicUrl": "Alamat publik",
   "about.mail": "Surel keluar",
+  "about.authProxy": "Proxy masuk",
   "about.outbound": "Koneksi keluar",
   "about.https": "HTTPS",
   "about.yes": "Ya",

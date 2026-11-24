@@ -22,6 +22,7 @@
   "about.proxyYes": "Evet (atlama: {hops})",
   "about.publicUrl": "Genel adres",
   "about.mail": "Giden e-posta",
+  "about.authProxy": "Giriş proxy'si",
   "about.outbound": "Giden bağlantılar",
   "about.https": "HTTPS",
   "about.yes": "Evet",
