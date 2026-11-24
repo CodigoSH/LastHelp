@@ -146,10 +146,13 @@ services:
     volumes:
       - lasthelp-data:/data
     environment:
-      # Turn this on only when a reverse proxy really is in front. With it on
-      # and no proxy there, the caller chooses the address we attribute their
-      # requests to, and the rate limits stop meaning anything.
+      # "true" when people reach it through a reverse proxy or a tunnel
+      # (Nginx, Nginx Proxy Manager, Caddy, Traefik, Pangolin, Cloudflare
+      # Tunnel...). With it on and nothing in front, the caller chooses the
+      # address we attribute their requests to.
       LASTHELP_TRUST_PROXY: "false"
+      # How many of them a request passes through: 1, unless two are chained.
+      LASTHELP_TRUST_PROXY_HOPS: "1"
     logging:
       driver: "json-file"
       options:
@@ -184,7 +187,7 @@ Run this command to install or update LastHelp:
 curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh | sudo sh
 ```
 
-It asks which port to use, which release channel to follow and whether a reverse proxy is in front, and remembers all three the next time you run it. The default channel is stable; answer `beta` to follow prereleases. Without a terminal to ask on — a container, a cron job — every answer is its default and `LASTHELP_CHANNEL=beta` supplies that one.
+It asks which port to use, which release channel to follow and whether a reverse proxy or a tunnel is in front (and through how many a request passes), and remembers the answers the next time you run it. The default channel is stable; answer `beta` to follow prereleases. Without a terminal to ask on — a container, a cron job — every answer is its default and `LASTHELP_CHANNEL=beta` supplies that one.
 
 It verifies the signature over the checksums before anything reaches the disk, installs a systemd service, keeps the database in `/var/lib/lasthelp` and serves on port 8080 unless you answer otherwise when it asks. **The first account created is the administrator**: open the address it prints and claim the instance — a server with somebody in it cannot be claimed again.
 

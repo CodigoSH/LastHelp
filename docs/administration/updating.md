@@ -24,6 +24,35 @@ The release channel is the switch just below. Following betas is remembered on
 the server rather than in a browser, because a setting that forgets itself
 between visits is one nobody trusts.
 
+Beside the version, **Needs you** says **All in order** or lists what the server
+has measured needs a hand, worst first, each with why it matters and the one
+thing to do; **See all** opens the whole list. Only problems the server sees go
+in it, never suggestions:
+
+- **The disk is almost full** — with a quarter of it or less free it turns
+  amber, with a tenth or less red. The database, and the copy taken before each
+  update, need room.
+- **Deliveries that failed** — what the server gave up on after trying again (a
+  notification to the team, a mail to a reporter, an issue opened on the forge),
+  with the last error.
+- **A proxy is in front and was not declared** — see
+  [`LASTHELP_TRUST_PROXY`](../getting-started/install.md#about-lasthelp_trust_proxy).
+- **The public address is missing** — an organization is connected to a forge
+  but `LASTHELP_PUBLIC_URL` is empty, so the issues it opens carry no link back
+  to the report.
+- **Reached without HTTPS** — somebody opened LastHelp over plain `http://`
+  from another machine, so session cookies are not marked secure.
+- **A new version is out**, with the way to the update.
+
+**Server details**, a discreet button in the corner of the version card, shows
+the machine (CPU, memory, disk, uptime), the installation (version, database
+size and schema, LastHelp's own memory, platform) and the configuration: the
+proxy in front and its hops, the public address, and whether outgoing mail,
+outbound connections and HTTPS are on — never a password or a token. **Copy for
+support** copies the lines a bug report needs (version, platform, schema, proxy
+and HTTPS), with no addresses or names in them; where the browser offers no
+clipboard, the text is shown selected, to copy by hand.
+
 What it does, in this order, and each step either proves something or stops:
 
 1. **Refuses outright if this build has no release keys.** No key does not mean

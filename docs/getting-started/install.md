@@ -48,8 +48,9 @@ curl -fsSL https://git.codigosh.com/CodigoSH/LastHelp/raw/branch/main/install.sh
 
 If you saved the script to a file, `sudo sh install.sh --uninstall` does the same.
 
-It asks three questions — port, release channel, reverse proxy — and remembers
-the answers, so an upgrade never asks twice. Where there is no terminal to ask
+It asks three questions — port, release channel, and whether people reach it
+through a reverse proxy or a tunnel (and, if so, through how many) — and
+remembers the answers, so an upgrade never asks twice. Where there is no terminal to ask
 on, every answer is its default and the environment supplies the ones that
 matter: `LASTHELP_CHANNEL=beta` for the beta channel, `LASTHELP_PORT` for the
 port.
@@ -86,7 +87,43 @@ The image is published for `linux/amd64` and `linux/arm64` with every release.
 the host has to belong to that user (`chown 10001:10001 ./data`). To update,
 pull the new image — the binary inside does not replace itself.
 
-Or with the compose file in the repository:
+Or with Docker Compose — the same as the
+[`docker-compose.yml`](https://git.codigosh.com/CodigoSH/LastHelp/src/branch/main/docker-compose.yml)
+in the repository. Save it as `docker-compose.yml`:
+
+```yaml
+services:
+  lasthelp:
+    image: git.codigosh.com/codigosh/lasthelp:latest
+    container_name: lasthelp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - lasthelp-data:/data
+    environment:
+      LASTHELP_PORT: "8080"
+      LASTHELP_DB_FILE: "/data/lasthelp.db"
+      # The address people open, when a reverse proxy is in front: it is what
+      # the links in notifications and shared previews point to.
+      # LASTHELP_PUBLIC_URL: "https://help.example.org"
+      # "true" when people reach it through a reverse proxy or a tunnel
+      # (Nginx, Nginx Proxy Manager, Caddy, Traefik, Pangolin, Cloudflare
+      # Tunnel...). See "About LASTHELP_TRUST_PROXY" below.
+      LASTHELP_TRUST_PROXY: "false"
+      # How many of them a request passes through: 1, unless two are chained.
+      LASTHELP_TRUST_PROXY_HOPS: "1"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  lasthelp-data:
+```
+
+and start it:
 
 ```sh
 docker compose up -d
@@ -145,8 +182,8 @@ invents one the binary does not read. The ones worth knowing about:
 | `LASTHELP_DB_FILE` | `lasthelp.db` | The database |
 | `LASTHELP_KEY_FILE` | beside the database | Only for upgrading: where a pre-Beta.04 install kept its encryption key |
 | `LASTHELP_PUBLIC_URL` | empty | Where this instance is reachable, for the links in notifications and feeds, for the share image in link previews, and for the sitemap search engines read (with none there is no sitemap) |
-| `LASTHELP_TRUST_PROXY` | `false` | Turn on **only** when a reverse proxy really is in front |
-| `LASTHELP_TRUST_PROXY_HOPS` | `1` | How many proxies |
+| `LASTHELP_TRUST_PROXY` | `false` | Turn on **only** when a reverse proxy or a tunnel really is in front |
+| `LASTHELP_TRUST_PROXY_HOPS` | `1` | How many of them a request passes through |
 | `LASTHELP_OFFLINE` | `false` | Stops every outbound connection |
 
 ### About `LASTHELP_TRUST_PROXY`
@@ -156,6 +193,21 @@ With it on and no proxy actually in front, a caller can put whatever they like i
 means the rate limits stop meaning anything. LastHelp reads the entry *your*
 proxy appended, not the leftmost one, so it is safe when the setting is true and
 a proxy is really there, and only then.
+
+**A tunnel counts as a proxy.** Pangolin, Cloudflare Tunnel and the like hand
+LastHelp the request from their own connector, so with the setting off every
+visitor gets the connector's address — in **Active sessions**, and in the rate
+limits, which then count every visitor as one. With two in a row
+(Cloudflare in front of Nginx Proxy Manager, say), set
+`LASTHELP_TRUST_PROXY_HOPS=2`. A tunnel that passes raw TCP instead of HTTP adds
+no header at all, so there is no address to read whatever you set.
+
+**LastHelp notices a proxy nobody declared.** With the setting off, a request
+from this machine or the local network that carries `X-Forwarded-For`,
+`X-Real-Ip` or `Forwarded` is what a proxy sends: the log says so once, and
+**About** lists **A proxy is in front and was not declared** for the
+administrator. It changes nothing by itself. The same header from the internet
+is ignored, since anybody can type it.
 
 ### About `LASTHELP_OFFLINE`
 

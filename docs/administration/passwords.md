@@ -20,6 +20,14 @@ docker exec -it lasthelp lasthelp password reset ana
 
 This is the way back for the administrator too: nobody else can reset that account.
 
+## Seeing where you are signed in
+
+**Profile**, under **Your account**, says how many browsers the account is signed in on, and **View sessions** opens them in a window: one line for each, with the browser and the system (*Firefox · Linux*), the address it was last used from and when. A green dot marks one used in the last five minutes; yours is marked **This device**.
+
+**Close** signs one of the others out and **Close all other sessions** signs out every one but yours; both ask first. Signing out ends the session on the server too, so a copy of its cookie stops working, and a session nobody uses for thirty days ends by itself.
+
+Behind a reverse proxy or a tunnel the address is only the visitor's when `LASTHELP_TRUST_PROXY` says the proxy is there; otherwise every line shows the proxy's. See [About `LASTHELP_TRUST_PROXY`](../getting-started/install.md#about-lasthelp_trust_proxy).
+
 ## When an account is locked
 
 Five wrong passwords for one name inside a minute lock that name for five minutes. The lock is on the name, whichever addresses the guesses came from, and it refuses the right password too while it lasts, because a lock that opens for the correct guess only tells the guesser when to stop. A name with no account is counted the same way, so the refusal does not say which names exist.

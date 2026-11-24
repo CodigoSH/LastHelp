@@ -15,6 +15,7 @@ advice.
 | A vote | The database, against a random identity, never an address | As long as the report exists. |
 | A **picture** the reporter attached | The database, drawn again from its pixels, so the place and the camera a photo carries are not kept | Seen only by your team and the reporter until approved. Erased thirty days after the report closes, or at once if it is rejected, marked as spam or deleted. |
 | The **picture of a team member**, if they chose one | The database | While the account exists. It is shown beside their replies on public pages, so a visitor sees it. Somebody who has chosen none, and everybody who is not on the team, is shown a default figure instead. |
+| For each **sign-in of a team member**: the browser and system it came from and the address it was last used from, so they can see where they are signed in (**Active sessions**) | The database, beside the session | Until the session ends: signing out, closing it from **Active sessions**, a password change, or thirty days unused. Visitors who do not sign in have no session. |
 
 Without a mail relay (`LASTHELP_SMTP_HOST`) the "tell me when this changes"
 option is not even offered, so **no email address is stored at all**.
@@ -26,7 +27,8 @@ Following a board with Atom stores nothing about the reader.
 - **The visitor's address.** It is never written to the database. The rate limits
   that slow a flood keep it in memory, grouped by network block (`/24` for IPv4,
   `/64` for IPv6), and it is gone when the server restarts. LastHelp writes no
-  access log of its own.
+  access log of its own. Only a team member's sign-in keeps an address, the one
+  it was last used from, as the table above says.
 - No account, no name, no profile, no analytics, and no third party — apart from
   the push service of a team member's own browser, if that person chose to
   receive push notifications (see [Notifications](notifications.md)).
