@@ -36,6 +36,10 @@ func (s *Server) handleServerInfo(w http.ResponseWriter, r *http.Request) {
 	// Seconds rather than a formatted string: the page knows the reader's
 	// language and this does not.
 	out["uptime_seconds"] = int64(s.now().Sub(s.startedAt).Seconds())
+	// A proxy is in front that the configuration does not know about.
+	if s.forwardedUnread.Load() {
+		out["proxy_unread"] = true
+	}
 	out["started_at"] = s.startedAt.Unix()
 
 	// The database and everything SQLite keeps beside it. Reporting only the

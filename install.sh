@@ -99,6 +99,9 @@ PORT="${LASTHELP_PORT:-8080}"
 # the default is `stable`.
 CHANNEL="${LASTHELP_CHANNEL:-stable}"
 PROXIED=no
+# How many proxies a request passes through before it reaches the service. Asked
+# only when there is one; most setups have exactly one.
+HOPS=1
 
 UNINSTALL=no
 PURGE=no
@@ -227,6 +230,7 @@ if [ -f "$UNIT" ]; then
     if [ -f "$ETC/$NAME.env" ]; then
         OLD_PORT=$(sed -n "s/^${ENV_PREFIX}_PORT=//p" "$ETC/$NAME.env" | tail -1)
         OLD_PROXY=$(sed -n "s/^${ENV_PREFIX}_TRUST_PROXY=//p" "$ETC/$NAME.env" | tail -1)
+        OLD_HOPS=$(sed -n "s/^${ENV_PREFIX}_TRUST_PROXY_HOPS=//p" "$ETC/$NAME.env" | tail -1)
     else
         # An installation from before the configuration lived in a file: the
         # settings are Environment= lines inside the unit. They are read out of
@@ -240,6 +244,9 @@ if [ -f "$UNIT" ]; then
     [ -n "${OLD_PORT:-}" ] && PORT="$OLD_PORT"
     case "${OLD_PROXY:-}" in
         true|1|yes) PROXIED=yes ;;
+    esac
+    case "${OLD_HOPS:-}" in
+        [1-9]) HOPS="$OLD_HOPS" ;;
     esac
 
     INSTALLED=$("$PREFIX/bin/$NAME" version 2>/dev/null \
@@ -293,8 +300,24 @@ if (exec 3< /dev/tty) 2>/dev/null; then
     case "$IN" in beta|Beta|BETA) CHANNEL=beta ;; stable|Stable|STABLE) CHANNEL=stable ;; esac
 
     if [ "$UPGRADE" = no ]; then
-        IN=$(ask '  Behind a reverse proxy? (nginx, Traefik, Caddy, Cloudflare...) (yes/no) [no]: ')
+        # Proxies and tunnels both, by name: somebody behind Pangolin or a
+        # Cloudflare Tunnel reads "reverse proxy", decides theirs is something
+        # else, answers no — and every session and every sign-in limit then sees
+        # the tunnel's address instead of the visitor's.
+        note "Opened through another server first? A reverse proxy (Nginx, Nginx Proxy Manager,"
+        note "Caddy, Traefik) or a tunnel (Pangolin, Cloudflare Tunnel). Answer yes and each visitor"
+        note "is seen at their own address; answer no and every visitor looks like that server."
+        IN=$(ask '  Behind a reverse proxy or a tunnel? (yes/no) [no]: ')
         case "$IN" in y|Y|yes|Yes) PROXIED=yes ;; esac
+        if [ "$PROXIED" = yes ]; then
+            note "One unless two are chained, such as Cloudflare in front of Nginx Proxy Manager."
+            IN=$(ask "$(printf '  How many does a request pass through? [%s]: ' "$HOPS")")
+            case "$IN" in
+                [1-9]) HOPS="$IN" ;;
+                "") ;;
+                *) note "Not a number from 1 to 9; keeping $HOPS." ;;
+            esac
+        fi
     fi
     say ""
 fi
@@ -508,12 +531,14 @@ ${ENV_PREFIX}_DB_FILE=$DATA/$NAME.db
 # links that go out by mail and in the feeds.
 #${ENV_PREFIX}_PUBLIC_URL=https://help.example.org
 
-# Turn this on only when a reverse proxy really is in front. With it on and no
-# proxy there, a caller chooses the address their requests are attributed to and
-# the rate limits stop meaning anything.
+# Whether a reverse proxy or a tunnel (Nginx, Nginx Proxy Manager, Caddy, Traefik,
+# Pangolin, Cloudflare Tunnel...) is in front. Off behind one, every visitor looks
+# like that server: one address in the list of sessions, and one sign-in limit
+# shared by everybody. On with nothing in front, a caller chooses the address
+# their requests are attributed to and the limits stop meaning anything.
 ${ENV_PREFIX}_TRUST_PROXY=$( [ "$PROXIED" = yes ] && echo true || echo false )
-# How many proxies are in front, when there is more than one.
-#${ENV_PREFIX}_TRUST_PROXY_HOPS=1
+# How many of them a request passes through: 1, unless two are chained.
+${ENV_PREFIX}_TRUST_PROXY_HOPS=$HOPS
 
 # Mail, for notifying whoever reported something. Without it, nothing is sent
 # and the rest of the product works.

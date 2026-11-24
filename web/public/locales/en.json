@@ -4,6 +4,7 @@
   "about.diskOf": "of {total}",
   "about.donate": "Donate",
   "about.memory": "Memory in use",
+  "about.proxyUnread": "Requests are arriving through a reverse proxy or a tunnel, but LastHelp was told nothing is in front, so every visitor has that server's address: in the list of sessions and in the sign-in limits. If one is in front, set {setting} to true and restart LastHelp.",
   "about.since": "Since {date}",
   "about.sourceCode": "Source Code",
   "about.support": "Support",

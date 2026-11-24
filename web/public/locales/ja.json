@@ -4,6 +4,7 @@
   "about.diskOf": "{total} 中",
   "about.donate": "寄付する",
   "about.memory": "使用中のメモリ",
+  "about.proxyUnread": "リクエストはリバースプロキシまたはトンネルを経由して届いていますが、LastHelp は前段に何もない設定になっているため、すべての訪問者がそのサーバーのアドレスで扱われています（セッション一覧とサインインの制限）。前段にある場合は {setting} を true にして LastHelp を再起動してください。",
   "about.since": "{date} から",
   "about.sourceCode": "ソースコード",
   "about.support": "サポート",

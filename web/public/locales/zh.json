@@ -4,6 +4,7 @@
   "about.diskOf": "共 {total}",
   "about.donate": "捐赠",
   "about.memory": "内存占用",
+  "about.proxyUnread": "请求正通过反向代理或隧道到达，但 LastHelp 配置为前面没有任何代理，因此所有访客都显示为该服务器的地址：会话列表和登录限制中都是如此。如果前面确实有代理，请将 {setting} 设为 true 并重启 LastHelp。",
   "about.since": "自 {date} 起",
   "about.sourceCode": "源代码",
   "about.support": "支持",

@@ -4,6 +4,7 @@
   "about.diskOf": "من أصل {total}",
   "about.donate": "تبرّع",
   "about.memory": "الذاكرة المستخدمة",
+  "about.proxyUnread": "تصل الطلبات عبر وكيل عكسي أو نفق، لكن LastHelp مضبوط على أنه لا يوجد شيء أمامه، لذا يظهر كل الزوار بعنوان ذلك الخادم: في الجلسات وفي حدود تسجيل الدخول. إن كان هناك واحد أمامه، فاضبط {setting} على true وأعد تشغيل LastHelp.",
   "about.since": "منذ {date}",
   "about.sourceCode": "كود المصدر",
   "about.support": "الدعم",

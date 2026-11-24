@@ -4,6 +4,7 @@
   "about.diskOf": "{total} में से",
   "about.donate": "दान करें",
   "about.memory": "उपयोग में मेमोरी",
+  "about.proxyUnread": "अनुरोध किसी रिवर्स प्रॉक्सी या टनल से होकर आ रहे हैं, पर LastHelp में सेट है कि आगे कुछ नहीं है, इसलिए हर आगंतुक उसी सर्वर के पते के साथ दिखता है: सत्रों में और साइन इन की सीमाओं में। अगर आगे कुछ है, तो {setting} को true करें और LastHelp फिर से चालू करें।",
   "about.since": "{date} से",
   "about.sourceCode": "स्रोत कोड",
   "about.support": "सहायता",

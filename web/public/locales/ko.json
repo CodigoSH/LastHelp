@@ -4,6 +4,7 @@
   "about.diskOf": "{total} 중",
   "about.donate": "후원하기",
   "about.memory": "사용 중인 메모리",
+  "about.proxyUnread": "요청이 리버스 프록시나 터널을 거쳐 들어오고 있지만 LastHelp는 앞에 아무것도 없도록 설정되어 있어, 모든 방문자가 그 서버의 주소로 보입니다(세션 목록과 로그인 제한). 앞에 있다면 {setting}을(를) true로 설정하고 LastHelp를 다시 시작하세요.",
   "about.since": "{date}부터",
   "about.sourceCode": "소스 코드",
   "about.support": "지원",

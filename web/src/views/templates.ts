@@ -4665,6 +4665,8 @@ export interface ServerFacts {
   disk_total_bytes?: number;
   memory_bytes?: number;
   schema?: number;
+  /** A reverse proxy or a tunnel is in front, and the configuration says there is none. */
+  proxy_unread?: boolean;
 }
 
 /**
@@ -4753,6 +4755,15 @@ export function aboutScreen(facts: ServerFacts, text: Text): string {
         <button type="button" class="button ghost with-icon about-check" data-check hidden>
           ${icons.update(15)}<span>${escapeHTML(text.t("update.check"))}</span></button>
       </section>
+
+      ${
+        // Said here, where the person who can change the setting looks, and only once the server has seen
+        // a proxy's headers arrive: every visitor otherwise has that proxy's address, in the sessions and
+        // in the sign-in limits, and nothing else on any screen would say so.
+        facts.proxy_unread
+          ? `<p class="notice">${icons.warning()}<span>${escapeHTML(text.t("about.proxyUnread", { setting: "LASTHELP_TRUST_PROXY" }))}</span></p>`
+          : ""
+      }
 
       <section class="bento-card">
         <div class="settings-row">

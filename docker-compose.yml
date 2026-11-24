@@ -21,10 +21,16 @@ services:
       # The address people open, when a reverse proxy is in front: it is what
       # the links in notifications and shared previews point to.
       # LASTHELP_PUBLIC_URL: "https://help.example.org"
-      # Turn this on only when a reverse proxy really is in front. With it on
-      # and no proxy there, the caller chooses the address we attribute their
-      # requests to, and the rate limits stop meaning anything.
+      # "true" when people reach it through a reverse proxy or a tunnel
+      # (Nginx, Nginx Proxy Manager, Caddy, Traefik, Pangolin, Cloudflare
+      # Tunnel...). Left "false" behind one, every visitor looks like that
+      # server: one address in the list of sessions, one sign-in limit shared
+      # by everybody. Set "true" with nothing in front, and a caller chooses
+      # the address their requests are attributed to.
       LASTHELP_TRUST_PROXY: "false"
+      # How many of them a request passes through: 1, unless two are chained
+      # (Cloudflare in front of Nginx Proxy Manager, say).
+      LASTHELP_TRUST_PROXY_HOPS: "1"
     logging:
       driver: "json-file"
       options:

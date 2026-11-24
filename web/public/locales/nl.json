@@ -4,6 +4,7 @@
   "about.diskOf": "van {total}",
   "about.donate": "Doneren",
   "about.memory": "Gebruikt geheugen",
+  "about.proxyUnread": "Verzoeken komen binnen via een reverse proxy of een tunnel, maar LastHelp is ingesteld alsof er niets voor staat, dus elke bezoeker heeft het adres van die server: in de sessies en in de aanmeldlimieten. Staat er wel een voor, zet {setting} dan op true en start LastHelp opnieuw.",
   "about.since": "Sinds {date}",
   "about.sourceCode": "Broncode",
   "about.support": "Ondersteuning",

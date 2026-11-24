@@ -4,6 +4,7 @@
   "about.diskOf": "/ {total}",
   "about.donate": "Bağış yap",
   "about.memory": "Kullanılan bellek",
+  "about.proxyUnread": "İstekler bir ters proxy ya da tünel üzerinden geliyor, ancak LastHelp önünde hiçbir şey yokmuş gibi ayarlı; bu yüzden tüm ziyaretçiler o sunucunun adresiyle görünüyor: oturumlarda ve giriş sınırlarında. Önünde bir tane varsa {setting} değerini true yapın ve LastHelp'i yeniden başlatın.",
   "about.since": "{date} tarihinden beri",
   "about.sourceCode": "Kaynak Kodu",
   "about.support": "Destek",

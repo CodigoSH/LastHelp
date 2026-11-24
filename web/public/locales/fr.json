@@ -4,6 +4,7 @@
   "about.diskOf": "sur {total}",
   "about.donate": "Faire un don",
   "about.memory": "Mémoire utilisée",
+  "about.proxyUnread": "Les requêtes arrivent par un proxy inverse ou un tunnel, mais LastHelp est configuré comme si rien ne se trouvait devant : tous les visiteurs ont donc l’adresse de ce serveur, dans les sessions et dans les limites de connexion. S’il y en a un devant, réglez {setting} sur true et redémarrez LastHelp.",
   "about.since": "Depuis le {date}",
   "about.sourceCode": "Code source",
   "about.support": "Assistance",

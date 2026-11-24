@@ -4,6 +4,7 @@
   "about.diskOf": "dari {total}",
   "about.donate": "Donasi",
   "about.memory": "Memori terpakai",
+  "about.proxyUnread": "Permintaan datang melalui reverse proxy atau tunnel, tetapi LastHelp diatur seolah tidak ada apa pun di depannya, sehingga semua pengunjung memakai alamat server itu: di sesi dan di batas masuk. Jika memang ada, atur {setting} ke true lalu mulai ulang LastHelp.",
   "about.since": "Sejak {date}",
   "about.sourceCode": "Kode Sumber",
   "about.support": "Dukungan",

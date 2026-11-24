@@ -4,6 +4,7 @@
   "about.diskOf": "von {total}",
   "about.donate": "Spenden",
   "about.memory": "Belegter Speicher",
+  "about.proxyUnread": "Anfragen kommen über einen Reverse Proxy oder einen Tunnel, aber LastHelp ist so eingestellt, dass nichts davor steht. Deshalb haben alle Besucher die Adresse dieses Servers: in den Sitzungen und bei den Anmeldelimits. Wenn einer davor steht, setzen Sie {setting} auf true und starten Sie LastHelp neu.",
   "about.since": "Seit {date}",
   "about.sourceCode": "Quellcode",
   "about.support": "Support",
