@@ -107,6 +107,20 @@ describe("the server dialog", () => {
     expect(html).not.toContain("<b>x</b>");
   });
 
+  test("the cores sit beside the processor's use, small, and the temperature is a row only where the machine has a sensor", () => {
+    const without = serverDialog(facts, text);
+    expect(without).toContain("12 % <small>[about.cores");
+    expect(without).not.toContain("[about.hostTemperature]");
+    expect(without).not.toContain("°C");
+    const withSensor = serverDialog({ ...facts, host: { ...facts.host, temperature: 56.6 } }, text);
+    expect(withSensor).toContain("[about.hostTemperature]");
+    expect(withSensor).toContain("57 °C");
+    // Between the memory and the disk, where the other product draws it.
+    const memory = withSensor.indexOf("[about.hostMemory]");
+    expect(memory).toBeGreaterThan(-1);
+    expect(withSensor.indexOf("[about.hostTemperature]")).toBeGreaterThan(memory);
+  });
+
   test("leaves out the machine where the system says nothing", () => {
     expect(serverDialog({ version: "1.4.0" }, text)).not.toContain("[about.machine]");
   });

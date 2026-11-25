@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "Inti: {count}",
   "about.hostMemory": "Memori",
+  "about.hostTemperature": "Suhu",
   "about.usedOf": "Terpakai: {used} dari {total}",
   "about.diskLabel": "Disk",
   "about.freeOf": "Kosong: {free} dari {total}",

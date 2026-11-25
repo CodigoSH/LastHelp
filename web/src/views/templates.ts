@@ -4999,7 +4999,7 @@ export interface ServerFacts {
   memory_bytes?: number;
   schema?: number;
   /** The machine, where the system says. */
-  host?: { cpu_percent: number; cores: number; mem_total_bytes: number; mem_used_bytes: number };
+  host?: { cpu_percent: number; cores: number; mem_total_bytes: number; mem_used_bytes: number; temperature?: number };
   /** How the server is set up, as far as it changes what people get. */
   config?: { trust_proxy: boolean; proxy_hops: number; public_url: string; mail: boolean; auth_proxy?: boolean; offline: boolean; https: boolean };
 }
@@ -5183,7 +5183,7 @@ export function serverDialog(facts: ServerFacts, text: Text): string {
     machine.push(
       row(
         text.t("about.cpu"),
-        `${escapeHTML(text.number(Math.round(h.cpu_percent)))} % · ${escapeHTML(text.t("about.cores", { count: text.number(h.cores) }))}`,
+        `${escapeHTML(text.number(Math.round(h.cpu_percent)))} % <small>${escapeHTML(text.t("about.cores", { count: text.number(h.cores) }))}</small>`,
         meter(h.cpu_percent, 100, text.t("about.cpu")),
       ),
       row(
@@ -5192,6 +5192,11 @@ export function serverDialog(facts: ServerFacts, text: Text): string {
         meter(h.mem_used_bytes, h.mem_total_bytes, text.t("about.hostMemory")),
       ),
     );
+    // Only where the machine has a sensor to read: a virtual machine has none and a container usually sees none, and a
+    // row that says there is none is noise on every one of them.
+    if (h.temperature !== undefined) {
+      machine.push(row(text.t("about.hostTemperature"), `${escapeHTML(text.number(Math.round(h.temperature)))} °C`));
+    }
   }
   if (facts.disk_free_bytes !== undefined && facts.disk_total_bytes !== undefined) {
     machine.push(

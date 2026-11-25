@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "کورز: {count}",
   "about.hostMemory": "میموری",
+  "about.hostTemperature": "درجہ حرارت",
   "about.usedOf": "استعمال میں: {total} میں سے {used}",
   "about.diskLabel": "ڈسک",
   "about.freeOf": "خالی: {total} میں سے {free}",

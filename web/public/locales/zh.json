@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "核心数：{count}",
   "about.hostMemory": "内存",
+  "about.hostTemperature": "温度",
   "about.usedOf": "已用：{used} / {total}",
   "about.diskLabel": "磁盘",
   "about.freeOf": "可用：{free} / {total}",

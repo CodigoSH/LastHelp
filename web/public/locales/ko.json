@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "코어: {count}",
   "about.hostMemory": "메모리",
+  "about.hostTemperature": "온도",
   "about.usedOf": "사용 중: {used} / {total}",
   "about.diskLabel": "디스크",
   "about.freeOf": "여유: {free} / {total}",

@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "Cores: {count}",
   "about.hostMemory": "Memory",
+  "about.hostTemperature": "Temperature",
   "about.usedOf": "Used: {used} of {total}",
   "about.diskLabel": "Disk",
   "about.freeOf": "Free: {free} of {total}",

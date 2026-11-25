@@ -12,6 +12,7 @@
   "about.cpu": "ЦП",
   "about.cores": "Ядра: {count}",
   "about.hostMemory": "Память",
+  "about.hostTemperature": "Температура",
   "about.usedOf": "Занято: {used} из {total}",
   "about.diskLabel": "Диск",
   "about.freeOf": "Свободно: {free} из {total}",

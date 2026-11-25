@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "Kernen: {count}",
   "about.hostMemory": "Geheugen",
+  "about.hostTemperature": "Temperatuur",
   "about.usedOf": "In gebruik: {used} van {total}",
   "about.diskLabel": "Schijf",
   "about.freeOf": "Vrij: {free} van {total}",

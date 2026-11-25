@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/outbox"
@@ -241,6 +243,83 @@ func TestTheDiskIsSaidWhenItIsFilling(t *testing.T) {
 			t.Errorf("%d free of %d: said %q, want nothing", c.free, c.total, item.Tone)
 		case c.tone != "" && (!said || item.Tone != c.tone):
 			t.Errorf("%d free of %d: said=%v %q, want %q", c.free, c.total, said, item.Tone, c.tone)
+		}
+	}
+}
+
+// zones builds a folder of thermal zones the way the kernel lists them: one directory each, with its kind and its
+// reading in thousandths of a degree.
+func zones(t *testing.T, readings map[string][2]string) string {
+	t.Helper()
+	root := t.TempDir()
+	for name, kv := range readings {
+		dir := filepath.Join(root, name)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if kv[0] != "" {
+			if err := os.WriteFile(filepath.Join(dir, "type"), []byte(kv[0]+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if kv[1] != "" {
+			if err := os.WriteFile(filepath.Join(dir, "temp"), []byte(kv[1]+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return root
+}
+
+// The processor's temperature is the zone that names the processor; failing that the hottest zone that is not
+// something else; and no sensor is no answer, never zero degrees.
+func TestTheProcessorTemperatureIsTheZoneThatNamesIt(t *testing.T) {
+	was := thermalRoot
+	t.Cleanup(func() { thermalRoot = was })
+	for name, c := range map[string]struct {
+		readings map[string][2]string
+		want     float64
+		found    bool
+	}{
+		"the processor's own zone wins over a hotter one": {map[string][2]string{
+			"thermal_zone0": {"acpitz", "81000"}, "thermal_zone1": {"x86_pkg_temp", "57000"},
+		}, 57, true},
+		"k10temp is the processor too": {map[string][2]string{"thermal_zone0": {"k10temp", "44500"}}, 44.5, true},
+		"otherwise the hottest that is not a card or a battery": {map[string][2]string{
+			"thermal_zone0": {"iwlwifi_1", "90000"}, "thermal_zone1": {"BAT0-battery", "70000"}, "thermal_zone2": {"acpitz", "41000"}, "thermal_zone3": {"pch", "52000"},
+		}, 52, true},
+		"only a card is no answer":       {map[string][2]string{"thermal_zone0": {"iwlwifi_1", "50000"}}, 0, false},
+		"a zone that cannot be read":     {map[string][2]string{"thermal_zone0": {"x86_pkg_temp", ""}, "thermal_zone1": {"", "40000"}}, 0, false},
+		"a reading that is not a number": {map[string][2]string{"thermal_zone0": {"x86_pkg_temp", "n/a"}}, 0, false},
+		"something that is not a zone":   {map[string][2]string{"cooling_device0": {"Processor", "3000"}}, 0, false},
+		"no zones at all (a container)":  {map[string][2]string{}, 0, false},
+	} {
+		thermalRoot = zones(t, c.readings)
+		got, ok := readTemperature()
+		if ok != c.found || got != c.want {
+			t.Errorf("%s: %v, %v, want %v, %v", name, got, ok, c.want, c.found)
+		}
+	}
+	thermalRoot = filepath.Join(t.TempDir(), "missing")
+	if _, ok := readTemperature(); ok {
+		t.Error("a machine with no thermal folder gave a temperature")
+	}
+}
+
+// The reading goes to the page as a number when there is one, and is not in the answer when there is not.
+func TestTheTemperatureIsOnlyInTheAnswerWhenThereIsOne(t *testing.T) {
+	for _, c := range []struct {
+		temp *float64
+		want bool
+	}{{nil, false}, {func() *float64 { v := 57.0; return &v }(), true}} {
+		raw, err := json.Marshal(hostStats{Cores: 4, Temperature: c.temp})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out map[string]any
+		_ = json.Unmarshal(raw, &out)
+		if _, has := out["temperature"]; has != c.want {
+			t.Errorf("temperature %v: in the answer = %v, want %v (%s)", c.temp, has, c.want, raw)
 		}
 	}
 }

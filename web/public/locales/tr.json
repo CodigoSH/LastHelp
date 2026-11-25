@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "Çekirdek: {count}",
   "about.hostMemory": "Bellek",
+  "about.hostTemperature": "Sıcaklık",
   "about.usedOf": "Kullanılan: {used} / {total}",
   "about.diskLabel": "Disk",
   "about.freeOf": "Boş: {free} / {total}",

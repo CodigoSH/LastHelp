@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "コア数: {count}",
   "about.hostMemory": "メモリー",
+  "about.hostTemperature": "温度",
   "about.usedOf": "使用中: {used} / {total}",
   "about.diskLabel": "ディスク",
   "about.freeOf": "空き: {free} / {total}",

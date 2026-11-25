@@ -161,6 +161,10 @@ type hostStats struct {
 	Cores      int     `json:"cores"`
 	MemTotal   uint64  `json:"mem_total_bytes"`
 	MemUsed    uint64  `json:"mem_used_bytes"`
+	// Temperature is the processor's, in degrees Celsius, and is left out when the machine has no
+	// sensor to read: a virtual machine has none and a container usually sees none, and a missing
+	// reading is not zero degrees.
+	Temperature *float64 `json:"temperature,omitempty"`
 }
 
 func readHostStats(sample time.Duration) (hostStats, bool) {
@@ -175,7 +179,60 @@ func readHostStats(sample time.Duration) (hostStats, bool) {
 	if err != nil {
 		return hostStats{}, false
 	}
-	return hostStats{CPUPercent: cpu, Cores: runtime.NumCPU(), MemTotal: total, MemUsed: used}, true
+	stats := hostStats{CPUPercent: cpu, Cores: runtime.NumCPU(), MemTotal: total, MemUsed: used}
+	if celsius, ok := readTemperature(); ok {
+		stats.Temperature = &celsius
+	}
+	return stats, true
+}
+
+// thermalRoot is where the kernel lists its sensors; a test points it elsewhere.
+var thermalRoot = "/sys/class/thermal"
+
+// readTemperature is the processor's temperature, from the kernel's thermal zones.
+//
+// A zone that names the processor (x86_pkg_temp, cpu-thermal, k10temp) is the answer. Failing that,
+// the hottest zone that is not obviously something else: the Wi-Fi card, a battery. No zone at all,
+// or none that can be read, is no answer.
+func readTemperature() (float64, bool) {
+	entries, err := os.ReadDir(thermalRoot)
+	if err != nil {
+		return 0, false
+	}
+	var hottest float64
+	found := false
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), "thermal_zone") {
+			continue
+		}
+		zone := filepath.Join(thermalRoot, entry.Name())
+		kind, err := os.ReadFile(filepath.Join(zone, "type"))
+		if err != nil {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(zone, "temp"))
+		if err != nil {
+			continue
+		}
+		milli, err := strconv.ParseFloat(strings.TrimSpace(string(raw)), 64)
+		if err != nil {
+			continue
+		}
+		celsius := milli / 1000
+		name := strings.TrimSpace(string(kind))
+		if name == "x86_pkg_temp" || name == "cpu-thermal" || name == "k10temp" {
+			return celsius, true
+		}
+		lower := strings.ToLower(name)
+		if strings.Contains(lower, "wifi") || strings.Contains(lower, "battery") || strings.Contains(lower, "wireless") {
+			continue
+		}
+		found = true
+		if celsius > hottest {
+			hottest = celsius
+		}
+	}
+	return hottest, found
 }
 
 // readMemInfo is the memory in use: total less what is available, which counts

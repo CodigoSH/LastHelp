@@ -12,6 +12,7 @@
   "about.cpu": "المعالج",
   "about.cores": "الأنوية: {count}",
   "about.hostMemory": "الذاكرة",
+  "about.hostTemperature": "الحرارة",
   "about.usedOf": "المستخدم: {used} من {total}",
   "about.diskLabel": "القرص",
   "about.freeOf": "الحر: {free} من {total}",

@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "Πυρήνες: {count}",
   "about.hostMemory": "Μνήμη",
+  "about.hostTemperature": "Θερμοκρασία",
   "about.usedOf": "Σε χρήση: {used} από {total}",
   "about.diskLabel": "Δίσκος",
   "about.freeOf": "Ελεύθερα: {free} από {total}",

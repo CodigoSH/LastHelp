@@ -12,6 +12,7 @@
   "about.cpu": "CPU",
   "about.cores": "هسته‌ها: {count}",
   "about.hostMemory": "حافظه",
+  "about.hostTemperature": "دما",
   "about.usedOf": "در حال استفاده: {used} از {total}",
   "about.diskLabel": "دیسک",
   "about.freeOf": "آزاد: {free} از {total}",
