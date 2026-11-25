@@ -80,8 +80,8 @@ const evaluate = async (expression: string) => {
   return result?.result?.value;
 };
 
-const go = async (path: string) => {
-  await page.send("Page.navigate", { url: BASE + path });
+const go = async (path: string, base = BASE) => {
+  await page.send("Page.navigate", { url: base + path });
   await sleep(1200);
   // English, whatever the browser asked for, so the images are comparable.
   await evaluate(`localStorage.setItem("lasthelp_lang", "en")`);
@@ -242,7 +242,9 @@ await shoot("landing");
 await go("/acme");
 await shoot("organization");
 
-await go("/sign-in");
+// By the name localhost: a browser offers passkeys on a name or on https and never on a bare address,
+// and the key beside Sign in is part of what the page looks like.
+await go("/sign-in", `http://localhost:${PORT}`);
 await shoot("sign-in");
 
 // --- what the repository itself shows ---------------------------------------
