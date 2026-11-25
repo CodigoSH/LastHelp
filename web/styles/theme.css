@@ -4720,6 +4720,9 @@ body > nav .brand {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 16px;
+  /* The status keeps the room a card of an update that is found takes, so the button below does not move when one is. */
+  min-block-size: 48px;
   margin-block-start: 18px;
 }
 
@@ -4729,6 +4732,7 @@ body > nav .brand {
   gap: 8px;
   margin: 0;
   font-size: 14px;
+  line-height: 20px;
   font-weight: 500;
   color: var(--text-dim);
 }
