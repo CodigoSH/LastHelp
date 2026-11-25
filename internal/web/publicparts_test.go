@@ -166,6 +166,67 @@ func TestAPrivateRoadmapStaysOffTheFrontPageAndTheSitemap(t *testing.T) {
 	}
 }
 
+// A link on the front page to a roadmap nobody outside the team can read is not sent to anybody
+// outside it: the visitor would be taken to "not found".
+func TestAPrivateRoadmapIsNotLinkedFromTheFrontPageToStrangers(t *testing.T) {
+	team := newInstance(t)
+	team.claim()
+	team.createOrg("codigosh")
+	team.createRepoWith("codigosh", "hidden", map[string]any{"roadmap_public": false})
+	team.createRepo("codigosh", "shown")
+
+	link := func(to, board string) map[string]any {
+		return map[string]any{"label": to + " " + board, "to": to, "scope": "codigosh/" + board}
+	}
+	page := map[string]any{
+		"bands": []map[string]any{{
+			"id": "b", "columns": "1",
+			"cells": [][]map[string]any{{{"id": "l", "kind": "links", "links": []map[string]any{
+				link("roadmap", "hidden"), link("roadmap", "shown"), link("board", "hidden"),
+			}}}},
+		}},
+		"settings": map[string]any{"footer": []map[string]any{link("roadmap", "hidden"), link("roadmap", "shown")}},
+	}
+	if got := status(t, team.do(http.MethodPut, "/api/landing", page)); got != http.StatusOK {
+		t.Fatalf("the administrator could not save the page: %d", got)
+	}
+
+	labels := func(body map[string]any) (module, footer []string) {
+		bands, _ := body["bands"].([]any)
+		for _, b := range bands {
+			cells, _ := b.(map[string]any)["cells"].([]any)
+			for _, cell := range cells {
+				for _, m := range cell.([]any) {
+					links, _ := m.(map[string]any)["links"].([]any)
+					for _, l := range links {
+						module = append(module, l.(map[string]any)["label"].(string))
+					}
+				}
+			}
+		}
+		settings, _ := body["settings"].(map[string]any)
+		foot, _ := settings["footer"].([]any)
+		for _, l := range foot {
+			footer = append(footer, l.(map[string]any)["label"].(string))
+		}
+		return module, footer
+	}
+
+	module, footer := labels(frontPage(t, team.anonymous(), ""))
+	if got := strings.Join(module, ","); got != "roadmap shown,board hidden" {
+		t.Errorf("a stranger's links: %q", got)
+	}
+	if got := strings.Join(footer, ","); got != "roadmap shown" {
+		t.Errorf("a stranger's footer: %q", got)
+	}
+
+	// The team, who can read that roadmap, keeps the link; and the page itself was never changed.
+	module, footer = labels(frontPage(t, team, ""))
+	if len(module) != 3 || len(footer) != 2 {
+		t.Errorf("the team's links: %v and footer %v", module, footer)
+	}
+}
+
 // A board made while the server has a channel starts on it, unless the team chose none.
 func TestANewBoardCanStartWithNoChannel(t *testing.T) {
 	team := newInstance(t)

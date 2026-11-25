@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -146,6 +147,8 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 		page = landing.Default()
 	}
 
+	page = s.withoutUnreadableRoadmapLinks(r, page)
+
 	body := map[string]any{"bands": page.Bands, "settings": page.Settings}
 	boards, needed := s.boardsForLanding(r, page, composer)
 	if needed {
@@ -159,6 +162,63 @@ func (s *Server) handleGetLanding(w http.ResponseWriter, r *http.Request) {
 		body["share_ready"] = s.cfg.PublicURL != ""
 	}
 	writeJSON(w, http.StatusOK, body)
+}
+
+// withoutUnreadableRoadmapLinks takes out of the page the links to a roadmap
+// this visitor would be told is not there: a team that keeps its roadmap to
+// itself answers everybody else "not found", and a link on the front page that
+// ends in that is worse than no link. The team, who can read it, keeps them.
+//
+// The page is the operator's, and the link stays in it: it comes back the day
+// the roadmap is made public again.
+func (s *Server) withoutUnreadableRoadmapLinks(r *http.Request, page landing.Page) landing.Page {
+	isRoadmap := func(l landing.Link) bool { return l.To == landing.ToRoadmap }
+	has := false
+	for _, m := range page.Modules() {
+		has = has || slices.ContainsFunc(m.Links, isRoadmap)
+	}
+	has = has || slices.ContainsFunc(page.Settings.Footer, isRoadmap)
+	if !has {
+		return page
+	}
+
+	boards, err := s.orgs().ListBoards()
+	if err != nil {
+		slog.Error("listing boards for the front page's links", "error", err)
+		return page
+	}
+	actor, signed := middleware.ActorFrom(r)
+	hidden := map[string]bool{}
+	for _, b := range boards {
+		if !b.RoadmapPublic && !(signed && actor.Can(authz.Triage, authz.Repository(b.ID, b.OrgID))) {
+			hidden[b.OrgSlug+"/"+b.Slug] = true
+		}
+	}
+	if len(hidden) == 0 {
+		return page
+	}
+	keep := func(links []landing.Link) []landing.Link {
+		return slices.DeleteFunc(slices.Clone(links), func(l landing.Link) bool {
+			return isRoadmap(l) && hidden[l.Scope]
+		})
+	}
+
+	bands := slices.Clone(page.Bands)
+	for i, band := range bands {
+		cells := make([][]landing.Module, len(band.Cells))
+		for j, cell := range band.Cells {
+			cells[j] = slices.Clone(cell)
+			for k := range cells[j] {
+				if cells[j][k].Links != nil {
+					cells[j][k].Links = keep(cells[j][k].Links)
+				}
+			}
+		}
+		bands[i].Cells = cells
+	}
+	page.Bands = bands
+	page.Settings.Footer = keep(page.Settings.Footer)
+	return page
 }
 
 // boardsForLanding reads the boards only when somebody on this request needs
