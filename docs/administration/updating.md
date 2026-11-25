@@ -37,11 +37,18 @@ in it, never suggestions:
   with the last error.
 - **A proxy is in front and was not declared** — see
   [`LASTHELP_TRUST_PROXY`](../getting-started/install.md#about-lasthelp_trust_proxy).
+  It says where to change the setting and what to run, by how LastHelp is
+  installed, and each line to type has a button that copies it.
 - **The public address is missing** — an organization is connected to a forge
   but `LASTHELP_PUBLIC_URL` is empty, so the issues it opens carry no link back
   to the report.
-- **Reached without HTTPS** — somebody opened LastHelp over plain `http://`
-  from another machine, so session cookies are not marked secure.
+- **Reached without HTTPS** — somebody signed in used LastHelp over plain
+  `http://` from another machine since it last started, so session cookies are
+  not marked secure. A request nobody is behind (a proxy's health probe, a check
+  of the server by its own address) does not count, and nothing is said while a
+  proxy in front has not been declared: behind one the connection to LastHelp is
+  plain whatever the visitor used, and the notice is judged again once the
+  setting is on. The log says once where the first one came from.
 - **A new version is out**, with the way to the update.
 
 **Server details**, a discreet button in the corner of the version card, shows

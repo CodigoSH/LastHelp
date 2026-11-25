@@ -199,6 +199,20 @@ invents one the binary does not read. The ones worth knowing about:
 | `LASTHELP_OFFLINE` | `false` | Stops every outbound connection |
 | `LASTHELP_AUTH_PROXY_HEADER`, `LASTHELP_AUTH_PROXY_TRUSTED`, `LASTHELP_AUTH_PROXY_LOGOUT_URL` | empty | Signing in through a proxy that already signs people in — see [Signing in](../administration/signing-in.md#signing-in-through-a-proxy) |
 
+### Changing a setting
+
+A **native installation** keeps every setting in one file, `/etc/lasthelp/lasthelp.env`, as lines such as `LASTHELP_TRUST_PROXY=false`. It is the file the installer never overwrites, so what you put there survives every update. Open it with an editor, `nano` here, change the value (or take the `#` off a line that is commented out, such as `LASTHELP_PUBLIC_URL`), and restart the service:
+
+```bash
+sudo nano /etc/lasthelp/lasthelp.env
+```
+
+```bash
+sudo systemctl restart lasthelp
+```
+
+**About → Server details** says whether the proxy settings took. On **Docker**, Podman or an **OCI image** the same variables are set where the container is defined (the `environment:` of the compose file, `-e` of `docker run`, or the container's environment variables on Proxmox VE), and the container is recreated to apply them.
+
 ### About `LASTHELP_TRUST_PROXY`
 
 With it on and no proxy actually in front, a caller can put whatever they like in
@@ -219,7 +233,8 @@ no header at all, so there is no address to read whatever you set.
 from this machine or the local network that carries `X-Forwarded-For`,
 `X-Real-Ip` or `Forwarded` is what a proxy sends: the log says so once, and
 **About** lists **A proxy is in front and was not declared** for the
-administrator. It changes nothing by itself. The same header from the internet
+administrator, with the lines to change it ([see above](#changing-a-setting)).
+It changes nothing by itself. The same header from the internet
 is ignored, since anybody can type it.
 
 ### About `LASTHELP_OFFLINE`
