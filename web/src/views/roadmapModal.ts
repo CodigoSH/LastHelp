@@ -57,7 +57,7 @@ export function roadmapKindGroup(value: string, text: Text): FilterGroup {
 }
 
 /** The frame, drawn once with the page and filled for each lane. */
-export function roadmapDialog(text: Text): string {
+export function roadmapDialog(text: Text, votes = true): string {
   return `<dialog class="modal ov-modal rm-modal" id="rm-modal" aria-labelledby="rm-modal-title">
     <header class="ov-modal-head">
       <h2 id="rm-modal-title"></h2>
@@ -70,19 +70,21 @@ export function roadmapDialog(text: Text): string {
         <input type="search" data-rm-q placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
       </label>
       ${segmented(roadmapKindGroup("", text))}
-      ${sortMenu(
-        {
-          name: "sort",
-          label: text.t("board.sort"),
-          value: "votes",
-          options: [
-            { value: "votes", label: text.t("board.sortVotes") },
-            { value: "recent", label: text.t("board.sortNew") },
-          ],
-        },
-        text.t("board.sort"),
-        text,
-      )}
+      ${votes
+        ? sortMenu(
+          {
+            name: "sort",
+            label: text.t("board.sort"),
+            value: "votes",
+            options: [
+              { value: "votes", label: text.t("board.sortVotes") },
+              { value: "recent", label: text.t("board.sortNew") },
+            ],
+          },
+          text.t("board.sort"),
+          text,
+        )
+        : ""}
     </div>
     ${filterChipsHost(text.t("board.clear"))}
     <div class="ov-modal-body" data-rm-modal-body></div>

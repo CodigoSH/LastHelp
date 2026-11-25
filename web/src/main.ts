@@ -1951,6 +1951,7 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
     const input = dialog?.querySelector<HTMLInputElement>("[data-bd-q]");
     const slot = dialog?.querySelector<HTMLElement>("[data-bd-filters]");
     const bar = dialog?.querySelector<HTMLElement>(".fb");
+    const votesOn = root?.querySelector<HTMLElement>(".bd")?.dataset.votes !== "false";
     if (!dialog || !body || !heading || !count || !input || !slot || !bar) return () => undefined;
 
     const ask: { lane: LaneSpec | null; status: string; sort: string; q: string; items: ItemSummary[]; total: number; seq: number } = {
@@ -1973,7 +1974,7 @@ async function showBoard(orgSlug: string, repoSlug: string): Promise<void> {
         text,
       );
       syncFilterBar(bar, { sort: ask.sort, status: ask.status }, ask.q);
-      body.innerHTML = views.boardDialogList(ask.items, ask.total, text);
+      body.innerHTML = views.boardDialogList(ask.items, ask.total, text, votesOn);
     };
     const load = async (append: boolean) => {
       if (!ask.lane) return;
@@ -2345,7 +2346,7 @@ function wireRoadmapDialog(page: HTMLElement, orgSlug: string, repoSlug: string)
   return async (lane, kind, words) => {
     ask.lane = lane;
     ask.kind = kind;
-    ask.sort = lane === "done" || lane === "declined" ? "recent" : "votes";
+    ask.sort = lane === "done" || lane === "declined" || page.dataset.votes === "false" ? "recent" : "votes";
     // It opens on what the page was showing: the words typed there are the question.
     ask.q = words.trim().length >= 2 ? words.trim() : "";
     ask.items = [];

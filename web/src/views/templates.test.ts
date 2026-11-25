@@ -3,7 +3,7 @@
  * a browser. These are the cases where the right answer is not the obvious one.
  */
 import { describe, expect, test } from "bun:test";
-import { accountRole, avatar, board, boardDialogList, commentEditForm, monthGroups, roadmap, roadmapDialogList, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
+import { accountRole, avatar, board, boardDialog, boardDialogList, roadmapDialog, commentEditForm, monthGroups, roadmap, roadmapDialogList, type RoadmapLane, itemTeamView, itemView, overviewNeeds, overviewScreen, type OverviewData, reportForm, rewriteForm, similarItems, type Text, updateZone } from "./templates";
 import type { ItemDetail } from "../api";
 import { projectForm, projectSummary } from "./templates";
 import { applyPreset, defaultOptions } from "../services/projectOptions";
@@ -919,6 +919,17 @@ describe("the board page", () => {
     expect(page).toContain('<span class="count">4</span>');
   });
 
+  test("a project that takes no votes offers no way to rank by them and draws no count", () => {
+    const off = board(org as never, { ...repo, votes: false } as never, lanes as never, filters, tiles, null, "idea", text);
+    expect(off).not.toContain("board.sortVotes");
+    expect(off).not.toContain('<span class="count">4</span>');
+    expect(off).toContain('class="score mark kind-idea"');
+    // And a project that does (the default, and what an older project is) keeps both.
+    const on = html();
+    expect(on).toContain("board.sortVotes");
+    expect(on).toContain('<span class="count">4</span>');
+  });
+
   test("the lane picker for a phone names each lane and its count, only when there are two", () => {
     expect(html()).toContain("data-bd-pick");
     expect(html({ kind: "bug" }, [lanes[1]!])).not.toContain("data-bd-pick");
@@ -935,6 +946,18 @@ describe("the dialog of a board lane", () => {
   });
   test("says nothing matches rather than drawing an empty list", () => {
     expect(boardDialogList([], 0, text)).toContain("review.nothingMatches");
+  });
+  test("draws no vote count when the project takes no votes", () => {
+    expect(boardDialogList([item("a")], 1, text)).toContain('<span class="count">2</span>');
+    const off = boardDialogList([item("a")], 1, text, false);
+    expect(off).not.toContain('<span class="count">2</span>');
+    expect(off).toContain("kind-idea");
+  });
+  test("the dialog's sort menu is there only for a project with votes", () => {
+    expect(boardDialog(text)).toContain("board.sortVotes");
+    expect(boardDialog(text, false)).not.toContain("board.sortVotes");
+    expect(roadmapDialog(text)).toContain("board.sortVotes");
+    expect(roadmapDialog(text, false)).not.toContain("board.sortVotes");
   });
 });
 

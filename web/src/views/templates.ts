@@ -258,6 +258,8 @@ export function board(
   text: Text,
 ): string {
   const base = `/${escapeAttr(org.slug)}/${escapeAttr(repo.slug)}`;
+  // A project that does not take votes has nothing to rank by, and shows no count.
+  const votes = repo.votes !== false;
   const cap = laneCap(lanes.length);
   const both = repo.accepts_bugs && repo.accepts_ideas;
   const narrowed = filters.query.trim().length >= 2 || filters.kind !== "" || (filters.state === "closed" && filters.outcome !== "");
@@ -356,7 +358,7 @@ export function board(
       ${icons.search(14)}
       <input type="search" data-bd-search value="${escapeAttr(filters.query)}" placeholder="${escapeAttr(text.t("board.searchBefore"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
     </label>
-    ${segmented(kind)}${filterMenu(groups, text.t("board.filters"), text)}${sortMenu(sort, text.t("board.sort"), text)}
+    ${segmented(kind)}${filterMenu(groups, text.t("board.filters"), text)}${votes ? sortMenu(sort, text.t("board.sort"), text) : ""}
   </div>`;
 
   // What narrows the list, said, and one press to undo it.
@@ -380,7 +382,7 @@ export function board(
       ${
         lane.items.length === 0
           ? `<p class="bd-empty">${escapeHTML(text.t(narrowed ? "review.nothingMatches" : "overview.nothingYet"))}</p>`
-          : `<div class="bd-rows">${lane.items.slice(0, cap).map((i) => boardLaneRow(i, text)).join("")}</div>`
+          : `<div class="bd-rows">${lane.items.slice(0, cap).map((i) => boardLaneRow(i, text, votes)).join("")}</div>`
       }
       ${lane.total > Math.min(lane.items.length, cap) ? `<button type="button" class="bd-more" data-bd-open="${lane.key}">${escapeHTML(text.t("review.more"))}</button>` : ""}
     </section>`;
@@ -390,7 +392,7 @@ export function board(
         <a class="button primary with-icon" href="${base}/new">${icons.add()}<span>${escapeHTML(text.t("board.report"))}</span></a></div>`
     : `${chips}${picker}<div class="bd-lanes${lanes.length === 1 ? " one" : ""}">${lanes.map(box).join("")}</div>`;
 
-  return `<div class="page bd">
+  return `<div class="page bd" data-votes="${votes}">
     <header class="page-head board-head">
       <div class="head-text">
         <p class="crumb"><a href="/${escapeAttr(org.slug)}">${escapeHTML(org.name)}</a></p>
@@ -409,15 +411,17 @@ export function board(
     ${tileRow}
     ${empty ? "" : tabs + bar}
     ${content}
-    ${empty ? "" : boardDialog(text)}
+    ${empty ? "" : boardDialog(text, votes)}
   </div>`;
 }
 
 /** A report in a lane. The kind is the lane's, so the line under the title is its state and its date. */
-export function boardLaneRow(item: ItemSummary, text: Text): string {
+export function boardLaneRow(item: ItemSummary, text: Text, votes = true): string {
   const lead =
-    item.kind === "idea"
+    item.kind === "idea" && votes
       ? `<span class="score${item.voted ? " voted" : ""}"><span class="count">${escapeHTML(text.number(item.votes))}</span><span class="label">${escapeHTML(text.t("item.votesLabel"))}</span></span>`
+      : item.kind === "idea"
+      ? `<span class="score mark kind-idea" aria-hidden="true">${icons.idea(20)}</span>`
       : `<span class="score mark kind-bug" aria-hidden="true">${icons.bug(20)}</span>`;
   return `<a class="bd-row" href="/i/${escapeAttr(item.public_id)}">${lead}
     <span class="bd-text"><span class="bd-title">${escapeHTML(item.title)}</span>
@@ -426,7 +430,7 @@ export function boardLaneRow(item: ItemSummary, text: Text): string {
 }
 
 /** The frame of the dialog a lane opens in, drawn once with the page and filled for each lane. */
-export function boardDialog(text: Text): string {
+export function boardDialog(text: Text, votes = true): string {
   return `<dialog class="modal ov-modal bd-modal" id="bd-modal" aria-labelledby="bd-modal-title">
     <header class="ov-modal-head">
       <h2 id="bd-modal-title"></h2>
@@ -439,19 +443,21 @@ export function boardDialog(text: Text): string {
         <input type="search" data-bd-q placeholder="${escapeAttr(text.t("board.search"))}" aria-label="${escapeAttr(text.t("board.search"))}" autocomplete="off" />
       </label>
       <span class="fb-slot" data-bd-filters></span>
-      ${sortMenu(
-        {
-          name: "sort",
-          label: text.t("board.sort"),
-          value: "new",
-          options: [
-            { value: "new", label: text.t("board.sortNew") },
-            { value: "votes", label: text.t("board.sortVotes") },
-          ],
-        },
-        text.t("board.sort"),
-        text,
-      )}
+      ${votes
+        ? sortMenu(
+          {
+            name: "sort",
+            label: text.t("board.sort"),
+            value: "new",
+            options: [
+              { value: "new", label: text.t("board.sortNew") },
+              { value: "votes", label: text.t("board.sortVotes") },
+            ],
+          },
+          text.t("board.sort"),
+          text,
+        )
+        : ""}
     </div>
     ${filterChipsHost(text.t("board.clear"))}
     <div class="ov-modal-body" data-bd-modal-body></div>
@@ -463,9 +469,9 @@ export function boardDialog(text: Text): string {
  * each, and what is left to read. The row is the one the board has always had,
  * with its kind, because here the lane is the question and not the page.
  */
-export function boardDialogList(items: ItemSummary[], total: number, text: Text): string {
+export function boardDialogList(items: ItemSummary[], total: number, text: Text, votes = true): string {
   if (items.length === 0) return `<p class="ov-empty">${escapeHTML(text.t("review.nothingMatches"))}</p>`;
-  return `<ul class="items bd-items">${items.map((i) => itemRow(i, text)).join("")}</ul>
+  return `<ul class="items bd-items">${items.map((i) => itemRow(i, text, votes)).join("")}</ul>
     <p class="bd-shown">${escapeHTML(text.t("board.showing", { shown: text.number(items.length), total: text.number(total) }))}</p>
     ${items.length < total ? `<button type="button" class="bd-more" data-bd-load>${escapeHTML(text.t("review.more"))}</button>` : ""}`;
 }
@@ -485,13 +491,15 @@ export function boardDialogList(items: ItemSummary[], total: number, text: Text)
  * people agreeing that something crashes does not make it crash harder, so a
  * bug is not given a count.
  */
-export function itemRow(item: ItemSummary, text: Text): string {
+export function itemRow(item: ItemSummary, text: Text, votes = true): string {
   const lead =
-    item.kind === "idea"
+    item.kind === "idea" && votes
       ? `<span class="score${item.voted ? " voted" : ""}">
            <span class="count">${escapeHTML(text.number(item.votes))}</span>
            <span class="label">${escapeHTML(text.t("item.votesLabel"))}</span>
          </span>`
+      : item.kind === "idea"
+      ? `<span class="score mark kind-idea" aria-hidden="true">${icons.idea(20)}</span>`
       : `<span class="score mark kind-bug" aria-hidden="true">${icons.bug(20)}</span>`;
 
   return `<li><a class="item" href="/i/${escapeAttr(item.public_id)}">
@@ -519,7 +527,7 @@ export interface RoadmapLane {
   items: ItemSummary[];
 }
 
-export { monthGroups, roadmapDialogList } from "./roadmapModal";
+export { monthGroups, roadmapDialog, roadmapDialogList } from "./roadmapModal";
 
 /** How many rows of the planned lane show before "show more". */
 export const ROADMAP_PLANNED_ROWS = 6;
@@ -678,7 +686,7 @@ export function roadmap(
         </div>
       </section>
     </div>
-    ${roadmapDialog(text)}
+    ${roadmapDialog(text, repo.votes !== false)}
   </div>`;
 }
 
