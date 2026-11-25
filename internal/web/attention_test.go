@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/outbox"
-	"git.codigosh.com/CodigoSH/LastHelp/internal/platform/config"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
 func (i *instance) attentionItems() []attentionItem {
@@ -78,20 +78,122 @@ func TestAttentionAsksForAPublicAddressOnlyWithAForge(t *testing.T) {
 	}
 }
 
-// Plain HTTP is noticed from another machine, not from this one.
-func TestPlainHTTPFromAnotherMachineIsNoticed(t *testing.T) {
-	seen := func(peer string) bool {
-		s := &Server{cfg: config.Config{}}
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
+// sessionOf is the cookie this client was signed in with.
+func (i *instance) sessionOf() *http.Cookie {
+	i.t.Helper()
+	u, _ := http.NewRequest(http.MethodGet, i.server.URL, nil)
+	for _, c := range i.client.Jar.Cookies(u.URL) {
+		if c.Name == middleware.SessionCookie {
+			return c
+		}
+	}
+	i.t.Fatal("this client is not signed in")
+	return nil
+}
+
+// Plain HTTP is noticed when somebody signed in uses the server so from another machine. Not from
+// this one, and not a request nobody is behind (a proxy's health probe, a check of the server by its
+// own address), which an administrator on HTTPS was being told about.
+func TestPlainHTTPIsNoticedWhenSomebodySignedInUsesIt(t *testing.T) {
+	i, srv := newPushInstance(t)
+	i.claim()
+	session := i.sessionOf()
+	request := func(peer string, signedIn bool, forwardedProto string) {
+		r := httptest.NewRequest(http.MethodGet, "/api/status", nil)
 		r.RemoteAddr = peer
-		s.noticeInsecure(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(httptest.NewRecorder(), r)
-		return s.insecureSeen.Load()
+		r.Header.Set("Sec-Fetch-Site", "same-origin")
+		if signedIn {
+			r.AddCookie(session)
+		}
+		if forwardedProto != "" {
+			r.Header.Set("X-Forwarded-Proto", forwardedProto)
+		}
+		srv.ServeHTTP(httptest.NewRecorder(), r)
 	}
-	if !seen("192.168.1.30:50000") {
-		t.Error("plain HTTP from the LAN was not noticed")
+
+	request("192.168.1.30:50000", false, "")
+	if srv.insecureSeen.Load() {
+		t.Fatal("a request with nobody signed in behind it was noticed as somebody using plain HTTP")
 	}
-	if seen("127.0.0.1:50000") {
-		t.Error("plain HTTP from this machine was noticed")
+	request("127.0.0.1:50000", true, "")
+	if srv.insecureSeen.Load() {
+		t.Fatal("somebody signed in from this machine was noticed")
+	}
+
+	// Behind a proxy that is declared, its word is what the visitor used: https, wss on a WebSocket
+	// (Traefik writes that one), and the first of a list.
+	srv.cfg.TrustProxy = true
+	for _, proto := range []string{"https", "wss", "https, http"} {
+		request("192.168.1.30:50000", true, proto)
+		if srv.insecureSeen.Load() {
+			t.Fatalf("somebody signed in over HTTPS through a proxy (%q) was noticed as using plain HTTP", proto)
+		}
+	}
+
+	request("192.168.1.30:50000", true, "http")
+	if !srv.insecureSeen.Load() {
+		t.Error("somebody signed in on plain HTTP from the LAN was not noticed")
+	}
+}
+
+// While a proxy has announced itself and nobody declared it, the server cannot tell what the visitor
+// used, and it does not say they used nothing: the notice of the proxy says what to do, and the other
+// is judged again once it is done.
+func TestPlainHTTPIsNotSaidWhileAnUndeclaredProxyIsInFront(t *testing.T) {
+	i, srv := newPushInstance(t)
+	i.claim()
+	has := func() bool {
+		for _, it := range srv.attention() {
+			if it.Key == "https" {
+				return true
+			}
+		}
+		return false
+	}
+	srv.insecureSeen.Store(true)
+	if !has() {
+		t.Fatal("plain HTTP, with no proxy in the picture, is not said")
+	}
+	srv.forwardedUnread.Store(true)
+	if has() {
+		t.Error("plain HTTP is said although a proxy in front was noticed and not declared")
+	}
+	srv.cfg.TrustProxy = true
+	if !has() {
+		t.Error("plain HTTP is not said once the proxy is declared")
+	}
+}
+
+// What the administrator is told to do about a setting depends on how LastHelp is installed, so the
+// server says which it is.
+func TestTheProxyNoticeSaysHowLastHelpIsInstalled(t *testing.T) {
+	i, srv := newPushInstance(t)
+	i.claim()
+	srv.forwardedUnread.Store(true)
+	var proxy *attentionItem
+	for _, it := range srv.attention() {
+		if it.Key == "proxy" {
+			it := it
+			proxy = &it
+		}
+	}
+	if proxy == nil {
+		t.Fatal("an undeclared proxy is not listed")
+	}
+	if got := proxy.Params["install"]; got != installKind() || (got != "container" && got != "native") {
+		t.Errorf("the proxy item says install=%v, this process is %q", got, installKind())
+	}
+}
+
+// A proxy writes the word of the connection it received, and it is not always "https".
+func TestTheProxysProtocolIsReadForWhatItSays(t *testing.T) {
+	for value, want := range map[string]bool{
+		"https": true, "wss": true, "HTTPS": true, "https, http": true, " wss ,http": true,
+		"http": false, "ws": false, "http, https": false, "": false, "javascript": false,
+	} {
+		if got := secureProto(value); got != want {
+			t.Errorf("%q read as secure=%v, want %v", value, got, want)
+		}
 	}
 }
 

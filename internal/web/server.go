@@ -479,6 +479,7 @@ func (s *Server) wrap() http.Handler {
 	}
 
 	var h http.Handler = s.mux
+	h = s.noticeInsecure(h)                  // and was somebody signed in using it over plain HTTP
 	h = auth.Attach(h)                       // who is asking
 	h = middleware.CSRF(s.cfg.TrustProxy)(h) // and did the page ask
 	h = middleware.CrossSite(h)              // and was it this site
@@ -487,7 +488,6 @@ func (s *Server) wrap() http.Handler {
 	// the whole server on itself.
 	h = middleware.RateLimit(s.perAddress, s.perBlock, s.addressOf)(h)
 	h = s.noticeForwarded(h)                     // and is a proxy in front that nobody declared
-	h = s.noticeInsecure(h)                      // and did it come over plain HTTP
 	h = middleware.BodyLimit(GlobalBodyLimit)(h) // and is it a sane size
 	// Outside the rate limiter, so a refused request is answered with the same
 	// policy as a served one: a 429 that arrives without a CSP is a page the
@@ -534,7 +534,16 @@ func (s *Server) isSecure(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
 	}
-	if s.cfg.TrustProxy && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+	return s.cfg.TrustProxy && secureProto(r.Header.Get("X-Forwarded-Proto"))
+}
+
+// secureProto reads the protocol a proxy says the visitor used. A proxy writes the word of the connection it
+// received: "https", and "wss" for a WebSocket over TLS, which is what Traefik sends on a socket's request.
+// A chain of proxies writes a list, "https, http", and the first is the visitor's.
+func secureProto(v string) bool {
+	first, _, _ := strings.Cut(v, ",")
+	switch strings.ToLower(strings.TrimSpace(first)) {
+	case "https", "wss":
 		return true
 	}
 	return false

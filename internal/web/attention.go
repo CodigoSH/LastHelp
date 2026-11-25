@@ -13,6 +13,7 @@ import (
 
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/authz"
 	"git.codigosh.com/CodigoSH/LastHelp/internal/core/org"
+	"git.codigosh.com/CodigoSH/LastHelp/internal/web/middleware"
 )
 
 // attentionItem is one thing about this server its administrator should know
@@ -59,7 +60,7 @@ func (s *Server) attention() []attentionItem {
 	}
 
 	if s.forwardedUnread.Load() {
-		out = append(out, attentionItem{Key: "proxy", Tone: "warn"})
+		out = append(out, attentionItem{Key: "proxy", Tone: "warn", Params: map[string]any{"install": installKind()}})
 	}
 
 	// Without a public address the issues opened on a forge carry no link back
@@ -69,14 +70,19 @@ func (s *Server) attention() []attentionItem {
 		if err := s.db.QueryRow(`SELECT COUNT(*) FROM organization WHERE forge_kind <> ?`, string(org.ForgeNone)).Scan(&forged); err != nil {
 			slog.Error("counting organisations with a forge", "error", err)
 		} else if forged > 0 {
-			out = append(out, attentionItem{Key: "public_url", Tone: "warn"})
+			out = append(out, attentionItem{Key: "public_url", Tone: "warn", Params: map[string]any{"install": installKind()}})
 		}
 	}
 
 	// Information rather than a fault: a server on a home network answered over
 	// plain HTTP is a choice, but it is one that leaves sessions on cookies that
 	// are not marked secure, and some things a browser only does over HTTPS.
-	if s.insecureSeen.Load() {
+	//
+	// Not while a proxy has announced itself and nobody declared it: behind one
+	// the connection to this server is plain whatever the visitor used, and what
+	// the visitor used is in a header this server is not yet told to believe. The
+	// notice above says what to do, and this one is judged again once it is done.
+	if s.insecureSeen.Load() && (s.cfg.TrustProxy || !s.forwardedUnread.Load()) {
 		out = append(out, attentionItem{Key: "https", Tone: "info"})
 	}
 	return out
@@ -108,16 +114,33 @@ func (s *Server) dataDir() string {
 	return dir
 }
 
-// noticeInsecure remembers that somebody reached this server over plain HTTP
-// from another machine. This machine itself does not count: that is somebody
-// trying it out, or a proxy on the same host.
+// noticeInsecure remembers that somebody signed in used this server over plain
+// HTTP from another machine. This machine itself does not count: that is
+// somebody trying it out, or a proxy on the same host.
+//
+// A person, not a request: a proxy's health probe, a check of this very server
+// by its own address or the restart after an update all arrive without HTTPS and
+// are nobody using it. It sits inside the authenticator, which is what says
+// whether somebody is signed in.
 func (s *Server) noticeInsecure(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !s.insecureSeen.Load() && !s.isSecure(r) && !fromLoopback(r) {
-			s.insecureSeen.Store(true)
+			if _, signedIn := middleware.ActorFrom(r); signedIn && s.insecureSeen.CompareAndSwap(false, true) {
+				slog.Info("somebody signed in is using LastHelp over plain HTTP", "from", r.RemoteAddr, "path", r.URL.Path)
+			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// installKind says how this server is installed, because what to do about a
+// setting depends on it: a container's environment is changed where the
+// container is defined, a native installation's in its configuration file.
+func installKind() string {
+	if inContainer() {
+		return "container"
+	}
+	return "native"
 }
 
 func fromLoopback(r *http.Request) bool {
