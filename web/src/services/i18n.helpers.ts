@@ -141,11 +141,17 @@ export function formatNumber(code: string, value: number): string {
  * Intl knows the unit names in every language this ships in, so "1,2 GB" and
  * "1.2 GB" and "١٫٢ غيغابايت" come out right without a table of our own. The
  * scale is chosen here because Intl formats a number, not a magnitude.
+ *
+ * Thousands, because that is what the labels say: a kilobyte is 1000 bytes and
+ * a gibibyte is the other thing. It divided by 1024 under the names of the
+ * decimal units, so a machine with 32 GiB of memory read as "31 GB" here and as
+ * 33.3 GB in the other product.
  */
 const byteUnits: Array<[number, string]> = [
-  [1024 ** 3, "gigabyte"],
-  [1024 ** 2, "megabyte"],
-  [1024, "kilobyte"],
+  [1000 ** 4, "terabyte"],
+  [1000 ** 3, "gigabyte"],
+  [1000 ** 2, "megabyte"],
+  [1000, "kilobyte"],
   [1, "byte"],
 ];
 

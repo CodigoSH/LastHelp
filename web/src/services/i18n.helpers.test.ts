@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   formatAge,
+  formatBytes,
   formatDate,
   formatNumber,
   isolate,
@@ -172,5 +173,25 @@ describe("formatAge", () => {
 
   test("never says less than a minute", () => {
     expect(formatAge("en", 10)).toBe(formatAge("en", minute));
+  });
+});
+
+describe("formatBytes", () => {
+  // It divided by 1024 under the names of the decimal units: 32 GiB of memory read as "31 GB" here and as 33.3 GB in
+  // the product it sits beside, for the same machine.
+  test("counts in thousands, which is what a kilobyte and a gigabyte are", () => {
+    expect(formatBytes("en", 32 * 1024 ** 3)).toBe("34.4 GB");
+    expect(formatBytes("en", 33_300_000_000)).toBe("33.3 GB");
+    expect(formatBytes("en", 1_000)).toBe("1 kB");
+    expect(formatBytes("en", 999)).toBe("999 byte");
+    expect(formatBytes("en", 1_500_000)).toBe("1.5 MB");
+  });
+
+  test("goes up to terabytes, which a disk can be", () => {
+    expect(formatBytes("en", 2_000_000_000_000)).toBe("2 TB");
+  });
+
+  test("says the unit in the reader's language", () => {
+    expect(formatBytes("de", 1_500_000)).toBe("1,5 MB");
   });
 });
