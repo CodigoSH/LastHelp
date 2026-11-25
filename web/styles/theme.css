@@ -4980,7 +4980,28 @@ body > nav .brand {
 .about-modal .ov-need.info .ov-need-mark { color: var(--hue-open); }
 .about-modal .ov-need-text .about-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block-start: 6px; }
 .about-fix .ov-more { align-self: auto; margin: 0; }
+.about-fix .about-code { display: inline-flex; align-items: center; gap: 4px; max-inline-size: 100%; }
+.about-code-copy {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  background: var(--surface-dim);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.about-code-copy:hover, .about-code-copy:focus-visible { color: var(--text-main); border-color: var(--text-dim); }
+.about-code-copy .about-code-ok { display: none; }
+.about-code-copy.done { color: var(--success-color); border-color: var(--success-color); }
+.about-code-copy.done .about-code-ic { display: none; }
+.about-code-copy.done .about-code-ok { display: inline-grid; }
 .about-fix code {
+  user-select: all;
+  overflow-wrap: anywhere;
   padding: 1px 6px;
   border: 1px solid var(--card-border);
   border-radius: 5px;

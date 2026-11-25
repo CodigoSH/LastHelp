@@ -1690,6 +1690,36 @@ function wireAttention(_items: views.AttentionItem[], facts: views.ServerFacts):
     root?.querySelector<HTMLDialogElement>("#attention-modal")?.close();
     if (updateFound) openUpdateDialog(updateFound);
   });
+  // Each command or setting to type has a button that copies exactly it, and says so on the button itself: a
+  // toast would sit under the dialog the button is in. Where the clipboard cannot be written (plain HTTP, which is
+  // how many servers at home are reached) the text is selected instead, ready for Ctrl+C.
+  root?.querySelector("#attention-modal")?.addEventListener("click", async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLElement>("[data-copy-code]");
+    if (!button) return;
+    try {
+      await navigator.clipboard.writeText(button.dataset.copyCode ?? "");
+    } catch {
+      const code = button.parentElement?.querySelector("code");
+      const selection = window.getSelection();
+      if (code && selection) {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+      return;
+    }
+    const was = button.getAttribute("aria-label") ?? "";
+    const done = button.dataset.done ?? was;
+    button.classList.add("done");
+    button.setAttribute("aria-label", done);
+    button.title = done;
+    window.setTimeout(() => {
+      button.classList.remove("done");
+      button.setAttribute("aria-label", was);
+      button.title = was;
+    }, 1600);
+  });
   root?.querySelector<HTMLButtonElement>("[data-copy-support]")?.addEventListener("click", async (event) => {
     const button = event.currentTarget as HTMLButtonElement;
     try {

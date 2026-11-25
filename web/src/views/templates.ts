@@ -5027,7 +5027,35 @@ interface AttentionWords {
   why?: string;
   code?: string;
   act?: string;
+  /** Lines to type after the sentence: each one is code of its own, with a button that copies it. */
+  after?: string[];
   link?: { label: string; attrs: string };
+}
+
+/** The configuration file of a native installation, the line that opens it and the one that restarts the service: never translated. */
+export const CONFIG_FILE = "/etc/lasthelp/lasthelp.env";
+export const EDIT_COMMAND = `sudo nano ${CONFIG_FILE}`;
+export const RESTART_COMMAND = "sudo systemctl restart lasthelp";
+
+/**
+ * What to do about a setting that is read at start: where it lives depends on how LastHelp is installed.
+ * The file and the commands are not part of the sentence, so they are not interpolated into it: the translation
+ * wraps every interpolated value in marks that say which way to read it, invisible, and a command copied with
+ * one at its end is not a command any more.
+ */
+export function restartWords(install: unknown, text: Text): Pick<AttentionWords, "act" | "after"> {
+  return install === "container"
+    ? { act: text.t("attention.restartContainer") }
+    : { act: text.t("attention.restartNative"), after: [EDIT_COMMAND, RESTART_COMMAND] };
+}
+
+/**
+ * A command or a setting to type, with a button that puts it on the clipboard: selecting it by hand is where a
+ * character is lost. What is copied is the attribute, never read back out of the page.
+ */
+function codeCopy(value: string, text: Text): string {
+  const label = escapeAttr(text.t("action.copy"));
+  return `<span class="about-code"><code>${escapeHTML(value)}</code><button type="button" class="about-code-copy" data-copy-code="${escapeAttr(value)}" data-done="${escapeAttr(text.t("action.copied"))}" aria-label="${label}" title="${label}"><span class="about-code-ic">${icons.copy(13)}</span><span class="about-code-ok">${icons.check(13)}</span></button></span>`;
 }
 
 /** What each kind of item says, in the reader's language: what is wrong, why it matters, the one thing to do. */
@@ -5054,7 +5082,7 @@ function attentionWords(item: AttentionItem, text: Text): AttentionWords | null 
         title: text.t("attention.proxy"),
         why: text.t("attention.proxyWhy"),
         code: "LASTHELP_TRUST_PROXY=true",
-        act: text.t("attention.restartAct"),
+        ...restartWords(p.install, text),
       };
     case "public_url":
       return {
@@ -5062,7 +5090,7 @@ function attentionWords(item: AttentionItem, text: Text): AttentionWords | null 
         title: text.t("attention.publicUrl"),
         why: text.t("attention.publicUrlWhy"),
         code: "LASTHELP_PUBLIC_URL=https://…",
-        act: text.t("attention.restartAct"),
+        ...restartWords(p.install, text),
       };
     case "https":
       return { icon: icons.shield(14), title: text.t("attention.https"), why: text.t("attention.httpsWhy"), act: text.t("attention.httpsAct") };
@@ -5113,7 +5141,7 @@ export function attentionList(items: AttentionItem[], text: Text): string {
     .map((item) => {
       const w = attentionWords(item, text);
       if (!w) return "";
-      const fix = `${w.code ? `<code>${escapeHTML(w.code)}</code>` : ""}${w.act ? `<span>${escapeHTML(w.act)}</span>` : ""}${
+      const fix = `${w.code ? codeCopy(w.code, text) : ""}${w.act ? `<span>${escapeHTML(w.act)}</span>` : ""}${(w.after ?? []).map((c) => codeCopy(c, text)).join("")}${
         w.link ? `<a class="ov-more" ${w.link.attrs}>${escapeHTML(w.link.label)}${icons.chevron(12)}</a>` : ""
       }`;
       return `<div class="ov-need ${item.tone}" data-attention-item="${escapeAttr(item.key)}">
